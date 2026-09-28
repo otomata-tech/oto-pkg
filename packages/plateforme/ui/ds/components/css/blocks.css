@@ -1,0 +1,190 @@
+/* Porté d'oto-frontend (src/design-system/components/css/blocks.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Les blocs, le document qu'on écrit (`BlockRow`, `BlockField`), pendant du lecteur de `content.css` : au repos l'écran est celui de la lecture (ni fond ni bordure, sinon quarante rectangles gris) ; la rangée prend toute la largeur de l'îlot, au corps de la lecture ; le bord gauche est décalé de la gouttière, qu'un débord négatif ferait rogner par le défilement de l'îlot. */
+
+.oto-block-row {
+  /* La gouttière est positionnée par rapport à la rangée. */
+  position: relative;
+  /* Une cellule de gouttière : la boîte d'un `IconButton` `sm`. */
+  --block-slot: var(--space-6);
+  /* Deux cellules côte à côte, le « + » puis la poignée, un nom dérivé de l'autre : une largeur écrite deux fois sortirait la poignée de sa gouttière. */
+  --block-gutter: calc(var(--block-slot) * 2);
+  /* La gouttière est prise sur la marge de gauche, le « + » et la poignée ; à droite, rien (E05-S11, AC-30) : le menu vit dans la poignée, le texte prend la largeur. */
+  margin-inline: var(--block-gutter) 0;
+  /* Pleine largeur : plus de `max-inline-size: var(--reader-measure)` ici, le lecteur seul garde sa mesure. */
+  /* La taille de texte de la lecture, conservée : la largeur change, pas le corps. */
+  font-size: var(--fs-sm);
+  /* Le rythme du lecteur recomposé : 4 (rembourrage du champ) + 1 (bordure) + 4 (cette marge) + 1 + 4 = 14, l'écart de deux paragraphes lus. */
+  margin-block-end: var(--space-1);
+}
+
+/* ── LE CHAMP */
+
+.oto-block-field {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  /* La bordure existe dès le repos, transparente : sans elle, le focus ajouterait 1 px et décalerait le texte. */
+  border: 1px solid transparent;
+  border-radius: var(--r-ctrl);
+  /* Aucun fond : c'est la raison d'être de ce composant. */
+  background: none;
+  color: var(--ink);
+  /* La police du document, pas celle d'un contrôle : `font-family` ne s'hérite pas dans un `<textarea>`. */
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  /* Le rembourrage donne à l'anneau de quoi respirer ; la marge négative le reprend, la première lettre reste à l'aplomb de la colonne. */
+  padding: var(--space-1) var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  inline-size: calc(100% + var(--space-4));
+  /* La hauteur est posée par le composant (`scrollHeight`) : une barre de défilement la contredirait, une poignée de redimensionnement ferait deux vérités. */
+  overflow: hidden;
+  resize: none;
+  transition: var(--tr-colors);
+}
+
+.oto-block-field::placeholder { color: var(--faint); }
+
+/* Aucun chrome au focus : le champ ne montre que le caret, comme un document ; le signal de focus est la gouttière révélée (`:focus-within` sur la rangée), une présence, pas une teinte. */
+.oto-block-field:focus-visible {
+  outline: none;
+  /* Le reset pose l'anneau sur tout `:focus-visible` (`tokens/reset.css`) : c'est lui qu'il faut neutraliser ici, pas seulement le contour. */
+  box-shadow: none;
+}
+
+/* Lecture seule n'est pas désactivé : le texte reste lisible ; cette règle couvre le temps d'un enregistrement. */
+.oto-block-field[readonly] { color: var(--mute); }
+
+/* ── la puce d'un bloc liste, pendant de `.oto-reader-list` (même retrait, disque `--faint`) : un seul `<textarea>` pour tout le bloc, la puce est dessinée par boîte de ligne (une tuile de fond haute de `1lh`) ; une ligne repliée reçoit aussi sa puce, écart cosmétique assumé. */
+.oto-block-field[data-kind="list"] {
+  padding-inline-start: calc(var(--space-2) + var(--space-4));
+  background-image: radial-gradient(circle, var(--faint) 2px, transparent 2.5px);
+  background-origin: border-box;
+  background-position: var(--space-2) calc(var(--space-1) + 1px);
+  background-size: var(--space-4) 1lh;
+  background-repeat: repeat-y;
+}
+
+/* ── la liste numérotée : aucune image de fond ne sait compter, c'est le composant qui dessine la colonne de numéros ; le fond se tait (`background-image: none`, rien d'autre), sinon disque et chiffres se recouvriraient. */
+.oto-block-field[data-kind="list"][data-ordered] {
+  background-image: none;
+}
+
+/* ── la colonne de numéros, `aria-hidden` (le nom du champ dit « liste numérotée ») : posée dans le retrait déjà réservé, jamais dans un retrait de plus, et décalée comme le disque ; une ligne repliée décale les numéros suivants, écart cosmétique assumé. */
+.oto-block-numbers {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  inline-size: var(--space-4);
+  padding-block-start: calc(var(--space-1) + 1px);
+  /* Une grille : chaque rangée fait exactement une boîte de ligne, un empilement de `<span>` dériverait ligne après ligne. */
+  display: grid;
+  grid-auto-rows: 1lh;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  text-align: end;
+  padding-inline-end: var(--space-1);
+  /* Le champ passe dessous : la colonne est décorative, un clic pose le caret dans le texte. */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Le numéro rythme, il ne parle pas, comme le disque et le `::marker` ; `tabular-nums` garde 9 et 10 à l'aplomb, `line-height: 1` laisse la grille décider de la hauteur. */
+.oto-block-numbers > span {
+  align-self: center;
+  color: var(--faint);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ── le titre d'un bloc, même silhouette qu'en lecture (`--fs-lg` gras) : sans cette règle, choisir « Titre » ne changeait rien à l'écran ; pas de marge de relief, la gouttière s'aligne sur la première ligne. */
+.oto-block-field[data-kind="heading"] {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.015em;
+  line-height: var(--lh-snug);
+  color: var(--title);
+}
+
+/* ── les deux boîtes révélées (la gouttière, le menu), une seule révélation, sinon la rangée clignote ; `pointer-events: none` au repos, le focus clavier passe quand même, et atteint le « + ». */
+
+.oto-block-gutter,
+.oto-block-menu {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.oto-block-gutter {
+  inset-inline-start: calc(var(--block-gutter) * -1);
+  inset-block-start: 0;
+  inline-size: var(--block-gutter);
+  /* À l'aplomb de la première ligne du bloc, pas du haut de la boîte : le champ a 4 px de rembourrage et 1 px de bordure au-dessus du texte. */
+  padding-block-start: var(--space-1);
+}
+
+.oto-block-menu {
+  inset-inline-end: calc(var(--block-gutter) * -1);
+  inset-block-start: 0;
+  padding-block-start: var(--space-1);
+}
+
+/* ── les deux cellules de la gouttière, le « + » à gauche, la poignée à droite : aucun réordonnancement visuel (`row-reverse`, `order`), l'ordre de tabulation suit le DOM. */
+
+.oto-block-insert,
+.oto-block-handle {
+  display: flex;
+  align-items: flex-start;
+  /* Les deux cellules totalisent exactement la gouttière : la poignée reste collée à la colonne de texte. */
+  justify-content: center;
+  inline-size: var(--block-slot);
+  /* Un bouton n'écrase pas sa cellule, sinon une icône plus large repousserait sa voisine hors de la gouttière. */
+  flex: none;
+}
+
+.oto-block-row:hover > .oto-block-gutter,
+.oto-block-row:hover > .oto-block-menu,
+.oto-block-row:focus-within > .oto-block-gutter,
+.oto-block-row:focus-within > .oto-block-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── les deux états que l'écran pose, `editing` (le caret est là) et `moving` (déplacement) : aucun n'est porté par la seule couleur, la gouttière révélée est une présence ; `moving` ajoute la teinte, jamais à la place. */
+
+.oto-block-row[data-state="editing"] > .oto-block-gutter,
+.oto-block-row[data-state="moving"] > .oto-block-gutter {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* `--card` et non `--oto-bg`, qui dirait « Oto a produit ça » et attribuerait le bloc à la machine. */
+.oto-block-row[data-state="moving"] > .oto-block-field {
+  /* `background-color` et non `background`, qui effacerait la puce dessinée en fond sur un bloc liste. */
+  background-color: var(--card);
+  border-color: var(--island-bd);
+}
+
+/* ── les étapes numérotées, un vrai `<ol>` autour des rangées : le numéro vient du navigateur (`::marker`) et se renumérote seul ; une étape reste une rangée, déplaçable et adressable ; `list-style` natif, un `::before` perdrait l'annonce « élément 2 sur 3 » ; `ol.oto-block-steps` et non la classe seule, que le reset `.oto ol` (0,1,1) battrait. */
+ol.oto-block-steps {
+  margin: 0;
+  padding-inline-start: var(--space-6);
+  /* Le reset retire les puces partout ; on les rétablit ici, comme `content.css` pour le lecteur. */
+  list-style: decimal;
+}
+
+.oto-block-steps > li {
+  list-style: inherit;
+}
+
+/* Le numéro rythme, il ne parle pas, comme la puce du lecteur ; `tabular-nums` garde 9 et 10 à l'aplomb. */
+.oto-block-steps > li::marker {
+  color: var(--faint);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}

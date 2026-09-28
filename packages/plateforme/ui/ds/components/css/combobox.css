@@ -1,0 +1,148 @@
+/* Porté d'oto-frontend (src/design-system/components/css/combobox.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Combobox · MultiSelect : au-delà d'une vingtaine d'options il faut chercher, pas avant (le `Select` suffit, plus aucun `<select>` natif : E05-S11, retour 8) ; `.oto-pop` et `.oto-menu-item` repris, on s'y déplace comme dans un menu ; le fragment trouvé est en gras, pas surligné, le safran dit déjà « Oto propose ». */
+
+.oto-combobox { position: relative; inline-size: 100%; }
+
+/* le déclencheur reprend exactement le chrome d'un champ */
+.oto-combobox-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--ctrl-h-md);
+  padding-inline: var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-ctrl);
+  background: var(--field);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: start;
+  transition: var(--tr-colors);
+}
+.oto-combobox-trigger:hover:not([aria-disabled="true"]) { border-color: color-mix(in srgb, var(--ink) 26%, var(--island-bd)); }
+.oto-combobox-trigger:focus-visible { border-color: var(--primary); box-shadow: var(--focus-ring); }
+.oto-combobox-trigger[aria-expanded="true"] { border-color: var(--primary); }
+.oto-combobox-trigger[aria-disabled="true"] { background: var(--hair); border-color: var(--hair); color: var(--faint); cursor: not-allowed; }
+
+.oto-combobox-value { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oto-combobox-value[data-placeholder] { color: var(--faint); }
+.oto-combobox-trigger > .oto-icon:last-child { color: var(--faint); }
+
+/* ── le champ de recherche, dans le popover ──────────────────────── */
+.oto-combobox-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  color: var(--faint);
+}
+.oto-combobox-search > input {
+  flex: 1;
+  min-inline-size: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.oto-combobox-search > input:focus-visible { outline: none; box-shadow: none; }
+.oto-combobox-search > input::placeholder { color: var(--faint); }
+
+.oto-combobox-list { max-block-size: min(300px, 46vh); overflow: auto; padding: var(--space-1); }
+
+/* le fragment trouvé : gras, jamais coloré */
+.oto-combobox-list mark {
+  background: none;
+  color: inherit;
+  font-weight: var(--fw-bold);
+}
+
+/* rien trouvé — un état vide, donc : un mot, pas d'illustration */
+.oto-combobox-empty {
+  padding: var(--space-4) var(--space-3);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--mute);
+}
+
+/* création à la volée : l'option qui crée est en bas, séparée */
+.oto-combobox-create {
+  border-block-start: 1px solid var(--hair);
+  margin-block-start: var(--space-1);
+  padding-block-start: var(--space-1);
+}
+.oto-combobox-create .oto-menu-item { color: var(--link); }
+
+/* MultiSelect : les valeurs choisies sont des jetons retirables ; au-delà d'une ligne, « +3 », le champ ne grandit pas, sinon le formulaire sauterait à chaque choix. */
+
+.oto-multiselect-trigger {
+  flex-wrap: nowrap;
+  gap: var(--space-1-5);
+  padding-block: var(--space-1);
+  min-block-size: var(--ctrl-h-md);
+}
+
+.oto-multiselect-tokens {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  overflow: hidden;
+}
+.oto-multiselect-tokens > .oto-tag { flex: none; block-size: 22px; }
+
+/* le débordement — un compte, en mono tabulaire */
+.oto-multiselect-overflow {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--mute);
+}
+
+/* le plafond atteint : la limite se dit, elle ne se devine pas */
+.oto-multiselect-cap {
+  padding: var(--space-2) var(--space-3);
+  border-block-start: 1px solid var(--hair);
+  font-size: var(--fs-xs);
+  color: var(--st-review-text);
+  background: color-mix(in srgb, var(--st-review) 10%, var(--island));
+}
+.oto-multiselect-trigger[data-at-cap] .oto-menu-item[aria-selected="false"] { color: var(--faint); }
+
+/* « tout sélectionner » — en tête, séparé du reste */
+.oto-multiselect-all {
+  border-block-end: 1px solid var(--hair);
+  margin-block-end: var(--space-1);
+  padding-block-end: var(--space-1);
+}
+
+/* Select (E05-S11, retour 8) : le déclencheur est celui de « Partager · Tout le monde » (`.oto-scope`, bord entièrement arrondi), à la hauteur d'un champ pour s'aligner sur ses voisins ; la valeur en `--ink`, c'est une donnée ; la liste est un `.oto-pop` de lignes `.oto-menu-item`, la coche en fin de ligne comme un choix radio d'un menu. */
+
+.oto-select { display: flex; inline-size: 100%; min-inline-size: 0; }
+
+.oto-select-trigger {
+  justify-content: space-between;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--ctrl-h-md);
+  padding-inline: var(--space-3) var(--space-2-5);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: start;
+}
+.oto-select-trigger[data-size="sm"] { block-size: var(--ctrl-h-sm); padding-inline: var(--space-2-5) var(--space-2); font-size: var(--fs-xs); }
+.oto-select-trigger[data-size="lg"] { block-size: var(--ctrl-h-lg); font-size: var(--fs-base); }
+.oto-select-trigger > .oto-icon { flex: none; color: var(--faint); }
+
+.oto-select-value { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oto-select-value[data-placeholder] { color: var(--faint); }
+
+.oto-select-list { max-block-size: min(300px, 46vh); overflow: auto; padding: var(--space-1); }
+.oto-select-list .oto-menu-item[aria-selected="true"] { font-weight: var(--fw-semibold); }
+.oto-select-list .oto-menu-item[aria-selected="true"] > .oto-menu-check { color: var(--primary-text); }
+.oto-select-list .oto-menu-check { inline-size: 16px; flex: none; margin-inline-start: auto; }

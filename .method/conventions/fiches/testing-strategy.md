@@ -1,0 +1,49 @@
+# Fiche — testing-strategy
+
+Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour écrire ; le texte complet se lit sur un doute, et toujours pour une revue. Chaque règle renvoie à sa section.
+
+- Un test vit dans `tests/unit/`, `tests/integration/` ou `tests/e2e/`, jamais à côté du code sous `src/`. § Unit Tests (Vitest)
+- E2E : les parcours critiques seulement, un fichier par parcours. § E2E Tests (Playwright)
+- Une fonction SQL re-versionnée se rejoue sur toutes les suites qui l'appellent : `rg -l "<fonction>" tests` au rayon d'impact, résultat de chaque fichier au rapport. § Non-régression
+- Un test par critère d'acceptation, pas un par permutation ; toujours testés : isolation entre organisations, droits, contrat MCP, invariants de base, gate de commit. § Budget de tests : le minimum vital
+- La vraie base quand elle est le sujet ou qu'un service la lit par sa face SQL ; jamais deux tests pour la même règle ; un script d'outillage n'a qu'un test de fumée ; seuls les textes figés du contrat se comparent à l'octet. § Budget de tests : le minimum vital
+- Un test sur base réelle part des fixtures `*-sql.ts` (une graine par fichier en `beforeAll`, attendu comparé par `readable`) ; refus sans requête, course et panne passent par `spyDb` de `tests/helpers/sql.ts`. § Budget de tests : le minimum vital
+- Un test qui ne prouve ni un critère d'acceptation, ni la sécurité, ni le contrat, ni un invariant de base se retire. § Budget de tests : le minimum vital
+- Les données de test sont jetables et préfixées (`t<hex>`, `test-<hex>@example.invalid`) et se retirent à la fin du passage ; `pnpm test:cleanup --delete` retire celles d'un passage interrompu. § Base de test
+- `describe` nomme l'unité, `it("should …")` en anglais dit un seul comportement, même dans un fichier aux `it` en français. § Naming Conventions
+- Tester le comportement, jamais l'implémentation ni le CSS : aucune assertion sur un attribut `style` ou une valeur CSS. § Anti-patterns
+- Mocker les seules frontières (base, API) ; chaque `it` passe lancé seul, pose sa précondition et consomme un état sur une ressource à lui. § Anti-patterns
+- Jamais de `sleep` : `waitFor` ou `findBy` ; un focus après une action asynchrone se lit par `await waitFor(() => expect(document.activeElement)…)`. § Anti-patterns
+- Aucun test sous jsdom ni spec Playwright ne charge `cli/db-prepare.mjs` ni `scripts/lib/env.mjs` : la règle TLS vient de `cli/ssl-option.mjs` ; un fichier jsdom qui importe une aide SQL porte `// @vitest-environment node`. § Anti-patterns
+- « Objet vide » s'affirme par `toEqual({})`, jamais par `{}` dans `toMatchObject` ou `objectContaining`. § Anti-patterns
+- Dans une spec qui garde l'hydratation, toute capture porte `caret: "initial"` ; une attente d'animations ne garde que celles de `document.timeline`. § Anti-patterns
+- Une course sur base réelle retient les écritures jusqu'à ce qu'elles partent ensemble (`crossing`) ou joue l'écriture concurrente dans le crochet `before` de `spyDb`, jamais le seul `Promise.all`. § Anti-patterns
+- Plusieurs remises en état se jouent toutes avant de lever leurs échecs (`undoAll`). § Anti-patterns
+- Une campagne de mutations passe par un script qui garde une copie du fichier et le rend dans un `finally`, empreinte comparée ; jamais à la main. § Anti-patterns
+- Une lecture sans `order by` triée par le service se prouve sur un jeu écrit hors de l'ordre attendu. § Anti-patterns
+- Un contraste se mesure après la fin des transitions (`transitionsFinies`). § Anti-patterns
+- Un test qui lance plus de trois processus a un `timeout` explicite, commenté ; aucun lancement synchrone n'attend plus de 60 s (au-delà, `execFile` promis). § Anti-patterns
+- Un motif de détection élargi a, dans le même diff, un `it.each` des formes voisines qu'il doit laisser passer. § Anti-patterns
+- Aucun faux secret en littéral (JWT, `sb_secret_…`, mot de passe, URL à mot de passe) : il se construit à l'exécution ; jamais la valeur d'un secret dans une assertion, comparer des noms. § Anti-patterns
+- La session d'un nouveau test d'intégration s'ouvre par `fx.sessionFor(user)`, jamais par `fx.signIn`. § Anti-patterns
+- Une personne sans compte posée dans `platform_staff` suit la création d'une organisation marquée (`createOrg`). § Anti-patterns
+- Un mot de passe E2E se saisit par `envoyerLaConnexion` seul, sous le rapport `line`, jamais `--reporter=html` ; `test-results/` et `playwright-report/` se suppriment après la campagne. § Anti-patterns
+- Une dépendance du paquet importée par `tests/` est aussi en `devDependencies` de la racine, à la même version. § Anti-patterns
+- Une `page.tsx` qui attrape un code de service ou lit selon le rôle a son test de page (`tests/integration/pages/`) ; un composant monté par un layout, un test du layout ; une prop de droit tirée de l'identité, un cas qui échoue si on la remplace. § Anti-patterns
+- Une condition de droit à plusieurs branches a un cas par branche seule vraie et un cas où toutes sont fausses. § Anti-patterns
+- Une règle d'ordre, de borne ou de choix se teste sur un jeu où chaque variante change le résultat (ordre inverse, égalité, N + 1 éléments, un concurrent). § Anti-patterns
+- Un filtre à plusieurs conditions a un cas écarté par chaque condition seule et un cas sur chaque borne. § Anti-patterns
+- Une lecture qui dépend du mode de l'hôte (Supabase ou OIDC) se teste pendant que l'autre source répond autrement. § Anti-patterns
+- `page.getByRole("alert")` se filtre par `hasText` (l'annonceur de route de Next est aussi une alerte). § Anti-patterns
+- Avant une campagne Playwright, le serveur du port 3000 est celui du worktree ; avant `pnpm verify`, aucun `.next/` (serveur arrêté, `test-results/` et `playwright-report/` supprimés), y compris après le retrait d'une page. § Anti-patterns
+- Un caractère invisible ne s'écrit jamais en littéral : échappement (`"\u202e"`), `\p{Zl}` ou `\p{Zp}` dans une expression, `String.fromCodePoint` dans une chaîne. § Anti-patterns
+- Une doublure de base sans `order()` rend un autre ordre que celui de la clé ; le test compare la liste entière lue. § Anti-patterns
+- Quand un module chargé par la fabrique importe `m`, `vi.mock(m)` simule `m` entier, sans `importOriginal`. § Anti-patterns
+- Le rendu d'un objet JSON écrit en base se compare aux lignes relues, ou par `toEqual`, jamais à l'octet sur l'objet envoyé. § Anti-patterns
+- Une mutation qui pose un état de session se joue sur le Postgres nu, jamais sur le projet partagé. § Anti-patterns
+- La console se lit par `loggedText` (`tests/helpers/logs.ts`), jamais par `JSON.stringify(<espion>.mock.calls)`. § Anti-patterns
+- Une aide de `tests/helpers/` qui enveloppe une face de `PlatformDb` a, dans le même diff, un test de cette face par `then` et par `execute`. § Anti-patterns
+- Un test qui affirme des microsecondes les sème en texte converti dans la requête (`${"…Z"}::text::timestamptz`). § Anti-patterns
+- Démo ne se vide jamais par un script écrit à la main sans `pnpm org:export` avant, tables lues dans `docs/architecture.md § 4` (`org_domains` = adresses), et son adresse vérifiée après. § Base de test
+- Une clause facultative d'un service mesuré par un budget de requêtes passe par un paramètre nul, jamais par un fragment `sql` ; un plafond ne se relève pas pour un fragment. § Anti-patterns
+- Une spec sur l'organisation jetable pose elle-même la précondition d'une partie calculée (contenus récents, nouveautés bornées). § Anti-patterns

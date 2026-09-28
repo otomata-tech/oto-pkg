@@ -1,0 +1,14 @@
+# Fiche — performance-patterns
+
+Texte complet : `.method/conventions/performance-patterns.md`. La fiche suffit pour écrire ; le texte complet se lit sur un doute, et toujours pour une revue. Chaque règle renvoie à sa section.
+
+- `ssr: false` ne s'écrit que dans un fichier dont la première ligne est `"use client"`. § Code Splitting
+- Chargement différé obligatoire pour un éditeur riche, une bibliothèque de graphiques, `react-day-picker` et toute dépendance absente du premier rendu ; interdit pour un composant d'un layout, rendu sans condition par une page, ou placé avant le premier `<Suspense>`. § Code Splitting
+- Toujours `next/image`, jamais `<img>`, avec `width` et `height` ou `fill` et `sizes` ; exactement une image `priority` par page, celle du LCP. § Images
+- Une police passe par `next/font` avec `display: "swap"`, jamais par un `<link>` vers Google Fonts. § Fonts
+- Un script tiers passe par `next/script` en `afterInteractive`, en `lazyOnload` s'il n'agit pas au premier rendu ; analytics gardés par `VERCEL_ENV === "production"` ; un embed lourd en façade, un seul par page. § Scripts tiers
+- `pnpm audit:lh` avant une mise en production et après un changement de layout, de hero, de police ou de token de couleur ; un nouvel archétype de page entre dans `lighthouserc.json`. § Audit Lighthouse
+- Aucun constat « bundle trop gros » sans chiffre mesuré. § Tailles cibles — objectifs mesurés en CI / Lighthouse
+- Imports nommés ; aucune bibliothèque géante pour un usage simple (natif ou `date-fns` plutôt que lodash ou `moment`). § Bonnes pratiques
+- Les lectures indépendantes partent ensemble (`Promise.all`), jamais en cascade ; une section lente se rend sous son `<Suspense>`. § Parallel fetching · § Streaming avec Suspense
+- Seule l'interactivité est cliente : la page reste serveur, le bouton seul est `"use client"`. § Éviter les re-renders inutiles

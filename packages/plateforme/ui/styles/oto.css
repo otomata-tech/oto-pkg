@@ -1,0 +1,563 @@
+/* ══════════════════════════════════════════════════════════════════
+ * LE JEU DE TOKENS DES ÉCRANS DU PAQUET — celui d'oto-frontend (ADR-008 § 3)
+ *
+ * Porté de oto-frontend, src/design-system/tokens/themes.css, le
+ * 2026-09-23. Les VALEURS sont recopiées à l'identique : elles ont été
+ * générées et vérifiées hors ligne là-bas (neuf contrôles de contraste par
+ * thème, scripts/verify-contrast.mjs). Ne rien recalculer à la main ici ;
+ * un nouveau thème se vérifie d'abord dans oto-frontend.
+ *
+ *   <div class="oto" data-oto-theme="foret">   ← CoquilleOto, jamais à la main
+ *
+ * Ce qui diffère de l'original :
+ * - la NUIT suit l'hôte : `.dark` sur un ancêtre (next-themes). Le mode
+ *   « auto » par prefers-color-scheme n'est pas repris : il rendait la
+ *   coquille sombre dans un hôte resté clair ;
+ * - depuis E05-S09 (partie a), les autres jetons du design system porté
+ *   (espacement, rayons, typographie, mouvement, élévation, ruptures,
+ *   états, densité) sont ici aussi, section 5 : ce fichier reste la seule
+ *   source des valeurs, les feuilles de `ui/ds/` ne font que les lire ;
+ * - --ring n'est PAS exposé en classe : primary translucide, il mesure
+ *   1,17:1 sur l'îlot (Manuscrit), contre 3:1 exigés pour un focus. Le
+ *   focus des écrans est `ring-ink` (≥ 10:1 sur les huit thèmes).
+ *
+ * Les classes utilitaires sont déclarées dans @theme inline ci-dessous :
+ * un écran de ui/ n'emploie QUE celles-là (tests/unit/ui-tokens.test.ts).
+ * Seules celles qu'un écran lit y figurent : un écran qui a besoin d'un
+ * autre token du contrat (--title, --hair, --oto-bg…) l'ajoute ici.
+ * ══════════════════════════════════════════════════════════════════ */
+
+@theme inline {
+  --color-island: var(--island);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-mute: var(--mute);
+  --color-primary: var(--primary);
+  --color-primary-on: var(--primary-on);
+  --color-skeleton: var(--skeleton);
+  --color-desk: var(--desk);
+  --color-hair: var(--hair);
+  --color-island-bd: var(--island-bd);
+}
+
+/* ── 1 · le contrat (défaut : Manuscrit) · 2 · les huit teintes ──── */
+.oto {
+  --primary:#f0b41e; --primary-on:#141210; --primary-text:#8c6912;
+  --primary-dk:#f0b41e; --on-primary-dk:#141210; --primary-text-dk:#f0b41e;
+  --base:#fefcf5; --desk-l:#edeae3; --card-l:#f8efda;
+  --island-bd-l:#e0ddd4; --hair-l:#efede5;
+  --base-dk:#302612; --desk-dk:#141007; --card-dk:#382f1b; --island-bd-dk:#433a27;
+  --rail-tint:#1f1a14;
+  --island:    var(--base);
+  --desk:      var(--desk-l);
+  --card:      var(--card-l);
+  --field:     var(--base);
+  --island-bd: var(--island-bd-l);
+  --hair:      var(--hair-l);
+  --ink:   color-mix(in srgb, var(--base) 10%, #0d0c0a);
+  --mute:  color-mix(in srgb, var(--base) 34%, #0d0c0a);
+  --faint: color-mix(in srgb, var(--base) 46%, #0d0c0a);
+  --title: color-mix(in srgb, var(--primary) 35%, var(--ink));
+  --brand:      var(--primary);
+  --on-primary: var(--primary-on);
+  --btn-bg:     var(--primary);
+  --btn-fg:     var(--primary-on);
+  --link:       var(--primary-text);
+  --ring:       color-mix(in srgb, var(--primary) 26%, transparent);
+  --oto-bg:  color-mix(in srgb, var(--primary) 11%, var(--island));
+  --oto-bd:  color-mix(in srgb, var(--primary) 30%, var(--island));
+  --oto-ink: var(--primary-text);
+  --rail-bg:    var(--rail-tint);
+  --rail-fg:    color-mix(in srgb, var(--rail-tint) 16%, #ffffff);
+  --rail-mute:  color-mix(in srgb, var(--rail-tint) 44%, #ffffff);
+  --rail-brand: #ffffff;
+  --rail-on-bg: var(--primary-dk);
+  --rail-on-fg: var(--on-primary-dk);
+  --rail-hover: color-mix(in srgb, #ffffff 12%, var(--rail-bg));
+  --rail-bd:    color-mix(in srgb, #ffffff 14%, var(--rail-bg));
+  --overlay:           color-mix(in srgb, #0d0c0a 44%, transparent);
+  --scroll-thumb:      color-mix(in srgb, var(--ink) 20%, transparent);
+  --scroll-thumb-hover:color-mix(in srgb, var(--ink) 34%, transparent);
+  --ring-solid:        color-mix(in srgb, var(--primary) 22%, var(--island));
+  --skeleton:          var(--card);
+  --skeleton-sheen:    color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.oto[data-oto-theme="manuscrit"] {
+  --primary:#f0b41e; --primary-on:#141210; --primary-text:#8c6912;
+  --primary-dk:#f0b41e; --on-primary-dk:#141210; --primary-text-dk:#f0b41e;
+  --base:#fefcf5; --desk-l:#edeae3; --card-l:#f8efda;
+  --island-bd-l:#e0ddd4; --hair-l:#efede5;
+  --base-dk:#302612; --desk-dk:#141007; --card-dk:#382f1b; --island-bd-dk:#433a27;
+  --rail-tint:#1f1a14;
+}
+.oto[data-oto-theme="ardoise"] {
+  --primary:#101011; --primary-on:#ffffff; --primary-text:#101011;
+  --primary-dk:#f2f2ef; --on-primary-dk:#141210; --primary-text-dk:#f2f2ef;
+  --base:#ffffff; --desk-l:#ededed; --card-l:#f2f2f2;
+  --island-bd-l:#e0e0e0; --hair-l:#f0f0f0;
+  --base-dk:#1b1b1e; --desk-dk:#080707; --card-dk:#252528; --island-bd-dk:#303032;
+  --rail-tint:#100f0d;
+}
+.oto[data-oto-theme="grenat"] {
+  --primary:#b3261e; --primary-on:#ffffff; --primary-text:#b3261e;
+  --primary-dk:#f4796d; --on-primary-dk:#141210; --primary-text-dk:#f4796d;
+  --base:#fdfbfb; --desk-l:#ece9e8; --card-l:#f3eded;
+  --island-bd-l:#dfdcdb; --hair-l:#eeecec;
+  --base-dk:#3f1714; --desk-dk:#110907; --card-dk:#48211f; --island-bd-dk:#512d2a;
+  --rail-tint:#241614;
+}
+.oto[data-oto-theme="brique"] {
+  --primary:#b4482b; --primary-on:#ffffff; --primary-text:#af462a;
+  --primary-dk:#f2926f; --on-primary-dk:#141210; --primary-text-dk:#f2926f;
+  --base:#fcfaf9; --desk-l:#ebe8e7; --card-l:#f2edec;
+  --island-bd-l:#dddbda; --hair-l:#edebea;
+  --base-dk:#361e16; --desk-dk:#110a08; --card-dk:#3f2820; --island-bd-dk:#48322b;
+  --rail-tint:#261b17;
+}
+.oto[data-oto-theme="foret"] {
+  --primary:#1f6b4a; --primary-on:#ffffff; --primary-text:#1f6b4a;
+  --primary-dk:#6ecb9c; --on-primary-dk:#141210; --primary-text-dk:#6ecb9c;
+  --base:#fbfcfb; --desk-l:#e6ebe9; --card-l:#edf0ee;
+  --island-bd-l:#dbdddc; --hair-l:#ecedec;
+  --base-dk:#17271e; --desk-dk:#090c09; --card-dk:#203027; --island-bd-dk:#2c3a32;
+  --rail-tint:#181e1a;
+}
+.oto[data-oto-theme="lagune"] {
+  --primary:#0f6f78; --primary-on:#ffffff; --primary-text:#0f6f78;
+  --primary-dk:#5ecad3; --on-primary-dk:#141210; --primary-text-dk:#5ecad3;
+  --base:#fafcfc; --desk-l:#e6ebeb; --card-l:#ecf0f0;
+  --island-bd-l:#dbdddd; --hair-l:#ebeded;
+  --base-dk:#132727; --desk-dk:#080c0c; --card-dk:#1c3030; --island-bd-dk:#283a3a;
+  --rail-tint:#161f1e;
+}
+.oto[data-oto-theme="cobalt"] {
+  --primary:#1a5fbf; --primary-on:#ffffff; --primary-text:#1a5fbf;
+  --primary-dk:#71a9f5; --on-primary-dk:#141210; --primary-text-dk:#71a9f5;
+  --base:#fbfbfc; --desk-l:#e8eaec; --card-l:#eceff3;
+  --island-bd-l:#dbdcde; --hair-l:#ececee;
+  --base-dk:#152439; --desk-dk:#090b0f; --card-dk:#1e2d41; --island-bd-dk:#2a384b;
+  --rail-tint:#171d24;
+}
+.oto[data-oto-theme="violet"] {
+  --primary:#6a45c4; --primary-on:#ffffff; --primary-text:#6a45c4;
+  --primary-dk:#b79bf5; --on-primary-dk:#141210; --primary-text-dk:#b79bf5;
+  --base:#fbfafd; --desk-l:#eae9ed; --card-l:#efedf3;
+  --island-bd-l:#dcdbde; --hair-l:#ecebee;
+  --base-dk:#291e3c; --desk-dk:#0d0a10; --card-dk:#322744; --island-bd-dk:#3c324e;
+  --rail-tint:#1e1b25;
+}
+
+/* ── 3 · la nuit, EN DERNIER ─────────────────────────────────────────
+ * Un bloc de nuit et un bloc de teinte pèsent le même poids : c'est le
+ * dernier déclaré qui gagne. Remonter ce bloc au-dessus des teintes
+ * rendrait le primary de JOUR sur les huit thèmes. */
+.dark .oto {
+  --primary:      var(--primary-dk);
+  --primary-on:   var(--on-primary-dk);
+  --primary-text: var(--primary-text-dk);
+  --island:    var(--base-dk);
+  --desk:      var(--desk-dk);
+  --card:      var(--card-dk);
+  --field:     var(--desk-dk);
+  --island-bd: var(--island-bd-dk);
+  --hair:      color-mix(in srgb, var(--base-dk) 92%, #ffffff);
+  --ink:   color-mix(in srgb, var(--base-dk) 12%, #ffffff);
+  --mute:  color-mix(in srgb, var(--base-dk) 46%, #ffffff);
+  --faint: color-mix(in srgb, var(--base-dk) 62%, #ffffff);
+  --title: color-mix(in srgb, var(--primary-dk) 20%, var(--ink));
+  --brand:      var(--primary-dk);
+  --on-primary: var(--on-primary-dk);
+  --btn-bg:     var(--primary-dk);
+  --btn-fg:     var(--on-primary-dk);
+  --link:       var(--primary-text-dk);
+  --ring:       color-mix(in srgb, var(--primary-dk) 30%, transparent);
+  --oto-bg:  color-mix(in srgb, var(--primary-dk) 12%, var(--island));
+  --oto-bd:  color-mix(in srgb, var(--primary-dk) 32%, var(--island));
+  --oto-ink: var(--primary-text-dk);
+  --rail-bg:    var(--island);
+  --rail-fg:    color-mix(in srgb, var(--base-dk) 26%, #ffffff);
+  --rail-mute:  color-mix(in srgb, var(--base-dk) 48%, #ffffff);
+  --rail-bd:    var(--island-bd);
+  --rail-brand: var(--ink);
+  --rail-on-bg: var(--primary-dk);
+  --rail-on-fg: var(--on-primary-dk);
+  --rail-hover: color-mix(in srgb, #ffffff 11%, var(--rail-bg));
+  --overlay:           color-mix(in srgb, #000000 62%, transparent);
+  --scroll-thumb:      color-mix(in srgb, var(--ink) 22%, transparent);
+  --scroll-thumb-hover:color-mix(in srgb, var(--ink) 36%, transparent);
+  --ring-solid:        color-mix(in srgb, var(--primary-dk) 24%, var(--island));
+  --skeleton:          var(--card);
+  --skeleton-sheen:    color-mix(in srgb, #ffffff 7%, transparent);
+}
+
+/* ── 4 · écrans d'authentification (E05-S07) ─────────────────────────
+ * Le décor du gabarit `EcranDAuthentification` (ui/authentification/) :
+ * ce que les utilitaires n'écrivent pas — le trait du mark et son tour,
+ * les pseudo-éléments du panneau, les couleurs du bloc de marque, qui
+ * changent à 64 rem. La section ne déclare aucun jeton, ne pose aucune
+ * teinte et n'écrit aucune couleur hors des masques (alpha seul) : elle
+ * lit le contrat, donc elle suit les huit thèmes et la nuit.
+ *
+ * Repris d'oto-frontend (components/css/brand.css ; product.css
+ * l. 30-49 ; tokens/motion.css) : le trait du mark, le panneau d'encre
+ * (--rail-bg, --rail-fg), la grille fondue, le halo, le filigrane à 7 %,
+ * `line-height: 0` qui tient le centre de rotation, la barre sous son
+ * filet, le repli prefers-reduced-motion, la courbe in-out d'un tour
+ * complet. Changé : un tour à l'arrivée, puis immobile, au lieu de la
+ * rotation continue de 28 s (fiche D15 B : WCAG 2.2.2) ; le mot-clé, le
+ * grand mark et le halo en --rail-on-bg, pas en --primary (1,01:1 sur le
+ * panneau en Ardoise, HN-E05S07-8) ; espacements et typographie en
+ * utilitaires, dans le composant.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Le mark : un cercle ouvert, trait 28, `currentColor`. `fill-box` : l'ouverture
+ * pivote autour du centre du cercle, quelle que soit l'origine du viewBox. */
+.oto .oto-marque > svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+.oto .oto-marque circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 28;
+  stroke-linecap: round;
+  stroke-dasharray: 230 46;
+  transform: rotate(-8deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Un tour à l'arrivée, en 3 s, puis immobile : il se voit démarrer et
+ * s'arrêter. Sans `line-height: 0`, l'espace sous la ligne de base
+ * décale le centre de rotation et le mark tangue. */
+@keyframes oto-marque-tour {
+  to { transform: rotate(360deg); }
+}
+.oto .oto-marque-tournante {
+  display: block;
+  line-height: 0;
+  animation: oto-marque-tour 3s cubic-bezier(0.65, 0, 0.35, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .oto .oto-marque-tournante {
+    animation: none;
+  }
+}
+
+/* Sous 64 rem : l'en-tête compact, sur le bureau. */
+.oto .oto-panneau-de-marque { color: var(--ink); }
+.oto .oto-marque-principale { color: var(--primary); }
+.oto .oto-promesse { color: var(--mute); }
+
+/* Dès 64 rem : le panneau d'encre, haut comme la page. */
+@media (width >= 64rem) {
+  .oto .oto-panneau-de-marque {
+    position: relative;
+    overflow: hidden;
+    background: var(--rail-bg);
+    color: var(--rail-fg);
+  }
+
+  /* La grille fine, fondue vers le bas : le masque est une rampe d'alpha. */
+  .oto .oto-panneau-de-marque::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--rail-fg) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--rail-fg) 6%, transparent) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: linear-gradient(to bottom, #000, transparent 62%);
+  }
+
+  /* Le halo, flouté, en haut à droite. */
+  .oto .oto-panneau-de-marque::after {
+    content: "";
+    position: absolute;
+    inset-block-start: -14rem;
+    inset-inline-end: -11rem;
+    inline-size: 45rem;
+    block-size: 34rem;
+    border-radius: 50%;
+    filter: blur(110px);
+    pointer-events: none;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in srgb, var(--rail-on-bg) 16%, transparent),
+      color-mix(in srgb, var(--rail-on-bg) 10%, transparent) 46%,
+      transparent
+    );
+  }
+
+  /* Le filigrane : hors du flux, hors des clics, à la couleur du panneau. */
+  .oto .oto-filigrane {
+    position: absolute;
+    inset-inline-end: -5rem;
+    inset-block-start: -3.75rem;
+    opacity: 0.07;
+    pointer-events: none;
+  }
+
+  .oto .oto-marque-principale,
+  .oto .oto-mot-cle {
+    color: var(--rail-on-bg);
+  }
+  .oto .oto-promesse { color: var(--rail-fg); }
+
+  /* La barre de repères, sous son filet. */
+  .oto .oto-barre-de-marque {
+    border-top: 1px solid color-mix(in srgb, var(--rail-fg) 13%, transparent);
+    color: var(--rail-mute);
+  }
+}
+
+/* ── 5 · le reste du contrat du design system (E05-S09, partie a) ─────
+ * Porté d'oto-frontend (src/design-system/tokens/spacing.css, radius.css,
+ * typography.css, motion.css, elevation.css, breakpoints.css, state.css,
+ * app/density.css) : les VALEURS à l'identique, pour l'application seule
+ * (`.oto`). Retiré : les jetons du site (`.oto-site`), la nuit par
+ * `prefers-color-scheme` et `data-theme` (la nuit suit `.dark`, comme
+ * les teintes). Les règles qui lisent ces jetons (rôles typographiques,
+ * images clés, remises à zéro) vivent dans `ui/ds/`, qui n'en déclare
+ * aucun : `tests/unit/ui-tokens.test.ts`.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Espacement : une grille de 4 px ; les demi-pas sont réservés au chrome
+   des contrôles. Les constantes de gabarit ne s'écrivent qu'ici. */
+.oto {
+  --space-0:    0;
+  --space-px:   1px;
+  --space-0-5:  2px;
+  --space-1:    4px;
+  --space-1-5:  6px;
+  --space-2:    8px;
+  --space-2-5:  10px;
+  --space-3:    12px;
+  --space-3-5:  14px;
+  --space-4:    16px;
+  --space-5:    20px;
+  --space-6:    24px;
+  --space-8:    32px;
+  --space-10:   40px;
+  --space-12:   48px;
+  --space-16:   64px;
+  --space-20:   80px;
+  --space-24:   96px;
+
+  --rail-w:            232px;
+  --rail-w-collapsed:  56px;
+  --inspector-w:       320px;
+  /* Changé (E05-S12, lot C) : la colonne d'annexes d'un document, lisible au niveau de sa carte. */
+  --annexes-w:         280px;
+  --topbar-h:          44px;
+  --row-h:             40px;
+  --row-h-dense:       32px;
+  --ctrl-h-sm:         28px;
+  --ctrl-h-md:         34px;
+  --ctrl-h-lg:         40px;
+  --touch:             44px;
+  /* Le cadre de tout écran de contenu, et celui d'un document. */
+  --content-max:       1160px;
+  --content-max-doc:   830px;
+  --content-max-wide:  1420px;
+  /* `ch` se résout sur la police de l'élément : ces deux mesures valent pour un corps en --fs-sm. */
+  --reader-measure:    68ch;
+  --table-cell-max:    36ch;
+
+  /* La grammaire d'îlots : bord de fenêtre, écart entre îlots, respiration interne. */
+  --desk-inset:  12px;
+  --island-gap:  10px;
+  --island-pad:  16px;
+  --inset: var(--desk-inset);
+  --gap:   var(--island-gap);
+}
+
+/* Rayons : ce qui agit est rond (999 px), ce qui contient est arrondi (8 px). */
+.oto {
+  --r-container: 8px;
+  --r-action:    999px;
+
+  --r-island: var(--r-container);
+  --r-card:   var(--r-container);
+  --r-ctrl:   var(--r-container);
+  --r-menu:   var(--r-container);
+  --r-dialog: var(--r-container);
+  --r-table:  var(--r-container);
+  --r-tab:    var(--r-container);
+  --r-sheet:  var(--r-container);
+
+  --r-btn:    var(--r-action);
+  --r-pill:   var(--r-action);
+  --r-dot:    var(--r-action);
+  --r-avatar: var(--r-action);
+  --r-switch: var(--r-action);
+  --r-chip:   var(--r-action);
+}
+
+/* Typographie : Inter et JetBrains Mono (`ui/ds/tokens/fonts.css`) ; rien sous 11 px, sauf la
+   micro-étiquette mono de 10 px. */
+.oto {
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --fs-2xs:  11px;
+  --fs-xs:   12px;
+  --fs-sm:   13px;
+  --fs-base: 14px;
+  --fs-md:   15px;
+  --fs-lg:   17px;
+  --fs-xl:   20px;
+  --fs-2xl:  24px;
+  --fs-3xl:  30px;
+  --fs-4xl:  38px;
+  --fs-mono-label: 10px;
+
+  --lh-tight:   1.15;
+  --lh-snug:    1.3;
+  --lh-normal:  1.5;
+  --lh-relaxed: 1.6;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --tr-display: -0.038em;
+  --tr-3xl:     -0.03em;
+  --tr-2xl:     -0.02em;
+  --tr-lg:      -0.01em;
+  --tr-base:    0;
+  --tr-mono:    0.12em;
+}
+
+/* Mouvement : cinq durées, cinq courbes ; `spring` pour le seul bouton du switch. */
+.oto {
+  --dur-instant: 80ms;
+  --dur-fast:    140ms;
+  --dur-base:    200ms;
+  --dur-slow:    320ms;
+  --dur-slower:  480ms;
+
+  --ease-standard: cubic-bezier(.2, 0, .15, 1);
+  --ease-out:      cubic-bezier(.16, 1, .3, 1);
+  --ease-in:       cubic-bezier(.4, 0, 1, 1);
+  --ease-spring:   cubic-bezier(.34, 1.32, .64, 1);
+  --ease-in-out:   cubic-bezier(.65, 0, .35, 1);
+
+  --tr-colors: background-color var(--dur-fast) var(--ease-standard),
+               border-color var(--dur-fast) var(--ease-standard),
+               color var(--dur-fast) var(--ease-standard),
+               box-shadow var(--dur-fast) var(--ease-standard);
+  --tr-press:  transform var(--dur-instant) var(--ease-standard);
+}
+
+/* Élévation : trois distances (îlot, flottant, dialogue), ombres teintées à l'encre du thème ;
+   l'anneau de focus du design system, en ombre pour épouser les rayons.
+   ÉCART VOULU : oto-frontend trace l'anneau en `--ring` (primaire translucide, 3 px), qui mesure
+   1,17:1 sur l'îlot (Manuscrit, mesuré en E05-S01) et 1,8:1 sur le rail (Manuscrit, calculé en
+   E05-S09), sous les 3:1 d'un indicateur de focus ; il
+   prend ici l'encre de sa surface, 2 px, comme le `ring-ink` des écrans portés (portage-ecrans.md
+   § 3, accessibility-patterns.md § Couleurs & Contraste) : `--ink` sur l'îlot, `--rail-fg` sur le
+   rail, sombre même de jour. */
+.oto {
+  --sh-island: 0 1px 2px color-mix(in srgb, var(--ink) 7%, transparent),
+               0 8px 20px -14px color-mix(in srgb, var(--ink) 32%, transparent);
+  --sh-pop:    0 2px 4px color-mix(in srgb, var(--ink) 6%, transparent),
+               0 12px 28px -12px color-mix(in srgb, var(--ink) 34%, transparent);
+  --sh-dialog: 0 4px 10px color-mix(in srgb, var(--ink) 8%, transparent),
+               0 32px 64px -24px color-mix(in srgb, var(--ink) 46%, transparent);
+
+  --focus-ring: 0 0 0 2px var(--ink);
+  --focus-ring-offset: 0 0 0 1px var(--island), 0 0 0 3px var(--ink);
+
+  --glass-bg:     color-mix(in srgb, var(--island) 82%, transparent);
+  --glass-blur:   saturate(140%) blur(14px);
+  --glass-bd:     color-mix(in srgb, var(--ink) 10%, transparent);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .oto { --glass-bg: var(--island); }
+}
+.oto .oto-rail { --focus-ring: 0 0 0 2px var(--rail-fg); }
+/* Une alerte du rail (l'arbre en panne et son « Réessayer ») garde la surface de l'îlot : son anneau reprend l'encre. */
+.oto .oto-rail .oto-alert { --focus-ring: 0 0 0 2px var(--ink); }
+
+/* Ruptures : lues depuis le JS (`useBreakpoint`) ; les @media du design system les écrivent en dur. */
+.oto {
+  --bp-sm:  640px;
+  --bp-md:  768px;
+  --bp-lg:  1024px;
+  --bp-xl:  1280px;
+  --bp-2xl: 1536px;
+  --bp-table-cards: 560px;
+}
+
+/* États : six couleurs, jamais thémées ; `-text` pour un mot (≥ 4,5:1 sur --card). */
+.oto {
+  --st-idle:   #a3a39c;
+  --st-run:    #1f6dba;
+  --st-think:  #7a5cc4;
+  --st-live:   #10786f;
+  --st-ok:     #8aa620;
+  --st-review: #f0b41e;
+  --st-fail:   #d63d0a;
+
+  --st-idle-text:   #6a6a63;
+  --st-run-text:    #1f6dba;
+  --st-think-text:  #5f43a8;
+  --st-live-text:   #10786f;
+  --st-ok-text:     #5f7414;
+  --st-review-text: #8a6209;
+  --st-fail-text:   #c43708;
+
+  --st-tint: 14%;
+}
+/* De nuit : mêmes teintes, luminosité relevée ; le safran ne bouge pas. */
+.dark .oto {
+  --st-idle:   #6f6f68;
+  --st-run:    #63aaf0;
+  --st-think:  #b49bf0;
+  --st-live:   #4fc0b4;
+  --st-ok:     #9ec95f;
+  --st-review: #f0b41e;
+  --st-fail:   #f2724a;
+
+  --st-idle-text:   #9c9c94;
+  --st-run-text:    #63aaf0;
+  --st-think-text:  #b49bf0;
+  --st-live-text:   #4fc0b4;
+  --st-ok-text:     #9ec95f;
+  --st-review-text: #f0b41e;
+  --st-fail-text:   #f2724a;
+}
+
+/* Densité : des réglages de confort, jamais une identité (ombres, hauteurs, respiration). */
+.oto[data-lift="none"] {
+  --sh-island: none;
+  --sh-pop:    0 0 0 1px var(--island-bd);
+  --sh-dialog: 0 0 0 1px var(--island-bd);
+}
+.oto[data-density="dense"] {
+  --row-h:      var(--row-h-dense);
+  --ctrl-h-md:  var(--ctrl-h-sm);
+  --ctrl-h-lg:  34px;
+  --island-pad: var(--space-3);
+  --island-gap: var(--space-2);
+  --desk-inset: var(--space-2);
+}
+.oto[data-density="comfortable"] {
+  --row-h:      48px;
+  --ctrl-h-md:  var(--ctrl-h-lg);
+  --island-pad: var(--space-5);
+  --island-gap: var(--space-3);
+  --desk-inset: var(--space-4);
+}
+@media (pointer: coarse) {
+  .oto[data-density="dense"] {
+    --row-h: var(--touch);
+    --ctrl-h-md: var(--ctrl-h-lg);
+    --ctrl-h-sm: 34px;
+  }
+}

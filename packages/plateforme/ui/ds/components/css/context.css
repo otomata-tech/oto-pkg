@@ -1,0 +1,142 @@
+/* Porté d'oto-frontend (src/design-system/components/css/context.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* L'écran Contexte (NotePanel, LayerStack, ServedMode) : la jauge n'est pas ici, c'est `Progress`, qui l'annonce mieux (`role="progressbar"`) ; chargée après `product.css` et `content.css`, dont elle resserre les motifs. */
+
+/* NotePanel, une note et pas un îlot : filet à gauche, fond teinté, ni en-tête ni ombre ; elle explique l'écran, elle ne se met pas au rang du texte, qui est le sujet. */
+
+.oto-note {
+  padding: var(--space-3) var(--space-3-5);
+  border-inline-start: 2px solid color-mix(in oklab, var(--primary) 55%, transparent);
+  background: color-mix(in oklab, var(--primary) 7%, var(--island));
+  /* carré du côté du filet : c'est lui qui tient la note, elle ne flotte pas dans un coin arrondi */
+  border-radius: 0 var(--r-ctrl) var(--r-ctrl) 0;
+}
+
+.oto-note-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: 0 0 var(--space-2);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--title);
+}
+.oto-note-head > .oto-icon { flex: none; color: var(--primary); }
+
+/* Le corps de la note : `> p` et non `p`, les paragraphes de sa liste et de sa pile n'en font pas partie. */
+.oto-note > p {
+  margin: 0 0 var(--space-2-5);
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  line-height: var(--lh-normal);
+}
+.oto-note > p:last-child { margin-block-end: 0; }
+.oto-note > p strong { color: var(--ink); }
+
+/* Les trois lignes « pour qui · quand · comment » : une `<dl>`, des couples terme-définition. */
+.oto-note-def {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-xs);
+}
+.oto-note-def dt {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.oto-note-def dd {
+  margin: var(--space-0-5) 0 0;
+  color: var(--ink);
+  line-height: var(--lh-snug);
+}
+
+/* L'intitulé d'une sous-partie de la note — au-dessus de la pile. */
+.oto-note-label {
+  margin: var(--space-3) 0 var(--space-1-5);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* La phrase de pied nuance, elle n'informe pas : deux classes, sinon `.oto-note > p` (0,1,1) la lirait comme du corps. */
+.oto-note > .oto-note-foot {
+  margin: var(--space-2-5) 0 0;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+  line-height: var(--lh-snug);
+}
+
+/* Le thermomètre dans la note : `Progress` n'a pas de marge à lui, il ne sait pas ce qui le suit. */
+.oto-note .oto-progress { margin-block-end: var(--space-2-5); }
+
+/* LayerStack, les couches comme elles sont vraiment (commun, équipe, soi) : `data-here` marque celle qu'on regarde, et l'écran pose aussi `aria-current`, un fond teinté n'est pas une information. */
+
+.oto-layers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.oto-layer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2-5);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-ctrl);
+  background: var(--island);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition: var(--tr-colors);
+}
+.oto-layer:hover { border-color: color-mix(in oklab, var(--primary) 45%, transparent); }
+.oto-layer > .oto-icon { flex: none; color: var(--title); }
+.oto-layer > .oto-num {
+  margin-inline-start: auto;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+.oto-layer[data-here] {
+  border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+  background: color-mix(in oklab, var(--primary) 10%, var(--island));
+  font-weight: var(--fw-semibold);
+}
+
+/* Dans une note, la pile se resserre : elle accompagne un texte, elle ne le concurrence pas. */
+.oto-note .oto-layer { padding: var(--space-1-5) var(--space-2); font-size: var(--fs-xs); }
+.oto-note .oto-layer > .oto-num { font-size: var(--fs-2xs); }
+
+/* ServedMode (servi ou à la demande) : ce qui compte dans le poids servi à l'IA ; ni un état de machine ni une étiquette, une micro-mention en capitales mono au rang des intitulés de section (`--fs-mono-label`), plus grande elle crierait au bout de chaque ligne. */
+
+.oto-served {
+  display: inline-block;
+  margin-inline-start: var(--space-1);
+  padding: var(--space-px) var(--space-1-5);
+  border-radius: var(--r-pill);
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* servi à chaque fois : la couleur du thème — c'est ce qui pèse */
+.oto-served[data-mode="served"] {
+  border: 1px solid color-mix(in oklab, var(--primary) 34%, transparent);
+  background: color-mix(in oklab, var(--primary) 18%, var(--island));
+  color: var(--ink);
+}
+/* à la demande : neutre — l'agent ira le chercher, et seulement alors */
+.oto-served[data-mode="on-demand"] {
+  border: 1px solid var(--hair);
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
+  color: var(--mute);
+}

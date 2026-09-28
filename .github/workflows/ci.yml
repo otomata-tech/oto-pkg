@@ -1,0 +1,102 @@
+# CI — contrôle des migrations et build
+# Type-check, lint et tests restent en local via commit-push ; la CI lance `check:migrations`
+# (FR-INST-04) puis `build`, et prouve la portabilité du schéma (E01-S09) : la ligne de base s'installe
+# sur un Postgres sans Supabase (`bare-postgres`). La ligne de base V1 égale l'ancienne chaîne : comparaison
+# jouée une fois, hors de la CI (E01-S12 partie d ; un dépôt neuf n'a pas l'historique de la chaîne, D96).
+name: CI — Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check migrations
+        run: pnpm check:migrations
+
+      - name: Build
+        run: pnpm build
+
+  # AC10, AC12, AC13 : sur un postgres:16 vierge (sa distribution porte moddatetime, que le Postgres
+  # managé de Scaleway refuse), `db prepare` deux fois, la ligne de base par la CLI Supabase, puis la
+  # fumée : ni moddatetime ni auth.users, et Léa ne lit que les nœuds de son organisation. Puis
+  # (E01-S10, AC-a7, AC-f5) toute la suite Vitest, tests unitaires compris, sans aucune variable
+  # Supabase : les suites portables passent sur ce Postgres nu, celles de Supabase se sautent. Le job
+  # joint un Postgres jetable sans mot de passe (`trust`) : une URL qui en porte un, le contrôle
+  # pré-public la refuse ; et sans TLS (`sslmode=disable`), que la CLI du paquet exige sinon.
+  bare-postgres:
+    name: Bare Postgres (db prepare, baseline, isolation)
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: postgresql://postgres@localhost:5432/postgres?sslmode=disable
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: db prepare, twice; the second changes nothing
+        run: |
+          set -o pipefail
+          export PLATFORM_APP_PASSWORD="$(openssl rand -hex 16)"
+          node packages/plateforme/cli/bin.mjs db prepare --db-url "$DB_URL"
+          node packages/plateforme/cli/bin.mjs db prepare --db-url "$DB_URL" | tee "$RUNNER_TEMP/second.txt"
+          if grep -E ': (créée?|accordé)' "$RUNNER_TEMP/second.txt"; then exit 1; fi
+
+      # La CLI Supabase ignore `sslmode=disable` dans `--db-url` et refuse un Postgres sans TLS ;
+      # `PGSSLMODE` l'y fait passer (rejeu local du 2026-09-27, CLI 2.108).
+      - name: Baseline by the Supabase CLI
+        env:
+          PGSSLMODE: disable
+        run: supabase db push --db-url "$DB_URL" --yes
+
+      - name: Smoke
+        run: docker exec -i ${{ job.services.postgres.id }} psql -U postgres -v ON_ERROR_STOP=1 < scripts/ci/bare-postgres-smoke.sql
+
+      # Le serveur par `platform_app`, l'administration des tests par `postgres` ; tous deux sans mot de
+      # passe (`trust`), sur la machine du job : le pool du paquet s'y passe de TLS.
+      - name: Portable tests
+        env:
+          PLATFORM_DATABASE_URL: postgresql://platform_app@localhost:5432/postgres
+          PLATFORM_ADMIN_DATABASE_URL: ${{ env.DB_URL }}
+        run: pnpm exec vitest run tests/integration tests/unit

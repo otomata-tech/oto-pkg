@@ -1,0 +1,17 @@
+<!--
+  L'icône de repli (M28), servie par Next (convention `app/icon.svg`) : dans le HTML de chaque page, elle
+  évite la requête de `favicon.ico`, en 404, au premier affichage. `FaviconDuTheme` la remplace dès
+  qu'une racine `.oto` se lit ; elle reste au chargement d'une page sans racine (404, catalogue du
+  design system).
+
+  Reprise d'oto-frontend (`design-system/assets/favicon/favicon.svg`, tracé et couleurs à l'identique) :
+  le mark safran sur une pastille d'encre, qui lui donne le contraste qu'une barre d'onglets claire ne
+  fournit pas. Retirés : la variante d'onglet sombre, l'icône masquable et les rasters (manifeste PWA).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="24" fill="#2c2112"/>
+  <g transform="translate(64 64)">
+    <circle r="34" fill="none" stroke="#f0b41e" stroke-width="21.6"
+            stroke-linecap="round" stroke-dasharray="177.6 35.5" transform="rotate(-8)"/>
+  </g>
+</svg>

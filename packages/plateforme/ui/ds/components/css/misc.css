@@ -1,0 +1,427 @@
+/* Porté d'oto-frontend (src/design-system/components/css/misc.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Avatar · AvatarGroup · ToolMark · Separator · Kbd · ScrollArea · Accordion · FileDrop · CodeBlock · Tree · DatePicker / DateRange */
+
+/* Avatar, rond, il représente quelqu'un : le repli est toujours les initiales, jamais un glyphe générique répété qui ne distingue personne. */
+
+.oto-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  flex: none;
+  border-radius: var(--r-avatar);
+  background: var(--hair);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  overflow: hidden;
+  user-select: none;
+}
+.oto-avatar > img { inline-size: 100%; block-size: 100%; object-fit: cover; }
+
+.oto-avatar[data-size="xs"] { inline-size: 20px; block-size: 20px; font-size: var(--fs-2xs); }
+.oto-avatar[data-size="sm"] { inline-size: 24px; block-size: 24px; font-size: var(--fs-2xs); }
+.oto-avatar[data-size="md"] { inline-size: 28px; block-size: 28px; }
+.oto-avatar[data-size="lg"] { inline-size: 36px; block-size: 36px; font-size: var(--fs-sm); }
+.oto-avatar[data-size="xl"] { inline-size: 48px; block-size: 48px; font-size: var(--fs-md); }
+
+/* l'avatar de la personne courante prend le primary : le seul avatar coloré de l'écran, c'est ce qui le rend repérable */
+.oto-avatar[data-self] { background: var(--btn-bg); color: var(--btn-fg); }
+
+/* Une pastille d'état sur un avatar, la seule superposition permise : l'anneau à la couleur du fond la détache du visage. */
+.oto-avatar-status {
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline-end: -1px;
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: var(--r-dot);
+  box-shadow: 0 0 0 2px var(--island);
+}
+
+/* ── AvatarGroup : un chevauchement de 8 px et un anneau à la couleur de la surface de dessous, sinon quatre avatars se lisent comme une seule tache. */
+.oto-avatar-group { display: inline-flex; align-items: center; }
+.oto-avatar-group > .oto-avatar {
+  margin-inline-start: -8px;
+  box-shadow: 0 0 0 2px var(--island);
+}
+.oto-avatar-group > .oto-avatar:first-child { margin-inline-start: 0; }
+.oto-avatar-group[data-on="card"] > .oto-avatar { box-shadow: 0 0 0 2px var(--card); }
+/* Sur le bureau (l'en-tête d'écran n'est pas un îlot) : l'anneau prend la couleur de dessous, sinon la pile porte un liseré clair sur un fond plus foncé. */
+.oto-avatar-group[data-on="desk"] > .oto-avatar { box-shadow: 0 0 0 2px var(--desk); }
+/* Le débord « +N » passe derrière le dernier visage, pas devant : en `position: relative` hérité, il lui mangeait sa seconde initiale. */
+.oto-avatar-group > .oto-avatar-more {
+  position: static;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  background: var(--island-bd);
+  color: var(--ink);
+}
+
+/* ToolMark, carré arrondi, il représente un outil : rond pour quelqu'un, carré pour quelque chose ; `--field` et un filet `--island-bd`, une surface qui se détache d'un îlot comme d'une carte ; les lettres en mono `--title`, une marque se lit comme une étiquette. */
+
+.oto-tool-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--r-ctrl);
+  border: 1px solid var(--island-bd);
+  background: var(--field);
+  color: var(--title);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  line-height: 1;
+  user-select: none;
+  /* Le centrage d'un mono traqué n'est pas celui de ses lettres : `letter-spacing` pose aussi un blanc après la dernière, le rembourrage de tête rend cette demi-approche. */
+  padding-inline-start: var(--tr-mono);
+}
+/* Deux tailles, pas une de plus (la rangée d'une liste, l'en-tête d'un écran) : un troisième cran ferait perdre la tuile d'un écran à l'autre. */
+.oto-tool-mark[data-size="lg"] {
+  inline-size: 56px;
+  block-size: 56px;
+  font-size: var(--fs-xl);
+}
+
+/* ── le créneau d'image (`data-logo`) : la caisse ne bouge pas, une colonne reste droite et rien ne saute quand l'image arrive ; la taille de l'image est fixée ici, pas par le fichier. */
+.oto-tool-mark[data-logo] {
+  /* Une image n'a pas d'approche : le rembourrage du mono la décalerait vers la droite dans une caisse centrée. */
+  padding-inline-start: 0;
+  overflow: hidden;
+}
+.oto-tool-mark[data-logo] > * {
+  inline-size: 22px;
+  block-size: 22px;
+  /* `contain` et jamais `cover` : un logo n'est pas une photo, le rogner coupe une marque au milieu d'un mot. */
+  object-fit: contain;
+}
+.oto-tool-mark[data-size="lg"][data-logo] > * {
+  inline-size: 34px;
+  block-size: 34px;
+}
+
+/* Separator : `--hair` dans un îlot, `--island-bd` entre deux régions ; un filet intérieur est plus discret que le contour de l'objet qui le contient. */
+
+.oto-separator { border: 0; background: var(--hair); flex: none; }
+.oto-separator[data-orientation="horizontal"] { block-size: 1px; inline-size: 100%; margin-block: var(--space-3); }
+.oto-separator[data-orientation="vertical"]   { inline-size: 1px; block-size: 100%; align-self: stretch; margin-inline: var(--space-2); }
+.oto-separator[data-strong] { background: var(--island-bd); }
+
+/* un séparateur avec un mot : le filet passe de part et d'autre */
+.oto-separator-labelled {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-block: var(--space-3);
+}
+.oto-separator-labelled::before,
+.oto-separator-labelled::after { content: ""; flex: 1; block-size: 1px; background: var(--hair); }
+
+/* Kbd, une touche : mono, chiffres tabulaires, un relief d'un pixel qui suffit à dire « touche ». */
+
+.oto-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 18px;
+  block-size: 18px;
+  padding-inline: var(--space-1-5);
+  border: 1px solid var(--island-bd);
+  border-block-end-width: 2px;
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--mute);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+.oto-kbd-group { display: inline-flex; align-items: center; gap: 3px; }
+.oto-kbd-group > .oto-kbd-plus { color: var(--faint); font-size: var(--fs-2xs); }
+
+/* ScrollArea : une zone qui défile dans un îlot, avec des ombres de bord quand il reste du contenu ; `scroll-driven animation` là où c'est supporté, sinon un défilement sans ombre. */
+
+.oto-scroll {
+  position: relative;
+  overflow: auto;
+  min-block-size: 0;
+  overscroll-behavior: contain;
+}
+
+@supports (animation-timeline: scroll()) {
+  .oto-scroll[data-shadows]::before,
+  .oto-scroll[data-shadows]::after {
+    content: "";
+    position: sticky;
+    inset-inline: 0;
+    display: block;
+    block-size: 12px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .oto-scroll[data-shadows]::before {
+    inset-block-start: 0;
+    margin-block-end: -12px;
+    background: linear-gradient(var(--island), transparent);
+    animation: oto-fade linear both;
+    animation-timeline: scroll(self);
+    animation-range: 0 12px;
+  }
+  .oto-scroll[data-shadows]::after {
+    inset-block-end: 0;
+    margin-block-start: -12px;
+    background: linear-gradient(transparent, var(--island));
+    animation: oto-fade-out linear both;
+    animation-timeline: scroll(self);
+    animation-range: calc(100% - 12px) 100%;
+  }
+}
+
+/* Accordion, bâti sur `<details>` : le clavier et Ctrl+F dans un contenu replié viennent du navigateur ; la hauteur s'anime avec `interpolate-size`, sinon elle s'ouvre net plutôt qu'un `max-height` deviné qui coupe. */
+
+.oto-accordion { border-block-start: 1px solid var(--hair); }
+.oto-accordion-item { border-block-end: 1px solid var(--hair); }
+
+.oto-accordion-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  inline-size: 100%;
+  min-block-size: var(--ctrl-h-lg);
+  padding: var(--space-2) 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  text-align: start;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+  transition: var(--tr-colors);
+}
+.oto-accordion-trigger::-webkit-details-marker { display: none; }
+.oto-accordion-trigger:hover { color: var(--link); }
+.oto-accordion-trigger > .oto-accordion-chevron {
+  margin-inline-start: auto;
+  color: var(--faint);
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+.oto-accordion-item[open] > .oto-accordion-trigger > .oto-accordion-chevron { transform: rotate(180deg); }
+
+.oto-accordion-body {
+  padding-block-end: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--mute);
+}
+
+@supports (interpolate-size: allow-keywords) {
+  .oto {  interpolate-size: allow-keywords; }
+  .oto-accordion-item::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition: block-size var(--dur-slow) var(--ease-standard),
+                content-visibility var(--dur-slow) allow-discrete;
+  }
+  .oto-accordion-item[open]::details-content { block-size: auto; }
+}
+
+/* FileDrop : la progression et les erreurs sont par fichier ; un lot de douze dont un échoue n'affiche pas « échec ». */
+
+.oto-filedrop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  border: 1px dashed var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--mute);
+  font-size: var(--fs-sm);
+  text-align: center;
+  cursor: pointer;
+  transition: var(--tr-colors);
+}
+.oto-filedrop:hover { border-color: color-mix(in srgb, var(--ink) 26%, var(--island-bd)); }
+.oto-filedrop:focus-visible { border-color: var(--primary); box-shadow: var(--focus-ring); }
+/* survol d'un fichier : la zone prend la surface « Oto propose », une surface qui attend quelque chose */
+.oto-filedrop[data-dragover] { border-color: var(--primary); background: var(--oto-bg); color: var(--oto-ink); }
+.oto-filedrop > .oto-icon { color: var(--faint); }
+.oto-filedrop[data-dragover] > .oto-icon { color: var(--oto-ink); }
+.oto-filedrop-hint { font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: var(--tr-mono); text-transform: uppercase; color: var(--faint); }
+
+.oto-filedrop-list { display: flex; flex-direction: column; gap: var(--space-1); margin-block-start: var(--space-2); }
+.oto-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: var(--space-2);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  font-size: var(--fs-xs);
+}
+.oto-file-name { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oto-file-size { font-family: var(--mono); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; color: var(--faint); }
+.oto-file[data-state="failed"] { border-color: color-mix(in srgb, var(--st-fail) 40%, var(--island-bd)); }
+.oto-file-error { font-size: var(--fs-2xs); color: var(--st-fail-text); }
+.oto-file > .oto-progress { inline-size: 72px; flex: none; }
+
+/* CodeBlock, le seul endroit où le mono n'est pas une étiquette : « copier » n'apparaît qu'au survol, il n'a rien à faire dans la lecture. */
+
+.oto-code {
+  position: relative;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+}
+.oto-code-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-2-5);
+  border-block-end: 1px solid var(--hair);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.oto-code-copy { margin-inline-start: auto; opacity: 0; transition: opacity var(--dur-fast) var(--ease-standard); }
+.oto-code:hover .oto-code-copy,
+.oto-code:focus-within .oto-code-copy { opacity: 1; }
+
+.oto-code pre { margin: 0; padding: var(--space-3); overflow-x: auto; line-height: var(--lh-normal); }
+.oto-code code { font-family: inherit; }
+
+/* numéros de ligne non sélectionnables, sinon un copier-coller les embarque */
+.oto-code[data-lines] pre { counter-reset: oto-line; padding-inline-start: 0; }
+.oto-code[data-lines] .oto-code-line { display: block; padding-inline-start: var(--space-10); position: relative; }
+.oto-code[data-lines] .oto-code-line::before {
+  counter-increment: oto-line;
+  content: counter(oto-line);
+  position: absolute;
+  inset-inline-start: 0;
+  inline-size: var(--space-8);
+  text-align: end;
+  color: var(--faint);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tree : l'indentation est une variable de profondeur posée par l'enveloppe ; imbriquer des `<ul>` casserait la navigation au clavier à plat. */
+
+.oto-tree { font-size: var(--fs-sm); }
+.oto-tree-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-block-size: var(--ctrl-h-sm);
+  padding-inline: var(--space-2);
+  padding-inline-start: calc(var(--space-2) + var(--depth, 0) * var(--space-4));
+  border-radius: var(--r-ctrl);
+  color: var(--ink);
+  inline-size: 100%;
+  text-align: start;
+  transition: background-color var(--dur-instant) var(--ease-standard);
+}
+.oto-tree-item:hover { background: var(--hair); }
+.oto-tree-item[aria-selected="true"] { background: var(--oto-bg); color: var(--oto-ink); font-weight: var(--fw-medium); }
+.oto-tree-item > .oto-tree-chevron {
+  flex: none;
+  color: var(--faint);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+.oto-tree-item[aria-expanded="true"] > .oto-tree-chevron { transform: rotate(90deg); }
+/* une feuille garde la gouttière du chevron, sinon les libellés ne s'alignent pas d'un niveau à l'autre */
+.oto-tree-item[data-leaf] > .oto-tree-chevron { visibility: hidden; }
+.oto-tree-label { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oto-tree-count { font-family: var(--mono); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; color: var(--faint); }
+
+/* DatePicker · DateRange : semaine au lundi, mois en toutes lettres, jamais MM/DD ; la saisie au clavier reste possible dans le champ. */
+
+.oto-calendar { padding: var(--space-3); inline-size: 268px; }
+
+.oto-calendar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block-end: var(--space-2);
+}
+.oto-calendar-month {
+  flex: 1;
+  text-align: center;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  text-transform: capitalize;
+}
+
+.oto-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.oto-calendar-dow {
+  block-size: 22px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.oto-calendar-day {
+  block-size: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-ctrl);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  transition: var(--tr-colors);
+}
+.oto-calendar-day:hover:not([aria-disabled="true"]) { background: var(--hair); }
+.oto-calendar-day[data-outside] { color: var(--faint); }
+.oto-calendar-day[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+/* aujourd'hui : un point sous le chiffre, pas un fond, réservé à la sélection */
+.oto-calendar-day[data-today] { position: relative; font-weight: var(--fw-semibold); }
+.oto-calendar-day[data-today]::after {
+  content: "";
+  position: absolute;
+  inset-block-end: 4px;
+  inline-size: 3px; block-size: 3px;
+  border-radius: var(--r-dot);
+  background: var(--primary);
+}
+.oto-calendar-day[aria-selected="true"] { background: var(--btn-bg); color: var(--btn-fg); font-weight: var(--fw-semibold); }
+.oto-calendar-day[aria-selected="true"][data-today]::after { background: var(--btn-fg); }
+
+/* la plage : extrémités pleines, intérieur en `--oto-bg` et carré, la bande se lit continue */
+.oto-calendar-day[data-in-range] { background: var(--oto-bg); border-radius: 0; color: var(--oto-ink); }
+.oto-calendar-day[data-range-start] { border-start-end-radius: 0; border-end-end-radius: 0; }
+.oto-calendar-day[data-range-end]   { border-start-start-radius: 0; border-end-start-radius: 0; }
+
+.oto-calendar-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2-5);
+  padding-block-start: var(--space-2-5);
+  border-block-start: 1px solid var(--hair);
+}
+.oto-daterange { display: flex; gap: var(--space-4); }
+@media (max-width: 639px) {
+  .oto-daterange { flex-direction: column; }
+}

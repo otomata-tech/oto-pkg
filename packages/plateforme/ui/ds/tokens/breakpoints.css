@@ -1,0 +1,12 @@
+/* Porté d'oto-frontend (src/design-system/tokens/breakpoints.css) : les régions de l'application
+   déclarent un contexte de conteneur, où les composants se mesurent ; les ruptures elles-mêmes sont
+   dans `ui/styles/oto.css` (section 5) ; chaque pourquoi en une ligne, l'historique retiré
+   (portage-ecrans.md § 5). */
+
+/* Une media query ne lit pas une propriété personnalisée : les `@media` écrivent les ruptures en dur, et les `--bp-*` servent au JS (`useBreakpoint`), pour qu'un composant et son CSS basculent au même pixel ; l'application se mesure sur elle-même, une forme compacte lit son conteneur, pas la fenêtre. */
+
+/* Les régions de l'application déclarent un contexte de conteneur ; les composants s'y mesurent. */
+.oto .oto-island,
+.oto .oto-content {
+  container-type: inline-size;
+}

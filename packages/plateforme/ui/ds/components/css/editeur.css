@@ -1,0 +1,165 @@
+/* Ce que l'éditeur de la plateforme ajoute au document qu'on écrit (`blocks.css`), écrit dans son style (E05-S10, partie a) : la poignée qui se glisse, les formes neuves (liste à cocher, citation, code), la liste des contenus à citer, et le titre et le résumé écrits en place ; puis (E05-S11) le texte au repos, liens dans la phrase, et l'indication d'enregistrement ; sur les seuls jetons du design system. */
+
+/* ── la poignée se glisse (AC-a3) : au doigt, le geste ne fait pas défiler la page ; au pointeur, elle se dit saisissable. */
+.oto-block-handle [data-geste="poignee"] {
+  touch-action: none;
+  cursor: grab;
+}
+
+.oto-block-row[data-state="moving"] [data-geste="poignee"] { cursor: grabbing; }
+
+/* ── la liste à cocher (AC-a2) : une case par ligne, dans le retrait du texte, comme la colonne de numéros ; une ligne repliée décale les cases suivantes, écart cosmétique assumé (le même que les numéros). */
+.oto-block-field[data-kind="checklist"] {
+  padding-inline-start: calc(var(--space-2) + var(--space-5));
+}
+
+.oto-block-checks {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  inline-size: var(--space-5);
+  padding-block-start: calc(var(--space-1) + 1px);
+  /* Une grille : chaque rangée fait exactement une boîte de ligne, comme `.oto-block-numbers`. */
+  display: grid;
+  grid-auto-rows: 1lh;
+  justify-items: center;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  /* Au-dessus du champ, que la colonne recouvre : la case se clique. */
+  z-index: 1;
+}
+
+.oto-block-check {
+  align-self: center;
+  inline-size: 14px;
+  block-size: 14px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+/* ── la citation (AC-a2) : un filet à gauche, pendant de l'encart lu, sans fond ; le texte garde la colonne. */
+.oto-block-field[data-kind="callout"] {
+  border-inline-start: 3px solid var(--island-bd);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+/* ── le code (AC-a2) : la chasse fixe du code lu (`oto-code`), un corps plus petit ; le texte ne se replie pas en mots. */
+.oto-block-field[data-kind="code"] {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  background-color: var(--field);
+  white-space: pre-wrap;
+}
+
+/* ── la liste des contenus à citer (AC-a9) : la surface d'un menu, posée dans le flux sous le champ, que l'îlot ne rogne pas. */
+.oto-pop.oto-citer {
+  position: static;
+  margin-block: var(--space-1);
+  max-inline-size: min(420px, 100%);
+}
+
+/* Le titre d'abord ; le chemin dessous, en légende : côte à côte, à 375 px, le chemin rognait le titre à une lettre (contrôle visuel). */
+.oto-citer .oto-menu-item {
+  flex-wrap: wrap;
+  row-gap: 0;
+  cursor: pointer;
+}
+
+.oto-citer .oto-pop-meta {
+  flex-basis: 100%;
+  margin-inline-start: 0;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ── le titre et le résumé écrits en place (AC-a1) : ni bordure ni fond au repos ; le champ prend le corps du texte où il est posé (le `<h1>` pour le titre). */
+.oto-en-tete-en-place {
+  display: block;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.oto-inline-field {
+  display: block;
+  inline-size: calc(100% + var(--space-4));
+  min-inline-size: 0;
+  /* La bordure existe dès le repos, transparente : le focus n'ajoute pas un pixel qui décalerait le texte. */
+  border: 1px solid transparent;
+  border-radius: var(--r-ctrl);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  /* Le rembourrage donne à l'anneau de quoi respirer ; la marge négative le reprend, la première lettre reste à l'aplomb. */
+  padding: 0 var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  overflow: hidden;
+  resize: none;
+}
+
+.oto-inline-field:hover { border-color: var(--island-bd); }
+
+/* Le résumé : le corps de la lecture, comme le résumé lu qu'il remplace. */
+.oto-en-tete-en-place[data-champ="summary"] .oto-inline-field {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  color: var(--ink);
+}
+
+/* ── le texte au repos (E05-S11, AC-26) : le champ et son rendu dans la même case d'une grille, la case prend le plus haut des deux ; le rendu, par-dessus, porte les classes du champ (sa géométrie, son corps), sans fond ni bordure visibles. */
+.oto-block-pile {
+  display: grid;
+}
+
+.oto-block-pile > * {
+  grid-area: 1 / 1;
+}
+
+/* Le rendu laisse passer le pointeur jusqu'au champ, sauf sur un lien, qui se suit ; il ne rogne pas l'anneau d'un lien. */
+.oto-block-pile > .oto-block-rendu {
+  pointer-events: none;
+  background-image: none;
+  background-color: transparent;
+  border-color: transparent;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.oto-block-pile > .oto-block-rendu a {
+  pointer-events: auto;
+}
+
+/* Hors du focus, le texte brut se tait sous son rendu ; au focus, le rendu s'efface et le texte brut paraît (le curseur y est). */
+.oto-block-pile > .oto-block-field[data-rendu]:not(:focus) {
+  color: transparent;
+}
+
+.oto-block-pile > .oto-block-field:focus + .oto-block-rendu {
+  visibility: hidden;
+}
+
+/* En couleurs forcées, le texte transparent ne se tait plus : le rendu se retire, le champ reste seul et lisible. */
+@media (forced-colors: active) {
+  .oto-block-pile > .oto-block-rendu {
+    display: none;
+  }
+
+  .oto-block-pile > .oto-block-field[data-rendu]:not(:focus) {
+    color: CanvasText;
+  }
+}
+
+/* ── l'indication d'enregistrement (E05-S11, AC-1) : en haut à droite de la carte du document, hors du flux, rien ne bouge quand elle paraît ; sur le fond de l'îlot, lisible par-dessus un texte long ; le pointeur passe au travers. */
+.oto-indication-d-enregistrement {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-3);
+  z-index: 1;
+  padding-inline: var(--space-1);
+  border-radius: var(--r-ctrl);
+  background: var(--island);
+  pointer-events: none;
+}

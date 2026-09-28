@@ -1,0 +1,180 @@
+/* Porté d'oto-frontend (src/design-system/components/css/lists.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* L'écran de liste (RowList, Row, ListTools, CounterStrip) : le CSS est la source de vérité, les enveloppes ne posent que des classes et des attributs ; un dosage de maquette est repris quand il porte une décision, remplacé par le nom du DS quand il en a un. */
+
+/* RowList · Row */
+
+.oto-row-list { list-style: none; margin: 0; padding: 0; }
+
+.oto-row {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* L'objet occupe toute la place restante et pousse l'état sur la marge de droite ; sans cette règle, la ligne s'empile en trois. */
+.oto-row > .oto-object-link { flex: 1; min-inline-size: 0; }
+
+/* Le glyphe de nature, 20 px, la même boîte que dans le rail : les lignes des deux colonnes tombent sur la même verticale. */
+.oto-row-lead {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  color: var(--ink);
+}
+
+/* L'état, au bout, en `--faint` : il se lit après le nom ; `nowrap`, « rien depuis 34 j » ne se coupe pas. */
+.oto-row-end {
+  flex: none;
+  margin-inline-start: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* Le vide prend la place de la liste, il n'est pas dedans. */
+.oto-row-list-empty { padding-block: var(--space-4); }
+
+/* ── le filet entre les lignes, `rules`, jamais par défaut : réservé aux listes de phrases de même longueur, qu'aucun relief ne sépare ; entre et non autour (`+`), sinon il doublerait le bord de l'îlot. */
+.oto-row-list[data-rules] > .oto-row { padding-block: var(--space-2); }
+.oto-row-list[data-rules] > .oto-row + .oto-row { border-block-start: 1px solid var(--hair); }
+
+/* Le repli d'une ligne : un créneau du DS, que chaque écran remplit à sa façon ; une ligne pliable est une rangée puis un repli, d'où `display: block` et `.oto-row-head`, qui reprend la géométrie de `.oto-row`. */
+
+.oto-row[data-foldable] { display: block; }
+
+.oto-row-head {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* Même raison que sur `.oto-row` : l'objet pousse l'état sur la marge. */
+.oto-row-head > .oto-object-link { flex: 1; min-inline-size: 0; }
+
+/* Le glyphe de nature devient la cible de dépliage, la même boîte de 20 px ; les deux glyphes partagent une cellule, l'un remplace l'autre sans que la ligne bouge. */
+.oto-row-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  border-radius: var(--r-ctrl);
+  color: var(--ink);
+  cursor: pointer;
+}
+.oto-row-toggle > * { grid-area: 1 / 1; transition: opacity var(--dur-fast) var(--ease-out); }
+.oto-row-chevron {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), rotate var(--dur-fast) var(--ease-out);
+}
+
+/* `:focus-visible` en plus du survol, comme sur l'arbre du rail : le clavier doit voir la cible qu'il atteint ; l'information, elle, est portée par `aria-expanded`. */
+.oto-row-head:hover .oto-row-toggle > :not(.oto-row-chevron),
+.oto-row-toggle:focus-visible > :not(.oto-row-chevron) { opacity: 0; }
+.oto-row-head:hover .oto-row-chevron,
+.oto-row-toggle:focus-visible .oto-row-chevron { opacity: 1; }
+
+/* Ouvert : le chevron reste et tourne, le glyphe de nature s'efface ; deux glyphes superposés seraient illisibles. */
+.oto-row[data-open] .oto-row-chevron { opacity: 1; rotate: 90deg; }
+.oto-row[data-open] .oto-row-toggle > :not(.oto-row-chevron) { opacity: 0; }
+
+/* Le repli s'aligne sur le texte de la ligne, pas sur son bord : le filet vertical relie le déplié à ce qui l'ouvre. */
+.oto-row-fold {
+  margin-block-end: var(--space-2);
+  margin-inline-start: calc(20px + var(--space-2));
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid var(--hair);
+}
+
+/* ListTools : deux commandes, une ligne, et un filet qui la sépare de la liste, sinon on ne sait pas si elle commande les lignes ou en fait partie. */
+
+.oto-list-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--hair);
+}
+
+/* Le champ prend la place, le reste tient la sienne. */
+.oto-list-filter { flex: 1 1 auto; min-inline-size: 0; display: flex; }
+.oto-list-filter > .oto-input-wrap { flex: 1; min-inline-size: 0; }
+.oto-list-tools > :not(.oto-list-filter) { flex: none; }
+
+/* « tout voir », la sortie vers l'écran qui pagine : un lien, pas une action, encre secondaire puis `--ink`, jamais le safran ; la marge est ici, un utilitaire côté écran serait battu en silence par ce CSS hors couche. */
+.oto-list-more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-inline-start: auto;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.oto-list-more:hover,
+.oto-list-more:focus-visible { color: var(--ink); }
+.oto-list-more > .oto-icon { flex: none; }
+
+/* CounterStrip : quatre tuiles, chacune un bouton ; le chiffre en `--title`, une tuile qui signale un problème porte une teinte, l'enfoncée plus franche ; le fond teinté est le seul `--primary` hors d'une action, et c'en est une : la tuile filtre la liste. */
+
+.oto-counter-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--gap);
+  margin-block-end: var(--gap);
+}
+
+/* Le repli se cale sur un palier déclaré (`--bp-md`), comme `ScreenHeader` : les seuils du CSS et du JS tombent au même pixel. */
+@media (max-width: 767px) {
+  .oto-counter-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.oto-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0-5);
+  padding: var(--space-3-5);
+  text-align: start;
+  cursor: pointer;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--island);
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard);
+}
+
+.oto-counter:hover { border-color: color-mix(in oklab, var(--primary) 50%, transparent); }
+
+.oto-counter[data-tone="alert"] {
+  background: color-mix(in oklab, var(--primary) 7%, var(--island));
+  border-color: color-mix(in oklab, var(--primary) 28%, transparent);
+}
+
+/* L'état enfoncé ne repose pas sur la couleur seule : `aria-pressed` le porte, et c'est lui que le sélecteur lit, pas une classe qui pourrait s'en désynchroniser. */
+.oto-counter[aria-pressed="true"] {
+  border-color: color-mix(in oklab, var(--primary) 65%, transparent);
+  background: color-mix(in oklab, var(--primary) 14%, var(--island));
+}
+
+/* `--title`, l'encre teintée ; le corps vient d'`oto-num-count`, que le DS porte déjà, sans le redéclarer. */
+.oto-counter-value { color: var(--title); }
+
+.oto-counter-label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--ink);
+}
+
+.oto-counter-hint {
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  line-height: var(--lh-normal);
+}

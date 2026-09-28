@@ -1,0 +1,190 @@
+/* Porté d'oto-frontend (src/design-system/components/css/feedback.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Toast · ToastStack · Alert / Banner · Progress · Skeleton · EmptyState */
+
+/* Toast · ToastStack : monte de 6 px, en bas à droite, près de là où l'on vient d'agir ; jamais une erreur qu'il faut lire (un toast disparaît, une erreur reste : c'est un Alert), et un toast avec une action ne se ferme jamais seul, sinon l'action est un piège. */
+
+.oto-toast-stack {
+  position: fixed;
+  z-index: 80;
+  inset-block-end: var(--inset);
+  inset-inline-end: var(--inset);
+  display: flex;
+  flex-direction: column-reverse;   /* le plus récent en bas, près du pouce */
+  gap: var(--space-2);
+  inline-size: min(380px, calc(100vw - var(--space-6)));
+  pointer-events: none;
+}
+.oto-toast-stack > * { pointer-events: auto; }
+
+.oto-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2-5);
+  padding: var(--space-3);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--island);
+  box-shadow: var(--sh-pop);
+  font-size: var(--fs-sm);
+  animation: oto-rise var(--dur-base) var(--ease-out) both;
+}
+.oto-toast[data-closing] { animation: oto-fade-out var(--dur-fast) var(--ease-in) both; }
+
+.oto-toast-body { flex: 1; min-inline-size: 0; }
+.oto-toast-title { font-weight: var(--fw-semibold); }
+.oto-toast-desc  { color: var(--mute); font-size: var(--fs-xs); margin-block-start: 2px; }
+.oto-toast-action { flex: none; }
+.oto-toast-close { flex: none; margin-inline-start: var(--space-1); }
+
+/* Le glyphe prend la couleur d'état, le texte reste à l'encre : un toast entièrement vert se lit comme une décoration. */
+.oto-toast[data-tone="ok"]     > .oto-icon:first-child { color: var(--st-ok-text); }
+.oto-toast[data-tone="fail"]   > .oto-icon:first-child { color: var(--st-fail-text); }
+.oto-toast[data-tone="review"] > .oto-icon:first-child { color: var(--st-review-text); }
+.oto-toast[data-tone="run"]    > .oto-icon:first-child { color: var(--st-run-text); }
+
+@media (max-width: 639px) {
+  .oto-toast-stack { inset-inline: var(--space-2); inline-size: auto; inset-block-end: var(--space-2); }
+}
+
+/* Alert / Banner : quatre tons alignés sur les états (info, succès, à valider, échec), pas de cinquième ; `role="alert"` pour ce qui interrompt (l'échec) seulement, `status` sinon : tout en `alert` fait parler le lecteur d'écran par-dessus la personne. */
+
+.oto-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2-5);
+  padding: var(--space-3);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  font-size: var(--fs-sm);
+}
+.oto-alert-title { font-weight: var(--fw-semibold); }
+.oto-alert-body  { flex: 1; min-inline-size: 0; color: var(--mute); }
+.oto-alert-title + .oto-alert-desc { margin-block-start: 2px; }
+.oto-alert-actions { display: flex; gap: var(--space-2); margin-block-start: var(--space-2-5); }
+.oto-alert-close { flex: none; }
+
+.oto-alert[data-tone="run"]    { background: color-mix(in srgb, var(--st-run)    10%, var(--island)); border-color: color-mix(in srgb, var(--st-run)    26%, var(--island)); }
+.oto-alert[data-tone="ok"]     { background: color-mix(in srgb, var(--st-ok)     10%, var(--island)); border-color: color-mix(in srgb, var(--st-ok)     26%, var(--island)); }
+.oto-alert[data-tone="review"] { background: color-mix(in srgb, var(--st-review) 10%, var(--island)); border-color: color-mix(in srgb, var(--st-review) 26%, var(--island)); }
+.oto-alert[data-tone="fail"]   { background: color-mix(in srgb, var(--st-fail)   10%, var(--island)); border-color: color-mix(in srgb, var(--st-fail)   26%, var(--island)); }
+
+.oto-alert[data-tone="run"]    > .oto-icon:first-child { color: var(--st-run-text); }
+.oto-alert[data-tone="ok"]     > .oto-icon:first-child { color: var(--st-ok-text); }
+.oto-alert[data-tone="review"] > .oto-icon:first-child { color: var(--st-review-text); }
+.oto-alert[data-tone="fail"]   > .oto-icon:first-child { color: var(--st-fail-text); }
+.oto-alert .oto-alert-title { color: var(--ink); }
+
+/* bandeau pleine largeur en tête d'îlot : il perd son rayon du haut pour épouser l'îlot, c'est le seul cas */
+.oto-banner {
+  border-inline: 0;
+  border-block-start: 0;
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* Progress : déterminé, la barre avance ; indéterminé, un segment balaie, une boucle permise seulement tant qu'un travail est en vol. */
+
+.oto-progress {
+  position: relative;
+  inline-size: 100%;
+  block-size: 6px;
+  border-radius: var(--r-pill);
+  background: var(--hair);
+  overflow: hidden;
+}
+.oto-progress-bar {
+  block-size: 100%;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  inline-size: var(--progress, 0%);
+  transition: inline-size var(--dur-slow) var(--ease-standard);
+}
+.oto-progress[data-indeterminate] .oto-progress-bar {
+  inline-size: 34%;
+  animation: oto-indeterminate 1400ms var(--ease-standard) infinite;
+}
+.oto-progress[data-tone="ok"]   .oto-progress-bar { background: var(--st-ok); }
+.oto-progress[data-tone="fail"] .oto-progress-bar { background: var(--st-fail); }
+.oto-progress[data-size="lg"] { block-size: 10px; }
+
+.oto-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-end: var(--space-1-5);
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+.oto-progress-label > .oto-progress-value {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+/* Skeleton : `--card` et un balayage de 1,4 s ; jamais un spinner pour du contenu, un squelette dit ce qui arrive et où. */
+
+.oto-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-ctrl);
+  background: var(--skeleton);
+  block-size: 1em;
+  inline-size: 100%;
+}
+.oto-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+  animation: oto-sheen 1400ms var(--ease-standard) infinite;
+}
+.oto-skeleton[data-shape="text"]   { block-size: .8em; border-radius: var(--r-pill); }
+.oto-skeleton[data-shape="circle"] { border-radius: var(--r-dot); aspect-ratio: 1; block-size: auto; inline-size: 32px; }
+.oto-skeleton[data-shape="card"]   { block-size: 88px; border-radius: var(--r-card); }
+.oto-skeleton[data-shape="row"]    { block-size: var(--row-h); border-radius: var(--r-ctrl); }
+
+/* La dernière ligne d'un paragraphe est plus courte, sinon le squelette se lit comme un bloc plein et non comme du texte. */
+.oto-skeleton-text > .oto-skeleton { margin-block-end: var(--space-2); }
+.oto-skeleton-text > .oto-skeleton:last-child { inline-size: 62%; margin-block-end: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .oto-skeleton::after { animation: none; opacity: .5; }
+}
+
+/* EmptyState : un glyphe de 24 px, une phrase, un bouton, et rien d'autre ; jamais d'illustration, de la décoration là où l'on cherche quoi faire. */
+
+.oto-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  color: var(--mute);
+}
+.oto-empty > .oto-icon { color: var(--faint); }
+.oto-empty-text { font-size: var(--fs-sm); max-inline-size: 42ch; }
+.oto-empty-title { font-size: var(--fs-base); font-weight: var(--fw-semibold); color: var(--ink); }
+
+/* ── la forme compacte (`data-compact`), pour une carte courte : titre et phrase en un seul paragraphe (`inline` dans un bloc, deux lignes au lieu de quatre) ; une règle du DS et non un utilitaire, qu'une règle hors couche battrait ; faite pour un titre et une phrase, sans icône ni action. */
+.oto-empty[data-compact] {
+  display: block;
+  padding: var(--space-4) var(--space-6);
+}
+/* Deux tailles sur une même ligne se lisent comme deux blocs : le titre garde sa graisse et son encre, c'est ce qui le distingue. */
+.oto-empty[data-compact] .oto-empty-title,
+.oto-empty[data-compact] .oto-empty-text {
+  display: inline;
+  font-size: var(--fs-sm);
+}
+/* La respiration entre les deux, qu'aucun `gap` ne donne plus (la boîte n'est plus un flex) ; le reset `p { margin: 0 }` est à spécificité nulle, cette règle passe devant. */
+.oto-empty[data-compact] .oto-empty-title { margin-inline-end: var(--space-1); }
+
+/* Pas d'image ni de glyphe de plus de 24 px dans un état vide : la règle est souvent enfreinte, elle a sa garde. */
+.oto-empty img,
+.oto-empty picture { display: none; }

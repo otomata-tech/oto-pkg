@@ -1,0 +1,206 @@
+// @vitest-environment node
+// Calcul pur des niveaux (E01-S07 AC1 à AC11) sur l'organisation O en mémoire, sans base : pour
+// chaque règle, le cas qui la prouve et sa frontière, jamais une matrice rôle × niveau
+// (`testing-strategy.md § Budget de tests : le minimum vital`). L'égalité avec le SQL est prouvée
+// par `tests/integration/access-parity.test.ts`.
+import { describe, expect, it } from "vitest"
+import {
+  accountLevelOf,
+  accountOwnerChangeAllowed,
+  callerOf,
+  isOrgAdmin,
+  isStaffWithGrant,
+  leadsTeam,
+  nodeLevelOf,
+  type AccessLevel,
+  type AccountFacts,
+  type NodeChain,
+  type NodeFact,
+  type NodeOwner,
+} from "../../packages/plateforme/server/access-levels"
+import type { Identity } from "../../packages/plateforme/server/identity"
+import {
+  ACCOUNTS,
+  identityOf,
+  nodeFacts,
+  ORG,
+  PEOPLE,
+  ruleFact,
+  TEAMS,
+  teamOf,
+  type AccountKey,
+  type Person,
+  type RuleSpec,
+} from "../helpers/reference-org"
+
+const NODES = nodeFacts()
+
+function fact(path: string): NodeFact {
+  const found = NODES.find((node) => node.path === path)
+  if (!found) throw new Error(`no node ${path} in O`)
+  return found
+}
+
+/** Le propriétaire que `node_owner` rend pour un nœud qui en porte un. */
+function ownerAt(path: string): NodeOwner {
+  const { owner, id } = fact(path)
+  if (!owner) throw new Error(`${path} inherits its owner`)
+  return { ...owner, nodeId: id }
+}
+
+/** La chaîne de `path` telle qu'on la lit : les nœuds de O sauf `hidden`, les règles données. */
+function chain(path: string, rules: RuleSpec[] = [], options: { hidden?: string[]; owner?: NodeOwner } = {}): NodeChain {
+  const ancestors = NODES.filter((node) => node.path !== path && !options.hidden?.includes(node.path))
+  return { node: fact(path), ancestors, rules: rules.map(ruleFact), ...(options.owner ? { owner: options.owner } : {}) }
+}
+
+const identity = (who: Person | Identity): Identity => (typeof who === "string" ? identityOf(who) : who)
+
+function level(who: Person | Identity, path: string, rules: RuleSpec[] = []): AccessLevel {
+  return nodeLevelOf(callerOf(identity(who)), chain(path, rules))
+}
+
+function account(key: AccountKey, rules: RuleSpec[] = []): AccountFacts {
+  const { id, owner } = ACCOUNTS[key]
+  return { account: { id, orgId: ORG.id, owner }, rules: rules.map(ruleFact) }
+}
+
+function accountLevel(who: Person, key: AccountKey, rules: RuleSpec[] = []): AccessLevel {
+  return accountLevelOf(callerOf(identityOf(who)), account(key, rules))
+}
+
+describe("nodeLevelOf", () => {
+  it("should give each owner's default, the effective owner being the closest one (AC1)", () => {
+    expect(level("marc", "guide")).toBe(1)
+    expect(level("lea", "ventes/devis/modele")).toBe(2)
+    expect(level("claire", "ventes/devis/modele")).toBe(3)
+    expect(level("paul", "ventes/devis/modele")).toBe(0)
+    expect([level("claire", "private/claire/notes"), level("lea", "private/claire/notes")]).toEqual([3, 0])
+    // `ventes/zone` porte Support : son contenu est à Support, pas à Ventes, le dossier du dessus.
+    expect([level("paul", "ventes/zone/doc"), level("claire", "ventes/zone/doc")]).toEqual([3, 0])
+  })
+
+  it("should give administrators and staff with a current access manage before the rules, except in personal spaces (AC2)", () => {
+    const rules: RuleSpec[] = [{ node: "ventes/devis", user: "ada", level: "none" }]
+    expect((["ada", "s", "t"] as const).map((who) => level(who, "ventes/devis", rules))).toEqual([3, 3, 3])
+    expect((["ada", "s", "t"] as const).map((who) => level(who, "private/claire", rules))).toEqual([0, 0, 0])
+    const revoked = identityOf("t", { hasOpenGrant: false })
+    expect([level(revoked, "guide", rules), level(revoked, "ventes/devis", rules)]).toEqual([1, 0])
+  })
+
+  it("should let the closest rule win on the way up to the root, even lower (AC3)", () => {
+    const rules: RuleSpec[] = [
+      { node: "ventes", team: "support", level: "read" },
+      { node: "ventes/devis", team: "support", level: "none" },
+    ]
+    expect([level("paul", "ventes", rules), level("paul", "ventes/devis/modele", rules)]).toEqual([1, 0])
+  })
+
+  it("should put the person's rule before the teams', and take the highest of the teams (AC4)", () => {
+    const inBoth = identityOf("lea", { teams: [teamOf("ventes", "lea"), teamOf("support", "lea")] })
+    const teams: RuleSpec[] = [
+      { node: "support/faq", team: "ventes", level: "read" },
+      { node: "support/faq", team: "support", level: "write" },
+    ]
+    expect(level(inBoth, "support/faq", teams)).toBe(2)
+    const named: RuleSpec[] = [
+      { node: "ventes/devis", team: "ventes", level: "write" },
+      { node: "ventes/devis", user: "lea", level: "read" },
+    ]
+    expect(level("lea", "ventes/devis", named)).toBe(1)
+  })
+
+  it("should keep the lead of the owner team manager until a rule names her anywhere in the chain (AC5)", () => {
+    const rules: RuleSpec[] = [{ node: "ventes/devis", team: "ventes", level: "read" }]
+    expect([level("claire", "ventes/devis", rules), level("lea", "ventes/devis", rules)]).toEqual([3, 1])
+    // HN-E01S07-16 : la règle qui la nomme sur `ventes` lui retire la gestion de `ventes/devis` ; la
+    // règle la plus proche y reste celle de son équipe (1), comme `node_level_for` ; le 0 que l'AC
+    // écrit vaut sur `ventes`, où sa règle est la plus proche.
+    const named: RuleSpec[] = [...rules, { node: "ventes", user: "claire", level: "none" }]
+    expect([level("claire", "ventes/devis", named), level("claire", "ventes", named)]).toEqual([1, 0])
+  })
+
+  it("should let a rule on the root lower a team on its own folder, its lead aside (AC6)", () => {
+    const rules: RuleSpec[] = [{ node: "guide", team: "ventes", level: "read" }]
+    expect([level("lea", "ventes", rules), level("claire", "ventes", rules)]).toEqual([1, 3])
+  })
+
+  it("should count in a personal space only the rules from the node that carries the person down (AC7)", () => {
+    const above: RuleSpec[] = [
+      { node: "private", user: "ada", level: "manage" },
+      { node: "ventes", team: "ventes", level: "write" },
+    ]
+    expect([level("ada", "private/claire", above), level("claire", "ventes/x", above)]).toEqual([0, 0])
+    expect(level("lea", "private/claire/notes", [{ node: "private/claire", user: "lea", level: "read" }])).toBe(1)
+  })
+
+  it("should count an organisation rule for every member, after the person's and the teams' rules on the same node (ADR-014)", () => {
+    const open: RuleSpec[] = [{ node: "annonces", org: true, level: "write" }]
+    expect([level("marc", "annonces", open), level("lea", "annonces", open), level("marc", "annonces")]).toEqual([2, 2, 1])
+    const precise: RuleSpec[] = [...open, { node: "annonces", team: "support", level: "read" }, { node: "annonces", user: "marc", level: "none" }]
+    expect((["paul", "marc", "lea"] as const).map((who) => level(who, "annonces", precise))).toEqual([1, 0, 2])
+  })
+
+  it("should let the closest rule win, an organisation one too, without taking from the owner what it gives (HN-E05S10e-12)", () => {
+    const rules: RuleSpec[] = [
+      { node: "ventes", team: "support", level: "write" },
+      { node: "ventes/devis", org: true, level: "read" },
+    ]
+    expect((["paul", "lea", "marc"] as const).map((who) => level(who, "ventes/devis", rules))).toEqual([1, 2, 1])
+    expect(level("lea", "ventes/devis", [{ node: "ventes/devis", org: true, level: "manage" }])).toBe(3)
+  })
+
+  it("should not count an organisation rule in a personal space (ADR-014, HN-E05S10e-13)", () => {
+    expect([level("lea", "private/claire/notes", [{ node: "private/claire", org: true, level: "write" }]), level("claire", "private/claire/notes")]).toEqual([0, 3])
+    expect(level("marc", "ventes/x/y", [{ node: "ventes/x", org: true, level: "write" }])).toBe(0)
+  })
+
+  it("should compute on an incomplete chain with the supplied owner, the residual gap aside (AC11)", () => {
+    const ada = callerOf(identityOf("ada"))
+    const shared: RuleSpec[] = [{ node: "private/claire/notes", user: "ada", level: "read" }]
+    const asAdaReadsIt = chain("private/claire/notes", shared, { hidden: ["private/claire"] })
+    expect(nodeLevelOf(ada, { ...asAdaReadsIt, owner: ownerAt("private/claire") })).toBe(1)
+    // Sans le propriétaire fourni, la racine le devient : 3, pas moins que le seuil d'une liste.
+    expect(nodeLevelOf(ada, asAdaReadsIt)).toBe(3)
+    const claire = callerOf(identityOf("claire"))
+    const gap: RuleSpec[] = [
+      { node: "guide", user: "claire", level: "none" },
+      { node: "ventes", team: "ventes", level: "write" },
+    ]
+    const asClaireReadsIt = chain("ventes/devis", gap.slice(1), { hidden: ["guide"], owner: ownerAt("ventes") })
+    // HN-E01S07-4 (c) : la règle qui la nomme est sur la racine cachée, le cas 1 bis s'applique à tort.
+    expect([nodeLevelOf(claire, asClaireReadsIt), nodeLevelOf(claire, chain("ventes/devis", gap))]).toEqual([3, 2])
+  })
+})
+
+describe("accountLevelOf", () => {
+  it("should give each owner's default, the lead's manage until named, and no inheritance from nodes (AC8)", () => {
+    expect([accountLevel("lea", "org"), accountLevel("ada", "org")]).toEqual([1, 3])
+    expect((["lea", "claire", "paul"] as const).map((who) => accountLevel(who, "ventes"))).toEqual([2, 3, 0])
+    expect(accountLevel("ada", "claire")).toBe(0)
+    expect(accountLevel("claire", "ventes", [{ account: "ventes", user: "claire", level: "read" }])).toBe(1)
+    expect(accountLevel("paul", "ventes", [{ node: "ventes", team: "support", level: "write" }])).toBe(0)
+  })
+})
+
+describe("owner change", () => {
+  it("should require manage before and after, and keep making personal to administrators (AC9)", () => {
+    const claire = callerOf(identityOf("claire"))
+    expect(accountOwnerChangeAllowed(claire, account("ventes"), ACCOUNTS.org.owner)).toBe(false)
+    expect(accountOwnerChangeAllowed(claire, account("ventes"), ACCOUNTS.claire.owner)).toBe(false)
+    // Fiche D18 B (M26) : un nœud, lui, se rend personnel par tout gestionnaire ; la décision des nœuds
+    // (`nodeOwnerChangeAllowed`) part avec la garde de M02 (`tests/integration/proprietaires.test.ts`).
+    const ada = callerOf(identityOf("ada"))
+    const toAda = { kind: "user" as const, teamId: null, userId: PEOPLE.ada.id }
+    expect(accountOwnerChangeAllowed(ada, account("org"), toAda)).toBe(true)
+  })
+})
+
+describe("predicates", () => {
+  it("should tell administrators, staff with a current access and team leads (AC10)", () => {
+    const [t, revoked, claire] = [identityOf("t"), identityOf("t", { hasOpenGrant: false }), identityOf("claire")]
+    expect([isOrgAdmin(t), isOrgAdmin(revoked)]).toEqual([true, false])
+    expect([isStaffWithGrant(t), isStaffWithGrant(claire)]).toEqual([true, false])
+    expect([leadsTeam(claire, TEAMS.ventes.id), leadsTeam(claire, TEAMS.support.id)]).toEqual([true, false])
+  })
+})

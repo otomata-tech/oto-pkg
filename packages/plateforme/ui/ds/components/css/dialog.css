@@ -1,0 +1,167 @@
+/* Porté d'oto-frontend (src/design-system/components/css/dialog.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Dialog · Drawer : bâtis sur `<dialog>` natif (piège de focus, Échap, couche du dessus et inertie du fond viennent du navigateur) ; le dialogue se pose en `scale(.98)`, une décision, jamais un formulaire de dix champs ; le tiroir garde ses 8 px et son ombre, un îlot qui a glissé. */
+
+/* ── un dialogue fermé ne peint rien : le `display` d'auteur des panneaux bat `dialog:not([open]) { display: none }` du navigateur ; la garde, reposée ici une fois, vaut pour tout `<dialog>` (l'ouverture, la sortie animée et `::backdrop` n'en souffrent pas). */
+.oto-dialog:not([open]),
+.oto-drawer:not([open]),
+.oto-palette:not([open]),
+:where(.oto, .oto-site) dialog:not([open]) {
+  display: none;
+}
+
+.oto-dialog {
+  padding: 0;
+  /* Le centrage est écrit : `dialog { margin: auto }` du navigateur ne survit pas à un reset `* { margin: 0 }` (le preflight de Tailwind), et la modale partait dans le coin haut gauche. */
+  margin: auto;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-dialog);
+  background: var(--island);
+  color: var(--ink);
+  box-shadow: var(--sh-dialog);
+  inline-size: min(520px, calc(100vw - var(--space-8)));
+  max-block-size: calc(100dvh - var(--space-16));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.oto-dialog[data-size="sm"] { inline-size: min(400px, calc(100vw - var(--space-8))); }
+.oto-dialog[data-size="lg"] { inline-size: min(720px, calc(100vw - var(--space-8))); }
+
+/* `backwards` : comme `.oto-pop` (`overlay.css`), le dialogue ouvert n'est pas le bloc conteneur de la liste d'un `Select`. */
+.oto-dialog[open] { animation: oto-zoom var(--dur-base) var(--ease-out) backwards; }
+.oto-dialog::backdrop {
+  background: var(--overlay);
+  animation: oto-fade var(--dur-base) var(--ease-out) both;
+}
+/* `::backdrop` n'hérite pas des propriétés personnalisées de l'élément dans tous les moteurs : la valeur est reposée à la racine. */
+.oto-dialog[data-closing] { animation: oto-zoom-out var(--dur-fast) var(--ease-in) both; }
+
+/* L'en-tête d'une modale est une bande d'îlot, la recette de l'en-tête d'un îlot du contenu (`islands.css`) : la même grammaire pour la surface flottante ; le masque n'est pas décoratif, sans lui le grain passe sous chaque lettre du titre. */
+
+.oto-dialog-head {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--space-4);
+  background: color-mix(in oklab, var(--primary) 5%, var(--island));
+  border-block-end: 1px solid var(--hair);
+}
+.oto-dialog-head::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in oklab, var(--ink) 12%, transparent) 1px,
+      transparent 0
+    ) 0 0 / 9px 9px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 62%);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 62%);
+}
+.oto-dialog-head > * { position: relative; }
+.oto-dialog-title {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--title);
+  line-height: var(--lh-snug);
+  flex: 1;
+}
+.oto-dialog-desc { font-size: var(--fs-sm); color: var(--mute); margin-block-start: var(--space-1-5); }
+.oto-dialog-close { margin-inline-start: auto; flex: none; }
+
+.oto-dialog-body {
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+  /* Le corps porte son propre rembourrage haut : il ne dépend pas du blanc de l'en-tête, et tient sans en-tête. */
+  padding: var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+/* ── le pied : l'action principale à droite, l'annulation à sa gauche ; un filet au-dessus, pour voir où s'arrête un corps qui défile. */
+.oto-dialog-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--hair);
+  background: var(--island);
+}
+/* une action destructrice se met à gauche, séparée : on ne la clique pas en visant « Confirmer » */
+.oto-dialog-foot > [data-align="start"] { margin-inline-end: auto; }
+
+@media (max-width: 639px) {
+  .oto-dialog { inline-size: calc(100vw - var(--space-4)); }
+  .oto-dialog-foot { flex-direction: column-reverse; align-items: stretch; }
+  .oto-dialog-foot > .oto-btn { inline-size: 100%; }
+}
+
+/* Drawer / Sheet */
+
+.oto-drawer {
+  padding: 0;
+  border: 1px solid var(--island-bd);
+  background: var(--island);
+  color: var(--ink);
+  box-shadow: var(--sh-dialog);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-block-size: none;
+  max-inline-size: none;
+}
+.oto-drawer::backdrop { background: var(--overlay); animation: oto-fade var(--dur-base) var(--ease-out) both; }
+
+/* latéral — il garde son écart au bord, comme tout îlot */
+.oto-drawer[data-side="right"],
+.oto-drawer[data-side="left"] {
+  inline-size: min(420px, calc(100vw - var(--space-8)));
+  block-size: calc(100dvh - var(--inset) * 2);
+  margin-block: var(--inset);
+  border-radius: var(--r-sheet);
+}
+.oto-drawer[data-side="right"] { margin-inline: auto var(--inset); animation: oto-slide-r var(--dur-slow) var(--ease-out) both; }
+.oto-drawer[data-side="left"]  { margin-inline: var(--inset) auto; animation: oto-slide-l var(--dur-slow) var(--ease-out) both; }
+
+/* bas — la forme mobile */
+.oto-drawer[data-side="bottom"] {
+  inline-size: calc(100vw - var(--inset) * 2);
+  margin: auto var(--inset) var(--inset);
+  max-block-size: calc(100dvh - var(--space-16));
+  border-radius: var(--r-sheet);
+  animation: oto-slide-b var(--dur-slow) var(--ease-out) both;
+}
+
+/* ── ancrages : un tiroir bas s'ouvre à trois hauteurs prévisibles, jamais à une taille traînée à la main. */
+.oto-drawer[data-side="bottom"][data-snap="sm"]   { block-size: 32dvh; }
+.oto-drawer[data-side="bottom"][data-snap="md"]   { block-size: 60dvh; }
+.oto-drawer[data-side="bottom"][data-snap="full"] { block-size: calc(100dvh - var(--space-16)); }
+
+/* la poignée : elle dit que ça se traîne */
+.oto-drawer-handle {
+  flex: none;
+  inline-size: 36px;
+  block-size: 4px;
+  border-radius: var(--r-pill);
+  background: var(--island-bd);
+  margin: var(--space-2) auto var(--space-1);
+}
+
+.oto-drawer-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-block-end: 1px solid var(--hair); }
+.oto-drawer-title { font-size: var(--fs-lg); font-weight: var(--fw-bold); letter-spacing: var(--tr-lg); flex: 1; }
+.oto-drawer-body { flex: 1; min-block-size: 0; overflow: auto; padding: var(--space-4); font-size: var(--fs-sm); }
+.oto-drawer-foot { flex: none; display: flex; gap: var(--space-2); justify-content: flex-end; padding: var(--space-3) var(--space-4); border-block-start: 1px solid var(--hair); }
+
+@media (max-width: 639px) {
+  .oto-drawer[data-side="right"],
+  .oto-drawer[data-side="left"] { inline-size: calc(100vw - var(--space-4)); }
+}

@@ -1,0 +1,82 @@
+/* Porté d'oto-frontend (src/design-system/components/css/badge.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Badge · Tag : ronds (999 px), des pastilles ; un badge de ton lit les six couleurs d'état (ce que la machine a fait), un badge neutre ou `oto` lit le primary (ce que le client a choisi), jamais mélangés ; le fond est la couleur d'état à 14 %, le texte sa variante `-text` vérifiée à 4,5:1, jamais l'inverse (`--st-review` en texte donne 1,82:1). */
+
+.oto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  block-size: 20px;
+  padding-inline: var(--space-2);
+  border-radius: var(--r-pill);
+  background: var(--hair);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  max-inline-size: 100%;
+}
+.oto-badge > span { overflow: hidden; text-overflow: ellipsis; }
+
+/* un compteur : rond parfait, chiffres tabulaires */
+.oto-badge[data-count] {
+  min-inline-size: 20px;
+  padding-inline: var(--space-1-5);
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── les six tons d'état ─────────────────────────────────────────── */
+.oto-badge[data-tone="idle"]   { background: color-mix(in srgb, var(--st-idle)   var(--st-tint), var(--island)); color: var(--st-idle-text); }
+.oto-badge[data-tone="run"]    { background: color-mix(in srgb, var(--st-run)    var(--st-tint), var(--island)); color: var(--st-run-text); }
+.oto-badge[data-tone="think"]  { background: color-mix(in srgb, var(--st-think)  var(--st-tint), var(--island)); color: var(--st-think-text); }
+.oto-badge[data-tone="live"]   { background: color-mix(in srgb, var(--st-live)   var(--st-tint), var(--island)); color: var(--st-live-text); }
+.oto-badge[data-tone="ok"]     { background: color-mix(in srgb, var(--st-ok)     var(--st-tint), var(--island)); color: var(--st-ok-text); }
+.oto-badge[data-tone="review"] { background: color-mix(in srgb, var(--st-review) var(--st-tint), var(--island)); color: var(--st-review-text); }
+.oto-badge[data-tone="fail"]   { background: color-mix(in srgb, var(--st-fail)   var(--st-tint), var(--island)); color: var(--st-fail-text); }
+
+/* ── le ton « Oto » — thémé, lui ─────────────────────────────────── */
+.oto-badge[data-tone="oto"] { background: var(--oto-bg); color: var(--oto-ink); }
+
+/* ── plein : pour un compteur qui doit se voir de loin ───────────── */
+.oto-badge[data-solid] { background: var(--btn-bg); color: var(--btn-fg); }
+.oto-badge[data-solid][data-tone="fail"] { background: var(--st-fail); color: #ffffff; }
+
+/* Tag */
+
+.oto-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  block-size: 24px;
+  padding-inline: var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-pill);
+  background: var(--island);
+  color: var(--ink);
+  font-size: var(--fs-xs);
+  max-inline-size: 100%;
+}
+.oto-tag > .oto-tag-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* le bouton de retrait : la croix ne prend la couleur d'échec qu'au survol, retirer une étiquette n'est pas une alerte */
+.oto-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-inline-end: -4px;
+  border-radius: var(--r-pill);
+  color: var(--faint);
+  flex: none;
+  transition: var(--tr-colors);
+}
+.oto-tag-remove:hover { background: color-mix(in srgb, var(--st-fail) 16%, transparent); color: var(--st-fail-text); }
+
+.oto-tag[data-interactive] { transition: var(--tr-colors); }
+.oto-tag[data-interactive]:hover { background: var(--hair); }
+.oto-tag[aria-pressed="true"] { background: var(--oto-bg); border-color: var(--primary); color: var(--oto-ink); }

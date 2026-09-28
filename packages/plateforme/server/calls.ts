@@ -1,0 +1,177 @@
+// `call` (E03-S04, ADR-002, ADR-003) : la seule porte vers les fonctions du catalogue. Dans l'ordre de
+// la maquette : la fonction (nom normalisé, N6), son activation (H81), ses arguments (schéma strict),
+// l'équipe porteuse (H84) et le compte (H83) d'E04-S01, le refus d'un compte non simulé (H85, N5), le
+// récapitulatif d'une fonction sensible sans `confirm` (H86, N1), puis l'exécution et son compte-rendu
+// (N4). Le service ne lit aucune table et ne décide aucun droit lui-même : les services qu'il orchestre
+// décident avant leur requête, et il sert leurs refus tels quels (H123). Sans lui, `<p>_call` répond
+// `unavailable_in_v1` et aucune fonction ne court.
+//
+// Repris de la maquette (`mcp-test/src/proto/services/call.ts` l. 27-56) : l'ordre, les textes « Unknown
+// function … », « Invalid arguments for … Read the contract with … », « Nothing was sent. Show this … »,
+// l'équipe rendue par la fonction qui prime. Retiré : « la première équipe qui a le droit » (→ E04-S01,
+// H84) et `teams.connectors`. Repris d'Oto (`oto_mcp\middleware\error_envelope.py` l. 24-66) : un code
+// stable, le même sur toutes les faces (H04) ; retiré : `retryable`, `hint` et l'enveloppe `data.oto`,
+// comme le `confirm=<N>` et l'envoi d'essai d'`oto_mcp\capabilities\outreach.py` (H86).
+import { administratorNames } from "./access"
+import type { CatalogFunction, FunctionContext } from "./catalog/define"
+import { catalogFunctions, findFunction, isActive, NATIVE_CONNECTOR } from "./catalog/registry"
+import { modeLabel, requireSimulated } from "./connectors/modes"
+import { resolveAccount, runningTeam, type ResolvedAccount, type RunningTeam } from "./connectors/resolution"
+import type { PlatformDb } from "./db"
+import { memberDirectory } from "./directory"
+import { issuesText, PlatformError } from "./errors"
+import type { Identity } from "./identity"
+import type { ToolOutput } from "./tool-output"
+
+/**
+ * L'entrée de `call` sans `ctx` (H22). Tenue ici, `server/` n'important pas `mcp/` (architecture § 3) :
+ * la ligne `call` de la porte y passe l'entrée validée par le schéma d'E03-S01, et un test de types
+ * (`mcp-call.test.ts`, N10) refuse tout écart entre les deux, champ ajouté au schéma compris.
+ */
+export type CallInput = {
+  function: string
+  arguments?: Record<string, unknown>
+  confirm?: boolean
+  team?: string
+  account?: string
+}
+
+/**
+ * Ce que l'appel a établi pour sa ligne de journal, rempli à mesure (AC16, N7) : la porte le garde
+ * quand l'appel échoue ensuite. Vide tant que le refus précède le choix de l'équipe.
+ */
+export type CallTrace = Pick<ToolOutput, "teamId" | "accountId">
+
+export type CallDeps = {
+  db: PlatformDb
+  identity: Identity
+  /** Code `ctx` validé par la garde de la porte (H27) : dernière procédure (H84) et provenance (N9). */
+  ctxCode: string | null
+  /** Origine de l'adresse appelée (`https://acme.oto.cx`) : lien du tableau de bord d'un refus (AC8). */
+  origin: string
+  /** Jeton vérifié de la requête, passé au contexte des seules fonctions de l'ERP, qui s'exécutent sous lui (E08-S05, NH4, NH19). */
+  accessToken?: string
+  /** Connecteurs actifs de l'organisation, lus une fois pour la requête (`McpDeps`, E04-S01 N27). */
+  activeConnectors: () => Promise<ReadonlySet<string>>
+  /**
+   * Le catalogue (défaut : `catalogFunctions()`). Les tests passent leurs fonctions : sans elles, la
+   * matrice des classes ne se teste pas, faute de fonction de lecture ou native en V1 avant E07.
+   */
+  functions?: readonly CatalogFunction[]
+  trace?: CallTrace
+}
+
+const NOTHING_SENT = "Nothing was sent. Show this to the user and ask for explicit approval, then call again with confirm: true."
+
+/** Refus d'une fonction dont le connecteur est inactif (AC2), qui nomme les administrateurs qui l'activent. */
+async function notEnabled(db: PlatformDb, identity: Identity, fn: CatalogFunction): Promise<PlatformError> {
+  const org = identity.org.name
+  const names = administratorNames(await memberDirectory(db, identity.org.id))
+  const who = names ? ` (${names})` : ""
+  return new PlatformError(
+    "not_enabled",
+    `Function ${fn.name} is not enabled at ${org}: the ${fn.connector} connector is off. Ask an administrator of ${org}${who} to activate it.`,
+  )
+}
+
+/** Arguments validés par le schéma strict de la fonction (AC3) : chaque problème par son chemin, 20 au plus. */
+function checkedArguments(fn: CatalogFunction, args: Record<string, unknown>, prefix: string): Record<string, unknown> {
+  const parsed = fn.schema.safeParse(args)
+  if (parsed.success) return parsed.data
+  throw new PlatformError(
+    "invalid_arguments",
+    `Invalid arguments for ${fn.name}: ${issuesText(parsed.error.issues)}. Read the contract with ${prefix}_read {"path": "${fn.name}"}.`,
+  )
+}
+
+/**
+ * Équipe de la ligne de journal (fiche D38, option A) : une équipe de la personne, sinon aucune ; le
+ * responsable d'une équipe dont elle n'est pas membre ne lit pas les arguments de ses appels.
+ */
+function journalTeam(identity: Identity, teamId: string | null | undefined): string | null {
+  return teamId && identity.teams.some((team) => team.id === teamId) ? teamId : null
+}
+
+/**
+ * Suites proposées (H87, N3) : `next` rendu par l'exécution, sinon celui de la fonction, sans fonction
+ * sensible (`mcp-patterns.md § 3`), inactive ni absente du catalogue (aucune impasse, § 4).
+ */
+function nextActions(names: readonly string[], functions: readonly CatalogFunction[], active: ReadonlySet<string>): string[] {
+  return names.filter((name) => {
+    const next = findFunction(functions, name)
+    return next !== null && next.class !== "sensitive" && isActive(next, active)
+  })
+}
+
+/** Données en champs (F7) : la fonction, l'équipe de l'appel, et le compte d'une fonction de connecteur (AC4, AC13). */
+function callData(fn: CatalogFunction, team: RunningTeam | null, account: ResolvedAccount | undefined): Record<string, unknown> {
+  return {
+    function: fn.name,
+    team: team ? { slug: team.slug, name: team.name } : null,
+    ...(account ? { account: { id: account.id, label: account.label, mode: account.mode } } : {}),
+  }
+}
+
+/** Dernière ligne du compte-rendu d'une fonction de connecteur (N4) : l'équipe de l'appel (F8), le compte et son mode (F5). */
+function accountLine(team: RunningTeam | null, account: ResolvedAccount): string {
+  return `${team ? `Team ${team.name}` : "No team"} · account « ${account.label} » (${modeLabel(account.mode)}).`
+}
+
+/**
+ * Récapitulatif d'une fonction sensible appelée sans `confirm` (H86, N1) : un résultat, pas une erreur,
+ * et rien d'exécuté. Une fonction sensible sans `summarize` ne court jamais sans accord : câblage fautif.
+ */
+async function confirmationRequest(fn: CatalogFunction, context: FunctionContext, args: Record<string, unknown>, team: RunningTeam | null) {
+  if (!fn.summarize) {
+    console.error(`[platform] call: sensitive function ${fn.name} has no summarize`)
+    throw new PlatformError("internal", "Internal error.")
+  }
+  // Arguments validés par `fn.schema` : le type commun du catalogue les efface en `never`.
+  const summary = await fn.summarize(context, args as never)
+  const text = [summary.text, ...(team ? [`Team: ${team.name}`] : []), "", NOTHING_SENT].join("\n")
+  return { text, summary: summary.data ?? {} }
+}
+
+/**
+ * `call` : fonction, activation, arguments, équipe, compte, puis récapitulatif (sensible sans
+ * `confirm`) ou exécution. Chaque refus est levé tel que le service qui le décide l'a écrit ; `trace`
+ * garde l'équipe et le compte établis avant lui. `confirm` ne sert qu'aux fonctions sensibles (N2).
+ */
+export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOutput> {
+  const { db, identity } = deps
+  const prefix = identity.org.prefix
+  const functions = deps.functions ?? catalogFunctions()
+  const fn = findFunction(functions, input.function.trim().toLowerCase())
+  if (!fn) throw new PlatformError("not_found", `Unknown function ${input.function}. Use ${prefix}_find with type function.`)
+  const active = await deps.activeConnectors()
+  if (!isActive(fn, active)) throw await notEnabled(db, identity, fn)
+  const args = checkedArguments(fn, input.arguments ?? {}, prefix)
+  const tablePath = fn.connector === NATIVE_CONNECTOR && typeof args.table === "string" ? args.table : undefined
+  const team = await runningTeam(db, identity, { fn, team: input.team, tablePath, ctxCode: deps.ctxCode })
+  const trace: CallTrace = deps.trace ?? {}
+  trace.teamId = journalTeam(identity, team?.id)
+  const account =
+    fn.origin === "service_connecteurs"
+      ? await resolveAccount(db, identity, { fn, team, account: input.account, origin: deps.origin })
+      : undefined
+  trace.accountId = account?.id ?? null
+  // En V1, un connecteur ne court que sur un compte simulé (H85) : refusé avant la fonction (N5).
+  if (account) requireSimulated(account)
+  const context: FunctionContext = { db, identity, account, ctx: deps.ctxCode, origin: deps.origin, accessToken: fn.origin === "erp" ? deps.accessToken : undefined }
+  const data = callData(fn, team, account)
+  const journal = { target: fn.name, teamId: trace.teamId, accountId: trace.accountId }
+  if (fn.class === "sensitive" && input.confirm !== true) {
+    const { text, summary } = await confirmationRequest(fn, context, args, team)
+    return { text, data: { ...data, status: "needs_confirmation", summary }, nextActions: [], ...journal }
+  }
+  // Arguments validés par `fn.schema` : le type commun du catalogue les efface en `never`.
+  const output = await fn.run(context, args as never)
+  return {
+    text: account ? `${output.text}\n${accountLine(team, account)}` : output.text,
+    data: { ...data, result: output.data ?? {} },
+    nextActions: nextActions(output.next ?? fn.next ?? [], functions, active),
+    ...journal,
+    // L'équipe rendue par la fonction prime (N8) : un tableau suivi par un ancien chemin (E07-S02).
+    teamId: output.teamId === undefined ? journal.teamId : journalTeam(identity, output.teamId),
+  }
+}

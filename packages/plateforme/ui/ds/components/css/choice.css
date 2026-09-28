@@ -1,0 +1,159 @@
+/* Porté d'oto-frontend (src/design-system/components/css/choice.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Checkbox · Radio · RadioGroup · Switch : la forme dit le comportement (carré, plusieurs choix ; rond, un parmi plusieurs ; pilule, un réglage qui s'applique aussitôt : s'il faut « Enregistrer », c'est une case) ; bâtis sur l'input natif, transparent et superposé, pour garder la sémantique, le clavier, les libellés et les contrastes forcés. */
+
+.oto-choice {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-block-size: var(--ctrl-h-sm);
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.oto-choice[data-disabled] { cursor: not-allowed; color: var(--faint); }
+
+/* l'input natif reste là, invisible mais présent et cliquable */
+.oto-choice > input {
+  position: absolute;
+  inline-size: 1px; block-size: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+.oto-choice-text { padding-block-start: 1px; }
+.oto-choice-desc { display: block; font-size: var(--fs-xs); color: var(--mute); margin-block-start: 2px; }
+
+/* Checkbox, carré de 16 px : un rayon de 8 px en ferait un cercle, la règle s'applique à l'échelle, 4 px, la moitié du pas de conteneur. */
+
+.oto-checkbox-box {
+  flex: none;
+  position: relative;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-block-start: 2px;
+  border: 1px solid var(--island-bd);
+  border-radius: 4px;
+  background: var(--field);
+  color: var(--btn-fg);
+  display: grid;
+  place-items: center;
+  transition: var(--tr-colors), var(--tr-press);
+}
+.oto-choice:hover > .oto-checkbox-box { border-color: color-mix(in srgb, var(--ink) 30%, var(--island-bd)); }
+.oto-choice > input:focus-visible + .oto-checkbox-box { box-shadow: var(--focus-ring); border-color: var(--primary); }
+.oto-choice > input:active + .oto-checkbox-box { transform: scale(.985); }
+
+.oto-choice > input:checked + .oto-checkbox-box,
+.oto-choice > input:indeterminate + .oto-checkbox-box {
+  background: var(--btn-bg);
+  border-color: var(--btn-bg);
+}
+
+/* la coche se DESSINE — `draw`, une fois, jamais en boucle */
+.oto-checkbox-box > svg { inline-size: 12px; block-size: 12px; stroke-width: 2.5; opacity: 0; }
+.oto-choice > input:checked + .oto-checkbox-box > svg {
+  opacity: 1;
+  stroke-dasharray: 24;
+  animation: oto-check var(--dur-base) var(--ease-out) both;
+}
+@keyframes oto-check { from { stroke-dashoffset: 24 } to { stroke-dashoffset: 0 } }
+
+/* indéterminé : un trait, pas une coche à moitié */
+.oto-choice > input:indeterminate + .oto-checkbox-box::after {
+  content: "";
+  inline-size: 8px; block-size: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.oto-choice > input:indeterminate + .oto-checkbox-box > svg { display: none; }
+
+.oto-choice > input:disabled + .oto-checkbox-box {
+  background: var(--hair);
+  border-color: var(--hair);
+  color: var(--faint);
+}
+
+/* Radio, rond */
+
+.oto-radio-box {
+  flex: none;
+  position: relative;
+  inline-size: 16px;
+  block-size: 16px;
+  margin-block-start: 2px;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-dot);
+  background: var(--field);
+  display: grid;
+  place-items: center;
+  transition: var(--tr-colors), var(--tr-press);
+}
+.oto-choice:hover > .oto-radio-box { border-color: color-mix(in srgb, var(--ink) 30%, var(--island-bd)); }
+.oto-choice > input:focus-visible + .oto-radio-box { box-shadow: var(--focus-ring); border-color: var(--primary); }
+.oto-choice > input:active + .oto-radio-box { transform: scale(.985); }
+.oto-choice > input:checked + .oto-radio-box { border-color: var(--btn-bg); border-width: 5px; }
+.oto-choice > input:disabled + .oto-radio-box { background: var(--hair); border-color: var(--hair); }
+
+/* ── RadioGroup : `role="radiogroup"` et une légende, sans quoi un lecteur d'écran annonce des options isolées sans dire de quoi il s'agit. */
+.oto-radio-group { display: flex; flex-direction: column; gap: var(--space-2); border: 0; padding: 0; margin: 0; }
+.oto-radio-group[data-orientation="horizontal"] { flex-direction: row; flex-wrap: wrap; gap: var(--space-4); }
+.oto-radio-group > legend {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  margin-block-end: var(--space-2);
+  padding: 0;
+}
+
+/* variante « cartes » : chaque option est une carte cliquable */
+.oto-radio-group[data-variant="cards"] { gap: var(--space-2); }
+.oto-radio-group[data-variant="cards"] .oto-choice {
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  padding: var(--space-2-5) var(--space-3);
+  transition: var(--tr-colors);
+}
+.oto-radio-group[data-variant="cards"] .oto-choice:hover { border-color: color-mix(in srgb, var(--ink) 26%, var(--island-bd)); }
+.oto-radio-group[data-variant="cards"] .oto-choice:has(> input:checked) {
+  background: var(--oto-bg);
+  border-color: var(--primary);
+}
+
+/* Switch, pilule : le seul endroit où `--ease-spring` est permis, le bouton dépasse puis se pose comme un interrupteur ; un ressort ailleurs, et l'interface a l'air de jouer. */
+
+.oto-switch-track {
+  flex: none;
+  position: relative;
+  inline-size: 34px;
+  block-size: 20px;
+  border-radius: var(--r-switch);
+  background: color-mix(in srgb, var(--ink) 22%, var(--island));
+  transition: background-color var(--dur-base) var(--ease-standard),
+              box-shadow var(--dur-fast) var(--ease-standard);
+}
+.oto-switch-track::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: var(--r-switch);
+  background: var(--island);
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 26%, transparent);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+.oto-choice > input:checked + .oto-switch-track { background: var(--btn-bg); }
+.oto-choice > input:checked + .oto-switch-track::after { transform: translateX(14px); }
+[dir="rtl"] .oto-choice > input:checked + .oto-switch-track::after { transform: translateX(-14px); }
+.oto-choice > input:focus-visible + .oto-switch-track { box-shadow: var(--focus-ring); }
+.oto-choice > input:disabled + .oto-switch-track { background: var(--hair); }
+.oto-choice > input:disabled + .oto-switch-track::after { background: var(--faint); box-shadow: none; }
+
+/* En contrastes forcés, `background-color` est écrasé et le bouton deviendrait invisible : une bordure le redessine. */
+@media (forced-colors: active) {
+  .oto-switch-track { border: 1px solid CanvasText; }
+  .oto-switch-track::after { background: CanvasText; }
+}

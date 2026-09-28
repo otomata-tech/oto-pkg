@@ -1,0 +1,49 @@
+# Stack Technique
+
+> Versions en vigueur ; l'histoire de chaque montée de version est dans `docs/changelog.md`.
+
+| Techno | Version | Rôle | Justification |
+|--------|---------|------|---------------|
+| Next.js | 15 (App Router) | Framework fullstack | SSR/SSG, Server Components, Server Actions, routing fichiers |
+| TypeScript | ~5.8.3 (strict mode) | Typage | Sécurité du code, autocomplétion, refactoring. **Épinglé 5.8.x** — les versions 5.9+ causent des hangs de `tsc --noEmit`. |
+| Supabase | Cloud, région Paris (ADR-005) | Backend-as-a-Service | Auth, DB PostgreSQL, RLS, serveur OAuth 2.1 ; rien qui n'existe pas en open source |
+| @supabase/supabase-js | ^2.117.1 | Client Supabase | Auth et clients de l'hôte de référence |
+| @supabase/ssr | ^0.12.7 | Clients serveur et navigateur avec cookies | Idem ; exige `supabase-js` ≥ 2.114 en peer |
+| postgres (postgres.js) | 3.4.9 exacte (`dependencies` du paquet ; `devDependencies` de la racine pour les tests) | Pilote Postgres : `oto-platform db prepare`, jobs de CI sur Postgres nu, lectures de catalogue des tests d'intégration ; pool du serveur (`server/sql.ts` : `prepare: false` pour le pooler en mode transaction) | ADR-012 § 1 nomme postgres.js ; `db prepare` doit joindre une base sans `psql` chez l'hôte. Sans dépendance ; chargé à la demande par la CLI (`migrations sync` et `check` ne le chargent pas) |
+| nodemailer | 10.0.10 exacte (`dependencies` du paquet) ; types livrés par le paquet depuis la 10, sans `@types/nodemailer` | Email d'invitation en mode OIDC (`server/mail.ts`) | SMTP plutôt que l'API d'un fournisseur : tout hôte a un relais, aucun compte à ouvrir. Sans dépendance ; Node 20 au moins. **Plancher 10.0.0** : avant, `createTransport` ignore sans erreur les réglages passés à côté de `url` (délais du relais, TLS exigé) |
+| oauth4webapi | 3.8.8 exacte (`dependencies` de l'hôte) | Connexion OIDC de l'hôte de référence (`src/lib/plateforme/oidc-client.ts`) : découverte, PKCE, échange du code, `id_token` (`iss`, `aud`, `nonce`, `exp`), rafraîchissement | Flux trop sensible pour être écrit à la main. Sans dépendance ; API du web seulement (`fetch`, WebCrypto) : chargée par le middleware, qui tourne sur Edge. La signature de l'`id_token` reçu du point de jeton n'est pas revérifiée (OpenID Connect Core § 3.1.3.7, TLS) |
+| Tailwind CSS | 4.x | Styling | Utility-first, design system via config, purge auto |
+| Shadcn/ui | latest | Composants UI | Copy-paste, personnalisables, accessibles, basés sur Radix |
+| Zod | 3.x (3.25) · `zod/v4` pour `packages/plateforme/schemas/` | Validation | Schemas partagés front/back, inférence TypeScript ; le sous-chemin `zod/v4` porte `toJSONSchema` (outils MCP) et se lit par `@hookform/resolvers` 5 ; `^3.25` en peer du paquet |
+| React Hook Form | 7.x | Formulaires | Performance, intégration Zod via resolver ; `^7.55` en peer du paquet, plancher qu'exige `@hookform/resolvers` 5 |
+| @hookform/resolvers | ^5 (hôte et peer du paquet) | `zodResolver` des formulaires | Seule version compatible `zod/v4` ; 3.x ne lit que le Zod classique |
+| Vitest | latest | Tests unit/integ | Rapide, compatible ESM, API Jest-like |
+| Testing Library | latest | Tests composants | Test du comportement user, pas de l'implémentation |
+| Playwright | latest | Tests E2E | Cross-browser, fiable, auto-wait |
+| ESLint | ^9, configuration plate non typée (ni `project` ni `projectService`) | `pnpm lint`, `--max-warnings 0` | **Sans `--cache`** : `import/no-restricted-paths` (frontière `ui/` ↔ `server/`, ADR-001) et `import/order` jugent un fichier sur la résolution de ses imports, donc sur d'autres fichiers. Reproduit : un fichier de `ui/` qui importait un fichier de `server/` encore absent gardait en cache son résultat propre une fois ce fichier créé. **Vérifiable :** le script `lint` ne porte pas `--cache`, ou la clé du cache contient une empreinte de la liste des fichiers |
+| @phosphor-icons/react | ^2.1.10 (hôte) · ^2 (peer du paquet) | Icônes de l'app | **Phosphor pour l'app, `lucide-react` réservé aux internes Shadcn** (`src/components/ui/`). Appliquée par ESLint dans `ui/` et `src/` (hors `src/components/ui/`). Une icône par import (`/dist/ssr/<Nom>` serveur, `/dist/csr/<Nom>` client) : le baril charge 1 500 icônes, 40 s par fichier de test (`portage-ecrans.md § 3`) |
+| pnpm | 12.4.1 (`packageManager`), workspace | Package manager | Rapide, strict ; workspace : application à la racine, paquet dans `packages/plateforme` consommé en source (`workspace:*`, `transpilePackages`) |
+
+**Peers du paquet.** La borne basse de chaque plage de `peerDependencies` de
+`packages/plateforme/package.json` satisfait les `peerDependencies` des autres peers qu'il déclare :
+sinon un hôte respecte la plage du paquet et casse celle de l'autre dépendance (`@hookform/resolvers`
+5 exige `react-hook-form` ^7.55.0). **Vérifiable :** pour chaque peer, les `peerDependencies` de
+`node_modules/<peer>/package.json` acceptent la borne basse des plages du paquet ; toute plage
+modifiée passe par `pnpm install` (le lockfile en garde le `specifier`).
+
+<!-- PERSONNALISER : ajouter les libs spécifiques au projet (ex: @tanstack/query, date-fns, etc.) -->
+
+## Canal MCP (si le produit expose un serveur MCP)
+
+> Installé dans la face `mcp/` du paquet, monté sur la route statique `src/app/api/mcp/route.ts` ;
+> ni outil démo ni widgets (ADR-009).
+
+| Techno | Version | Rôle | Justification |
+|--------|---------|------|---------------|
+| @modelcontextprotocol/sdk | 1.26.0 exacte (`dependencies` du paquet ; `devDependencies` de la racine pour les tests) | Serveur MCP : handlers bas niveau (`setRequestHandler`), `InMemoryTransport` des tests | SDK TypeScript officiel ; épinglé sur le peer exact de `mcp-handler` 1.1.0. Les tests de `tests/` l'importent : pnpm ne résout que les dépendances de la racine |
+| mcp-handler | 1.1.0 exacte (`dependencies` du paquet) | Transport Streamable HTTP sur la route `/api/mcp` (`basePath: "/api"`), `withMcpAuth` (401 et `WWW-Authenticate`) | Sans état (`disableSse`, ADR-009) ; un serveur construit par requête. Il lit le corps sans attendre son échec : un corps illisible est refusé avant lui (`mcp/handler.ts`) |
+| jose | 6.2.12 exacte (`dependencies` du paquet ; `devDependencies` de la racine pour les tests) | Vérification du jeton par la JWKS du projet (`mcp/auth.ts`) ; JWKS locale et jetons ES256 des tests | OAuth 2.1 resource server (ADR-004) ; la JWKS se lit au premier jeton, jamais à l'import (`pnpm build` sans variable Supabase) |
+| Zod | `zod/v4` pour tout schéma que le MCP compose (`mcp/schemas.ts`, `schemas/nodes.ts`, `schemas/ctx.ts`) | Entrées des six outils et leur JSON Schema (`z.toJSONSchema`) | Un schéma v3 ne s'imbrique pas dans un objet v4 |
+| MCP Apps (GA en janvier 2026) — resources `ui://` | non installé (ADR-009) | Widgets visuels dans Claude/ChatGPT | Texte seul en V1. Le jour venu : bundles `ui://` en `text/html;profile=mcp-app` + variante `-skybridge` (`text/html+skybridge`, ChatGPT), triple méta (`ui.resourceUri` + alias plat déprécié + `openai/outputTemplate`). Pas de dépendance `@mcp-ui/*` |
+| @modelcontextprotocol/ext-apps | non installé (ADR-009) ; réf. : 1.7.4 | SDK officiel côté widget (bridge MCP Apps) | Le bridge `widgets/shared/bridge.ts` en dépendrait entièrement (handshake `ui/initialize`, tool-result, thème, autoResize) — ne PAS réimplémenter le protocole. Entrée `app-with-deps` (évite le conflit de peer avec le SDK serveur) |
+| Vite + vite-plugin-singlefile | non installé (ADR-009) | Build des widgets en HTML single-file (`widgets/build.mjs` → `generated.ts` inliné) | CSP des hosts = zéro requête externe, zéro fs à runtime |

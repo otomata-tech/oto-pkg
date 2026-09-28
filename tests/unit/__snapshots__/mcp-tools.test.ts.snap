@@ -1,0 +1,316 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add, never modify) 1`] = `
+[
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "phrase": {
+          "description": "The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit only when there is no request yet (default: none).",
+          "maxLength": 2000,
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "acme_context",
+  },
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ctx": {
+          "description": "ctx code returned by acme_context, e.g. 7K3Q-M2XA. Required: call acme_context first.",
+          "type": "string",
+        },
+        "query": {
+          "description": "Words to search for, e.g. "relance devis" or "grille tarifaire".",
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "description": "Restrict to one kind of result: procedure, page, table or function (default: all kinds, functions included).",
+          "enum": [
+            "procedure",
+            "page",
+            "table",
+            "function",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "ctx",
+        "query",
+      ],
+      "type": "object",
+    },
+    "name": "acme_find",
+  },
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ctx": {
+          "description": "ctx code returned by acme_context, e.g. 7K3Q-M2XA. Required: call acme_context first.",
+          "type": "string",
+        },
+        "cursor": {
+          "description": "Cursor given by a previous result cut at 45,000 characters, to read what follows (default: from the start).",
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string",
+        },
+        "draft": {
+          "description": "true: read the pending draft instead of the published revision (default false).",
+          "type": "boolean",
+        },
+        "outline": {
+          "description": "true: only the section titles with their sizes (default false).",
+          "type": "boolean",
+        },
+        "path": {
+          "description": "Path of a page, procedure or table (e.g. ventes/relance_devis), journal, or a function name (e.g. table.rows).",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "refs": {
+          "description": "true: each block comes with its reference, e.g. <!-- ref: 3f9a2c1b -->, for the block operations of write (default false).",
+          "type": "boolean",
+        },
+        "section": {
+          "description": "Title of one section to read, e.g. "Étapes" (default: the whole page, or its outline if long).",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "since_revision": {
+          "description": "Only what changed after this revision, e.g. 3 (default: the current content).",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "ctx",
+        "path",
+      ],
+      "type": "object",
+    },
+    "name": "acme_read",
+  },
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "Label of the connector account to use, e.g. "Mail Ventes"; only when the user names one (default: resolved by the server).",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "arguments": {
+          "additionalProperties": {},
+          "description": "Arguments of the function, as its contract says; read it with acme_read, path = the function name (default {}).",
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "confirm": {
+          "description": "true only after the user explicitly approved the summary of a sensitive function, or the content it sends (default false).",
+          "type": "boolean",
+        },
+        "ctx": {
+          "description": "ctx code returned by acme_context, e.g. 7K3Q-M2XA. Required: call acme_context first.",
+          "type": "string",
+        },
+        "function": {
+          "description": "Function name, e.g. table.rows or mail.create_draft.",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+        "team": {
+          "description": "Slug of the team the call runs for, e.g. ventes; only when a result says the team is ambiguous (default: chosen by the server).",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "ctx",
+        "function",
+      ],
+      "type": "object",
+    },
+    "name": "acme_call",
+  },
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "base_revision": {
+          "description": "Revision you read, e.g. 4; required to edit an existing node, a stale one is refused (default: none, for a creation).",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer",
+        },
+        "ctx": {
+          "description": "ctx code returned by acme_context, e.g. 7K3Q-M2XA. Required: call acme_context first.",
+          "type": "string",
+        },
+        "header": {
+          "additionalProperties": {},
+          "description": "Header of a table; its contract: acme_read with path write.table (default: unchanged).",
+          "propertyNames": {
+            "type": "string",
+          },
+          "type": "object",
+        },
+        "kind": {
+          "description": "Kind of a new node: page, procedure or table (default page).",
+          "enum": [
+            "page",
+            "procedure",
+            "table",
+          ],
+          "type": "string",
+        },
+        "ops": {
+          "description": "Operations on sections addressed by title, applied in order; the first that fails refuses them all (default: none). Block operations address a block by its reference instead.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "after": {
+                "description": "add_section only: title of the section to insert after (default: at the end).",
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string",
+              },
+              "after_block": {
+                "description": "move_block only: reference of the block to put it after (default: the start of the page).",
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string",
+              },
+              "block": {
+                "description": "Block operations: reference of the block, from read with refs: true, e.g. "3f9a2c1b" or a key such as "etapes".",
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string",
+              },
+              "find": {
+                "description": "replace_text only: exact words to replace, appearing once in the section.",
+                "minLength": 1,
+                "type": "string",
+              },
+              "op": {
+                "description": "replace_section, append, add_section, delete_section or replace_text. By block: replace_block, insert_after, delete_block or move_block.",
+                "enum": [
+                  "replace_section",
+                  "append",
+                  "add_section",
+                  "delete_section",
+                  "replace_text",
+                  "replace_block",
+                  "insert_after",
+                  "delete_block",
+                  "move_block",
+                ],
+                "type": "string",
+              },
+              "section": {
+                "description": "Title of the section it applies to, e.g. "Étapes". Section operations only.",
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string",
+              },
+              "text": {
+                "description": "New text (markdown); required by every op except delete_section. delete_block and move_block take no text either.",
+                "type": "string",
+              },
+            },
+            "required": [
+              "op",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "path": {
+          "description": "Path of the page, procedure or table to create or edit, e.g. conseil/cr_client_2026_09.",
+          "maxLength": 200,
+          "minLength": 1,
+          "pattern": "^[a-z0-9_]+(\\/[a-z0-9_]+)*$",
+          "type": "string",
+        },
+        "publish": {
+          "description": "true: publish after applying ops; publishing needs the manage level (default false: draft only).",
+          "type": "boolean",
+        },
+        "summary": {
+          "description": "One-line summary, 200 characters max; required to create (default: unchanged).",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "title": {
+          "description": "Title, 200 characters max, e.g. "Compte rendu Mairie de Valbrune"; required to create (default: unchanged). A new title, once published, moves the path to follow it; the old path still leads here.",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "ctx",
+        "path",
+      ],
+      "type": "object",
+    },
+    "name": "acme_write",
+  },
+  {
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "ctx": {
+          "description": "ctx code returned by acme_context, e.g. 7K3Q-M2XA. Required: call acme_context first.",
+          "type": "string",
+        },
+        "target": {
+          "description": "Tool, function or path concerned, e.g. table.rows or ventes/relance_devis (default: none).",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+        "text": {
+          "description": "What happened, what you expected, and the call involved; 4,000 characters max.",
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "description": "friction: unclear or slow; gap: missing capability or content; error: a tool failed.",
+          "enum": [
+            "friction",
+            "gap",
+            "error",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "ctx",
+        "type",
+        "text",
+      ],
+      "type": "object",
+    },
+    "name": "acme_feedback",
+  },
+]
+`;

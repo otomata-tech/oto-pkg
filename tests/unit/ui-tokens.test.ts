@@ -1,0 +1,169 @@
+// @vitest-environment node
+import fs from "fs"
+import path from "path"
+import tailwindcss from "@tailwindcss/postcss"
+import postcss from "postcss"
+import { describe, it, expect } from "vitest"
+
+const root = path.resolve(__dirname, "../..")
+const uiDir = path.join(root, "packages/plateforme/ui")
+const otoCss = fs.readFileSync(path.join(uiDir, "styles/oto.css"), "utf8")
+const globalsCssPath = path.join(root, "src/app/globals.css")
+// Repris de `tailwind-package-source.test.ts` (M11b) : une classe utilisée seulement dans
+// packages/plateforme/ui/components/package-version.tsx, compilée par le `@source` de globals.css.
+const PACKAGE_ONLY_CLASS = "select-all"
+
+const couleursDeclarees = (css: string) => new Set([...css.matchAll(/--color-([a-z0-9-]+):/g)].map((m) => m[1]))
+
+// Jeu Oto : les seules couleurs qu'un écran de ui/ peut employer (ADR-008 § 3).
+const OTO = couleursDeclarees(otoCss)
+// Tokens de l'hôte ABSENTS du jeu Oto : sous `.oto`, ils rendraient le violet du template en silence.
+const HOTE_SEUL = [...couleursDeclarees(fs.readFileSync(globalsCssPath, "utf8"))].filter((c) => !OTO.has(c))
+
+// Un seul parcours pour les trois listes, depuis que ce fichier reçoit celui de
+// `tailwind-package-source.test.ts` (M11b) : l'extension cherchée en paramètre.
+function fichiers(dir: string, extension: RegExp): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name)
+    if (e.isDirectory()) return fichiers(full, extension)
+    return extension.test(e.name) ? [full] : []
+  })
+}
+
+const fichiersTsx = (dir: string) => fichiers(dir, /\.tsx$/)
+const fichiersTsEtTsx = (dir: string) => fichiers(dir, /\.tsx?$/)
+
+const relatif = (f: string) => path.relative(root, f).split(path.sep).join("/")
+
+// Tous les écrans de ui/ sont rendus sous la `CoquilleOto` du layout `(dashboard)` (E09-S01), ceux
+// d'E01-S01 compris : plus aucune exemption.
+const ecransOto = fichiersTsx(uiDir)
+
+// Les pages du groupe, elles aussi rendues sous cette coquille ; le layout seul rend hors d'elle
+// (barre latérale). Sur l'îlot, les tokens de l'hôte perdent leur contraste : le
+// `text-muted-foreground` de `PageContainer` et `EmptyState` y mesurait 3,77:1 la nuit (page `/`,
+// Manuscrit), le `text-primary-foreground` de `Button` passe sur le primaire du thème.
+const dashboardDir = path.join(root, "src/app/(dashboard)")
+const pagesSousLaCoquille = fichiersTsx(dashboardDir).filter((f) => f !== path.join(dashboardDir, "layout.tsx"))
+
+// Les écrans d'authentification de l'hôte, rendus sous la `CoquilleOto` que chaque page pose en
+// `pleinePage` (E05-S07) : formulaires, pages et chaînes de classes ; le consentement OAuth aussi (E02-S02).
+const ecransDAuthentification = ["src/app/(auth)", "src/app/auth/confirmer", "src/app/aucune-organisation", "src/app/oauth"].flatMap(
+  (dossier) => fichiersTsEtTsx(path.join(root, dossier)),
+)
+
+function tokensDeLHote(fichiers: string[]): string[] {
+  const utilitaire = /\b(?:bg|text|border|ring|fill|stroke|outline|divide|decoration|placeholder|caret)-([a-z-]+)\b/g
+  return fichiers.flatMap((f) =>
+    [...fs.readFileSync(f, "utf8").matchAll(utilitaire)]
+      .filter((m) => HOTE_SEUL.includes(m[1]))
+      .map((m) => `${relatif(f)} : ${m[0]}`),
+  )
+}
+
+const importsDeLHote = (fichiers: string[]) =>
+  fichiers.filter((f) => /from\s+["']@\/components\//.test(fs.readFileSync(f, "utf8"))).map(relatif)
+
+// Une bordure colorée perd contre `* { border-color }`, hors layer, de l'hôte (`portage-ecrans.md § 3`).
+function bordersColorees(fichiers: string[]): string[] {
+  const couleurs = new Set([...OTO, ...HOTE_SEUL])
+  const bordure = /\bborder(?:-[trblxyse])?-([a-z-]+)\b/g
+  return fichiers.flatMap((f) =>
+    [...fs.readFileSync(f, "utf8").matchAll(bordure)].filter((m) => couleurs.has(m[1])).map((m) => `${relatif(f)} : ${m[0]}`),
+  )
+}
+
+describe("ui/ design tokens (ADR-008)", () => {
+  it("should find host-only tokens to guard against", () => {
+    expect(HOTE_SEUL).toContain("muted-foreground")
+  })
+
+  it("should use no host-only color token in a ported screen", () => {
+    expect(tokensDeLHote(ecransOto)).toEqual([])
+  })
+
+  it("should use no colored border in a ported screen", () => {
+    expect(bordersColorees(ecransOto)).toEqual([])
+  })
+
+  // La compilation Tailwind scanne tout le dépôt : au-delà des 5 s par défaut sur Windows. Une seule
+  // compilation pour les jetons Oto et le `@source` du paquet (M11b).
+  it("should compile the Oto classes and a class used only in packages/plateforme/ui through the host globals.css", { timeout: 30_000 }, async () => {
+    const css = fs.readFileSync(globalsCssPath, "utf8")
+    const result = await postcss([tailwindcss()]).process(css, { from: globalsCssPath })
+    expect(result.css).toContain(".bg-island")
+    expect(result.css).toContain(".text-primary-on")
+    expect(result.css).toContain(".dark .oto")
+    // Les trois jetons des écrans d'authentification (E05-S07, AC11).
+    expect(result.css).toContain(".bg-desk")
+    expect(result.css).toContain(".bg-hair")
+    expect(result.css).toContain(".ring-island-bd")
+    expect(result.css).toContain(`.${PACKAGE_ONLY_CLASS}`)
+    // Le design system porté d'oto-frontend (E05-S09, AC-a1) : le bureau, le rail, sous `.oto`.
+    expect(result.css).toContain(".oto-desk")
+    expect(result.css).toContain(".oto-rail-item")
+  })
+
+  // E05-S09, AC-a1 : les feuilles de `ui/ds/` lisent les jetons d'`oto.css`, la seule source des valeurs ;
+  // une feuille qui en redéclare un ne peut que le rapporter à un autre jeton (`--gap: var(--space-2)`).
+  it("should give ui/ds no value of its own for a token of oto.css", () => {
+    const jetons = new Set([...otoCss.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]))
+    const redeclares = fichiers(path.join(uiDir, "ds"), /\.css$/).flatMap((f) =>
+      [...fs.readFileSync(f, "utf8").matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)]
+        .filter((m) => jetons.has(m[1]) && !m[2].trim().startsWith("var(--"))
+        .map((m) => `${relatif(f)} : ${m[1]}: ${m[2].trim()}`),
+    )
+    expect(jetons.has("--space-2")).toBe(true)
+    expect(redeclares).toEqual([])
+  })
+
+  it("should not find the class used only in packages/plateforme/ui anywhere in src/", () => {
+    const hits = fichiers(path.join(root, "src"), /\.(ts|tsx|css)$/).filter((file) => fs.readFileSync(file, "utf8").includes(PACKAGE_ONLY_CLASS))
+    expect(hits).toEqual([])
+  })
+})
+
+describe("(dashboard) pages under the layout's CoquilleOto (E09-S01)", () => {
+  it("should find the pages of the group, the layout left out", () => {
+    const relatifs = pagesSousLaCoquille.map(relatif)
+    expect(relatifs).toContain("src/app/(dashboard)/page.tsx")
+    expect(relatifs).not.toContain("src/app/(dashboard)/layout.tsx")
+  })
+
+  it("should import no host component, all written on the host tokens", () => {
+    expect(importsDeLHote(pagesSousLaCoquille)).toEqual([])
+  })
+
+  it("should use no host-only color token", () => {
+    expect(tokensDeLHote(pagesSousLaCoquille)).toEqual([])
+  })
+})
+
+describe("authentication screens under the page's CoquilleOto (E05-S07, AC11)", () => {
+  it("should find the forms, the pages and the class strings of the six screens", () => {
+    const relatifs = ecransDAuthentification.map(relatif)
+    // Garde contre un chemin mort : un dossier renommé viderait la liste sans bruit.
+    expect(relatifs).toContain("src/app/(auth)/login/formulaire-de-connexion.tsx")
+    expect(relatifs).toContain("src/app/(auth)/classes-oto.ts")
+    expect(relatifs).toContain("src/app/auth/confirmer/page.tsx")
+    expect(relatifs).toContain("src/app/aucune-organisation/page.tsx")
+    expect(relatifs).toContain("src/app/oauth/consent/page.tsx")
+  })
+
+  it("should import no host component", () => {
+    expect(importsDeLHote(ecransDAuthentification)).toEqual([])
+  })
+
+  it("should use no host-only color token", () => {
+    expect(tokensDeLHote(ecransDAuthentification)).toEqual([])
+  })
+
+  it("should use no colored border", () => {
+    expect(bordersColorees(ecransDAuthentification)).toEqual([])
+  })
+})
+
+// La section « écrans d'authentification » d'oto.css (E05-S07, AC3, AC11) n'est plus lue règle par
+// règle (M11b : on ne teste pas le CSS) : ses jetons sont gardés ci-dessus, l'animation unique et
+// coupée sous « réduire les animations » et le contraste du panneau d'encre sont mesurés dans le
+// navigateur (`tests/e2e/ecrans-d-authentification.spec.ts`, AC3 et AC12).

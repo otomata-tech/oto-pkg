@@ -1,0 +1,366 @@
+// @vitest-environment node
+// `write` sur une base réelle (E03-S03, AC19, AC20, AC21, AC26, AC27, AC28 ; E01-S10, lot t1-b) : création,
+// refus, garde de révision, en-tête en attente et genre, provenance. Chaque cas écrit ses tables simulées sur
+// l'organisation O de la graine du fichier (`replaceContent`), puis relit par la connexion d'administration
+// les lignes que le service a écrites. Les droits sont décidés par le service avant toute écriture :
+// l'espion des requêtes (`spyDb`) montre qu'aucune écriture ne part d'un refus. Une course (chemin pris
+// entre le contrôle et l'insertion) est une vraie insertion de la connexion d'administration, juste avant
+// celle du service : la base la refuse (`23505`). Une création tient dans une transaction (AC-x4, partie b2) :
+// arrêtée au milieu, elle ne laisse rien. En suite portable (`sqlConfigured`) : le projet, ou le Postgres nu du job `bare-postgres`.
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { inputSchemas, parseInput } from "../../packages/plateforme/mcp/schemas"
+import type { BlockInput } from "../../packages/plateforme/schemas"
+import { writeNode, type WriteOrigin } from "../../packages/plateforme/server/nodes/write"
+import { addBlocks, contentTables, identityOf, nodeId, TEAMS, type ContentNode, type Person, type RuleSpec } from "../helpers/reference-org"
+import { seedReferenceOrg, type ReferenceOrgSql } from "../helpers/reference-org-sql"
+import type { Tables } from "../helpers/simulated-db"
+import { functionCalls, isWrite, replaceContent, spyDb, touches, type SpiedCall, type SpyHook } from "../helpers/spy-t1-b"
+import { sqlConfigured, seedWithAdmin, type SeededData, portable } from "../helpers/sql"
+
+const NETWORK_TIMEOUT = 60_000
+const SETUP_TIMEOUT = 180_000
+
+const AGENT: WriteOrigin = { kind: "agent", ctx: "7K3Q-M2XA" }
+
+const heading = (text: string, level: 1 | 2 | 3 = 1, key?: string): BlockInput => ({ type: "heading", text, data: { level }, key })
+const paragraph = (text: string): BlockInput => ({ type: "paragraph", text, data: {} })
+
+function base(nodes: ContentNode[] = [], rules: RuleSpec[] = []): Tables {
+  return contentTables(rules, [{ path: "ventes", title: "Ventes" }, { path: "conseil", title: "Conseil" }, ...nodes])
+}
+
+/** Écritures parties vers la base, par l'une ou l'autre face : insertions, mises à jour, suppressions, `open_draft`, `publish_node`. */
+const writes = (calls: SpiedCall[]) => calls.filter(isWrite)
+
+/** Une insertion dans `table` par la face SQL, son verbe en tête (`insert into platform.nodes …`) : `write-result.ts` et `store.ts` écrivent ainsi (partie b2). */
+const inserts = (call: SpiedCall, table: string) => call.kind === "sql" && new RegExp(`^\\s*insert\\s+into\\s+platform\\.${table}\\b`, "i").test(call.text)
+
+/** `ventes/devis` publiée en révision `revision` : Objet, un paragraphe, Étapes, Cas particulier. */
+function devis(revision = 1): Tables {
+  const tables = base([{ path: "ventes/devis", title: "Devis", revision }])
+  addBlocks(tables, "ventes/devis", "published", [heading("Objet", 1, "objet"), paragraph("Relancer un devis resté sans réponse."), heading("Étapes", 1, "etapes"), heading("Cas particulier", 2), paragraph("Requalifier.")])
+  return tables
+}
+
+/** Une ligne de `blocks` relue par la connexion d'administration. */
+type BlockRow = { id: string; type: string; text: string | null; key: string | null; position: number | null; revision: number; provenance: Record<string, unknown>; created_by: string | null; updated_by: string | null }
+
+describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout: NETWORK_TIMEOUT }, () => {
+  let seed: SeededData
+  let ref: ReferenceOrgSql
+
+  beforeAll(async () => {
+    seed = seedWithAdmin()
+    ref = await seedReferenceOrg(seed)
+  }, SETUP_TIMEOUT)
+
+  afterAll(async () => {
+    await seed?.cleanup()
+  }, SETUP_TIMEOUT)
+
+  /** L'identité de la personne dans O, préfixe `acme` des textes servis (l'organisation simulée, son identifiant réel). */
+  const who = (person: Person) => ref.identityOf(person, { org: identityOf(person).org })
+  const content = (tables: Tables) => replaceContent(seed, ref, tables)
+
+  async function write(person: Person, input: Record<string, unknown>, options: { hook?: SpyHook; origin?: WriteOrigin } = {}) {
+    const spied = spyDb(await ref.db(person), options.hook)
+    const output = await writeNode(spied.db, who(person), input, options.origin ?? AGENT).then(
+      (result) => ({ result, error: null }),
+      (error: unknown) => ({ result: null, error }),
+    )
+    return { ...output, calls: spied.calls }
+  }
+
+  /** Le nœud de O à ce chemin, semé ou créé par le service, relu par la connexion d'administration. */
+  async function nodeRow(path: string): Promise<Record<string, unknown> | undefined> {
+    const [row] = await seed.admin<Record<string, unknown>[]>`
+      select id, org_id, parent_id, path, kind, title, summary, status, revision, owner_kind, created_by, updated_by
+        from platform.nodes where org_id = ${ref.org.id} and path = ${path}`
+    return row
+  }
+
+  /** Les blocs d'un état d'un nœud de O, dans l'ordre du document. */
+  async function blockRows(path: string, state: "published" | "draft"): Promise<BlockRow[]> {
+    return seed.admin<BlockRow[]>`
+      select b.id, b.type, b.text, b.key, b.position, b.revision, b.provenance, b.created_by, b.updated_by
+        from platform.blocks b join platform.nodes n on n.id = b.node_id
+       where n.org_id = ${ref.org.id} and n.path = ${path} and b.state = ${state}
+       order by b.position, b.id`
+  }
+
+  /** Les brouillons ouverts des nœuds de O : ce que la base simulée gardait dans `node_drafts`. */
+  async function draftsOfO(): Promise<Record<string, unknown>[]> {
+    return seed.admin<Record<string, unknown>[]>`
+      select d.node_id, d.base_revision, d.title, d.summary, d.kind, d.updated_by, to_json(d.updated_at) #>> '{}' as updated_at
+        from platform.node_drafts d join platform.nodes n on n.id = d.node_id
+       where n.org_id = ${ref.org.id} order by n.path`
+  }
+
+  describe("write — creation (AC19, AC20)", () => {
+    it("should create a draft at revision 0 under the inherited owner, open its draft and write its blocks (AC19)", async () => {
+      const input = { path: "ventes/cr_test", kind: "page", title: "CR de test", summary: "Compte rendu de test", ops: [{ op: "add_section", section: "Décisions", text: "Lancer la pré-étude." }] }
+      await content(base())
+      const lea = await write("lea", input)
+      expect(lea.result?.text).toBe(
+        "Draft of ventes/cr_test created (revision 0): added « Décisions » (34 characters).\nPublishing ventes/cr_test is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+      )
+      // Le nœud inséré, tel que le service l'a écrit : ses colonnes, et celles que la base pose (brouillon, révision 0, propriétaire hérité).
+      const node = await nodeRow("ventes/cr_test")
+      expect(ref.readable(node)).toMatchObject({
+        org_id: "org-acme",
+        parent_id: nodeId("ventes"),
+        path: "ventes/cr_test",
+        kind: "page",
+        title: "CR de test",
+        summary: "Compte rendu de test",
+        created_by: "user-lea",
+        updated_by: "user-lea",
+        status: "draft",
+        revision: 0,
+        owner_kind: null,
+      })
+      expect(functionCalls(lea.calls, "open_draft")).toHaveLength(1)
+      const drafts = await draftsOfO()
+      expect(drafts).toMatchObject([{ node_id: node?.id, base_revision: 0 }])
+      const drafted = await blockRows("ventes/cr_test", "draft")
+      expect(drafted.map((row) => [row.type, row.text, row.position])).toEqual([["heading", "Décisions", 1024], ["paragraph", "Lancer la pré-étude.", 2048]])
+      expect(await blockRows("ventes/cr_test", "published")).toEqual([])
+      const [first, second] = drafted
+      expect(lea.result?.data).toEqual({
+        path: "ventes/cr_test",
+        revision: 0,
+        status: "draft",
+        has_draft: true,
+        touched: [{ op: "add_section", text: "added « Décisions » (34 characters)", blocks: [first, second].map((row) => ({ id: row.id, ref: String(row.id).slice(0, 8), revision: 1 })) }],
+        blocks_total: 2,
+        // Le tampon du brouillon relu après l'écriture, une garde (l'écran le rend pour écrire l'en-tête) : le
+        // texte exact de `node_drafts.updated_at` relu par `to_json`, que PostgREST écrit de même, microsecondes
+        // comprises ; une valeur coupée à la milliseconde ne le passerait pas.
+        draft_stamp: drafts[0]?.updated_at,
+      })
+      expect([lea.result?.nextActions, lea.result?.target, lea.result?.teamId]).toEqual([["acme_read"], "ventes/cr_test", ref.id(TEAMS.ventes.id)])
+      await content(base())
+      const claire = await write("claire", input)
+      expect(claire.result?.text.split("\n")[1]).toBe('Publish it with acme_write {"path": "ventes/cr_test", "base_revision": 0, "publish": true}.')
+      await content(base())
+      const empty = await write("lea", { path: "ventes/cr_vide", title: "CR", summary: "Vide" })
+      expect(empty.result?.text.split("\n")[0]).toBe("Draft of ventes/cr_vide created (revision 0): no content yet.")
+    })
+
+    it("should refuse a creation without header, under a missing, reserved or occupied path, and a table or a header (AC20)", async () => {
+      const refused = async (person: Person, input: Record<string, unknown>) => {
+        const outcome = await write(person, input)
+        expect(writes(outcome.calls), JSON.stringify(input)).toEqual([])
+        return outcome.error
+      }
+      const create = (path: string, extra: Record<string, unknown> = {}) => ({ path, title: "T", summary: "S", ...extra })
+      await content(base())
+      expect(await refused("lea", { path: "ventes/x9", title: "T" })).toMatchObject({
+        code: "invalid_arguments",
+        message: "ventes/x9 does not exist: give title and summary (one line, 200 characters max) to create it.",
+      })
+      expect(parseInput(inputSchemas("acme").write, { ctx: "AAAA-BBBB", ...create("ventes/x9"), summary: "s".repeat(201) })).toMatchObject({ issues: expect.stringMatching(/^summary: /) })
+      expect(await refused("lea", create("ventes/x9", { title: "a\nb" }))).toMatchObject({ code: "invalid_arguments", message: "title and summary hold on one line (no line break)." })
+      expect(await refused("lea", create("ventes/clients/acme"))).toMatchObject({
+        code: "not_found",
+        message: "Cannot create ventes/clients/acme: its parent ventes/clients does not exist. Closest existing page: ventes. Create ventes/clients first, or choose a path under ventes.",
+      })
+      expect(await refused("paul", create("ventes/nouveau"))).toMatchObject({
+        message: "Cannot create ventes/nouveau: its parent ventes does not exist. Closest existing page: guide. Create ventes first, or choose a path under guide.",
+      })
+      expect(await refused("lea", create("guide/x"))).toMatchObject({
+        code: "invalid_arguments",
+        message: "guide is the organisation's guide, the root of the tree: its children have paths without prefix, e.g. ventes/notes.",
+      })
+      expect(await refused("marc", create("conseil/nouveau"))).toMatchObject({
+        code: "forbidden",
+        message: "Writing under conseil is reserved to the administrators of Acme Test (Ada Martin). Ask them for access.",
+      })
+      const occupied = { code: "conflict", message: "Path ventes/confidentiel is not available: choose another path." }
+      await content(base([{ path: "ventes/confidentiel" }], [{ node: "ventes/confidentiel", user: "lea", level: "none" }]))
+      expect(await refused("lea", create("ventes/confidentiel"))).toMatchObject(occupied)
+      // Une autre personne prend le chemin entre le contrôle du service et son insertion : la base la refuse (23505).
+      await content(base())
+      const race = await write("lea", create("ventes/confidentiel"), {
+        hook: async (call) => {
+          if (inserts(call, "nodes")) await ref.addNodes([{ path: "ventes/confidentiel" }])
+        },
+      })
+      expect(race.error).toMatchObject(occupied)
+      // Un tableau se crée avec son en-tête (E07-S04, AC2) : sans lui, rien n'est écrit.
+      expect(await refused("lea", create("ventes/tableau", { kind: "table" }))).toMatchObject({
+        code: "invalid_arguments",
+        message: 'Creating a table needs header {columns, key}: read the contract with acme_read {"path": "write.table"}.',
+      })
+      expect(await refused("lea", create("ventes/x9", { header: {} }))).toMatchObject({ message: "header applies only to tables; ventes/x9 is a page." })
+      expect(await refused("lea", create("ventes/x9", { kind: "procedure", header: {} }))).toMatchObject({ message: "header applies only to tables; ventes/x9 is a procedure." })
+    })
+
+    it("should leave neither node nor draft when a creation stops after its first writes, and let it be replayed (AC-x4)", async () => {
+      const input = { path: "ventes/cr_test", kind: "page", title: "CR de test", summary: "Compte rendu de test", ops: [{ op: "add_section", section: "Décisions", text: "Lancer la pré-étude." }] }
+      await content(base())
+      // Le nœud inséré et son brouillon ouvert, l'insertion de ses blocs tombe en panne : tout est annulé.
+      const failed = await write("lea", input, { hook: (call) => (inserts(call, "blocks") ? { code: "57014" } : null) })
+      expect(failed.error).toMatchObject({ code: "internal", message: "Internal error." })
+      expect([failed.calls.filter((call) => inserts(call, "nodes")).length, functionCalls(failed.calls, "open_draft").length]).toEqual([1, 1])
+      expect([await nodeRow("ventes/cr_test"), await draftsOfO()]).toEqual([undefined, []])
+      // Rejouée (« Retry once » du MCP), la création passe, sans rien en double.
+      const replayed = await write("lea", input)
+      expect(replayed.error).toBeNull()
+      expect((await blockRows("ventes/cr_test", "draft")).map((row) => row.text)).toEqual(["Décisions", "Lancer la pré-étude."])
+    })
+  })
+
+  describe("write — edits (AC21, AC26, AC27, AC28)", () => {
+    it("should leave no draft open when an edit stops after opening it: the draft opens in the transaction of the write (AC-x4, M32)", async () => {
+      await content(devis(1))
+      // Aucun brouillon au départ : l'écriture l'ouvre, puis l'écriture de ses blocs tombe en panne.
+      const writesBlocks = (call: SpiedCall) => call.kind === "sql" && /^\s*(insert\s+into|update)\s+platform\.blocks\b/i.test(call.text)
+      const failed = await write("lea", { path: "ventes/devis", base_revision: 1, ops: [{ op: "append", section: "Objet", text: "Relancer." }] }, {
+        hook: (call) => (writesBlocks(call) ? { code: "57014" } : null),
+      })
+      expect(failed.error).toMatchObject({ code: "internal", message: "Internal error." })
+      expect(functionCalls(failed.calls, "open_draft")).toHaveLength(1)
+      expect(await draftsOfO()).toEqual([])
+    })
+
+    it("should refuse a missing or stale revision with the current state, and a reader, writing nothing (AC21)", async () => {
+      const state = [
+        "# Devis (revision 4, published)",
+        "- Objet (47 characters)",
+        "- Étapes (44 characters)",
+        "  - Cas particulier (33 characters)",
+        "Read what you need, then write again with base_revision 4.",
+      ].join("\n")
+      const op = { op: "append", section: "Objet", text: "x" }
+      await content(devis(4))
+      const missing = await write("lea", { path: "ventes/devis", ops: [op] })
+      expect(missing.error).toMatchObject({
+        code: "stale_revision",
+        message: `stale revision: ventes/devis is at revision 4 and base_revision is missing. Nothing was written. Current state:\n${state}`,
+        details: { revision: 4 },
+      })
+      const stale = await write("lea", { path: "ventes/devis", base_revision: 3, ops: [op] })
+      expect(stale.error).toMatchObject({ message: `stale revision: ventes/devis is at revision 4, not 3. Nothing was written. Current state:\n${state}` })
+      await content(base([{ path: "conseil/methode_etude" }]))
+      const marc = await write("marc", { path: "conseil/methode_etude", base_revision: 1, ops: [op] })
+      expect(marc.error).toMatchObject({
+        code: "forbidden",
+        message: "Writing conseil/methode_etude is reserved to the administrators of Acme Test (Ada Martin). Ask them for access.",
+      })
+      for (const outcome of [missing, stale, marc]) expect(writes(outcome.calls)).toEqual([])
+    })
+
+    it("should write nothing at all when an operation is refused, on a page or a creation (AC22, AC23)", async () => {
+      const unknown = { op: "append", section: "Budget", text: "x" }
+      const refusal = { code: "invalid_arguments", message: "Op 1 (append « Budget »): unknown section « Budget ». Sections: « Objet », « Étapes », « Cas particulier ». Nothing was written." }
+      // Ni `open_draft` sur la page sans brouillon, ni nœud en révision 0 pour une création refusée.
+      await content(devis())
+      const edit = await write("lea", { path: "ventes/devis", base_revision: 1, ops: [unknown] })
+      await content(base())
+      const creation = await write("lea", { path: "ventes/cr_x", title: "CR", summary: "CR.", ops: [{ op: "add_section", section: "A", text: "# Titre" }] })
+      expect([edit.error, writes(edit.calls)]).toMatchObject([refusal, []])
+      expect([creation.error, writes(creation.calls)]).toMatchObject([{ code: "invalid_arguments", message: expect.stringMatching(/^Op 1 \(add_section « A »\): line 1 /) }, []])
+    })
+
+    it("should refuse a write with nothing to write (AC26)", async () => {
+      await content(devis())
+      for (const input of [{ path: "ventes/devis", base_revision: 1 }, { path: "ventes/devis", base_revision: 1, ops: [] }]) {
+        expect((await write("lea", input)).error).toMatchObject({
+          code: "invalid_arguments",
+          message: "Nothing to write: give ops, title, summary or header, or publish: true.",
+        })
+      }
+    })
+
+    it("should keep the title, summary and kind pending in node_drafts, and refuse what a kind forbids (AC27)", async () => {
+      await content(devis())
+      const lea = await write("lea", { path: "ventes/devis", base_revision: 1, title: "Relance d'un devis", summary: "Relancer un devis." })
+      expect(lea.result?.text).toBe(
+        "Draft of ventes/devis saved on revision 1: title « Relance d'un devis », summary « Relancer un devis. ».\nPublishing ventes/devis is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+      )
+      expect(ref.readable(await draftsOfO())).toMatchObject([{ node_id: "node:ventes/devis", title: "Relance d'un devis", summary: "Relancer un devis.", updated_by: "user-lea" }])
+      expect(await nodeRow("ventes/devis")).toMatchObject({ title: "Devis" })
+      await content(devis())
+      await write("lea", { path: "ventes/devis", base_revision: 1, kind: "procedure" })
+      expect(await draftsOfO()).toMatchObject([{ kind: "procedure" }])
+      const tables = base([{ path: "ventes/suivi", kind: "table" }, { path: "ventes/proc", kind: "procedure" }])
+      const cases: [Record<string, unknown>, string, string][] = [
+        [{ path: "ventes/suivi", kind: "page" }, "invalid_arguments", "ventes/suivi is a table: its kind cannot change."],
+        [{ path: "ventes/devis", kind: "table" }, "invalid_arguments", "A page cannot become a table: create the table at a new path."],
+        [{ path: "ventes/suivi", ops: [{ op: "append", section: "x", text: "y" }] }, "invalid_arguments", "ventes/suivi is a table: it has no sections. Write its rows with acme_call table.write."],
+        // Un en-tête vide ne change rien au tableau (E07-S04) : rien à écrire.
+        [{ path: "ventes/suivi", header: {} }, "invalid_arguments", "Nothing to write: give ops, title, summary or header, or publish: true."],
+        [{ path: "ventes/devis", header: {} }, "invalid_arguments", "header applies only to tables; ventes/devis is a page."],
+        [{ path: "ventes/proc", header: {} }, "invalid_arguments", "header applies only to tables; ventes/proc is a procedure."],
+        [{ path: "ventes/contexte", header: {} }, "invalid_arguments", "header applies only to tables; ventes/contexte is a context page."],
+        [{ path: "ventes/contexte", kind: "procedure" }, "invalid_arguments", "ventes/contexte is a context page: its kind cannot change."],
+      ]
+      await content(tables)
+      for (const [input, code, message] of cases) {
+        expect((await write("claire", { base_revision: 1, ...input })).error, message).toMatchObject({ code, message })
+      }
+      // Le titre en attente d'un tableau ne touche pas ses lignes : elles ne passent jamais par le brouillon.
+      await ref.write({ blocks: [{ id: "row-1", state: "published", org_id: "org-acme", node_id: "node:ventes/suivi", position: null, type: "row", text: null, data: {}, key: "P-001", provenance: {}, revision: 1 }] })
+      const titled = await write("claire", { path: "ventes/suivi", base_revision: 1, title: "Suivi des prospects" })
+      expect([titled.error, ref.readable(await draftsOfO())]).toMatchObject([null, [{ node_id: "node:ventes/suivi", title: "Suivi des prospects" }]])
+      expect(titled.calls.filter((call) => isWrite(call) && touches(call, "blocks"))).toEqual([])
+    })
+
+    it("should mark what an assistant or a person writes, bump the revision on content only, and write well-formed text (AC28)", async () => {
+      const tables = devis()
+      const [objet, , etapes] = tables.blocks.map((row) => String(row.id))
+      const ops = [
+        { op: "replace_block", block: "objet", text: "## Objet du devis" },
+        { op: "move_block", block: "etapes" },
+        { op: "append", section: "Objet du devis", text: "Demi \ud83d paire." },
+      ]
+      await content(tables)
+      const lea = ref.people.lea.id
+      const agent = await write("lea", { path: "ventes/devis", base_revision: 1, ops })
+      expect(agent.error).toBeNull()
+      const drafted = await blockRows("ventes/devis", "draft")
+      const published = await blockRows("ventes/devis", "published")
+      // Le contenu changé : révision + 1, écrit par Léa, provenance de l'assistant.
+      const replaced = drafted.find((row) => row.id === ref.id(objet))
+      expect(replaced).toMatchObject({ text: "Objet du devis", revision: 2, updated_by: lea })
+      expect(replaced?.provenance).toEqual({ origin: "agent", by: lea, ctx: "7K3Q-M2XA", at: expect.any(String) })
+      // Le bloc déplacé seulement : sa place change, rien d'autre (la mise à jour n'envoie que `position`), ni sa
+      // révision, ni sa provenance, ni l'auteur de sa dernière écriture.
+      const before = published.find((row) => row.id === ref.id(etapes))
+      const moved = drafted.find((row) => row.id === ref.id(etapes))
+      expect(moved?.provenance).toEqual({})
+      expect(moved).toEqual({ ...before, position: expect.any(Number) })
+      expect(moved?.position).not.toBe(before?.position)
+      // Le bloc neuf, au texte bien formé (moitié de paire remplacée).
+      const inserted = drafted.filter((row) => !published.some((old) => old.id === row.id))
+      expect(inserted).toEqual([
+        expect.objectContaining({ text: "Demi � paire.", created_by: lea, updated_by: lea, provenance: expect.objectContaining({ origin: "agent", ctx: "7K3Q-M2XA" }) }),
+      ])
+      const humanTables = devis()
+      await content(humanTables)
+      const human = await write("lea", { path: "ventes/devis", base_revision: 1, ops: [ops[0]] }, { origin: { kind: "human" } })
+      expect(human.error).toBeNull()
+      // Par l'écran, la provenance d'une personne : ni `ctx`, ni rien d'autre.
+      const byHand = (await blockRows("ventes/devis", "draft")).find((row) => row.id === ref.id(String(humanTables.blocks[0].id)))
+      expect(byHand?.provenance).toEqual({ origin: "human", by: lea, at: expect.any(String) })
+
+      // Par l'API, `revision` et `input` passent le corps (`writeNodeBodySchema`) jusqu'au service (AC24, AC37).
+      const screen = { origin: { kind: "human" } as const }
+      const checklist = { type: "checklist", data: { items: [{ text: "Relire", checked: true }] } }
+      const aimed = (revision: number, input: Record<string, unknown>) => ({ path: "ventes/devis", base_revision: 1, ops: [{ op: "replace_block", block: ref.id(objet), revision, input }] })
+      await content(tables)
+      const saved = await write("lea", aimed(1, checklist), screen)
+      expect(saved.error).toBeNull()
+      expect((await blockRows("ventes/devis", "draft")).find((row) => row.id === ref.id(objet))).toMatchObject({ type: "checklist", text: null, key: null, revision: 2 })
+      await content(tables)
+      expect((await write("lea", aimed(2, checklist), screen)).error).toMatchObject({
+        code: "stale_revision",
+        message: "stale revision: block objet of ventes/devis is at revision 1, not 2. Nothing was written. Read it again, then retry.",
+        details: { revision: 1 },
+      })
+      const invalid = await write("lea", aimed(1, { type: "heading", text: "Titre", data: { level: 9 } }), screen)
+      expect([invalid.error, writes(invalid.calls)]).toMatchObject([{ code: "invalid_arguments", message: expect.stringMatching(/^Invalid arguments: ops\.0\.input/) }, []])
+    })
+  })
+})

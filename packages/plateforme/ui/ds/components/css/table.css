@@ -1,0 +1,350 @@
+/* Porté d'oto-frontend (src/design-system/components/css/table.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Table, quatre décisions : la ligne à 40 px (32 en dense), prise à `--row-h`, jamais à un padding ; l'en-tête colle dans l'îlot qui défile, pas à la fenêtre ; les en-têtes de colonne en mono capitales, des repères ; sous 768 px le tableau devient des cartes, sans défilement horizontal, mesuré sur l'îlot (container query) autant que sur la fenêtre. */
+
+/* ── la surface du tableau est celle de l'îlot, `--island`, jamais `--card` (la surface de ce qui est posé dans un îlot) : les lignes sont transparentes, et un corps en `--card` sous un en-tête en `--island` faisait deux tons dans le même cadre ; aucune variante creusée n'est posée, personne ne la demande. */
+.oto-table-wrap {
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-table);
+  background: var(--island);
+  overflow: auto;
+  max-block-size: 100%;
+  container-type: inline-size;
+}
+/* posé dans un îlot `data-flush`, le tableau n'a pas besoin de sa propre bordure, celle de l'îlot fait le travail ; la surface est le défaut, elle n'est pas redite */
+.oto-island-body[data-flush] > .oto-table-wrap {
+  border: 0;
+  border-radius: 0;
+}
+
+.oto-table {
+  inline-size: 100%;
+  font-size: var(--fs-sm);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* ── en-tête ─────────────────────────────────────────────────────── */
+.oto-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  /* opaque obligatoire : les lignes passent dessous en défilant */
+  background: var(--island);
+  /* `--hair` et non `--island-bd` : le filet sous l'en-tête est celui qui sépare deux lignes ; en `--island-bd`, un bord d'îlot couperait le tableau en deux. */
+  border-block-end: 1px solid var(--hair);
+  block-size: var(--ctrl-h-sm);
+  padding: 0 var(--space-3);
+  text-align: start;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  /* Regular, pas semibold : un en-tête de colonne est un repère, plus lourd il pèserait plus que la donnée qu'il annonce. */
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* ── tri : `aria-sort` porte l'information, le chevron la montre, en permanence et discret (sans survol au doigt, la fonction n'existerait pas) ; le libellé est un `<button>` (`.oto-th-sort`), sinon aucun tri au clavier. */
+.oto-table th[aria-sort] { user-select: none; transition: var(--tr-colors); }
+.oto-table th[aria-sort]:hover { color: var(--ink); }
+.oto-table th[aria-sort="ascending"],
+.oto-table th[aria-sort="descending"] { color: var(--ink); }
+
+/* ── la cellule d'en-tête est une ligne (l'intitulé, puis ce qui agit sur la colonne), posée même sans actions ; le flex est sur ce span, jamais sur le `<th>`, qu'il sortirait du modèle de tableau. */
+.oto-table th > .oto-th-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+}
+.oto-table th .oto-th-in { display: inline-flex; align-items: center; gap: var(--space-1-5); }
+
+/* ── trier et filtrer se font sur la colonne : les actions se révèlent au survol de l'en-tête et au focus clavier (`:focus-within`), seize icônes permanentes feraient un tableau de boutons. */
+.oto-table th > .oto-th-cell > .oto-th-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin-inline-start: auto;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+.oto-table th:hover .oto-th-actions,
+.oto-table th .oto-th-actions:focus-within { opacity: 1; }
+/* Un filtre posé reste visible sans survol : sinon rien ne dit que le tableau ne montre pas tout. */
+.oto-table th .oto-th-actions[data-on] { opacity: 1; }
+
+/* Le bouton ne réintroduit aucun style de bouton : seuls le curseur, le rayon (l'anneau épouse la cible) et la remise à zéro du chrome natif sont à lui. */
+.oto-table th .oto-th-sort {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  border-radius: var(--r-ctrl);
+}
+.oto-table th .oto-th-sort:hover { color: var(--ink); }
+
+.oto-table th .oto-sort-icon {
+  /* Sans `flex: none`, le repère se laissait comprimer à côté d'un libellé qui réclame la place, un chevron réduit à un trait. */
+  flex: none;
+  opacity: .45;
+  transition: opacity var(--dur-fast) var(--ease-standard),
+              color var(--dur-fast) var(--ease-standard);
+}
+.oto-table th:hover .oto-sort-icon { opacity: 1; }
+/* Au clavier aussi : ce que le survol révèle doit l'être sans souris. */
+.oto-table th .oto-th-sort:focus-visible .oto-sort-icon { opacity: 1; }
+/* la colonne triée : le chevron passe au primary, le seul endroit du tableau où il apparaît, donc il se repère */
+.oto-table th[aria-sort="ascending"] .oto-sort-icon,
+.oto-table th[aria-sort="descending"] .oto-sort-icon { opacity: 1; color: var(--primary-text); }
+
+/* ── la profondeur de l'en-tête collant : une ombre seulement une fois défilé ; sur un tableau de trois lignes, elle ferait flotter un objet pour rien. */
+@supports (animation-timeline: scroll()) {
+  .oto-table thead th {
+    animation: oto-th-lift linear both;
+    animation-timeline: scroll(nearest block);
+    animation-range: 0 8px;
+  }
+  @keyframes oto-th-lift {
+    to { box-shadow: 0 4px 10px -6px color-mix(in srgb, var(--ink) 40%, transparent); }
+  }
+}
+
+/* ── cellules ────────────────────────────────────────────────────── */
+.oto-table tbody td,
+.oto-table tbody th[scope="row"] {
+  block-size: var(--row-h);
+  padding: 0 var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  /* ── le corps se lit en `--mute`, la première colonne à l'encre : l'identifiant de la ligne est l'entrée de l'œil ; les cellules numériques restent à l'encre. */
+  color: var(--mute);
+  vertical-align: middle;
+  /* Sans `nowrap`, une colonne de trop s'écrase au lieu de déborder, et le tableau ne glisse plus dans son îlot ; la bascule en cartes le remet à `normal`. */
+  white-space: nowrap;
+}
+.oto-table tbody td[data-primary] { color: var(--ink); font-weight: var(--fw-medium); }
+/* L'en-tête de ligne (la clé d'une vue rendue par un écran serveur, `TableServeur`) se lit comme la cellule primaire : ajout du paquet, oto-frontend n'en rend pas (M31). */
+.oto-table tbody th[scope="row"] { color: var(--ink); font-weight: var(--fw-medium); text-align: start; }
+.oto-table tbody tr:last-child :is(td, th) { border-block-end: 0; }
+
+/* ── une cellule de texte se tronque, elle seule (`[data-clip]`, posé par l'enveloppe) : sur une cellule à contrôles, `overflow: hidden` rognerait l'anneau de focus, et l'ellipse ne vaut que pour un contenu en ligne ; l'enveloppe ne le pose que sur un texte ou un nombre, dont elle sait redire le texte entier. */
+.oto-table tbody td[data-clip] {
+  max-inline-size: var(--table-cell-max);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Une cellule tronquée devient focalisable (`tabindex="0"`, seulement quand le texte déborde) : l'anneau, `inset`, montre au clavier où il arrive. */
+.oto-table tbody td[data-clip]:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+/* L'infobulle d'une cellule tronquée, une variante de `.oto-tooltip` (0,2,0), qui la bat quel que soit l'ordre des fichiers : `--reader-measure` (un texte, pas une légende), `pre-wrap`, `anywhere` ; hauteur bornée à 60 % de l'écran, le texte entier reste dans la cellule pour les lecteurs d'écran. */
+.oto-tooltip.oto-cell-tip {
+  max-inline-size: var(--reader-measure);
+  max-block-size: 60vh;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Les colonnes numériques alignées à droite et en tabulaire, pour comparer d'un coup d'œil ; la règle porte aussi sur le `<th>`, sinon l'intitulé ne surmonte pas ses chiffres. */
+.oto-table [data-align="end"],
+.oto-table [data-numeric] {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+/* Le chiffre est la donnée, pas une légende : il se lit à l'encre ; restreint à `td`, sur un `<th>` il écraserait la mono capitales de l'en-tête. */
+.oto-table td[data-numeric] { font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink); }
+.oto-table [data-align="center"] { text-align: center; }
+
+/* ── lignes ──────────────────────────────────────────────────────── */
+.oto-table tbody tr { transition: background-color var(--dur-instant) var(--ease-standard); }
+/* ── le survol est un voile, pas une surface : un voile d'encre à 4 % se compose avec ce qu'il y a dessous, là où `--hair`, opaque, virait au gris et effaçait la teinte de la ligne. */
+.oto-table tbody tr:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.oto-table tbody tr[aria-selected="true"] { background: var(--oto-bg); }
+.oto-table tbody tr[data-state="review"] { background: var(--oto-bg); }
+/* ── une ligne écrite par une exécution se voit (au primary à 8 %, transparente) : rien d'autre ne distingue ce qu'une machine vient d'ajouter. */
+.oto-table tbody tr[data-state="new"] { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+/* sélectionnée et survolée : sans ceci, le survol effaçait la sélection */
+.oto-table tbody tr[aria-selected="true"]:hover,
+.oto-table tbody tr[data-state="review"]:hover {
+  background: color-mix(in srgb, var(--primary) 18%, var(--island));
+}
+.oto-table tbody tr[data-state="new"]:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.oto-table tbody tr:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+
+/* ── le repère de ligne, une barre de 2 px au bord de la première cellule : une forme, pas seulement une couleur, lisible en niveaux de gris. */
+.oto-table tbody tr[data-state] > td:first-child { box-shadow: inset 2px 0 0 currentColor; }
+.oto-table tbody tr[data-state="review"] > td:first-child { color: var(--st-review); }
+.oto-table tbody tr[data-state="failed"] > td:first-child { color: var(--st-fail); }
+.oto-table tbody tr[data-state="running"] > td:first-child { color: var(--st-run); }
+/* la barre ne doit pas teindre le contenu de la cellule qu'elle borde */
+.oto-table tbody tr[data-state] > td:first-child > * { color: var(--ink); }
+/* `new` écrit sa barre en dur : le détour par `currentColor` teindrait le texte nu de la première cellule. */
+.oto-table tbody tr[data-state="new"] > td:first-child {
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+/* ── colonne de sélection ────────────────────────────────────────── */
+.oto-table .oto-table-select { inline-size: 40px; padding-inline: var(--space-3); }
+
+/* ── colonne collante (la première, en général le nom) ────────────── */
+/* La colonne collante peint la même surface que l'enveloppe, opaque : les autres colonnes passent dessous, sans bande grise. */
+.oto-table [data-sticky] {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--island);
+}
+.oto-table thead [data-sticky] { z-index: 3; background: var(--island); }
+.oto-table tbody tr:hover [data-sticky] { background: var(--hair); }
+
+/* ── colonnes redimensionnables : la poignée de 8 px ne se voit qu'au survol, une ligne permanente ferait une grille de tableur. */
+.oto-table th { position: sticky; }
+.oto-resize-handle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: -4px;
+  inline-size: 8px;
+  cursor: col-resize;
+  z-index: 4;
+  touch-action: none;
+}
+.oto-resize-handle::after {
+  content: "";
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 3px;
+  inline-size: 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.oto-resize-handle:hover::after,
+.oto-resize-handle[data-dragging]::after { background: var(--primary); }
+
+/* ── ligne vide ──────────────────────────────────────────────────── */
+.oto-table-empty td { block-size: auto; padding: var(--space-10) var(--space-4); text-align: center; }
+
+/* Une ligne devient une carte : chaque cellule affiche son en-tête par `data-label`, du CSS pur ; deux déclencheurs, le palier de la fenêtre (768 px) et le conteneur trop étroit (560 px), car la largeur du conteneur n'est pas monotone avec la fenêtre ; les deux blocs sont identiques et se modifient ensemble. */
+
+/* ── déclencheur 1 · le palier du produit */
+@media (max-width: 767px) {
+  .oto-table[data-responsive="cards"] thead { display: none; }
+
+  .oto-table[data-responsive="cards"],
+  .oto-table[data-responsive="cards"] tbody { display: block; }
+
+  .oto-table[data-responsive="cards"] tbody tr {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--island-bd);
+    border-radius: var(--r-card);
+    padding: var(--space-1) var(--space-3);
+    margin-block-end: var(--space-2);
+  }
+  .oto-table[data-responsive="cards"] tbody tr:last-child { margin-block-end: 0; }
+
+  .oto-table[data-responsive="cards"] tbody td {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    block-size: auto;
+    min-block-size: var(--touch);
+    padding: var(--space-1-5) 0;
+    border-block-end: 1px solid var(--hair);
+    text-align: start !important;
+    position: static;
+    white-space: normal;
+    /* La troncature n'a plus de sens dans une carte : le texte se replie, et le `tabindex` de l'enveloppe se retire seul. */
+    max-inline-size: none;
+    overflow: visible;
+  }
+  .oto-table[data-responsive="cards"] tbody td:last-child { border-block-end: 0; }
+
+  .oto-table[data-responsive="cards"] tbody td::before {
+    content: attr(data-label);
+    flex: none;
+    inline-size: 38%;
+    font-family: var(--mono);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tr-mono);
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .oto-table[data-responsive="cards"] tbody td:not([data-label])::before { content: none; }
+  .oto-table[data-responsive="cards"] tbody td[data-primary] {
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-base);
+  }
+  .oto-table[data-responsive="cards"] tbody td[data-primary]::before { content: none; }
+  .oto-table[data-responsive="cards"] .oto-table-select { inline-size: auto; }
+}
+
+/* ── déclencheur 2 · le tableau est trop étroit pour lui-même ────── */
+@container (max-width: 560px) {
+  .oto-table[data-responsive="cards"] thead { display: none; }
+
+  .oto-table[data-responsive="cards"],
+  .oto-table[data-responsive="cards"] tbody { display: block; }
+
+  .oto-table[data-responsive="cards"] tbody tr {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--island-bd);
+    border-radius: var(--r-card);
+    padding: var(--space-1) var(--space-3);
+    margin-block-end: var(--space-2);
+  }
+  .oto-table[data-responsive="cards"] tbody tr:last-child { margin-block-end: 0; }
+
+  .oto-table[data-responsive="cards"] tbody td {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    block-size: auto;
+    min-block-size: var(--touch);
+    padding: var(--space-1-5) 0;
+    border-block-end: 1px solid var(--hair);
+    text-align: start !important;
+    position: static;
+    white-space: normal;
+    /* La troncature n'a plus de sens dans une carte : le texte se replie, et le `tabindex` de l'enveloppe se retire seul. */
+    max-inline-size: none;
+    overflow: visible;
+  }
+  .oto-table[data-responsive="cards"] tbody td:last-child { border-block-end: 0; }
+
+  /* l'en-tête de colonne redevient une étiquette, en mono capitales */
+  .oto-table[data-responsive="cards"] tbody td::before {
+    content: attr(data-label);
+    flex: none;
+    inline-size: 38%;
+    font-family: var(--mono);
+    font-size: var(--fs-2xs);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tr-mono);
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  /* une cellule sans `data-label` (la case à cocher, les actions) prend toute la largeur au lieu d'afficher une étiquette vide */
+  .oto-table[data-responsive="cards"] tbody td:not([data-label])::before { content: none; }
+  .oto-table[data-responsive="cards"] tbody td[data-primary] {
+    font-weight: var(--fw-semibold);
+    font-size: var(--fs-base);
+  }
+  .oto-table[data-responsive="cards"] tbody td[data-primary]::before { content: none; }
+  .oto-table[data-responsive="cards"] .oto-table-select { inline-size: auto; }
+}

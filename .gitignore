@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Supabase local runtime
+.supabase/
+# Fichiers de `supabase link` (référence du projet lié)
+supabase/.temp/
+
+# Testing
+test-results/
+playwright-report/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# TypeScript
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Lighthouse CI (rapports locaux)
+.lighthouseci/
+
+# Turbo
+.turbo/
+
+# Claude Code
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/skills/
+# Reçu de vérification : purement local, il atteste que les checks ont tourné sur CE code
+.claude/.verify-receipt.json
+
+# Playwright MCP (captures et journaux de session)
+.playwright-mcp/
+
+# Contrôle pré-public (ADR-010 § 4) : noms de clients réels lus par `pnpm check:public`, jamais commités
+.public-denylist
+
+# Export d'une organisation (`pnpm org:export`, E09-S04) : emails et contenu d'un client, jamais commités
+*.org-export.json

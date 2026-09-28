@@ -1,0 +1,41 @@
+# Supabase local development configuration
+# Docs: https://supabase.com/docs/guides/cli/config
+
+[api]
+enabled = true
+port = 54321
+# `platform` n'est pas exposé (E01-S10 f2, fiche D80) : le paquet le lit par sa propre connexion
+# (`PLATFORM_DATABASE_URL`), sous l'appelant vérifié. Exposé, il rouvrirait l'accès direct aux tables par
+# le Data API, que seule la RLS d'isolation borne (E01-S08). Le projet se règle par `pnpm data-api:close`.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+# Le lien d'un email ramène à l'adresse d'où on l'a demandé (`localhost`, `demo.localhost`, E02-S01 N2).
+additional_redirect_urls = ["https://localhost:3000", "http://localhost:3000/**", "http://*.localhost:3000/**"]
+
+[auth.email]
+# Fiche D1, option B (E02-S01) : inscription ouverte, filtrée par le hook « Before User Created »,
+# qui n'accepte une création de compte que si une invitation attend cette adresse. Pile locale
+# seulement : le projet cloud se règle dans son dashboard (action JB).
+enable_signup = true
+double_confirm_changes = true
+# H12 : seul un email vérifié entre. Sans confirmation, une inscription par mot de passe à une
+# adresse invitée serait confirmée d'office et `accept_invitations` l'accepterait.
+enable_confirmations = true
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/platform/hook_before_user_created"

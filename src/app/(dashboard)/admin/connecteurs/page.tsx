@@ -1,0 +1,55 @@
+import type { Metadata } from "next"
+import Link from "next/link"
+import { redirect } from "next/navigation"
+import {
+  deactivationImpact,
+  isOrgAdmin,
+  listConnectorsForOrg,
+  listOrgAccounts,
+  listTeams,
+  type Identity,
+  type PlatformDb,
+} from "@otomata_tech/oto_platform/server"
+import {
+  EcranConnecteurs,
+  reserveAuxAdministrateurs,
+  resultatDe,
+  type DonneesDesConnecteurs,
+  type EcranConnecteursProps,
+} from "@otomata_tech/oto_platform/ui"
+import { getPlatformIdentitySafely } from "@/lib/plateforme/session"
+import { ADRESSES } from "../adresses"
+
+// « Connecteurs » (E08-S03) : réservée à qui administre l'organisation de l'adresse, décidé ici par
+// `isOrgAdmin` avant tout appel (AC1, N1) ; chaque service redécide son droit. La page lit le
+// catalogue, les comptes et les équipes avec le jeton de la session, puis l'impact de la désactivation
+// de chaque connecteur actif ; l'écran écrit par `/api/plateforme/admin/*`.
+export const metadata: Metadata = {
+  title: "Connecteurs",
+  robots: { index: false },
+}
+
+const ECHEC = { error: "Une erreur est survenue. Réessayez." } as const
+const ICI = "/admin/connecteurs"
+
+async function lire(db: PlatformDb, identity: Identity): Promise<DonneesDesConnecteurs> {
+  // Trois lectures indépendantes, en parallèle (`performance-patterns.md § Data Fetching Performance`).
+  const [connectors, accounts, teams] = await Promise.all([listConnectorsForOrg(db, identity), listOrgAccounts(db, identity), listTeams(db, identity)])
+  const actifs = connectors.filter((connecteur) => connecteur.state === "active")
+  const impacts = await Promise.all(actifs.map(async ({ connector }) => [connector, await deactivationImpact(db, identity, connector)] as const))
+  return { connectors, impacts: Object.fromEntries(impacts), accounts, options: { teams: teams.map(({ id, name }) => ({ id, name })) } }
+}
+
+export default async function ConnecteursPage() {
+  // La session et l'appartenance se revérifient ici, hors de tout `try` : le layout n'est pas une
+  // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
+  const identite = await getPlatformIdentitySafely("admin/connecteurs")
+  if (identite?.error?.code === "unauthenticated") redirect("/login")
+  if (identite?.error) redirect("/aucune-organisation")
+
+  const administre = identite ? isOrgAdmin(identite.data.identity) : false
+  let resultat: EcranConnecteursProps["resultat"] = ECHEC
+  if (identite && !administre) resultat = { error: reserveAuxAdministrateurs(identite.data.identity.org.name) }
+  else if (identite) resultat = await resultatDe(lire(identite.data.session.db, identite.data.identity))
+  return <EcranConnecteurs resultat={resultat} Lien={Link} ici={ICI} fil={{ adresses: ADRESSES, administre }} />
+}

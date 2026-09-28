@@ -1,0 +1,67 @@
+/* Porté d'oto-frontend (src/design-system/components/css/card.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Card : 8 px, une carte CONTIENT et vit dans un îlot ; `--card` est une surface d'un pas plus haute que `--island` (1,09), assez pour se distinguer, jamais pour se lire comme un second îlot ; pas d'ombre, l'élévation est réservée à ce qui flotte. */
+
+.oto-card {
+  background: var(--card);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  padding: var(--space-3) var(--space-3-5);
+  min-inline-size: 0;
+}
+
+.oto-card[data-flush] { padding: 0; overflow: hidden; }
+
+/* Une carte cliquable : le survol relève la bordure d'un cran, comme un bouton secondaire, sans ombre ; elle reste posée dans l'îlot. */
+.oto-card[data-interactive] {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  transition: var(--tr-colors), var(--tr-press);
+}
+.oto-card[data-interactive]:hover { border-color: color-mix(in srgb, var(--ink) 28%, var(--island-bd)); }
+.oto-card[data-interactive]:active { transform: scale(.995); }
+.oto-card[data-selected] { background: var(--oto-bg); border-color: var(--primary); }
+
+.oto-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+.oto-card-title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-lg);
+  line-height: var(--lh-snug);
+  min-inline-size: 0;
+}
+.oto-card-head > .oto-card-actions { margin-inline-start: auto; display: flex; gap: var(--space-1); }
+.oto-card-body  { font-size: var(--fs-sm); color: var(--mute); }
+.oto-card-foot  {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-block-start: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--hair);
+}
+
+/* ── la tuile de chiffre : le KPI en chiffres tabulaires et l'étiquette en mono capitales ; une valeur qui change ne fait pas danser la mise en page. */
+.oto-stat { display: flex; flex-direction: column; gap: var(--space-1); }
+.oto-stat-value {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tr-3xl);
+  line-height: var(--lh-tight);
+  font-variant-numeric: tabular-nums;
+}
+.oto-stat-label {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.oto-stat-delta { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.oto-stat-delta[data-dir="up"]   { color: var(--st-ok-text); }
+.oto-stat-delta[data-dir="down"] { color: var(--st-fail-text); }

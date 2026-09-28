@@ -1,0 +1,324 @@
+/* Porté d'oto-frontend (src/design-system/components/css/procedure.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* L'écran procédure (VersionList, AgentPlan, AgentFlow) : le CSS est la source de vérité ; ces motifs d'un seul écran entrent au DS parce que le CSS est la seule façon de les dessiner (aucun utilitaire ne trace une flèche) ; le schéma se replie, il ne s'agrandit pas dans une seconde surface, qui serait une seconde vérité sur le même dessin. */
+
+/* VersionList : ce que la procédure a appris, une histoire et pas un écran de plus ; posée sous l'en-tête de l'îlot, sur un fond à peine plus sombre, un tiroir de l'en-tête. */
+
+.oto-version-list {
+  padding: var(--space-2) var(--island-pad) var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  background: color-mix(in oklab, var(--ink) 2.5%, transparent);
+}
+
+.oto-version {
+  display: flex;
+  gap: var(--space-2-5);
+  padding: var(--space-2) var(--space-1);
+}
+.oto-version + .oto-version { border-block-start: 1px solid var(--hair); }
+
+/* Le numéro se cale en haut, pas au centre : sur un résumé de deux lignes, centré, il flotterait au milieu du texte. */
+.oto-version-number {
+  flex: none;
+  align-self: flex-start;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  color: var(--mute);
+  background: color-mix(in oklab, var(--ink) 7%, transparent);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+}
+
+.oto-version-text {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+
+/* D'où vient la version (« depuis votre refus du 2 août ») : la moitié utile de l'histoire, sans elle une pile de phrases sans auteur. */
+.oto-version-source {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin-block-start: var(--space-px);
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+}
+.oto-version-source > .oto-icon { flex: none; }
+
+/* AgentPlan : une bande, pas une carte ; le schéma appartient à l'îlot des instructions et se lit avant le texte, dont il n'est qu'une lecture. */
+
+.oto-plan {
+  border-block-end: 1px solid var(--hair);
+  background: color-mix(in oklab, var(--primary) 3%, var(--island));
+}
+
+.oto-plan-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--island-pad);
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+.oto-plan-head > .oto-icon { flex: none; color: var(--title); }
+
+/* La géométrie de l'étirement est générique (`[data-stretch]`, `app/islands.css`) ; ne reste ici que ce qui appartient à cette bande. */
+.oto-plan-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.oto-plan-toggle > .oto-icon { flex: none; color: var(--title); }
+/* `z-index: 2` et pas seulement `position: relative` : le pseudo-élément étiré (`z-index: 1`), peint en dernier à rang égal, recouvrait les commandes et avalait leurs clics. */
+.oto-plan-actions { position: relative; z-index: 2; }
+
+.oto-plan-title {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--title);
+}
+
+/* Les commandes se calent au bout de la bande par une marge automatique : le titre et sa légende restent collés à gauche. */
+.oto-plan-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Replié : le chevron pointe vers la droite, comme partout ailleurs (rail, ligne pliable, arbre des contenus). */
+.oto-plan-actions > [aria-expanded="false"] > .oto-icon { rotate: -90deg; }
+
+.oto-plan-body { padding: 0 var(--island-pad) var(--island-pad); }
+
+/* AgentFlow : pas de moteur de placement ; une colonne de nœuds, un embranchement est une paire de voies qui se referme d'elle-même ; tout en pseudo-éléments, sans SVG ni coordonnée ; dans la bande, de gauche à droite pour rester bas. */
+
+.oto-flow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-5);
+  overflow-x: auto;
+  padding-block: var(--space-2);
+}
+.oto-flow > * { flex: none; position: relative; }
+
+/* Le lien entre deux nœuds, un trait et sa pointe : un carré tourné de 45° dont on garde deux bords, un chevron sans glyphe ni police. */
+.oto-flow > * + *::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: calc(var(--space-5) * -1);
+  inline-size: var(--space-5);
+  block-size: 1px;
+  background: color-mix(in oklab, var(--ink) 24%, transparent);
+}
+.oto-flow > * + *::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: -7px;
+  inline-size: 5px;
+  block-size: 5px;
+  rotate: 45deg;
+  translate: 0 -50%;
+  border-block-start: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+  border-inline-end: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+}
+
+/* ── le même graphe, empilé (`data-vertical`) : seuls la direction et le tracé des liens changent, retournés d'un quart de tour. */
+.oto-flow[data-vertical] {
+  flex-direction: column;
+  align-items: center;
+  overflow-x: visible;
+}
+.oto-flow[data-vertical] > * + *::before {
+  inset-block-start: calc(var(--space-5) * -1);
+  inset-inline-start: 50%;
+  inline-size: 1px;
+  block-size: var(--space-5);
+}
+.oto-flow[data-vertical] > * + *::after {
+  inset-block-start: -7px;
+  inset-inline-start: 50%;
+  rotate: 135deg;
+  translate: -50% 0;
+}
+/* Le choix reste côte à côte : empilé dans un flux vertical, « ou bien, ou bien » se lirait comme deux étapes qui se suivent. */
+.oto-flow[data-vertical] > .oto-flow-split {
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--space-5);
+}
+.oto-flow[data-vertical] > .oto-flow-split > .oto-flow-lane {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.oto-flow-node {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  inline-size: 168px;
+  padding: var(--space-2) var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-ctrl);
+  background: var(--island);
+}
+
+.oto-flow-node-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+}
+.oto-flow-node-title > .oto-icon { flex: none; color: var(--primary); }
+
+/* Ce que l'étape touche (un connecteur, une page) : tronqué plutôt que replié, la boîte garde sa hauteur et la colonne son alignement. */
+.oto-flow-node-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oto-flow-node-tool > .oto-icon { flex: none; color: var(--title); }
+
+/* Les cinq natures de nœud, sans arc-en-ciel : la forme et le filet, jamais une couleur par type ; un état n'est pas une catégorie. */
+.oto-flow-node[data-kind="start"] {
+  inline-size: auto;
+  min-inline-size: 120px;
+  background: color-mix(in oklab, var(--ink) 5%, var(--island));
+  border-color: color-mix(in oklab, var(--ink) 18%, transparent);
+}
+.oto-flow-node[data-kind="start"] > .oto-flow-node-title { color: var(--mute); }
+
+.oto-flow-node[data-kind="choice"] {
+  border-color: color-mix(in oklab, var(--ink) 34%, transparent);
+  background: color-mix(in oklab, var(--ink) 4%, var(--island));
+  font-weight: var(--fw-semibold);
+}
+
+/* L'arrêt, la seule nature à la couleur du thème : la seule qui attend un geste de vous. */
+.oto-flow-node[data-kind="hold"] {
+  border-color: color-mix(in oklab, var(--primary) 45%, transparent);
+  background: color-mix(in oklab, var(--primary) 12%, var(--island));
+}
+.oto-flow-node[data-kind="hold"] > .oto-flow-node-title { font-weight: var(--fw-semibold); }
+
+.oto-flow-node[data-kind="stop"] { border-style: dashed; }
+.oto-flow-node[data-kind="stop"] > .oto-flow-node-title { color: var(--mute); }
+
+.oto-flow-node[data-kind="output"] {
+  border-color: color-mix(in oklab, var(--primary) 30%, transparent);
+  background: color-mix(in oklab, var(--primary) 5%, var(--island));
+}
+
+/* ── l'embranchement : le trait arrive sur un bus vertical qui distribue vers deux voies de même hauteur (centres à 25 % et 75 %), tout se dessine sans mesurer. */
+
+.oto-flow-split {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  justify-content: center;
+}
+.oto-flow-split > .oto-flow-lane { flex: 1 1 0; inline-size: 100%; }
+
+.oto-flow-lane {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.oto-flow-lane > .oto-flow-node { flex: 1; inline-size: auto; }
+
+.oto-flow-lane-label {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: var(--tr-mono);
+  color: var(--mute);
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 7%, transparent);
+}
+
+/* LE BUS : il relie les centres des deux voies, 25 % → 75 %. */
+.oto-flow-split::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset-inline-start: calc(var(--space-3) * -1);
+  inset-block: 25% 25%;
+  inline-size: 1px;
+  background: color-mix(in oklab, var(--ink) 24%, transparent);
+}
+
+/* LA DISTRIBUTION : du bus vers chaque voie, avec sa pointe. */
+.oto-flow-lane::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: calc(var(--space-3) * -1);
+  inline-size: var(--space-3);
+  block-size: 1px;
+  background: color-mix(in oklab, var(--ink) 24%, transparent);
+}
+.oto-flow-lane::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: -7px;
+  inline-size: 5px;
+  block-size: 5px;
+  rotate: 45deg;
+  translate: 0 -50%;
+  border-block-start: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+  border-inline-end: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+}
+
+/* La reprise part de la voie qui continue, pas du milieu du bloc : le nœud suivant perd son lien générique. */
+.oto-flow-split + *::before,
+.oto-flow-split + *::after { display: none; }
+
+.oto-flow-lane[data-next] > .oto-flow-node { position: relative; }
+.oto-flow-lane[data-next] > .oto-flow-node::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 100%;
+  inline-size: var(--space-5);
+  block-size: 1px;
+  background: color-mix(in oklab, var(--ink) 24%, transparent);
+}
+.oto-flow-lane[data-next] > .oto-flow-node::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 50%;
+  inset-inline-start: calc(100% + var(--space-5) - 7px);
+  inline-size: 5px;
+  block-size: 5px;
+  rotate: 45deg;
+  translate: 0 -50%;
+  border-block-start: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+  border-inline-end: 1.5px solid color-mix(in oklab, var(--ink) 34%, transparent);
+}

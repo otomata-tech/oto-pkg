@@ -1,0 +1,105 @@
+// Cas de forme des blocs (E01-S06, AC6, AC7, AC36), partagés par le test unitaire des schémas et
+// par le test de parité avec la base : au moins un cas valide et deux invalides par type. Un cas
+// invalide est refusé par `blockInputSchema` et par la base (`23514`) ; un cas valide passe les deux.
+// Les clés des cas valides sont distinctes : ils s'insèrent tous dans le même brouillon.
+
+export type BlockCase = { name: string; valid: boolean; block: Record<string, unknown> }
+
+const long = (length: number, char = "a") => char.repeat(length)
+
+const valid = (name: string, block: Record<string, unknown>): BlockCase => ({ name, valid: true, block })
+const invalid = (name: string, block: Record<string, unknown>): BlockCase => ({ name, valid: false, block })
+
+/** Blocs de document (page, procédure, Contexte) : écrits dans un brouillon. */
+export const DOCUMENT_CASES: BlockCase[] = [
+  valid("a heading of level 2", { type: "heading", text: "Étapes", data: { level: 2 } }),
+  valid("a heading with a key", { type: "heading", text: "Règles", data: { level: 1 }, key: "regles" }),
+  invalid("a heading of level 4", { type: "heading", text: "Titre", data: { level: 4 } }),
+  invalid("a heading without text", { type: "heading", data: { level: 1 } }),
+  invalid("a heading on two lines", { type: "heading", text: "Titre\nsuite", data: { level: 1 } }),
+  invalid("a blank heading", { type: "heading", text: "   ", data: { level: 1 } }),
+  invalid("a heading of 201 characters", { type: "heading", text: long(201), data: { level: 1 } }),
+  // N40 : `char_length` compte une paire de substitution pour un caractère.
+  valid("a heading of 200 characters outside the basic plane", { type: "heading", text: long(200, "\u{1F600}"), data: { level: 1 } }),
+  invalid("a heading of 201 characters outside the basic plane", { type: "heading", text: long(201, "\u{1F600}"), data: { level: 1 } }),
+
+  valid("a paragraph with a link", { type: "paragraph", text: "Voir [[ventes/devis]]." }),
+  valid("an empty paragraph", { type: "paragraph", text: "" }),
+  valid("a paragraph with free data", { type: "paragraph", text: "Texte.", data: { note: 1 } }),
+  invalid("a paragraph without text", { type: "paragraph" }),
+  invalid("a paragraph with a null text", { type: "paragraph", text: null }),
+  invalid("a paragraph of 100 001 characters", { type: "paragraph", text: long(100_001) }),
+  invalid("a paragraph whose data is an array", { type: "paragraph", text: "Texte.", data: [] }),
+
+  valid("an ordered list from 3", { type: "list", data: { items: ["Réserve", "Écris"], ordered: true, start: 3 } }),
+  valid("a list starting at 1.5", { type: "list", data: { items: ["a"], start: 1.5 } }),
+  invalid("a list with a text", { type: "list", text: "a", data: { items: ["a"] } }),
+  invalid("a list without items", { type: "list", data: {} }),
+  invalid("a list with no item", { type: "list", data: { items: [] } }),
+  invalid("a list with a number item", { type: "list", data: { items: ["a", 1] } }),
+  invalid("a list starting at 0", { type: "list", data: { items: ["a"], start: 0 } }),
+  invalid("a list whose ordered is a string", { type: "list", data: { items: ["a"], ordered: "yes" } }),
+  invalid("a list whose ordered is null", { type: "list", data: { items: ["a"], ordered: null } }),
+
+  valid("a checklist", { type: "checklist", data: { items: [{ text: "Vérifier", checked: false }] } }),
+  invalid("a checklist item without checked", { type: "checklist", data: { items: [{ text: "Vérifier" }] } }),
+  invalid("a checklist item checked by a string", { type: "checklist", data: { items: [{ text: "a", checked: "no" }] } }),
+  invalid("a checklist item that is a string", { type: "checklist", data: { items: ["a"] } }),
+
+  valid("a code block with a language", { type: "code", text: "x = 1", data: { language: "python" } }),
+  valid("a code block without data", { type: "code", text: "select 1" }),
+  invalid("a code block without text", { type: "code", data: { language: "sql" } }),
+  invalid("a code block whose language is a number", { type: "code", text: "x", data: { language: 3 } }),
+
+  valid("a call", { type: "call", data: { function: "table.claim", args: { table: "ventes/suivi", limit: 3 } } }),
+  invalid("a call with a text", { type: "call", text: "x", data: { function: "f", args: {} } }),
+  invalid("a call without function", { type: "call", data: { args: {} } }),
+  invalid("a call with an empty function", { type: "call", data: { function: "", args: {} } }),
+  invalid("a call with a function of 101 characters", { type: "call", data: { function: long(101), args: {} } }),
+  invalid("a call whose args is an array", { type: "call", data: { function: "f", args: [] } }),
+  invalid("a call without args", { type: "call", data: { function: "f" } }),
+
+  valid("a mermaid block", { type: "mermaid", text: "graph TD; A-->B" }),
+  invalid("a blank mermaid block", { type: "mermaid", text: "   " }),
+  invalid("a mermaid block without text", { type: "mermaid" }),
+
+  valid("an image with a caption", { type: "image", text: "Légende", data: { src: "https://x.test/a.png", alt: "Plan" } }),
+  valid("an image without caption", { type: "image", data: { src: "a.png" } }),
+  invalid("an image without src", { type: "image", data: { alt: "Plan" } }),
+  invalid("an image with an empty src", { type: "image", data: { src: "" } }),
+  invalid("an image whose alt is a number", { type: "image", data: { src: "a.png", alt: 1 } }),
+
+  valid("a callout with a tone", { type: "callout", text: "Attention.", data: { tone: "warning" } }),
+  valid("a callout without data", { type: "callout", text: "Note." }),
+  invalid("a callout without text", { type: "callout", data: { tone: "warning" } }),
+  invalid("a callout whose tone is a number", { type: "callout", text: "x", data: { tone: 1 } }),
+
+  valid("a reference to a table view", { type: "reference", data: { path: "ventes/suivi_prospects", view: { limit: 5 } } }),
+  valid("a reference to a page", { type: "reference", data: { path: "ventes/devis" } }),
+  invalid("a reference to a malformed path", { type: "reference", data: { path: "Ventes/Suivi" } }),
+  invalid("a reference with a text", { type: "reference", text: "x", data: { path: "ventes/devis" } }),
+  invalid("a reference without path", { type: "reference", data: { view: {} } }),
+  invalid("a reference whose view is an array", { type: "reference", data: { path: "ventes/devis", view: [] } }),
+
+  valid("a block with a key", { type: "paragraph", text: "Clé.", key: "etapes" }),
+  invalid("a key with a leading space", { type: "paragraph", text: "x", key: " x" }),
+  invalid("a key with a trailing space", { type: "paragraph", text: "x", key: "x " }),
+  invalid("an empty key", { type: "paragraph", text: "x", key: "" }),
+  invalid("a key of 501 characters", { type: "paragraph", text: "x", key: long(501, "k") }),
+  invalid("a key with a control character", { type: "paragraph", text: "x", key: "a\tb" }),
+  // N40 : `btrim` ne retire que l'espace U+0020 ; `[[:cntrl:]]` couvre les caractères Cc (U+0000 à
+  // U+001F, U+007F à U+009F), U+0085 compris, U+00A0 non.
+  valid("a key starting with a no-break space", { type: "paragraph", text: "x", key: " nbsp" }),
+  invalid("a key with the control character U+0085", { type: "paragraph", text: "x", key: "a\u0085b" }),
+]
+
+/** Lignes de tableau : écrites publiées dans un tableau. */
+export const ROW_CASES: BlockCase[] = [
+  valid("a row with its values", { type: "row", key: "P-001", data: { ref: "P-001", entreprise: "Boulangerie des Tilleuls", montant: 12000 } }),
+  valid("a row without values", { type: "row", key: "P-002" }),
+  invalid("a row without key", { type: "row", data: { ref: "P-003" } }),
+  invalid("a row with a text", { type: "row", key: "P-004", text: "x" }),
+  invalid("a row whose data is an array", { type: "row", key: "P-005", data: ["P-005"] }),
+]
+
+export const BLOCK_CASES: BlockCase[] = [...DOCUMENT_CASES, ...ROW_CASES]

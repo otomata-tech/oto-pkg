@@ -1,0 +1,208 @@
+// Face schemas : Zod pur, partagé par toutes les faces, ui/ compris (H02). Aucun client de base,
+// aucun import de server/, api/, mcp/ ni de l'hôte (frontière ESLint, AC31).
+// Les listes `INVITATION_ROLES` et `INVITATION_STATES` restent internes tant qu'aucun écran ne les
+// lit (E05-S03) ; leurs types suffisent aux faces.
+export { inviteSchema, invitationIdSchema, listInvitationsQuerySchema } from "./invitations"
+export type { Invite, InviteInput, InvitationRole, InvitationState } from "./invitations"
+export { brandInputSchema, OTO_THEMES, THEME_LABELS, themeSchema } from "./brand"
+export type { BrandInput, Theme } from "./brand"
+export { NODE_PATH_PATTERN, nodePathSchema, WRITE_OPS } from "./nodes"
+export { CTX_PATTERN, ctxCodeSchema } from "./ctx"
+export { BLOCK_TYPES, blockTypeSchema, blockKeySchema, blockInputSchema, blockRef } from "./blocks"
+export type { BlockType, BlockInput } from "./blocks"
+export { flagNameSchema, flagToggleSchema, flagViewSchema } from "./flags"
+export type { FlagView } from "./flags"
+export { feedbackInputSchema, feedbackTypeSchema } from "./feedback"
+export type { FeedbackInput } from "./feedback"
+export { feedbackListQuerySchema, feedbackStateChangeSchema, feedbackStateSchema, ticketSchema } from "./feedback"
+export type {
+  FeedbackCounts,
+  FeedbackFilter,
+  FeedbackList,
+  FeedbackListQuery,
+  FeedbackState,
+  FeedbackStateChange,
+  FeedbackStateChangeInput,
+  FeedbackTicketView,
+  FeedbackType,
+} from "./feedback"
+export { USAGE_MAX_LINES, usageQuerySchema } from "./usage"
+export type { UsagePeriod, UsageQuery, UsageSummary } from "./usage"
+export {
+  orderBlocks,
+  renderBlock,
+  renderBlocks,
+  splitSections,
+  findSections,
+  normalizeTitle,
+  sectionOfBlock,
+  callLocation,
+  formatCallLocation,
+} from "./blocks-render"
+export type { BlockLike, BlockSection, CallLocation, RenderOptions } from "./blocks-render"
+export { decisionErrorSchema } from "./oauth"
+// `connectorNameSchema`, `accountLabelSchema` et `accountModeSchema` restent internes à
+// `connectors.ts` tant que seuls ses schémas les lisent (E04-S01, N33).
+export { connectorRefSchema, createAccountSchema, disableAccountSchema } from "./connectors"
+export type { AccountMode } from "./connectors"
+export { createTeamSchema, equipesSearchSchema, teamMemberSchema, updateMemberSchema, updateTeamSchema } from "./teams"
+export { teamRoleSchema } from "./teams"
+export type {
+  CreateTeam,
+  EquipesTab,
+  MemberRoleView,
+  MemberView,
+  PlatformAccessOverview,
+  PlatformAccessView,
+  StaffAddedMemberView,
+  TeamView,
+  UpdateTeam,
+} from "./teams"
+// `accessLevelSchema` et `ruleSubjectSchema` restent internes à `rules.ts` tant que seuls
+// `setNodeRuleSchema` et `setAccountRuleSchema` les lisent (E05-S03, E08-S06).
+export { ACCESS_LEVEL_NAMES, setNodeRuleSchema } from "./rules"
+export type { AccessLevelName, NodeRulesView, RuledNodeView, RuleSubject } from "./rules"
+export { BLOCK_OPS, NODE_KINDS, nodeKindSchema, readNodeSchema, SECTION_OPS, writeNodeSchema, writeOpSchema } from "./nodes"
+export type { BlockView, NodeKind, NodeView, ReadNodeInput, TreeNode, WriteNodeInput, WriteOp } from "./nodes"
+export { writeNodeBodySchema } from "./node-body"
+export type { WriteNodeBody, WriteOpBody } from "./node-body"
+export { JOURNAL_PERIODS, journalFiltersSchema, journalSectionSchema } from "./journal"
+export type {
+  ConversationDetail,
+  ConversationSummary,
+  JournalArgs,
+  JournalCall,
+  JournalFilters,
+  JournalPage,
+  JournalParam,
+  JournalSection,
+} from "./journal"
+// E05-S12 (lot B) : les activités et les procédures utiles de l'accueil.
+export { USEFUL_PROCEDURES_SHOWN } from "./activity"
+export type { Activity, ActivityPage, ActivityVerb, UsefulProcedure } from "./activity"
+// Les bornes du nom, des domaines de travail, des seuils, du motif et du préfixe ne sortent que par les
+// schémas qui les composent : les schémas servis du MCP admin les en tirent (`orgSettingsSchema.shape`,
+// `platformAccessSchema.shape`). `hostSchema` sort seul : E09-S02 en passe chaque adresse d'une création
+// et le domaine de base de la cellule (E08-S02).
+export {
+  emailSchema,
+  hostOpSchema,
+  hostSchema,
+  orgCreateSchema,
+  orgSettingsSchema,
+  orgSlugSchema,
+  orgUpdateSchema,
+  platformAccessSchema,
+} from "./admin"
+export type { OrgSettings } from "./admin"
+export { moveNodeSchema } from "./nodes"
+export type { MoveNodeInput } from "./nodes"
+// Tableaux (E07-S01) : en-tête, grammaire de filtre et arguments des trois fonctions de lecture, que
+// lisent `server/tables/` (forms-patterns.md § Principe). `tableFilterSchema` et `tableRowReadSchema`
+// restent internes à `tables.ts` tant que seuls ses schémas et les tests les lisent.
+export {
+  FILTER_OPERATORS,
+  MAX_FILTER_CLAUSES,
+  MAX_IN_VALUES,
+  nullInFilterMessage,
+  tableAggregateArgsSchema,
+  tableColumnSchema,
+  tableHeaderSchema,
+  tableLifecycleSchema,
+  tableReviewSchema,
+  tableRowsArgsSchema,
+  tableSchemaArgsSchema,
+  tooManyInValuesMessage,
+  unknownOperatorMessage,
+} from "./tables"
+export type {
+  AggregateOp,
+  CellValue,
+  ColumnType,
+  FilterOperator,
+  TableAggregateArgs,
+  TableColumn,
+  TableHeader,
+  TableLifecycle,
+  TableRowRead,
+  TableRowsArgs,
+  TableSort,
+} from "./tables"
+export { isPlaceholderValue, PROCEDURE_REFUSAL_KINDS } from "./procedures"
+export type { ProcedureRefusal, ProcedureRefusalKind, ProcedureSummary } from "./procedures"
+export { nodeVersionParamSchema } from "./nodes"
+// Tableau de bord (E08-S03) : réglages de l'organisation, impact d'une désactivation, comptes.
+export { orgSettingsFormSchema } from "./admin"
+export type { OrgSettingsForm, OrgView } from "./admin"
+export type { AccountView, DeactivationImpact, OrgConnector } from "./connectors"
+// L'écran d'un tableau (E07-S03) : décision de la revue, paramètres de la grille, vue d'un bloc
+// `reference`, formes des lectures de l'écran.
+export {
+  GRID_PAGE_ROWS,
+  GRID_ROWS_MAX,
+  GRID_SEARCH_MAX,
+  REVIEW_REASON_MAX,
+  reviewDecisionSchema,
+  SCREEN_REFERENCES_MAX,
+  TABLE_VIEW_ROWS_MAX,
+  tableScreenParamsSchema,
+  tableViewSchema,
+} from "./table-screen"
+export type {
+  ReviewOutcome,
+  ScreenCard,
+  ScreenReference,
+  ScreenReferenceProblem,
+  ScreenView,
+  TableGridRows,
+  TableGridSummary,
+  TableReviewQueue,
+} from "./table-screen"
+export { previewSearchSchema, proceduresSearchSchema } from "./procedures"
+export type { ProceduresSearch } from "./procedures"
+export { languageSchema, profilePatchSchema } from "./profile"
+export type { ProfilePatch, ProfileView } from "./profile"
+// La page « Profil » et la langue servie à l'assistant (E05-S11, lot a).
+export { PROFILE_TEXT_MAX } from "./profile"
+export type { ProfileSheet } from "./profile"
+export type { Language } from "./brand"
+// MCP admin (E08-S06) : propriétaires et sujets en références plates (N1) ; règles d'un compte.
+export { accountOwnerRefSchema, ownerRefSchema, subjectRefSchema } from "./admin"
+export type { OwnerRef } from "./admin"
+export { setAccountRuleSchema } from "./rules"
+// L'écran « Équipes et droits » (E05-S09, partie d1) : la recherche, le filtre et le tri de ses tableaux,
+// lus dans l'adresse par la page de l'hôte.
+export { equipesListesSchema } from "./team-screen"
+export type { ReglagesDesListes } from "./team-screen"
+// Les gestes du rail et le partage public (E05-S10, parties e et d ; ADR-013).
+export {
+  GENERAL_ACCESS,
+  generalAccessSchema,
+  moveImpactQuerySchema,
+  nodePathBodySchema,
+  placeNodeSchema,
+  publicReadQuerySchema,
+  SHARE_TOKEN_PATTERN,
+  shareNodeSchema,
+  sharesQuerySchema,
+} from "./node-gestures"
+export type {
+  AccessChange,
+  GeneralAccess,
+  MoveImpact,
+  NodeLinksView,
+  NodePathBody,
+  OrgShareView,
+  PlaceNodeInput,
+  PlaceView,
+  PublicBlock,
+  PublicNodeView,
+  ShareNodeInput,
+  ShareView,
+  TrashItem,
+} from "./node-gestures"
+export type { PublicTable } from "./node-gestures"
+// M71 : les listes d'index d'une partie de Contexte servie, écrites par le service, relues par la vue « Contexte ».
+export { CONTEXT_INDEX } from "./context-index"
+// E05-S13 (AC-16) : les formats des blocs servis que la vue « Contexte » relit pour les dire en français.
+export { SERVED_BUDGET, SERVED_NEWS, SERVED_PROCEDURES, SERVED_RECENT, SERVED_RULES } from "./context-index"

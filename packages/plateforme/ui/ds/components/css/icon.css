@@ -1,0 +1,22 @@
+/* Porté d'oto-frontend (src/design-system/components/css/icon.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Icon · AnimatedIcon : quatre tailles, `currentColor` ; les gestes de survol sont dans `ui/ds/icons/anim.css` (glyphes Phosphor ici, lucide dans oto-frontend, portage-ecrans.md § 3). */
+
+.oto-icon {
+  display: inline-flex;
+  flex: none;
+  color: inherit;          /* currentColor — une icône n'a jamais sa couleur */
+  line-height: 0;
+}
+
+.oto-icon > svg {
+  display: block;
+  stroke-width: 1.75;
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.oto-icon[data-size="xs"] > svg { inline-size: 14px; block-size: 14px; }
+.oto-icon[data-size="sm"] > svg { inline-size: 16px; block-size: 16px; }
+.oto-icon[data-size="md"] > svg { inline-size: 20px; block-size: 20px; }
+.oto-icon[data-size="lg"] > svg { inline-size: 24px; block-size: 24px; }

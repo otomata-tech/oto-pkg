@@ -1,0 +1,651 @@
+/* Porté d'oto-frontend (src/design-system/components/css/product.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Composants propres au produit (OtoMark, OrgSwitcher, TraceStep, OtoSuggestion, ApprovalCard, ThemeSwitch, CommandPalette) : les seuls qui portent du sens Oto plutôt qu'une forme générique. */
+
+/* OtoMark : un seul cercle, aucune autre géométrie ; 2π × 44 ≈ 276 = 230 + 46, la boucle tombe juste et la forme ne dérive jamais, les états s'obtiennent en animant ce tracé ; 16 px au moins, zone de protection de la moitié du diamètre. */
+
+.oto-mark {
+  display: inline-block;
+  inline-size: 24px;
+  block-size: 24px;
+  flex: none;
+  color: inherit;          /* toujours currentColor */
+}
+.oto-mark > svg { inline-size: 100%; block-size: 100%; overflow: visible; }
+.oto-mark > svg > circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 28;
+  stroke-linecap: round;
+  stroke-dasharray: 230 46;
+  transform: rotate(-8deg);
+  transform-origin: center;
+}
+
+/* la zone de protection : la moitié du diamètre sur les quatre côtés */
+.oto-mark[data-clearspace] { padding: 50%; box-sizing: content-box; }
+
+/* ── les quatre états : `breathe` au repos, seul permanent et seulement sur une surface encre ; `think` remplace tout spinner ; `talk` ouvre et referme l'ouverture ; `draw` une fois, à l'apparition. */
+.oto-mark[data-motion="breathe"] > svg > circle { animation: oto-mark-breathe 4200ms var(--ease-standard) infinite; }
+.oto-mark[data-motion="think"]   > svg          { animation: oto-spin 1100ms linear infinite; }
+.oto-mark[data-motion="talk"]    > svg > circle { animation: oto-mark-talk 900ms var(--ease-standard) infinite; }
+.oto-mark[data-motion="draw"]    > svg > circle { animation: oto-mark-draw var(--dur-slower) var(--ease-out) both; }
+
+/* ── le tour au survol de la pastille d'entreprise (le bouton, pas le mark de 18 px) : une animation et non une transition, qui dévisserait la marque en sortant ; `--ease-in-out`, le tour se voit démarrer et s'arrêter ; « réduire les animations » le coupe. */
+.oto-org-switcher:hover > .oto-mark > svg,
+.oto-org-switcher:focus-visible > .oto-mark > svg {
+  animation: oto-spin var(--dur-slower) var(--ease-in-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oto-mark > svg, .oto-mark > svg > circle { animation: none !important; }
+}
+
+/* OrgSwitcher : le mark et le nom de l'organisation, « Oto » sinon ; le mark ne bouge jamais, la dernière chose qui dit de quel produit il s'agit. */
+
+.oto-org-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--ctrl-h-md);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-ctrl);
+  background: var(--rail-hover);
+  color: var(--rail-brand);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-lg);
+  text-align: start;
+  transition: var(--tr-colors);
+}
+.oto-org-switcher:hover { background: color-mix(in srgb, var(--rail-fg) 12%, transparent); }
+.oto-org-switcher > .oto-mark { inline-size: 18px; block-size: 18px; }
+.oto-org-name {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oto-org-switcher > .oto-icon:last-child { color: var(--rail-mute); }
+
+/* TraceStep · TraceList : glyphe, libellé, durée, coût, résultat, les chiffres en mono tabulaire (on compare des durées de haut en bas) ; l'étape en attente prend `--oto-bg`, la surface « Oto propose », portée par le primary du client. */
+
+.oto-trace {
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.oto-trace-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.oto-trace-head > .oto-trace-total {
+  margin-inline-start: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+
+.oto-trace-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  min-block-size: var(--row-h);
+  padding: var(--space-1-5) var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  font-size: var(--fs-sm);
+  inline-size: 100%;
+  text-align: start;
+  transition: background-color var(--dur-instant) var(--ease-standard);
+}
+.oto-trace-step:last-child { border-block-end: 0; }
+.oto-trace-step[data-interactive]:hover { background: var(--hair); }
+
+.oto-trace-label { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oto-trace-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+.oto-trace-meta > [data-cost] { color: var(--mute); }
+
+/* l'étape qui attend une décision */
+.oto-trace-step[data-state="review"] {
+  background: var(--oto-bg);
+  color: var(--oto-ink);
+}
+.oto-trace-step[data-state="review"] .oto-trace-meta { color: inherit; opacity: .8; }
+.oto-trace-step[data-state="failed"] .oto-trace-label { color: var(--st-fail-text); }
+
+/* l'imbrication : une sous-étape prend un cran d'indentation et un filet vertical, pas une bordure gauche colorée, qui se lirait comme un état */
+.oto-trace-step[data-depth="1"] { padding-inline-start: var(--space-8); }
+.oto-trace-step[data-depth="2"] { padding-inline-start: var(--space-12); }
+
+/* TraceList `thread`, le déroulé d'une exécution : un rail vertical relie des faits, sans pastille numérotée ni pourcentage ; il s'arrête au premier et au dernier bloc, il ne promet pas de suite ; le déroulé est le corps de l'îlot, pas une carte dans une carte. */
+
+.oto-trace[data-variant="thread"] {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.oto-trace[data-variant="thread"] .oto-trace-step {
+  position: relative;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-block-size: 0;
+  /* Le bloc déborde de la gouttière de l'îlot : la bande de survol respire autour du texte sans rien décaler. */
+  padding: var(--space-2-5) var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  border-block-end: 0;
+  border-radius: var(--r-ctrl);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+/* Survol : le bloc visé s'éclaire, les autres reculent, on lit un fait à la fois. */
+.oto-trace[data-variant="thread"]:hover .oto-trace-step { opacity: .5; }
+.oto-trace[data-variant="thread"] .oto-trace-step:hover {
+  opacity: 1;
+  background: color-mix(in oklab, var(--primary) 7%, transparent);
+}
+.oto-trace[data-variant="thread"] .oto-trace-step[data-interactive]:hover { background: color-mix(in oklab, var(--primary) 7%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .oto-trace[data-variant="thread"] .oto-trace-step { transition: none; }
+  /* Le recul des voisins est un mouvement d'attention : sans lui, la lecture reste entière. */
+  .oto-trace[data-variant="thread"]:hover .oto-trace-step { opacity: 1; }
+}
+
+/* Le rail, aligné sur le centre de la pastille (23 px / 2, arrondi) plus le débord du bloc. */
+.oto-trace[data-variant="thread"] .oto-trace-step::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: calc(11px + var(--space-2));
+  inline-size: 1px;
+  background: var(--hair);
+}
+.oto-trace[data-variant="thread"] .oto-trace-step:first-child::before { inset-block-start: 50%; }
+.oto-trace[data-variant="thread"] .oto-trace-step:last-child::before { inset-block-end: 50%; }
+
+.oto-trace-ico {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  inline-size: 23px;
+  block-size: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-dot);
+  border: 1px solid var(--hair);
+  background: var(--island);
+  color: var(--mute);
+}
+
+.oto-trace-body {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-block-start: 1px;
+}
+.oto-trace-title { font-size: var(--fs-sm); color: var(--ink); }
+.oto-trace-detail { font-size: var(--fs-xs); color: var(--mute); line-height: var(--lh-normal); }
+
+/* Un lien dans un fait : souligné du primary, jamais coloré, la couleur emporterait la lecture. */
+.oto-trace-title a,
+.oto-trace-detail a {
+  color: var(--ink);
+  text-decoration: none;
+  border-block-end: 1px solid color-mix(in oklab, var(--primary) 45%, transparent);
+}
+.oto-trace-detail a { color: var(--mute); }
+.oto-trace-title a:hover,
+.oto-trace-detail a:hover { color: var(--ink); border-block-end-color: var(--primary); }
+
+.oto-trace-when {
+  flex: 0 0 auto;
+  font-size: var(--fs-2xs);
+  color: var(--faint);
+  padding-block-start: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.oto-trace-tag {
+  display: inline-block;
+  margin-inline-start: 5px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 6%, transparent);
+  color: var(--mute);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-mono);
+  vertical-align: 1px;
+}
+
+/* ── les six natures ne se distinguent que par la pastille et le poids du libellé ; aucune ne clignote, aucune n'est rouge : une erreur se dit. */
+
+/* une étape déclarée porte le poids : c'est ce que la procédure a fait */
+.oto-trace-step[data-kind="etape"] .oto-trace-title { font-weight: var(--fw-semibold); }
+.oto-trace-step[data-kind="etape"] .oto-trace-ico {
+  color: var(--primary);
+  border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+}
+
+/* un appel d'outil est un fait technique : il s'efface d'un cran */
+.oto-trace-step[data-kind="outil"] .oto-trace-title { color: var(--mute); font-size: var(--fs-xs); }
+.oto-trace-step[data-kind="outil"] .oto-trace-ico { color: var(--mute); }
+
+/* une sortie produite : elle existe désormais, elle se lit */
+.oto-trace-step[data-kind="sortie"] .oto-trace-title { font-weight: var(--fw-semibold); }
+.oto-trace-step[data-kind="sortie"] .oto-trace-ico {
+  color: var(--ink);
+  background: color-mix(in oklab, var(--primary) 16%, var(--island));
+  border-color: color-mix(in oklab, var(--primary) 35%, transparent);
+}
+
+/* une erreur : dite, pas criée ; ni rouge ni clignotement, le filet pointillé la distingue et le texte dit la suite */
+.oto-trace-step[data-kind="erreur"] .oto-trace-ico {
+  border-style: dashed;
+  border-color: color-mix(in oklab, var(--ink) 28%, transparent);
+  color: var(--mute);
+}
+.oto-trace-step[data-kind="erreur"] .oto-trace-title { font-weight: var(--fw-semibold); color: var(--mute); }
+
+/* une question posée — ce n'est pas une septième nature, c'est une étape qui attend */
+.oto-trace-step[data-kind="question"] .oto-trace-title { font-style: italic; }
+.oto-trace-step[data-kind="question"] .oto-trace-ico { color: var(--primary); }
+
+/* la réponse humaine, sous la question */
+.oto-trace-answer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-block-start: 5px;
+  padding: var(--space-2) var(--space-2-5);
+  border-radius: var(--r-ctrl);
+  background: color-mix(in oklab, var(--ink) 4%, transparent);
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+.oto-trace-answer .oto-avatar { inline-size: 20px; block-size: 20px; font-size: var(--fs-2xs); flex: 0 0 auto; }
+.oto-trace-answer em { color: var(--ink); font-style: normal; }
+
+/* l'attente : l'exécution s'arrête là et attendra ; rien n'expire, rien ne décompte */
+.oto-trace-step[data-kind="attente"] .oto-trace-ico {
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 12%, var(--island));
+  border-color: color-mix(in oklab, var(--primary) 40%, transparent);
+}
+.oto-trace-step[data-kind="attente"] .oto-trace-title { color: var(--mute); }
+
+/* OtoSuggestion, la carte « Oto propose » : `--oto-bg` et `--oto-bd`, jamais d'ombre, une zone du contenu qui appartient à Oto, où le safran « à valider » et le primary du client se rejoignent. */
+
+.oto-suggestion {
+  background: var(--oto-bg);
+  border: 1px solid var(--oto-bd);
+  border-radius: var(--r-card);
+  color: var(--oto-ink);
+  padding: var(--space-3) var(--space-3-5);
+  box-shadow: none;
+}
+.oto-suggestion-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  opacity: .78;
+  margin-block-end: var(--space-2);
+}
+.oto-suggestion-body { font-size: var(--fs-sm); line-height: var(--lh-normal); }
+.oto-suggestion-actions { display: flex; gap: var(--space-1-5); margin-block-start: var(--space-3); }
+
+/* ApprovalCard : la conséquence d'abord, les actions ensuite (un bouton au-dessus de ce qu'il déclenche, c'est un clic pris sans savoir) ; le refus à gauche, pas en rouge, une décision ordinaire. */
+
+.oto-approval {
+  background: var(--oto-bg);
+  border: 1px solid var(--oto-bd);
+  border-radius: var(--r-card);
+  color: var(--oto-ink);
+  padding: var(--space-3-5);
+}
+.oto-approval-consequence {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+  color: var(--ink);
+}
+.oto-approval-detail {
+  font-size: var(--fs-sm);
+  margin-block-start: var(--space-2);
+  opacity: .85;
+}
+/* les chiffres de la conséquence ressortent : ce sont eux qu'on relit avant de cliquer */
+.oto-approval-detail .oto-num,
+.oto-approval-consequence .oto-num {
+  font-family: var(--mono);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.oto-approval-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--oto-bd);
+}
+.oto-approval-actions > .oto-btn { flex: 1; justify-content: center; }
+
+/* ThemeSwitch (auto, clair, sombre) : trois valeurs, jamais deux, sans « auto » on ne revient plus à la préférence du système. */
+
+.oto-theme-switch { display: inline-flex; }
+.oto-theme-switch .oto-segment { padding-inline: var(--space-2-5); }
+
+/* ThemeSwatches, choisir parmi les huit : pas un `<select>`, qui cache la couleur qu'on choisit ; chaque pastille porte sa propre portée `.oto[data-oto-theme]` et montre le primary de son thème. */
+
+.oto-theme-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-pill);
+  background: var(--field);
+}
+
+.oto-swatch {
+  inline-size: 22px;
+  block-size: 22px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-dot);
+  position: relative;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+/* la pastille EST la couleur du thème qu'elle propose */
+.oto-swatch > i {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--r-dot);
+  background: var(--primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.oto-swatch:hover { transform: scale(1.12); }
+.oto-swatch:active { transform: scale(.96); }
+
+/* Le thème actif prend un anneau, pas une coche : à 22 px une coche couvrirait la couleur qu'on est venu regarder. */
+.oto-swatch[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: var(--r-dot);
+  border: 2px solid var(--primary);
+}
+.oto-swatch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+@media (pointer: coarse) {
+  /* 22 px se voit mais ne se vise pas : la cible s'étend sans que la pastille grossisse */
+  .oto-swatch { inline-size: var(--touch); block-size: var(--touch); display: grid; place-items: center; }
+  .oto-swatch > i { inline-size: 22px; block-size: 22px; }
+  .oto-swatch[aria-pressed="true"]::after { inset: calc(50% - 15px); }
+}
+
+/* CommandPalette (⌘K) : elle flotte en haut de l'écran plutôt qu'au centre, le regard y va sans quitter le contenu et la liste a la place de descendre. */
+
+/* Le `display: flex` d'auteur d'une boîte `<dialog>` battrait la garde `dialog:not([open])` du navigateur : la garde est reposée une fois, en tête de `dialog.css` ; pas de `display: none` local. */
+.oto-palette {
+  padding: 0;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-dialog);
+  background: var(--island);
+  box-shadow: var(--sh-dialog);
+  color: var(--ink);
+  inline-size: min(560px, calc(100vw - var(--space-8)));
+  max-block-size: min(60dvh, 480px);
+  /* Le centrage horizontal est écrit (un reset `* { margin: 0 }` le retirerait, comme pour `.oto-dialog`) ; seule la marge du haut est réglée : la palette se pose au premier tiers, on la lit de haut en bas. */
+  margin-block: 12dvh auto;
+  margin-inline: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.oto-palette::backdrop { background: var(--overlay); animation: oto-fade var(--dur-fast) var(--ease-out) both; }
+.oto-palette[open] { animation: oto-zoom var(--dur-base) var(--ease-out) both; }
+
+.oto-palette-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: var(--space-3) var(--space-4);
+  border-block-end: 1px solid var(--hair);
+  color: var(--faint);
+  flex: none;
+}
+.oto-palette-input > input {
+  flex: 1;
+  min-inline-size: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+.oto-palette-input > input:focus-visible { outline: none; box-shadow: none; }
+.oto-palette-input > input::placeholder { color: var(--faint); }
+
+.oto-palette-list { flex: 1; min-block-size: 0; overflow: auto; padding: var(--space-1); }
+/* Une liste vide ne prend pas la place : le message « rien trouvé », frère de la `listbox` (qui ne possède que des options et des groupes), resterait sinon tout en bas, contre le pied. */
+.oto-palette-list:empty { flex: none; padding: 0; }
+
+.oto-palette-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-block-start: 1px solid var(--hair);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.oto-palette-foot > span { display: inline-flex; align-items: center; gap: var(--space-1-5); }
+
+/* ObjectLink, le renvoi vers un autre objet : le nom à gauche, pesé ; le qualificatif à droite, discret, aligné sur la marge, qui se lit en diagonale d'un lien à l'autre. */
+
+.oto-object-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--r-ctrl);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--dur-instant) var(--ease-standard);
+  /* Sans cette largeur, la méta ne part pas à droite quand le lien est posé seul dans un corps d'îlot ; dans une rangée, `flex: 1` l'emporte sur elle. */
+  inline-size: 100%;
+}
+/* Le survol prend `--hair`, la surface que `.oto-menu-item` et `.oto-tree-item` posent déjà : un second dosage dériverait au premier réglage. */
+.oto-object-link:hover { background: var(--hair); }
+
+.oto-object-link-name {
+  /* `0 1 auto` et non `0 0 auto` : le nom doit pouvoir se resserrer, sinon un nom long passe sous sa méta ; la méta cède d'abord, puis le nom s'arrête en « … ». */
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+/* `--title`, l'encre teintée : le glyphe dit la nature de l'objet, le même langage que le rail et le titre d'écran. */
+.oto-object-link-name > .oto-icon { flex: none; color: var(--title); }
+
+.oto-object-link-meta {
+  flex: 1;
+  min-inline-size: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  text-align: end;
+}
+/* Dans le qualificatif, le glyphe est plus appuyé que le texte : c'est lui qu'on repère. */
+.oto-object-link-meta > .oto-icon { flex: none; color: var(--ink); }
+
+/* ── la rangée à tuile (`data-lead`) : deux lignes et une tuile à cheval, pour un catalogue qu'on découvre (la phrase y permet de choisir) ; une grille et non un flex imbriqué, qui ajouterait une `<div>` dans l'ordre de lecture. */
+.oto-object-link[data-lead] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-0-5);
+  /* Le seul endroit où la rangée respire : deux lignes dans le rembourrage d'une seule se touchent. */
+  padding-block: var(--space-2-5);
+}
+.oto-object-link-lead {
+  grid-row: 1 / span 2;
+  display: inline-flex;
+  align-items: center;
+}
+/* Le nom porte, à deux lignes : c'est lui qu'on parcourt dans un catalogue. */
+.oto-object-link[data-lead] > .oto-object-link-name {
+  grid-column: 2;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+/* La phrase repart à gauche, sous le nom qu'elle décrit ; ce que l'appelant pousse d'une marge automatique reste à droite. */
+.oto-object-link[data-lead] > .oto-object-link-meta {
+  grid-column: 2;
+  justify-content: flex-start;
+  text-align: start;
+  font-size: var(--fs-xs);
+}
+
+/* ScreenHeader, l'en-tête d'écran en deux rangs : où l'on est (le fil) et ce qu'on peut faire, puis ce qu'on regarde (le titre) et depuis quand ; le titre est le seul invariant, les autres zones sont des créneaux. */
+
+.oto-screen-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  margin-block-end: var(--gap);
+}
+
+.oto-screen-header > .oto-screen-header-path { grid-area: 1 / 1; min-inline-size: 0; }
+.oto-screen-header > .oto-screen-header-side { grid-area: 1 / 2; justify-self: end; }
+.oto-screen-header > .oto-page-title         { grid-area: 2 / 1; margin: 0; }
+.oto-screen-header > .oto-screen-header-meta { grid-area: 2 / 2; justify-self: end; align-self: center; }
+
+/* Le glyphe du type, à gauche du titre : on reconnaît la nature de l'objet avant d'en lire le nom. */
+.oto-screen-header > .oto-page-title { display: inline-flex; align-items: center; gap: var(--space-2-5); }
+.oto-screen-header > .oto-page-title > .oto-icon { flex: none; color: var(--title); }
+
+/* Titre seul (± méta) : sans cette règle, le premier rang reste déclaré, vide, et décolle le titre du haut de la page. */
+.oto-screen-header:not(:has(> .oto-screen-header-path)):not(:has(> .oto-screen-header-side)) > * {
+  grid-row: 1;
+}
+
+/* Sans fil d'Ariane mais avec des actions : une seule ligne, « titre · méta … actions » ; sinon les actions montent seules sur un rang vide. */
+/* La ligne de base se partage : `align-self: baseline` sur la seule méta retombe sur `start` ; le titre doit y participer, d'où l'alignement porté par le conteneur. */
+.oto-screen-header:not(:has(> .oto-screen-header-path)) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+}
+.oto-screen-header:not(:has(> .oto-screen-header-path)) > .oto-page-title { grid-area: 1 / 1; }
+.oto-screen-header:not(:has(> .oto-screen-header-path)) > .oto-screen-header-meta {
+  grid-area: 1 / 2;
+  /* La méta reste collée au titre qu'elle qualifie (« 12 au total »), elle ne part pas sur la marge. */
+  justify-self: start;
+}
+/* Le côté reste centré : aligner la ligne de base d'un bouton sur le titre remonterait sa pilule. */
+.oto-screen-header:not(:has(> .oto-screen-header-path)) > .oto-screen-header-side {
+  grid-area: 1 / 3;
+  align-self: center;
+}
+
+/* Ni fil d'Ariane ni actions (l'accueil) : la méta y est le résumé de l'écran, au bout de la ligne, pas un sous-titre ; un utilitaire côté écran serait battu en silence par ce CSS hors couche, le placement d'un créneau appartient au composant. */
+.oto-screen-header:not(:has(> .oto-screen-header-path)):not(:has(> .oto-screen-header-side))
+  > .oto-screen-header-meta {
+  justify-self: end;
+  /* Centré sur la hauteur du titre : la ligne de base poserait la méta trop bas, le titre est deux fois plus haut qu'elle. */
+  align-self: center;
+}
+
+.oto-screen-header-side,
+.oto-screen-header-state,
+.oto-screen-header-access,
+.oto-screen-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2-5);
+}
+
+.oto-screen-header-meta { margin: 0; color: var(--faint); font-size: var(--fs-xs); }
+
+/* Le repli se cale sur un palier déclaré (`--bp-md`) : les seuils du CSS et du JS tombent au même pixel. */
+/* Une colonne, les zones dans l'ordre du DOM (le fil, le titre, la méta, puis l'accès) ; chaque zone est nommée : `> *` perdait contre les placements du dessus, plus spécifiques, et « Partager » restait sur le rang du fil, qu'il chevauchait (M46). */
+@media (max-width: 767px) {
+  .oto-screen-header { grid-template-columns: minmax(0, 1fr); }
+  .oto-screen-header > :is(.oto-screen-header-path, .oto-screen-header-side, .oto-page-title, .oto-screen-header-meta) { grid-area: auto; justify-self: start; }
+}
+
+/* E05-S10 (partie b) — l'en-tête d'un nœud et son panneau « Partager ». */
+
+/* La ligne sous le titre (« modifiée il y a 3 jours, par Claire ») porte une infobulle : le pointillé la signale, le focus l'ouvre au clavier. */
+.oto-node-modified { border-radius: var(--r-ctrl); text-decoration: underline dotted; text-underline-offset: 3px; cursor: default; }
+.oto-node-modified:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* L'infobulle des faits du nœud : intitulé et valeur sur deux colonnes, la valeur en gras ; aucune couleur de plus que l'infobulle. */
+.oto-node-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-2); row-gap: var(--space-1); margin: 0; }
+.oto-node-facts > div { display: contents; }
+.oto-node-facts dd { margin: 0; font-weight: var(--fw-semibold); }
+
+/* Le niveau d'une ligne du partage : le `Select` à sa largeur, poussé en fin de ligne comme `.oto-pop-meta` ; son cadre arrondi est celui de toute liste de choix (E05-S11, retour 8). */
+.oto-share-level { flex: none; inline-size: auto; margin-inline-start: auto; }
+
+/* Les suggestions du champ « Ajouter une personne ou une équipe » : dans le panneau, sous le champ, au pas d'un menu. */
+.oto-share-suggestions { display: flex; flex-direction: column; max-block-size: 240px; overflow: auto; padding: var(--space-1); border: 1px solid var(--island-bd); border-radius: var(--r-ctrl); }
+
+/* E05-S10 (partie b, AC-b7) — la ligne du rail qui recevra le nœud glissé : le fond du survol et un filet de la pastille (`--rail-on-bg`, le rail est une surface sombre même en mode clair). */
+.oto-rail-item[data-depot] { background: var(--rail-hover); box-shadow: inset 0 0 0 2px var(--rail-on-bg); }

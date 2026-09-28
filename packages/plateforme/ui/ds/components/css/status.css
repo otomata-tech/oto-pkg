@@ -1,0 +1,78 @@
+/* Porté d'oto-frontend (src/design-system/components/css/status.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* StatusDot · AgentState : neuf états en six couleurs, distingués aussi par la forme et le mouvement ; l'échec ne clignote jamais (un état stable qui attend une décision, pas une alarme qui rend les autres lignes illisibles) ; « au repos » est un anneau, « en file » un point plein, lisibles en niveaux de gris. */
+
+.oto-dot {
+  display: inline-block;
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--r-dot);
+  background: var(--st-idle);
+  flex: none;
+}
+
+.oto-dot[data-state="rest"]   { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.oto-dot[data-state="paused"] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.oto-dot[data-state="queued"] { background: var(--st-idle); }
+.oto-dot[data-state="running"]{ background: var(--st-run); }
+.oto-dot[data-state="thinking"]{background: var(--st-think); }
+.oto-dot[data-state="live"]   { background: var(--st-live); }
+.oto-dot[data-state="ok"]     { background: var(--st-ok); }
+.oto-dot[data-state="review"] { background: var(--st-review); }
+.oto-dot[data-state="failed"] { background: var(--st-fail); }
+
+/* ── le mouvement : `oto-halo` propage une onde depuis le point, une variation d'opacité ne se verrait pas sur 6 px. */
+.oto-dot[data-state="thinking"] { color: var(--st-think); animation: oto-halo 1600ms var(--ease-standard) infinite; }
+.oto-dot[data-state="live"]     { color: var(--st-live);  animation: oto-halo 2600ms var(--ease-standard) infinite; }
+.oto-dot[data-state="running"]  { animation: oto-pulse 1200ms var(--ease-standard) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .oto-dot { animation: none !important; }
+}
+
+/* AgentState, trois densités : le point seul dans une cellule (le mot en `title`), pastille et mot sur une carte, pastille, mot et durée dans un inspecteur. */
+
+.oto-agent-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  block-size: 22px;
+  padding-inline: var(--space-2);
+  /* Un filet à la teinte de l'état, à 26 % : sans lui une pastille à 14 % sur une carte déjà teintée se lit comme une tache. */
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+
+.oto-agent-state[data-variant="dot"] { padding: 0; block-size: auto; background: none !important; }
+
+/* le fond est la couleur d'état à 14 %, le filet à 26 %, le texte sa variante `-text` vérifiée à 4,5:1 */
+.oto-agent-state[data-state="rest"],
+.oto-agent-state[data-state="paused"] { background: var(--hair); border-color: var(--island-bd); color: var(--mute); }
+.oto-agent-state[data-state="queued"] { background: color-mix(in srgb, var(--st-idle)   var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-idle)   26%, var(--island)); color: var(--st-idle-text); }
+.oto-agent-state[data-state="running"]{ background: color-mix(in srgb, var(--st-run)    var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-run)    26%, var(--island)); color: var(--st-run-text); }
+.oto-agent-state[data-state="thinking"]{background: color-mix(in srgb, var(--st-think)  var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-think)  26%, var(--island)); color: var(--st-think-text); }
+.oto-agent-state[data-state="live"]   { background: color-mix(in srgb, var(--st-live)   var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-live)   26%, var(--island)); color: var(--st-live-text); }
+.oto-agent-state[data-state="ok"]     { background: color-mix(in srgb, var(--st-ok)     var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-ok)     26%, var(--island)); color: var(--st-ok-text); }
+.oto-agent-state[data-state="review"] { background: color-mix(in srgb, var(--st-review) var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-review) 26%, var(--island)); color: var(--st-review-text); }
+.oto-agent-state[data-state="failed"] { background: color-mix(in srgb, var(--st-fail)   var(--st-tint), var(--island)); border-color: color-mix(in srgb, var(--st-fail)   26%, var(--island)); color: var(--st-fail-text); }
+
+/* le glyphe hérite de la couleur du mot — il ne se colore pas à part */
+.oto-agent-state > .oto-icon { color: inherit; }
+.oto-agent-state[data-state="running"] > .oto-icon > svg { animation: oto-spin 900ms linear infinite; }
+.oto-agent-state[data-state="thinking"] > .oto-icon      { animation: oto-pulse 1600ms var(--ease-standard) infinite; }
+.oto-agent-state[data-state="live"] > .oto-icon          { animation: oto-pulse 2600ms var(--ease-standard) infinite; }
+
+.oto-agent-state > .oto-agent-meta {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+  opacity: .75;
+  margin-inline-start: var(--space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oto-agent-state > .oto-icon, .oto-agent-state > .oto-icon > svg { animation: none !important; }
+}

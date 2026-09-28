@@ -1,0 +1,40 @@
+/* Porté d'oto-frontend (src/design-system/components/components.css) : l'ordre des feuilles, tel quel ; imports relatifs. */
+
+@import "./css/_interaction.css";
+
+@import "./css/icon.css";
+@import "./css/button.css";
+@import "./css/card.css";
+@import "./css/badge.css";
+@import "./css/status.css";
+
+@import "./css/field.css";
+@import "./css/choice.css";
+@import "./css/combobox.css";
+
+@import "./css/overlay.css";
+@import "./css/dialog.css";
+
+@import "./css/navigation.css";
+
+@import "./css/table.css";
+@import "./css/lists.css";
+
+@import "./css/feedback.css";
+
+@import "./css/misc.css";
+
+@import "./css/product.css";
+
+@import "./css/brand.css";
+
+@import "./css/home.css";
+
+@import "./css/content.css";
+
+@import "./css/context.css";
+
+@import "./css/procedure.css";
+
+@import "./css/blocks.css";
+@import "./css/editeur.css";

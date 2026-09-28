@@ -1,0 +1,174 @@
+// @vitest-environment node
+// Créer un tableau, le fermer, changer son cycle de vie, lire son brouillon (E07-S04, AC1, AC2, AC11,
+// AC12), par les services d'E03-S03 et leur branche `table`, sur la fixture d'E07-S01 semée sur une
+// vraie base (E01-S10, lot t1-c1b : `seedTableFixture`, une graine pour le fichier ; suite portable),
+// le tableau remis à son état semé par `freshTable`. Droits dans le service (H123) : la
+// publication de Léa (écriture) est refusée avant tout appel de `publish_node`, et un lecteur ne reçoit
+// pas le brouillon que la base rend (`security-patterns.md § Droits dans le service`) ; requêtes vues
+// par `spyDb`. Textes servis au modèle comparés mot pour mot (H04).
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { readNode } from "../../packages/plateforme/server/nodes/read"
+import { teamOf } from "../helpers/reference-org"
+import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
+import { spyDb, type DbCall } from "../helpers/spy-tables"
+import { seedWithAdmin, type SeededData, sqlConfigured, portable } from "../helpers/sql"
+import { PROSPECTS, PROSPECTS_HEADER, STATES } from "../factories/table-fixture"
+import { seedTableFixture } from "../factories/table-fixture-sql"
+import { acmeIdentity, draftsAt, freshTable, nodeAt, publishCalls, writeAs, writesOf } from "../factories/table-publish-sql"
+
+const NETWORK_TIMEOUT = 60_000
+const SETUP_TIMEOUT = 180_000
+
+const SALONS_STATES = ["à contacter", "en cours", "à revoir", "inscrit", "écarté"]
+
+/** L'en-tête de l'AC1 : quatre colonnes, clé `nom`, file sur `statut` avec revue. */
+const SALONS_HEADER = {
+  columns: [
+    { name: "nom", type: "text", required: true, max_length: 200 },
+    { name: "ville", type: "text" },
+    { name: "date", type: "date" },
+    { name: "statut", type: "enum", options: SALONS_STATES },
+  ],
+  key: "nom",
+  lifecycle: { column: "statut", states: SALONS_STATES, working: "en cours", review: { state: "à revoir", approve: "inscrit", reject: "écarté" } },
+}
+
+const salons = (path: string, header: Record<string, unknown> = SALONS_HEADER) => ({
+  path,
+  kind: "table",
+  title: "Salons professionnels",
+  summary: "Les salons où l'équipe Ventes expose ou prospecte.",
+  header,
+  publish: true,
+})
+
+const draftReads = (calls: readonly DbCall[]) => calls.filter((call) => call.kind === "table" && call.table === "node_drafts")
+
+describe.skipIf(!sqlConfigured)(portable("tables written through write"), { timeout: NETWORK_TIMEOUT }, () => {
+  let seed: SeededData
+  let ref: ReferenceOrgSql
+
+  beforeAll(async () => {
+    seed = seedWithAdmin()
+    ref = await seedTableFixture(seed)
+  }, SETUP_TIMEOUT)
+
+  afterAll(async () => {
+    await seed?.cleanup()
+  }, SETUP_TIMEOUT)
+
+  describe("creating a table (AC1, AC2)", () => {
+    it("should create, open the draft, pose the header and publish revision 1 for Claire, and keep Léa's draft unpublished", async () => {
+      const claire = await writeAs(ref, "claire", salons("ventes/salons"))
+      expect(claire.result?.text).toBe("Published ventes/salons revision 1: a table with 4 columns, key nom. Write rows with acme_call table.write.")
+      const node = await nodeAt(seed, ref, "ventes/salons")
+      expect(node).toMatchObject({ kind: "table", status: "published", revision: 1 })
+      expect(node?.meta).toEqual({ ...SALONS_HEADER, closed: false })
+      expect(claire.calls.filter((call) => call.kind === "rpc" && call.name === "open_draft")).toHaveLength(1)
+      // `p_node`, `p_base_revision`, `p_draft_stamp`.
+      expect(publishCalls(claire.calls)).toEqual([{ kind: "rpc", name: "publish_node", values: [node?.id, 0, expect.any(String)] }])
+      expect(await draftsAt(seed, ref, "ventes/salons")).toEqual([])
+      const read = await readNode(await ref.db("claire"), acmeIdentity(ref, "claire"), { path: "ventes/salons" })
+      expect(read.text).toContain("\n\nKey: nom — each row is addressed by its nom value; a new value creates a row.\nColumns:\n- nom: text, required, 200 characters at most (key)\n")
+      expect(read.text).toContain("\nWork queue on statut: rows enter « à contacter »; « en cours » marks a row a worker holds under a lease.\n")
+
+      // Léa rédige : le brouillon est créé et son en-tête posé, la publication refusée par le service.
+      const lea = await writeAs(ref, "lea", salons("ventes/salons_2"))
+      expect(lea.error).toMatchObject({
+        code: "forbidden",
+        message: "Draft of ventes/salons_2 saved on revision 0, not published: publishing ventes/salons_2 is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+      })
+      const drafted = await nodeAt(seed, ref, "ventes/salons_2")
+      expect(drafted).toMatchObject({ kind: "table", revision: 0 })
+      expect(await draftsAt(seed, ref, "ventes/salons_2")).toMatchObject([{ node_id: drafted?.id, meta: { ...SALONS_HEADER, closed: false } }])
+      expect(publishCalls(lea.calls)).toEqual([])
+    })
+
+    it("should refuse a new column without type, a header the checks refuse, and ops on a table, writing nothing", async () => {
+      // Aucun `ventes/salons` : celui que crée le cas précédent ferait de ces écritures des modifications.
+      await seed.admin`delete from platform.nodes where org_id = ${ref.org.id} and path = 'ventes/salons'`
+      const contract = 'Contract: acme_read {"path": "write.table"}.'
+      const noType = { ...SALONS_HEADER, columns: SALONS_HEADER.columns.map((column) => (column.name === "ville" ? { name: "ville" } : column)) }
+      const invalid = { columns: [{ name: "statut", type: "enum", options: ["a", "b"] }], key: "statut", lifecycle: { column: "statut", states: ["b", "a"], working: "b" } }
+      const cases: [Record<string, unknown>, string][] = [
+        [salons("ventes/salons", noType), `Invalid table header: columns: « ville » is a new column: give its type (text, number, date, datetime, bool, enum, email, url). ${contract}`],
+        [
+          salons("ventes/salons", invalid),
+          `Invalid table header: key: the key column must be text, email, url or number; statut is enum; lifecycle.states must list exactly the options of statut, in the same order; lifecycle.working: b is the first state, where rows enter; the working state comes after it. ${contract}`,
+        ],
+        // Un attribut inconnu, refusé par la forme stricte du patch (N1) : à la création, dans le cadre de l'AC2.
+        [
+          salons("ventes/salons", { ...SALONS_HEADER, columns: [...SALONS_HEADER.columns, { name: "stand", type: "text", width: 3 }] }),
+          `Invalid table header: header.columns[4]: unknown key « width »; keys: name, type, options, required, max_length. ${contract}`,
+        ],
+        [{ ...salons("ventes/salons"), ops: [{ op: "append", section: "Colonnes", text: "x" }] }, "ventes/salons is a table: it has no sections. Write its rows with acme_call table.write."],
+      ]
+      for (const [input, message] of cases) {
+        const refused = await writeAs(ref, "claire", input)
+        expect(refused.error, message).toMatchObject({ code: "invalid_arguments", message })
+        expect(writesOf(refused.calls), message).toEqual([])
+      }
+    })
+  })
+
+  describe("closing and lifecycle (AC11)", () => {
+    it("should publish closed, and replace the lifecycle together with the options of its state column", async () => {
+      // Le titre écrit dans le même appel reste dit ; ce que l'en-tête change l'est par la ligne de publication.
+      await freshTable(seed, ref)
+      const closed = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, title: "Suivi des prospects 2026", header: { closed: true }, publish: true })
+      // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17).
+      expect(closed.result?.text).toBe(
+        "Draft of ventes/suivi_prospects saved on revision 3: title « Suivi des prospects 2026 ».\nPublished ventes/suivi_prospects revision 4: closed.\nRenamed: now at ventes/suivi_des_prospects_2026; the old path ventes/suivi_prospects still leads here.",
+      )
+      expect((await nodeAt(seed, ref, "ventes/suivi_des_prospects_2026"))?.meta).toEqual({ ...PROSPECTS_HEADER, closed: true })
+
+      const states = [...STATES, "archivé"]
+      const lifecycle = { column: "statut", states, working: "en cours" }
+      await freshTable(seed, ref)
+      const replaced = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, header: { columns: [{ name: "statut", options: states }], lifecycle }, publish: true })
+      expect(replaced.result?.text).toBe("Published ventes/suivi_prospects revision 4: changed statut (options); lifecycle replaced.")
+      // Le cycle remplacé entier : sans `review`, que l'ancien portait.
+      expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual({ ...PROSPECTS_HEADER, columns: expect.any(Array), lifecycle })
+      // Les états sans les options : `parseTableHeader` refuse, rien n'est écrit.
+      await freshTable(seed, ref)
+      const alone = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, header: { lifecycle }, publish: true })
+      expect(alone.error).toMatchObject({ code: "invalid_arguments", message: expect.stringContaining("lifecycle.states must list exactly the options of statut, in the same order") })
+      expect(writesOf(alone.calls)).toEqual([])
+    })
+  })
+
+  describe("reading the draft of a table (AC12)", () => {
+    it("should describe the pending header and its changes to a writer, the published header without pending header, and nothing to a reader", async () => {
+      await freshTable(seed, ref)
+      await writeAs(ref, "lea", { path: PROSPECTS.path, base_revision: 3, header: { columns: [{ name: "telephone", type: "text" }, { name: "email", max_length: 100 }], remove_columns: ["notes"] } })
+      const read = async (person: "lea" | "marc" = "lea") => {
+        const identity = person === "marc" ? acmeIdentity(ref, "marc", { teams: [teamOf("support", "marc")] }) : acmeIdentity(ref, person)
+        const { db, calls } = spyDb(await ref.db(person))
+        const output = await readNode(db, identity, { path: PROSPECTS.path, draft: true }).then(
+          (result) => ({ result, error: null }),
+          (error: unknown) => ({ result: null, error }),
+        )
+        return { ...output, calls }
+      }
+      const pending = await read()
+      const lines = pending.result?.text.split("\n") ?? []
+      expect(lines).toContain("- telephone: text")
+      expect(lines).toContain("- email: email, 100 characters at most")
+      expect(lines).not.toContain("- notes: text")
+      expect(lines.at(-1)).toBe("pending header changes (from revision 3): add telephone; change email (max_length); remove notes.")
+
+      // Marc lit le tableau (règle de lecture) : la base rend le brouillon, le service ne le lit pas.
+      await ref.addRules([{ node: PROSPECTS.path, team: "support", level: "read" }])
+      const reader = await read("marc")
+      expect(reader.error).toMatchObject({ code: "forbidden", message: expect.stringMatching(/^Drafts of ventes\/suivi_prospects are shown to its writers: /) })
+      expect(draftReads(reader.calls)).toEqual([])
+
+      await freshTable(seed, ref, { draft: { meta: null } })
+      const unchanged = await read()
+      expect(unchanged.result?.text).toContain("\n- notes: text\n")
+      expect(unchanged.result?.text.endsWith("\nno pending header changes.")).toBe(true)
+      await freshTable(seed, ref)
+      expect((await read()).result?.text.endsWith("\n\nNo pending draft on ventes/suivi_prospects.")).toBe(true)
+    })
+  })
+})

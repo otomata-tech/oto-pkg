@@ -1,0 +1,140 @@
+// Les lignes d'une partie du texte servi, dites en français (E05-S13, retours 1 et 8, AC-4, AC-14, AC-15 ;
+// HN-E05S13-12, -13, -14) : les morceaux que `parties-du-contexte.ts` relit (listes sous leur légende, phrases fixes,
+// règles de l'espace, avis de budget), chaque chemin ou titre un lien vers son contenu ; une ligne non reconnue, telle
+// que servie, en police mono. Monté dans la carte d'une partie par la vue « Contexte » de l'accueil, sous l'éditeur
+// d'un Contexte écrivable, et sous les blocs de l'encart « Contexte · Tout le monde » d'Organisation. Server
+// Component. Remplace `ListesDIndex` (M71), qui ne rendait que les listes d'index, en anglais. Sans lui, la personne
+// lit le texte anglais brut que reçoit son assistant.
+import type { ReactNode } from "react"
+import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
+import { LIEN } from "../components/classes"
+import { dateLisible } from "../format/dates"
+import { LIGNES_SERVIES, nomDuBloc, REGLES_OTO, type EquipesNommees } from "./libelles"
+import type { Legende, LigneServie, MorceauServi } from "./parties-du-contexte"
+
+type Navigation = { prefixeDesPages: string; Lien: LienDeLHote }
+
+export type ListesServiesProps = Navigation & {
+  morceaux: readonly MorceauServi[]
+  /** L'ancre de la partie : préfixe des `id` des légendes. */
+  ancre: string
+  /** Les équipes : le nom d'une partie omise nommée par l'avis de budget. */
+  equipes?: EquipesNommees
+}
+
+/** Une date servie (`AAAA-MM-JJ`), lisible ; illisible, telle que servie. */
+function date(servie: string): string {
+  return dateLisible(servie) ?? servie
+}
+
+function legende(une: Legende): string {
+  if (une.genre === "procedures") return LIGNES_SERVIES.procedures(une.nombre)
+  if (une.genre === "nouveautes") return LIGNES_SERVIES.depuis(date(une.depuis))
+  return LIGNES_SERVIES[une.genre]
+}
+
+/** Le lien d'un contenu servi, par son titre (son chemin sans titre), puis sa précision. */
+function VersLeContenu({ chemin, texte, precision, prefixeDesPages, Lien }: Navigation & { chemin: string; texte: string; precision: string }) {
+  return (
+    <>
+      <Lien href={`${prefixeDesPages}${chemin}`} className={LIEN}>
+        {texte || chemin}
+      </Lien>
+      {precision !== "" && ` — ${precision}`}
+    </>
+  )
+}
+
+function Ligne({ ligne, ...navigation }: Navigation & { ligne: LigneServie }): ReactNode {
+  switch (ligne.genre) {
+    case "connecteur":
+      return LIGNES_SERVIES.connecteur(ligne.nom, date(ligne.date))
+    // Une procédure utile se lit par son chemin : le texte servi n'a pas son titre (HN-E05S13-15).
+    case "procedure":
+      return <VersLeContenu chemin={ligne.chemin} texte={ligne.chemin} precision={ligne.resume} {...navigation} />
+    case "version":
+      return <VersLeContenu chemin={ligne.chemin} texte={ligne.titre} precision={LIGNES_SERVIES.version(ligne.revision, date(ligne.date))} {...navigation} />
+    case "recent":
+      return <VersLeContenu chemin={ligne.chemin} texte={ligne.titre} precision={LIGNES_SERVIES.recent(ligne.nature, date(ligne.date))} {...navigation} />
+    case "index":
+      return <VersLeContenu chemin={ligne.chemin} texte={ligne.titre} precision={ligne.resume} {...navigation} />
+  }
+}
+
+function Liste({ morceau, id, ...navigation }: Navigation & { morceau: Extract<MorceauServi, { genre: "liste" }>; id: string }) {
+  const lignes = morceau.lignes.length > 0 && (
+    <ul aria-labelledby={morceau.legende ? id : undefined} className="flex flex-col gap-1.5">
+      {morceau.lignes.map((ligne, rang) => (
+        // Une ligne servie n'a pas d'identité propre (deux nouveautés peuvent viser le même contenu) : son rang.
+        <li key={rang}>
+          <Ligne ligne={ligne} {...navigation} />
+        </li>
+      ))}
+    </ul>
+  )
+  if (!morceau.legende) return lignes
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p id={id} className="font-medium text-ink">
+        {legende(morceau.legende)}
+      </p>
+      {lignes}
+    </div>
+  )
+}
+
+/** Du texte tel que servi : une ligne non reconnue, jamais perdue. */
+function Brut({ texte }: { texte: string }) {
+  return <pre className="oto-code whitespace-pre-wrap break-words p-3">{texte}</pre>
+}
+
+/** Les règles de l'espace en français, quand le texte servi en porte autant que la traduction ; sinon telles que servies. */
+function Regles({ lignes, texte }: { lignes: readonly string[]; texte: string }) {
+  if (lignes.length !== REGLES_OTO.length) return <Brut texte={texte} />
+  return (
+    <ul className="flex list-disc flex-col gap-1.5 ps-5">
+      {REGLES_OTO.map((regle) => (
+        <li key={regle}>{regle}</li>
+      ))}
+    </ul>
+  )
+}
+
+const PHRASES = {
+  "aucune-procedure": LIGNES_SERVIES.aucuneProcedure,
+  "rien-de-nouveau": LIGNES_SERVIES.rienDeNouveau,
+  suite: LIGNES_SERVIES.suite,
+  "non-charge": LIGNES_SERVIES.nonCharge,
+} as const
+
+function Morceau({ morceau, id, equipes = [], ...navigation }: Navigation & { morceau: MorceauServi; id: string; equipes?: EquipesNommees }): ReactNode {
+  switch (morceau.genre) {
+    case "liste":
+      return <Liste morceau={morceau} id={id} {...navigation} />
+    case "phrase":
+      return <p className="text-mute">{PHRASES[morceau.phrase]}</p>
+    case "autres-procedures":
+      return <p className="text-mute">{LIGNES_SERVIES.autresProcedures(morceau.nombre)}</p>
+    case "regles":
+      return <Regles lignes={morceau.lignes} texte={morceau.texte} />
+    case "budget": {
+      const noms = morceau.noms.map(({ nom, coupe }) => (coupe ? LIGNES_SERVIES.coupe(nomDuBloc({ name: nom }, equipes)) : nomDuBloc({ name: nom }, equipes)))
+      const liste = [...noms, ...(morceau.autres > 0 ? [LIGNES_SERVIES.autres(morceau.autres)] : [])].join(", ")
+      return <p className="text-ink">{LIGNES_SERVIES.budget(liste)}</p>
+    }
+    case "brut":
+      return <Brut texte={morceau.texte} />
+  }
+}
+
+export function ListesServies({ morceaux, ancre, ...props }: ListesServiesProps) {
+  if (morceaux.length === 0) return null
+  return (
+    <div className="flex flex-col gap-3 text-sm text-ink">
+      {morceaux.map((morceau, rang) => (
+        // Les morceaux suivent l'ordre servi, que rien ne réordonne : leur rang.
+        <Morceau key={rang} morceau={morceau} id={`${ancre}-liste-${rang}`} {...props} />
+      ))}
+    </div>
+  )
+}

@@ -1,0 +1,302 @@
+/* Porté d'oto-frontend (src/design-system/components/css/content.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* L'écran nœud (accès, lecteur, encart, contenus liés, arbre des contenus) : ce que le DS disait déjà n'est pas ici (la ligne d'un contenu lié est `.oto-object-link`, les popovers `.oto-pop`, la pile d'avatars `.oto-avatar-group`, l'en-tête `.oto-screen-header`) ; composer, jamais recopier. */
+
+/* L'accès, qui voit l'objet et par où l'ouvrir : une ligne, jamais deux (visages, périmètre, partage, « ⋯ ») ; le détail vit dans un popover, une ligne d'en-tête qui déroule cinq personnes n'en est plus une. */
+
+.oto-access {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  min-inline-size: 0;
+}
+
+/* ── le périmètre et le « ⋯ », deux déclencheurs de popover posés sur le bureau : le filet et le fond `--island` les détachent du grain, un bouton fantôme y disparaîtrait ; `[data-icon-only]`, l'attribut que pose déjà `IconButton`. */
+.oto-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  flex: none;
+  padding: var(--space-1) var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-pill);
+  background: var(--island);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  transition: var(--tr-colors);
+}
+.oto-scope:hover { color: var(--ink); border-color: color-mix(in oklab, var(--primary) 35%, transparent); }
+.oto-scope[data-icon-only] { padding-inline: var(--space-2); }
+/* le chevron se retourne quand le panneau est ouvert : le seul signal qui reste quand le popover se pose ailleurs qu'en dessous */
+.oto-scope[aria-expanded="true"] > .oto-icon:last-child { rotate: 180deg; }
+
+/* ── la mention « propriétaire » : ni un état de machine (`.oto-badge`) ni « Oto a produit ça » (`oto`) ; une pastille teintée du thème, parce qu'elle parle de quelqu'un. */
+.oto-owner {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: var(--space-px) var(--space-2);
+  border: 1px solid color-mix(in oklab, var(--primary) 40%, transparent);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--ink);
+  font-size: var(--fs-2xs);
+}
+
+/* Le lecteur, le corps d'un document en lecture (`.oto-island-body[data-reading]` est dans `islands.css`, ses enfants ici) : de l'air entre les blocs plutôt que dans l'interligne ; la mesure est sur le paragraphe, pas sur le conteneur, l'îlot reste pleine largeur pour un encart ou un tableau. */
+
+/* Tout est scopé par `.oto-island-body[data-reading]`, et c'est obligatoire : le reset (`.oto h2`, `.oto p`, `.oto ul`, (0,1,1)) bat une simple classe, et sans le préfixe les intertitres se collent et les puces disparaissent, sans erreur. */
+
+/* L'intertitre est un vrai titre de document, `--fs-lg` gras contre un corps en `--fs-sm` ; la graisse et le corps portent la hiérarchie, `--title` garde le relief du thème. */
+.oto-island-body[data-reading] .oto-reader-heading {
+  margin: var(--space-5) 0 var(--space-2-5);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.015em;
+  /* `--lh-snug` : la ligne des titres 17-24 px, dit le jeton lui-même. */
+  line-height: var(--lh-snug);
+  /* `--title` et non `--ink` : l'encre teintée des intitulés ; en `--ink`, un intertitre pèse autant que le corps qu'il coiffe, et se lit à un autre niveau que les en-têtes d'îlot voisins. */
+  color: var(--title);
+}
+/* Le premier bloc ne décolle pas du haut de l'îlot : la marge de tête d'un intertitre sépare deux blocs, elle n'ouvre pas le corps. */
+.oto-island-body[data-reading] > :first-child { margin-block-start: 0; }
+
+.oto-island-body[data-reading] .oto-reader-para {
+  margin: 0 0 var(--space-3-5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  color: var(--ink);
+  /* `--reader-measure` et non `68ch` en clair, le jeton que lit aussi la rangée d'un bloc en écriture (`blocks.css`) ; le `ch` se compte sur `--fs-sm`. */
+  max-inline-size: var(--reader-measure);
+}
+
+/* Le reset retire les puces partout, on les rétablit ici seulement : dans une liste de règles, la puce porte le sens ; le marqueur en `--faint`, il rythme sans parler. */
+.oto-island-body[data-reading] .oto-reader-list {
+  margin: 0 0 var(--space-3-5);
+  padding-inline-start: var(--space-4);
+  list-style: disc;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+  color: var(--ink);
+  max-inline-size: var(--reader-measure);
+}
+.oto-island-body[data-reading] .oto-reader-list > li { margin-block-end: var(--space-1-5); list-style: inherit; }
+.oto-island-body[data-reading] .oto-reader-list > li:last-child { margin-block-end: 0; }
+.oto-island-body[data-reading] .oto-reader-list > li::marker { color: var(--faint); font-size: 0.85em; }
+
+/* Le pendant décimal (`ordered`) : seul le marqueur change, `tabular-nums` garde 9 et 10 à l'aplomb ; le sélecteur porte `ol`, (0,0,1) de plus, pour battre le `disc` de la règle sœur au même scope. */
+.oto-island-body[data-reading] ol.oto-reader-list { list-style: decimal; }
+.oto-island-body[data-reading] ol.oto-reader-list > li::marker { font-variant-numeric: tabular-nums; }
+
+/* L'encart de contenu, un objet posé au fil du texte et pas une ligne : sa vignette (la trame du thème, le glyphe de son type) dit ce que c'est avant qu'on lise le nom. */
+
+.oto-embed {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2-5) var(--space-3);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--island);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--ink) 5%, transparent);
+  color: inherit;
+  transition: border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out);
+}
+/* la trame du thème traverse la carte et s'estompe vers la droite : la matière au bord gauche, l'air où le texte respire */
+.oto-embed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 1px 1px,
+    color-mix(in oklab, var(--ink) 9%, transparent) 1px, transparent 0) 0 0 / 9px 9px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 55%);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 55%);
+}
+.oto-embed > * { position: relative; }
+.oto-embed:hover {
+  border-color: color-mix(in oklab, var(--primary) 50%, transparent);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--ink) 10%, transparent);
+}
+
+/* LA VIGNETTE : teintée, texturée, avec le glyphe du type. */
+.oto-embed-icon {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  inline-size: 38px;
+  block-size: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-ctrl);
+  color: var(--title);
+  background: color-mix(in oklab, var(--primary) 20%, var(--island));
+  border: 1px solid color-mix(in oklab, var(--primary) 34%, transparent);
+}
+.oto-embed-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 1px 1px,
+    color-mix(in oklab, var(--ink) 16%, transparent) 1px, transparent 0) 0 0 / 7px 7px;
+  -webkit-mask-image: linear-gradient(135deg, #000 0%, transparent 80%);
+  mask-image: linear-gradient(135deg, #000 0%, transparent 80%);
+}
+.oto-embed-icon > * { position: relative; }
+
+.oto-embed-text { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: var(--space-0-5); }
+.oto-embed-name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Toute la carte se clique par un lien étiré, et le lien reste sur le nom : une seule cible dans la tabulation, dont la surface est la carte ; `position: static` sur le texte, sinon `inset: 0` se résout contre lui ; la vignette et l'action restent positionnées et gardent leurs clics ; prix connu : le texte n'est plus sélectionnable. */
+.oto-embed > .oto-embed-text { position: static; z-index: 1; }
+.oto-embed-name::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+/* L'anneau de focus doit épouser la carte, pas les quelques caractères du nom : c'est la carte qui a l'air cliquable. Changé : un trait d'encre de 2 px (HN-E05S09a-11), là où `outline: var(--ring)`, une couleur sans style de trait, n'en traçait aucun ; le nom ne garde pas l'anneau du reset, qui en ferait deux. */
+.oto-embed:has(> .oto-embed-text > .oto-embed-name:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.oto-embed .oto-embed-name:focus-visible { outline: none; box-shadow: none; }
+/* Pas de souligné au survol : le filet et l'ombre de la carte disent déjà qu'elle réagit, souligner ferait lire le nom comme un lien dans une phrase. */
+
+.oto-embed-meta { display: flex; align-items: center; gap: var(--space-1-5); font-size: var(--fs-xs); color: var(--mute); }
+
+/* le type (« page », « tableau ») en mono capitales : une catégorie, pas une phrase */
+.oto-embed-kind {
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-mono);
+  padding: var(--space-px) var(--space-1-5);
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--ink) 7%, transparent);
+  color: var(--mute);
+}
+
+/* ── ici ou ailleurs : un contenu rangé dans cette page et un contenu cité se distinguent avant d'être lus (pastille pleine, pastille creuse), et se disent par le mot, jamais par la seule forme. */
+.oto-embed-where { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--fs-xs); color: var(--mute); }
+.oto-embed-where::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: var(--r-dot);
+  background: color-mix(in oklab, var(--primary) 70%, transparent);
+}
+.oto-embed-where[data-where="elsewhere"]::before {
+  background: none;
+  border: 1px dashed color-mix(in oklab, var(--ink) 45%, transparent);
+}
+
+/* `z-index` au-dessus du lien étiré : sans ce rang, le lien avalait la flèche de bout de ligne, qui porte un geste différent de la destination. */
+.oto-embed-actions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  z-index: 2;
+}
+
+/* Les contenus liés, « Qui s'en sert » : une commande, pas un encart (une pastille à chevron, large comme son texte) ; `<details>` natif, l'ouverture, le clavier et l'annonce viennent du navigateur. */
+
+/* Changé (E05-S12, retour 6) : plus de marge basse, la colonne du document met seule son écart (`--gap`) entre la pastille et la carte. */
+.oto-linked { margin: 0; }
+
+/* Le chapô d'un Contexte, seul dans sa rangée au-dessus de la carte et des annexes (E05-S12, retour 5) : l'écart du contenu (`--space-3`) ramené à celui de la colonne (`--gap`), comme sur une page. */
+.oto-content > .oto-node-lead { margin-block-end: calc(var(--gap) - var(--space-3)); }
+
+.oto-linked > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  list-style: none;
+  border: 1px solid color-mix(in oklab, var(--primary) 32%, transparent);
+  border-radius: var(--r-ctrl);
+  background: color-mix(in oklab, var(--primary) 9%, var(--island));
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+/* Safari dessine encore son propre triangle sans cette ligne. */
+.oto-linked > summary::-webkit-details-marker { display: none; }
+.oto-linked > summary:hover {
+  background: color-mix(in oklab, var(--primary) 18%, var(--island));
+  border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+}
+.oto-linked > summary > .oto-icon:first-child { color: var(--primary); }
+.oto-linked > summary strong { font-weight: var(--fw-semibold); color: var(--ink); font-size: var(--fs-sm); }
+
+/* le COMPTE : ce qui casserait si on supprimait l'objet, en un chiffre */
+.oto-linked-count {
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  padding-inline: var(--space-1-5);
+  border-radius: var(--r-pill);
+  color: var(--ink);
+  background: color-mix(in oklab, var(--primary) 26%, var(--island));
+}
+
+.oto-linked-chevron { margin-inline-start: auto; color: var(--ink); transition: rotate var(--dur-fast) var(--ease-out); }
+.oto-linked[open] > summary .oto-linked-chevron { rotate: 180deg; }
+/* ouverte, la pastille se soude à son panneau : deux filets entre les deux se liraient comme deux objets */
+.oto-linked[open] > summary {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+  border-block-end-color: transparent;
+}
+
+.oto-linked-body {
+  margin-block-start: calc(var(--space-1) * -1);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--primary) 32%, transparent);
+  border-radius: 0 0 var(--r-ctrl) var(--r-ctrl);
+  background: color-mix(in oklab, var(--primary) 4%, var(--island));
+}
+.oto-linked-label {
+  margin: var(--space-3) 0 var(--space-1);
+  font-family: var(--mono);
+  font-size: var(--fs-mono-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tr-mono);
+  color: var(--faint);
+}
+.oto-linked-label:first-child { margin-block-start: 0; }
+/* La note dit ce qui casse, et que les deux pannes ne sont pas la même ; `--mute` et non `--faint`, du texte à lire que `--faint` à cette taille ferait passer sous le contraste. */
+.oto-linked-note { margin: var(--space-2-5) 0 0; font-size: var(--fs-xs); color: var(--mute); line-height: var(--lh-normal); }
+.oto-linked-note strong { color: var(--ink); font-weight: var(--fw-semibold); }
+
+/* L'arbre des contenus, ce qui dépend de l'objet : ni filet ni repère sur le côté, le survol de `.oto-object-link` suffit ; le glyphe est le frère du lien, pour devenir un bouton le jour où l'arbre se déplie. */
+
+.oto-content-tree { list-style: none; margin: 0; padding: 0; }
+.oto-content-tree .oto-content-tree { padding-inline-start: var(--space-4); }
+.oto-content-tree-row { display: flex; align-items: center; min-inline-size: 0; list-style: none; }
+.oto-content-tree-row > .oto-object-link { flex: 1; min-inline-size: 0; }
+.oto-content-tree-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  color: var(--ink);
+}
+/* Cassé, le lien pointe dans le vide : la couleur ne porte pas seule, un mot dans le qualificatif et l'icône changent, `--st-fail-text` le fait voir de loin. */
+.oto-content-tree-row[data-broken] > .oto-content-tree-icon,
+.oto-content-tree-row[data-broken] .oto-object-link-name { color: var(--st-fail-text); }

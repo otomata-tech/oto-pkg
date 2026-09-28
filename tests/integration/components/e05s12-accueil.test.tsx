@@ -1,0 +1,179 @@
+// L'accueil en activités (E05-S12, lot B) : une activité par ligne, sa phrase écrite par l'écran depuis le verbe
+// classé par le service, le nombre de gestes regroupés, l'heure (AC-13) ; ce qu'ouvre une ligne (AC-15) ; à
+// droite la recherche, « Brancher un assistant » et « Procédures les plus utilisées » (AC-18). L'hôte est simulé par ce
+// qu'il prête ; l'écran reçoit les données déjà lues, comme de sa page. Les journées, le premier jour et les
+// lectures en échec restent éprouvés par `ecran-accueil.test.tsx`.
+import type { AnchorHTMLAttributes } from "react"
+import { cleanup, render, screen, within } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import type { Activity, UsefulProcedure } from "@otomata_tech/oto_platform/schemas"
+import { ContexteDeLHote, ContexteDeRafraichissement, CoquilleOto, EcranDAccueil, type DonneesDeLAccueil } from "@otomata_tech/oto_platform/ui"
+
+// Le 26 septembre 2026 à midi, heure de Paris (UTC+2).
+const MAINTENANT = new Date("2026-09-26T10:00:00Z")
+const MOI = "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02"
+const ADA = "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c03"
+
+const activite = (id: number, surcharge: Partial<Activity>): Activity => ({
+  id,
+  at: "2026-09-26T09:00:00Z",
+  userId: ADA,
+  userName: "Ada Martin",
+  verb: "edited",
+  kind: "page",
+  path: `ventes/page_${id}`,
+  title: `Page ${id}`,
+  count: 1,
+  ctx: null,
+  ...surcharge,
+})
+
+const DONNEES: DonneesDeLAccueil = {
+  nom: "Claire Morel",
+  moi: MOI,
+  activites: { data: { activities: [], truncated: false } },
+  adresse: "https://demo.example.test/api/mcp",
+  connexions: { data: [{ famille: "claude.ai", signature: "claude-ai@1.0", date: "2026-09-24T09:00:00Z" }] },
+  procedures: { data: [] },
+}
+
+function LienDeLHote({ href, children, ...reste }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
+  return (
+    <a href={href} data-lien="hote" {...reste}>
+      {children}
+    </a>
+  )
+}
+
+function monter(donnees: Partial<DonneesDeLAccueil>) {
+  render(
+    <CoquilleOto pleinePage>
+      <ContexteDeRafraichissement.Provider value={vi.fn()}>
+        <ContexteDeLHote.Provider value={{ Lien: LienDeLHote, chemin: "/", naviguer: vi.fn() }}>
+          <EcranDAccueil
+            donnees={{ data: { ...DONNEES, ...donnees } }}
+            Lien={LienDeLHote}
+            hrefDuJournal="/journal"
+            hrefDeConversation={(code) => `/journal?conversation=${code}`}
+            hrefDesGuides="/connect"
+            prefixeDesPages="/n/"
+            onglet="activites"
+            hrefDOnglet={(cle) => (cle === "activites" ? "/" : `/?onglet=${cle}`)}
+            hrefDuProfil="/profil"
+          />
+        </ContexteDeLHote.Provider>
+      </ContexteDeRafraichissement.Provider>
+    </CoquilleOto>,
+  )
+}
+
+const fil = () => within(screen.getByRole("tabpanel", { name: "Activités" }))
+/** Les lignes du fil, liens ou non, dans l'ordre du document. */
+const lignes = () => [...screen.getByRole("tabpanel", { name: "Activités" }).querySelectorAll(".oto-feed-item")]
+
+beforeEach(() => {
+  vi.useFakeTimers({ now: MAINTENANT, toFake: ["Date"] })
+})
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+describe("home activities, one line each (E05-S12, AC-13, AC-15)", () => {
+  it("should write who, what happened with the nature and the title, the grouped count and the hour, each line opening the content through the host's link", () => {
+    monter({
+      activites: {
+        data: {
+          truncated: false,
+          activities: [
+            activite(5, { at: "2026-09-26T10:02:00Z", userId: MOI, userName: "Claire Morel", verb: "published", path: "ventes/tarifs_2026", title: "Tarifs 2026" }),
+            activite(4, { at: "2026-09-26T09:15:00Z", verb: "wrote_rows", kind: "table", path: "ventes/salons", title: "Salons", count: 3 }),
+            activite(3, { at: "2026-09-26T09:00:00Z", userId: MOI, userName: "Claire Morel", verb: "created", kind: "table", path: "ventes/prospects", title: "Prospects" }),
+          ],
+        },
+      },
+    })
+
+    const liens = fil().getAllByRole("link").filter((lien) => lien.textContent !== "Tout le journal")
+    // L'avatar se tait : chaque ligne se nomme par sa phrase entière, puis le nombre et l'heure.
+    expect(liens.map((lien) => [lien.getAttribute("href"), lien.dataset.lien])).toEqual([
+      ["/n/ventes/tarifs_2026", "hote"],
+      ["/n/ventes/salons", "hote"],
+      ["/n/ventes/prospects", "hote"],
+    ])
+    expect(liens[0]).toHaveAccessibleName("Vous avez publié la page Tarifs 2026 12:02")
+    expect(liens[1]).toHaveAccessibleName("Ada Martin a écrit dans le tableau Salons 3 fois 11:15")
+    expect(liens[2]).toHaveAccessibleName("Vous avez créé le tableau Prospects 11:00")
+    // « ×3 » à l'œil, « 3 fois » au lecteur d'écran (AC-14).
+    expect(within(liens[1]).getByText("×3")).toHaveAttribute("aria-hidden", "true")
+    // La phrase coupée par des points de suspension garde son texte entier au survol, sans changer le nom de la ligne.
+    expect(within(liens[1]).getByText("a écrit dans le tableau Salons")).toHaveAttribute("title", "a écrit dans le tableau Salons")
+  })
+
+  it("should open the conversation of a launched procedure, and nothing for a content the person does not read, keeping its path as the journal shows it", () => {
+    monter({
+      activites: {
+        data: {
+          truncated: false,
+          activities: [
+            activite(3, { verb: "ran", kind: "procedure", path: "ventes/relance_devis", title: "Relancer les devis", ctx: "K7M2-9QXR" }),
+            activite(2, { userId: "u-parti", userName: null, verb: "trashed", path: "ventes/ancienne_grille", title: null }),
+            // L'espace personnel d'une autre personne, coupé par le service (D44) : ni nature ni titre.
+            activite(1, { verb: "edited", kind: null, path: "private/lea", title: null, count: 2 }),
+          ],
+        },
+      },
+    })
+
+    const [lancee, corbeille, privee] = lignes()
+    expect(lancee).toHaveAttribute("href", "/journal?conversation=K7M2-9QXR")
+    expect(lancee).toHaveAccessibleName("Ada Martin a lancé la procédure Relancer les devis 11:00")
+    expect(corbeille.tagName).toBe("DIV")
+    expect(corbeille).toHaveTextContent("Personne retiréea mis à la corbeille la page ventes/ancienne_grille11:00")
+    expect(privee.tagName).toBe("DIV")
+    expect(privee).toHaveTextContent("Ada Martina modifié private/lea×22 fois 11:00")
+  })
+})
+
+describe("home right column (E05-S12, AC-18)", () => {
+  const PROCEDURES: UsefulProcedure[] = [
+    { path: "ventes/relance_devis", title: "Relancer les devis" },
+    { path: "achats/commande", title: "Passer une commande" },
+  ]
+
+  it("should put the main island alone on the left, then the search, Brancher un assistant and the useful procedures on the right, in that order", () => {
+    monter({ procedures: { data: PROCEDURES } })
+
+    const principal = screen.getByRole("region", { name: "Activités et contexte" })
+    const recherche = screen.getByRole("search")
+    const brancher = screen.getByRole("region", { name: "Brancher un assistant" })
+    const procedures = screen.getByRole("region", { name: "Procédures les plus utilisées" })
+    const colonnes = [...document.querySelectorAll(".oto-home-col")]
+    expect(colonnes).toHaveLength(2)
+    expect(colonnes[0]).toContainElement(principal)
+    for (const element of [recherche, brancher, procedures]) expect(colonnes[1]).toContainElement(element)
+    const ordre = [principal, recherche, brancher, procedures]
+    for (let rang = 1; rang < ordre.length; rang += 1) expect(ordre[rang - 1].compareDocumentPosition(ordre[rang]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("should list the useful procedures in the order served, each with its glyph and its title, opening the procedure", () => {
+    monter({ procedures: { data: PROCEDURES } })
+
+    const liens = within(screen.getByRole("region", { name: "Procédures les plus utilisées" })).getAllByRole("link")
+    expect(liens.map((lien) => [lien.textContent, lien.getAttribute("href"), lien.dataset.lien])).toEqual([
+      ["Relancer les devis", "/n/ventes/relance_devis", "hote"],
+      ["Passer une commande", "/n/achats/commande", "hote"],
+    ])
+    expect(liens[0].querySelector("svg")).not.toBeNull()
+  })
+
+  it("should say that no procedure is published when the list is empty, without any action", () => {
+    monter({ procedures: { data: [] } })
+
+    const ilot = within(screen.getByRole("region", { name: "Procédures les plus utilisées" }))
+    expect(ilot.getByText("Aucune procédure publiée")).toBeInTheDocument()
+    expect(ilot.queryByRole("link")).toBeNull()
+    expect(ilot.queryByRole("button")).toBeNull()
+  })
+})

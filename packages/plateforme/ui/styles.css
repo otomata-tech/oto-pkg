@@ -1,0 +1,27 @@
+/* ══════════════════════════════════════════════════════════════════
+ * LE STYLE DES ÉCRANS DU PAQUET — `@otomata_tech/oto_platform/ui/styles.css`
+ *
+ * Porté d'oto-frontend (src/design-system/styles.css) : l'ordre des
+ * couches, tel quel (ADR-008 points 3 et 6, E05-S09). Les jetons d'abord
+ * (`styles/oto.css`, seule source des valeurs), puis les remises à zéro,
+ * la grammaire d'îlots, les gestes d'icônes et les composants.
+ *
+ * Changé pour vivre sous Tailwind : les remises à zéro vont dans la couche
+ * `base`, sous les utilitaires, pour que les écrans portés avant E05-S09
+ * gardent leurs classes ; le reste est hors couche, comme dans
+ * oto-frontend, et l'emporte donc sur un utilitaire posé sur le même
+ * élément qu'une classe `oto-*`.
+ * ══════════════════════════════════════════════════════════════════ */
+
+@import "./styles/oto.css";
+
+@import "./ds/tokens/reset.css" layer(base);
+@import "./ds/tokens/typography.css";
+@import "./ds/tokens/motion.css";
+@import "./ds/tokens/breakpoints.css";
+
+@import "./ds/app/islands.css";
+
+@import "./ds/icons/anim.css";
+
+@import "./ds/components/components.css";

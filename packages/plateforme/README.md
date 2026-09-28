@@ -1,0 +1,376 @@
+# @otomata_tech/oto_platform
+
+La plateforme MCP d'entreprise, en paquet npm : écrans, API, serveur MCP à six outils figés,
+services et migrations du schéma Postgres `platform`. Elle s'installe dans une application Next
+(App Router) adossée à Supabase, qui monte ses routes. Le paquet est publié en sources TypeScript,
+sans étape de build, sous licence MIT.
+
+## Les faces
+
+| Face | Export | Rôle |
+|------|--------|------|
+| `ui/` | `@otomata_tech/oto_platform/ui` | Écrans et composants, portés d'oto-frontend ; jamais `server/`, `migrations/`, client DB |
+| `schemas/` | `@otomata_tech/oto_platform/schemas` | Schémas Zod (`zod/v4`) partagés par toutes les faces, `ui/` compris ; Zod pur, aucune autre face ni client DB (frontière ESLint) |
+| `mcp/` | `@otomata_tech/oto_platform/mcp` | Six outils, ctx, routage, prompts ; instructions et descriptions statiques |
+| `api/` | `@otomata_tech/oto_platform/api` | Route handlers `/api/plateforme/*` : adaptateurs des services |
+| `server/` | `@otomata_tech/oto_platform/server` | Services : la seule porte d'écriture (Zod → droits → écriture → journal) |
+| `migrations/` | `@otomata_tech/oto_platform/migrations/*` | SQL du schéma `platform`, additif, copié par l'application hôte |
+| `cli/` | commande `oto-platform` | Copie et contrôle des migrations dans l'application hôte ; préparation d'une base (`db prepare`) |
+
+## Règle de dépendance entre faces
+
+`ui/` → `schemas/` seulement : il reçoit ses données par props et appelle `api/` par HTTP (même
+origine) ; `api/` et `mcp/` → `server/` et `schemas/` ; `server/` → la base et, plus tard, le
+service connecteurs ; `schemas/` n'importe aucune autre face ; `migrations/` n'est importé par
+personne. La frontière de `ui/` est appliquée par ESLint avec un test, comme celle de `server/`,
+`api/` et `mcp/`, qui n'importent `@supabase/*` que dans `server/oauth.ts` et `server/invitations.ts`
+(consentement OAuth, lien magique). `server/` parle à la base par sa propre connexion
+(`PLATFORM_DATABASE_URL`), sous l'appelant vérifié que l'hôte lui passe ; le client Supabase de l'hôte
+reste pour ses propres pages. Le paquet n'importe jamais le code de l'hôte. Une page de l'hôte qui
+appelle un service construit ce client par `createPlatformDb({ caller })` : l'appelant vérifié de la
+session, sous lequel tournent les services (`db.tx`, la seule face du client ; `accessToken`, que les
+versions antérieures demandaient, est accepté et n'est plus lu). Sur Supabase Auth, `{ userId, email, name }` du
+compte de la session (`callerName(user)` pour le nom, jamais une valeur de repli) ; avec un émetteur
+OIDC, `{ issuer, issuerKind: "oidc", subject, email, name }` de l'`id_token` validé (`issuer` :
+`PLATFORM_OIDC_ISSUER` telle quelle, l'email seulement vérifié), que la base traduit en identifiant
+interne à la première requête (`identity_for_caller`). `resolveIdentity(db, host, { email })` lit cet
+identifiant dans la session.
+
+## Installer dans une application
+
+Pour une application Next 15 (App Router) sur Supabase.
+
+1. Installer une version exacte ; Renovate la fera monter ensuite :
+
+   ```bash
+   pnpm add @otomata_tech/oto_platform@<version exacte>
+   ```
+
+   Dépendances pairs, à installer dans l'application : `next` 15, `react` et `react-dom` 19,
+   `@supabase/supabase-js` 2, `@phosphor-icons/react` 2, `zod` 3 (3.25 au moins),
+   `react-hook-form` 7 (7.55 au moins), `@hookform/resolvers` 5. La liste qui fait foi est
+   `peerDependencies` dans le `package.json` du paquet.
+
+2. pnpm 12 refuse d'installer une version publiée trop récemment (`minimumReleaseAge`). Pour
+   recevoir chaque version dès sa publication, exclure le paquet de ce délai dans le
+   `pnpm-workspace.yaml` de l'application :
+
+   ```yaml
+   minimumReleaseAgeExclude:
+     - "@otomata_tech/oto_platform"
+   ```
+
+3. `next.config.ts` : le paquet est publié en sources TypeScript, Next le transpile.
+
+   ```ts
+   transpilePackages: ["@otomata_tech/oto_platform"],
+   ```
+
+4. `src/app/globals.css`, après `@import "tailwindcss";` : Tailwind lit les classes des écrans
+   du paquet, et leurs tokens se chargent une fois.
+
+   ```css
+   @source "../../node_modules/@otomata_tech/oto_platform/ui";
+   @import "@otomata_tech/oto_platform/ui/styles.css";
+   ```
+
+5. Variables d'environnement de l'application : `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`. Jamais de clé service dans
+   l'application : le paquet travaille sous l'appelant vérifié de la session, sous RLS.
+
+   Et `PLATFORM_DATABASE_URL`, la connexion du serveur du paquet à la base (port de base, ADR-012),
+   **exigée dès la version qui passe un premier service en SQL** ; sans elle, ces services lèvent
+   `PlatformConfigError`. Avant : une fois, `oto-platform db prepare` sur le projet (section
+   « Installer sur un Postgres sans Supabase », point 2 : sur Supabase, elle ne crée que le rôle
+   `platform_app`). La valeur : l'URL du pooler en mode transaction (port 6543, utilisateur
+   `platform_app.<ref du projet>`, mot de passe de `PLATFORM_APP_PASSWORD`), dans l'environnement
+   serveur de l'application seulement, jamais en `NEXT_PUBLIC_`. Le rôle `platform_app` ne peut que
+   devenir `authenticated` ou `anon` : chaque requête porte l'appelant vérifié, sous RLS. TLS est
+   exigé hors de la machine locale.
+
+6. Routes à monter : celles de `src/app/` de l'application de base du dépôt
+   [`otomata-tech/oto-pkg`](https://github.com/otomata-tech/oto-pkg), qui en est la
+   référence. Les écrans s'y montent à l'un des trois niveaux de « Monter les écrans ».
+
+   Routes de `/api/plateforme/*` des gestes du rail et du partage public, servies par la même route
+   de l'hôte :
+   - `GET nodes/links?path=` : liens sortants et entrants d'un nœud (« Contenus liés »).
+   - `GET nodes/impact?path=&new_path=` : qui gagne, perd ou change d'accès si le nœud se déplace.
+   - `POST nodes/position` `{ path, after }` : range un nœud juste après un frère (`null` : en tête).
+   - `POST nodes/duplicate` `{ path }` : copie le nœud et son sous-arbre, juste après lui.
+   - `POST nodes/access` `{ path, access, level? }` : accès général, `organisation` (niveau `read`,
+     `write` ou `manage`, `read` par défaut ; `manage` à l'administrateur) ou `restricted`.
+   - `GET trash`, `POST trash` `{ path }`, `POST trash/restore` `{ path }` : la corbeille (30 jours).
+   - `GET shares?path=`, `GET shares`, `POST shares` `{ path, include_children? }`, `DELETE shares/<id>` :
+     les liens publics d'un nœud, ceux de l'organisation (administrateur).
+   - `GET public/<jeton>?path=` : la lecture publique d'un lien, **hors session** (la route de l'hôte la
+     passe au paquet sans jeton), toujours `X-Robots-Tag: noindex, nofollow` ; la page `/p/<jeton>` de
+     l'hôte peut aussi appeler `readPublicNode` directement.
+
+7. Réglages d'Auth du projet Supabase, une fois les migrations appliquées : depuis un clone du dépôt
+   `otomata-tech/oto-pkg`, `pnpm auth:settings --to <ref> --site-url <url> --redirect <motif>`
+   montre l'écart avec les réglages de la plateforme (hook d'inscription, serveur OAuth, adresses,
+   emails, SMTP hors mot de passe) ; `--apply` l'écrit, et la commande liste ce qui reste à poser à
+   la main.
+
+8. Data API du projet Supabase : `platform` n'y est pas exposé. Le paquet le lit par
+   `PLATFORM_DATABASE_URL` ; exposé, le schéma resterait lisible et modifiable par PostgREST sous le
+   seul jeton d'une personne, que seule la RLS d'isolation borne. Une fois l'application passée à une
+   version du paquet qui ne lit plus `platform` par PostgREST, retirer `platform` des schémas exposés
+   (Settings → Data API → Exposed schemas), ou, depuis un clone du dépôt,
+   `pnpm data-api:close --to <ref>` (l'écart), puis `--apply` (l'écriture, la relecture et le contrôle :
+   `/rest/v1/nodes` sous `Accept-Profile: platform` est refusé). Jeton de gestion :
+   `SUPABASE_ACCESS_TOKEN`, jamais affiché.
+
+## Émetteur d'identité : trois combinaisons
+
+Un hôte, un émetteur. Sans `PLATFORM_OIDC_ISSUER`, c'est Supabase Auth du projet, comme avant ; avec
+elle, un émetteur OpenID Connect (Logto, Keycloak), dont le paquet lit les clés par la découverte, et
+dont chaque jeton doit porter `PLATFORM_OIDC_AUDIENCE` dans `aud`. Une personne y entre par
+invitation : son sujet chez l'émetteur est relié à un identifiant interne à sa première requête, par
+l'email vérifié de l'invitation (ou de l'équipe plateforme). Les métadonnées de ressource protégée
+annoncent l'émetteur aux assistants, qui s'y enregistrent et y consentent.
+
+| Hôte | Variables | Côté émetteur |
+|---|---|---|
+| Supabase | `PLATFORM_DATABASE_URL`, en plus des variables Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) | Réglages d'Auth reproduits (`pnpm auth:settings` : hook, serveur OAuth, adresses de retour) |
+| Postgres nu + Logto | `PLATFORM_DATABASE_URL`, `PLATFORM_OIDC_ISSUER` (`https://<logto>/oidc`), `PLATFORM_OIDC_AUDIENCE`, le client web et le secret de session de l'hôte (`PLATFORM_OIDC_CLIENT_ID`, `PLATFORM_OIDC_CLIENT_SECRET`, `PLATFORM_SESSION_SECRET`), `PLATFORM_SMTP_URL` et `PLATFORM_MAIL_FROM` (invitations) | Application web confidentielle (adresse de rappel exacte par adresse de l'hôte : Logto n'admet pas de motif) ; ressource d'API = l'adresse du MCP ; clients des assistants (« dynamic apps ») ; email vérifié exigé |
+| Postgres nu + Keycloak | Mêmes variables (`PLATFORM_OIDC_ISSUER` : `https://<keycloak>/realms/<realm>`) | Client web confidentiel (adresse de rappel exacte par adresse de l'hôte : Keycloak n'admet aucun motif d'hôte, `*` seulement en fin de chemin) ; enregistrement des clients des assistants (anonyme sur hôtes de confiance ; Client ID Metadata Documents : fonction expérimentale, coupée par défaut en 26.7) ; audience par mappeur (RFC 8707 : fonction expérimentale, coupée par défaut en 26.7) ; « Verify email » activé |
+
+`PLATFORM_OIDC_ISSUER` s'écrit exactement comme l'émetteur l'écrit dans `iss` (barre finale
+comprise), en `https`. L'émetteur ne marque `email_verified` que pour une adresse réellement
+vérifiée : l'invitation et l'équipe plateforme relient une personne par cet email. Avec un émetteur
+OIDC :
+
+- **Invitations** : la plateforme envoie elle-même l'email, au nom affiché et au logo de
+  l'organisation, avec un lien vers `/login` de l'adresse d'où l'on invite, par le relais SMTP de
+  l'hôte. `PLATFORM_SMTP_URL` : `smtps://<utilisateur>:<mot de passe>@<relais>:465`, ou
+  `smtp://…:587`, TLS exigé dans les deux cas (STARTTLS demandé, l'envoi refusé sans lui) ;
+  `?requireTLS=false` en fin d'adresse, pour un relais de développement local seulement.
+  `PLATFORM_MAIL_FROM` : l'expéditeur (`Invitations <invitations@exemple.fr>`), sur un domaine
+  qui publie SPF et DKIM pour ce relais. Une variable qui manque refuse l'invitation en la nommant,
+  sans rien créer ; un relais qui refuse retire l'invitation. Sur Supabase, Supabase envoie le lien
+  magique, comme avant.
+- **Équipe plateforme** : `pnpm platform:staff add <email>` crée la ligne par son email, sans compte
+  Supabase ; la personne entre au MCP admin avec un jeton dont l'email vérifié est celui-là.
+- **Équipe plateforme, retour d'une personne retirée** : `pnpm platform:staff add <email> --user <identifiant>`
+  reprend l'identifiant interne auquel son sujet reste lié dans `platform.identities` ; un identifiant
+  inconnu de l'émetteur est refusé, sans rien écrire.
+- **Consentement** : chez l'émetteur ; la page de consentement de Supabase ne sert pas.
+
+## Monter les écrans : trois niveaux
+
+`@otomata_tech/oto_platform/ui/styles.css` charge le design system porté d'oto-frontend (jetons,
+huit thèmes, grammaire d'îlots, composants, polices Inter et JetBrains Mono servies avec le paquet),
+sous une racine `.oto` : `CoquilleOto`, que l'hôte pose une fois, au thème de l'organisation
+(`readBrand(identity.org).theme`) ; la nuit suit la classe `.dark` de l'hôte. Les écrans n'importent
+aucun routeur : l'hôte leur prête, dans un composant client, son lien, l'adresse courante, sa
+navigation et sa déconnexion (`ContexteDeLHote`), et sa relecture (`ContexteDeRafraichissement`) :
+
+```tsx
+"use client"
+// Dans Next : next/link, usePathname, useRouter ; ailleurs, le lien et la navigation du routeur de l'ERP.
+<ContexteDeRafraichissement.Provider value={() => router.refresh()}>
+  <ContexteDeLHote.Provider value={{ Lien: Link, chemin: usePathname(), naviguer: (a) => router.push(a), deconnecter }}>
+    {children}
+  </ContexteDeLHote.Provider>
+</ContexteDeRafraichissement.Provider>
+```
+
+Une seule coque est visible, quel que soit le niveau choisi :
+
+1. **La coque entière**, pour une section « plateforme » de l'ERP : le layout pose le bureau, le rail
+   et le contenu. Le rail reçoit ses données, lues par le layout sous le jeton de la session
+   (`visibleTree`, les équipes de `listTeams` réduites à `{ slug, name }`, l'identité, le nom affiché et
+   le logo de la marque), et les adresses des écrans que l'hôte sert (une adresse absente retire son
+   entrée ; `profil` et `corbeille` vont au menu du compte, `connecteurs` au pied du rail). La couleur est
+   celle de la personne, sinon celle de l'organisation (`preferredTheme`) :
+
+   ```tsx
+   <CoquilleOto theme={preferredTheme(identity)} pleinePage>
+     {/* le fournisseur ci-dessus */}
+     <Desk>
+       <RailApplication entreprise={…} arbre={…} equipes={…} handle={…} compte={…} administre={isOrgAdmin(identity)} adresses={{ pages: "/n/", profil: "/profil", … }} />
+       <Content>{children}</Content>
+     </Desk>
+   </CoquilleOto>
+   ```
+
+2. **Les morceaux du rail dans la barre latérale de l'ERP**, sans second rail : `EntrepriseDuRail`
+   (l'organisation et son menu), `RechercheDuRail` (« Rechercher », ⌘K et la palette),
+   `SectionsDuRail` (Tout le monde, les équipes, Privé : le Contexte en tête, l'arbre, ses menus
+   « ⋯ » et « + »), `PiedDuRail` (Connecteurs, le compte et son menu), sous une `CoquilleOto` et le même
+   fournisseur ; les primitives qui les composent sont exportées aussi (`Desk`, `Content`, `Rail`,
+   `RailSection`, `RailTree`, `RailItem`, `DropdownMenu`), à employer dans un composant client : elles
+   reçoivent des fonctions. Leurs gestes passent par l'API du paquet (`/api/plateforme/*`, même
+   origine).
+
+3. **Un écran seul** dans une page de l'ERP (la grille d'un tableau dans une fiche client) : l'écran
+   exporté (`TableauDuNoeud`, `EcranDeNoeud`…), sous une `CoquilleOto`, avec ses données lues par la
+   page ; ses liens reçoivent le lien de l'hôte par props (`Lien`, `hrefDuChemin`).
+
+## Installer sur un Postgres sans Supabase
+
+Le schéma `platform` s'installe aussi sur un Postgres sans Supabase, un Postgres managé par
+exemple : ses migrations partent d'une ligne de base sans table `auth.users` ni extension
+`moddatetime`. Le serveur du paquet s'y connectera par un pilote Postgres et par l'émetteur
+d'identité de l'hôte dans une version prochaine, qui en portera le guide complet. Pour la base :
+
+1. Extensions : l'hôte admet `pg_trgm`, `unaccent` et `ltree`, les trois seules que le paquet
+   demande.
+2. Une fois, par un rôle d'administration de la base (`CREATEROLE`, droit de créer un schéma) :
+
+   ```bash
+   PLATFORM_APP_PASSWORD='<mot de passe>' pnpm exec oto-platform db prepare --db-url '<url>?sslmode=require'
+   ```
+
+   Elle crée les rôles `anon` et `authenticated`, le schéma `auth` réduit à `uid()`, `jwt()` et
+   `role()` (lus dans `request.jwt.claims`), le schéma `extensions` et ses trois extensions, et le
+   rôle `platform_app`, la connexion du serveur, dont le mot de passe vient de
+   `PLATFORM_APP_PASSWORD` (jamais affiché). Un second passage ne change rien ; une extension
+   refusée arrête la commande en la nommant. Sur Supabase, elle ne crée que `platform_app`. La
+   connexion passe en TLS, sauf `sslmode` écrit dans l'URL (`?sslmode=disable` pour un Postgres
+   local sans TLS).
+3. Les migrations, comme sur Supabase (section « Migrations ») : `migrations sync`, puis
+   `supabase db push --db-url '<url>?sslmode=require'` ou le workflow de l'hôte.
+
+Une personne se supprime par l'outillage : `select platform.forget_user('<id>');`, par le rôle
+d'administration de la base (sur Supabase, la clé de service), retire ce qui lui appartient dans
+`platform` (appartenances, accès, espace personnel) et efface son identifiant des lignes qu'elle a
+écrites, avant la suppression de son compte chez l'émetteur ; ses limites sont dans
+`migrations/README.md` (« Supprimer une personne »).
+
+## Fonctions métier
+
+Un ERP ajoute ses fonctions métier (lire un client, créer une facture) au catalogue de la
+plateforme : elles se trouvent par `find`, se lisent par `read` et s'exécutent par `call`, comme
+les fonctions natives, sans outil de plus. Un besoin nouveau devient une fonction, jamais un outil.
+
+- **Où** : `src/lib/fonctions-metier.ts` de l'application, qui appelle une fois
+  `registerFunctions([...])` de `@otomata_tech/oto_platform/server`. Chaque appel remplace toute la
+  liste. Ce fichier est importé pour son effet, en tête de chaque route qui monte une porte du
+  paquet : `src/app/api/mcp/route.ts`, `src/app/api/plateforme/[...route]/route.ts` et
+  `src/app/api/mcp-admin/route.ts` (`import "@/lib/fonctions-metier"`). Chaque route est un bundle
+  à part : une route qui l'oublie sert un catalogue sans ces fonctions. Une page de l'application
+  qui appelle elle-même un service qui lit le catalogue (`checkProcedure` ou `checkProcedureBlocks`
+  pour contrôler une procédure, `readNode` sur une fonction) l'importe aussi.
+- **Déclaration** : `defineErpFunction({ name, class, description, schema, examples, refusals?,
+  next?, run, summarize? })`. Le nom est `<espace>.<nom>` : deux parties qui commencent chacune par
+  une lettre, en minuscules ASCII, chiffres et `_` (64 caractères au plus), dans un espace que ni le
+  paquet (`table`, `mail`) ni les contrats (`write`) n'occupent. Le schéma est un `z.strictObject`
+  de `zod/v4` (`import * as z from "zod/v4"`), comme chaque objet qu'il imbrique : une clé inconnue
+  est refusée à tout niveau, pas ignorée (un `z.record` garde ses clés libres). Le contrat sert son
+  JSON Schema côté entrée, ce que le modèle écrit : un champ à `.default()` y est facultatif ; ce que
+  JSON Schema n'écrit pas (`z.date()`, `z.bigint()`, `z.map()`, `z.custom()`) est refusé à
+  l'inscription. Au moins un exemple, chacun accepté par le schéma. La description, en anglais, dit
+  d'abord ce que fait la fonction (1 000 caractères au plus). Classe `read`, `write` ou `sensitive` ;
+  une fonction `sensitive` (envoyer, supprimer, payer) déclare `summarize`, le récapitulatif montré
+  avant l'accord de la personne, et ne court qu'avec `confirm: true`. `next` ne cite que des
+  fonctions du catalogue ; une fonction sensible n'y est jamais proposée.
+- **Refus** : une liste mal déclarée lève `CatalogRegistrationError` au chargement de la route, et
+  rien n'est inscrit.
+- **Exécution sous le jeton de l'appelant** : `run(ctx, args)` reçoit des arguments validés et
+  `ctx = { db, identity, accessToken }`. Les données de l'ERP se lisent et s'écrivent par un client
+  Supabase construit sur `ctx.accessToken` (en-tête `Authorization`), donc sous la RLS de l'ERP.
+  `ctx.db` est le client du schéma `platform`, jamais celui des données de l'ERP : il ne sert qu'à
+  appeler les services du paquet avec `ctx.identity`, qui décident les droits et bornent
+  l'organisation, jamais à lire les tables de `platform`, dont la RLS ne sépare que les organisations
+  dont la personne est membre. L'organisation de l'appel est celle de l'adresse appelée
+  (`ctx.identity.org`), pas celle du jeton : un ERP qui sert plusieurs organisations borne ses
+  données à celle-ci. Aucun compte n'est résolu ; l'équipe de l'appel, au journal, est celle que la
+  plateforme calcule.
+- **Erreurs** : une `PlatformError` levée par `run` est servie telle quelle au modèle
+  (`new PlatformError("not_found", "Unknown customer C-999.")`), sauf `internal`, servie comme la
+  panne générique, sa cause écrite au log serveur. Toute autre erreur est servie comme une panne
+  interne, sans son texte, et journalisée côté serveur. Une erreur de la base de l'ERP passe par
+  `fromDatabaseError(error, "<fonction>: <table>")` : une écriture que sa RLS refuse devient
+  `forbidden`, un jeton refusé `unauthorized` (une session à reprendre, pas une panne), le reste une
+  panne ; seul son code part au log, jamais le message de la base.
+- **Contrat** : une fonction ERP est toujours active, pour toute l'organisation ; la description de
+  `call` ne la cite pas, `find` la trouve. Un contrat servi ne se durcit pas en place : une fonction
+  dont les arguments changent s'inscrit sous un autre nom.
+
+## Migrations
+
+Le SQL du paquet ne touche que le schéma `platform` et ne fait qu'ajouter. L'application copie les
+migrations du paquet dans les siennes, puis les applique par son propre workflow de migrations,
+dans l'ordre du paquet.
+
+```bash
+pnpm exec oto-platform migrations sync --to supabase/migrations
+pnpm exec oto-platform migrations check
+```
+
+- `sync` copie chaque migration du paquet absente de l'application et dit `à jour` pour les
+  autres. Une copie modifiée n'est jamais écrasée : la commande nomme le fichier, n'écrit rien et
+  sort en code 1 ; le paquet fait foi, l'écart se résout à la main.
+- `check` refuse tout objet créé ou modifié hors de `platform`, tout retrait (`drop`, `rename`,
+  `set not null`, changement de type), toute fonction de `platform` sans
+  `revoke execute … from public` dans le même fichier (fonctions de déclencheur exceptées), et ce
+  qui attacherait le schéma à Supabase ou à une extension refusée : clé ou lecture vers
+  `auth.users`, extension hors de `pg_trgm`, `unaccent` et `ltree` ; ligne par ligne
+  (`fichier:ligne règle`) ; `--file <chemin>` contrôle un fichier seul. Sa place est dans la CI de
+  l'application.
+- `pnpm exec oto-platform --help` : usage et codes de sortie (0 succès, 1 refus, 2 usage incorrect).
+
+Après chaque montée de version du paquet : `sync`, puis le workflow de migrations de l'application.
+
+## Mises à jour par Renovate
+
+Chaque version du paquet arrive dans l'application par une pull request Renovate, avec les notes
+de `CHANGELOG.md`. L'application Renovate installée sur le dépôt de l'application, son
+`renovate.json` étend le preset du paquet :
+
+```json
+{
+  "extends": ["config:recommended", "github>otomata-tech/oto-pkg//renovate/preset"]
+}
+```
+
+Le preset épingle la version du paquet. Mineures et correctifs sont fusionnés automatiquement si
+la CI est verte, puisque le paquet ne fait qu'ajouter. Une majeure attend une revue humaine, sous
+le label `oto-platform-major`. Dans les réglages du dépôt de l'application : fusion automatique
+autorisée, CI exigée avant toute fusion.
+
+## Versions et CHANGELOG
+
+Numérotation sémantique : le paquet ne fait qu'ajouter, un changement cassant est donc une
+majeure. `CHANGELOG.md`, embarqué dans le paquet, a un titre par version publiée,
+`## <x.y.z> — <AAAA-MM-JJ>`, la plus récente en tête, et `## Unreleased` au-dessus pour ce qui
+n'est pas encore publié. Sous chaque titre, au plus deux listes, en anglais :
+
+- `### Assistants` : ce qu'un assistant connecté à la plateforme sait faire de nouveau, une phrase
+  de 200 caractères au plus par entrée, servie aux assistants dans les nouveautés de `context` ;
+- `### Hosts` : ce qu'une application qui installe le paquet doit savoir ou faire, lu dans les
+  pull requests Renovate.
+
+Tout changement visible d'un hôte ou d'un assistant a sa ligne sous `## Unreleased`, dans le
+commit qui le livre.
+
+## Publier une version
+
+Réservé aux mainteneurs du dépôt.
+
+1. Dans `CHANGELOG.md`, renommer `## Unreleased` en `## <x.y.z> — <AAAA-MM-JJ>`, et rouvrir un
+   `## Unreleased` vide au-dessus.
+2. Porter la même version dans `version` de `packages/plateforme/package.json`.
+3. `pnpm verify`, puis le commit par le skill `commit-push`.
+4. JB pousse le tag de la version :
+
+   ```bash
+   git tag v<x.y.z>
+   git push origin v<x.y.z>
+   ```
+
+5. Le workflow `.github/workflows/publish.yml` contrôle les secrets de l'arbre et de l'historique
+   et les migrations, vérifie que le tag, la version et le CHANGELOG concordent, puis publie sur
+   npmjs.com avec provenance. Chaque application hôte reçoit sa pull request Renovate.
+
+Une version fautive ne se republie pas : JB la signale par
+`npm deprecate @otomata_tech/oto_platform@<x.y.z> "<raison>"`, et une version corrective la
+remplace par la pull request Renovate suivante ; une application épinglée ne bouge pas tant que
+sa pull request n'est pas fusionnée.
+
+Dans ce dépôt, l'application de base consomme le paquet depuis le workspace
+(`"@otomata_tech/oto_platform": "workspace:*"`, `@source "../../packages/plateforme/ui";`), sans
+passer par npm.

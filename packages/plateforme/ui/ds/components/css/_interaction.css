@@ -1,0 +1,92 @@
+/* Porté d'oto-frontend (src/design-system/components/css/_interaction.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* États d'interaction, la grammaire commune, écrite ici une fois : survol (un rempli fonce vers l'encre, un transparent prend `--hair`, un bordé monte d'un cran, une icône seule passe de `--mute` à `--ink`) ; appui en `scale(.985)`, jamais un saut de couleur ; focus visible seulement au clavier, jamais supprimé ; désactivé par la couleur, jamais par l'opacité, qui ferait échouer les contrastes ; invalide par la bordure et `aria-invalid`, jamais par la couleur seule. */
+
+/* ── press : sur tout ce qui agit ; `:active` et non un état JS, le retour est immédiat même quand le fil principal est occupé. */
+.oto [data-press]:active:not(:disabled):not([aria-disabled="true"]),
+.oto-site [data-press]:active:not(:disabled) {
+  transform: scale(.985);
+}
+
+/* ── disabled ─────────────────────────────────────────────────────── */
+.oto [disabled],
+.oto [aria-disabled="true"] {
+  cursor: not-allowed;
+  /* le pointeur reste capté : sinon l'infobulle qui explique pourquoi c'est désactivé ne s'affiche jamais */
+  pointer-events: auto;
+}
+.oto button[disabled],
+.oto [role="button"][aria-disabled="true"] {
+  background: var(--hair);
+  border-color: var(--hair);
+  color: var(--faint);
+  box-shadow: none;
+  transform: none;
+}
+
+/* ── invalid : la bordure n'est qu'un renfort ; `aria-invalid` porte l'information pour les lecteurs d'écran, le message sous le champ pour tout le monde. */
+.oto [aria-invalid="true"] {
+  border-color: var(--st-fail);
+}
+.oto [aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--st-fail) 24%, transparent);
+}
+
+.oto-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  margin-block-start: var(--space-1-5);
+  font-size: var(--fs-xs);
+  color: var(--st-fail-text);
+}
+
+.oto-field-hint {
+  margin-block-start: var(--space-1-5);
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+
+/* ── selected ─────────────────────────────────────────────────────── */
+.oto [aria-selected="true"][data-surface],
+.oto [data-selected] {
+  background: var(--oto-bg);
+  border-color: var(--primary);
+}
+
+/* ── l'étiquette d'un champ ───────────────────────────────────────── */
+.oto-field-label {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--ink);
+  margin-block-end: var(--space-1-5);
+}
+.oto-field-label[data-required]::after {
+  content: "*";
+  color: var(--st-fail-text);
+  margin-inline-start: 2px;
+}
+
+.oto-field { display: block; min-inline-size: 0; }
+
+/* ── réservé aux lecteurs d'écran : `clip-path` et non `display: none`, un élément masqué n'est pas lu (le libellé d'un avatar en initiales, la légende d'un tableau). */
+.oto-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+/* rendu au focus : un lien « aller au contenu » doit se voir quand on l'atteint au clavier */
+.oto-sr-only:focus-visible {
+  position: static;
+  inline-size: auto;
+  block-size: auto;
+  margin: 0;
+  clip-path: none;
+}

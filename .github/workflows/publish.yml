@@ -1,0 +1,44 @@
+# Publication du paquet sur npmjs.com, déclenchée par un tag v<version> que seul JB pousse
+# (ADR-010). La CI de chaque push reste ci.yml.
+name: Publish package
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write # provenance npm
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # check-public lit tout l'historique
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Secrets (tree and history)
+        run: node scripts/check-public.mjs --secrets-only
+      - name: Check migrations
+        run: pnpm check:migrations
+      - name: Tag, version and CHANGELOG agree
+        run: |
+          version=$(node -p "require('./packages/plateforme/package.json').version")
+          test "$GITHUB_REF_NAME" = "v$version" || { echo "tag $GITHUB_REF_NAME, package v$version"; exit 1; }
+          grep -q "^## $version — " packages/plateforme/CHANGELOG.md || { echo "CHANGELOG: no entry for $version"; exit 1; }
+      - name: Files to publish
+        working-directory: packages/plateforme
+        run: npm pack --dry-run
+      - name: Publish
+        working-directory: packages/plateforme
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,183 @@
+// @vitest-environment node
+// `server/rules.ts` (E05-S03 : AC15 à AC17 ; H66, H68, fiche D4) sur une vraie base : les niveaux sont
+// ceux que la base calcule, sous la session de la personne. Chaque cas pose ses règles sur un nœud à lui,
+// sous `ventes` : aucun ne dépend de l'ordre. Le partage refusé sous le niveau de gestion et la gestion
+// réservée à l'administrateur sont décidés par le service, prouvés sur la base réelle par
+// `tests/unit/equipes-droits.test.ts` : leurs cas sont retirés d'ici (M11b, liste d'E01-S07 ; M29). Suite portable
+// depuis E01-S10 f2 (chaque personne par `fx.as`, sans Supabase Auth ni PostgREST) : le job
+// `bare-postgres` la joue.
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import {
+  listNodeRules,
+  listRuledNodes,
+  PlatformError,
+  removeRule,
+  resolveIdentity,
+  setNodeRule,
+  type Identity,
+  type PlatformDb,
+} from "@otomata_tech/oto_platform/server"
+import { hex } from "../helpers/plateforme"
+import { createSqlFixtures, SQL_SKIP_REASON, sqlConfigured, type SqlFixtures, type SqlReferenceOrg } from "../helpers/sql"
+import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
+
+// Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
+// 20260928120000 n'est pas appliquée au projet (`database-patterns.md § Règles`).
+const privatePending = await privateFolderPending()
+
+const NETWORK_TIMEOUT = 60_000
+const SETUP_TIMEOUT = 180_000
+
+type Who = "ada" | "claire" | "lea" | "paul"
+type Session = { db: PlatformDb; identity: Identity }
+
+async function refusal(promise: Promise<unknown>): Promise<PlatformError> {
+  const error = await promise.then(
+    () => null,
+    (reason: unknown) => reason,
+  )
+  if (!(error instanceof PlatformError)) throw new Error(`expected a PlatformError, got ${String(error)}`)
+  return error
+}
+
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(sqlConfigured ? "rules service" : `rules service (${SQL_SKIP_REASON})`, privatePending),
+  { timeout: NETWORK_TIMEOUT },
+  () => {
+    let fx: SqlFixtures
+    let o: SqlReferenceOrg
+    let autre: SqlReferenceOrg
+    const sessions = new Map<Who, Session>()
+
+    function as(who: Who): Session {
+      const found = sessions.get(who)
+      if (!found) throw new Error(`${who} has no session`)
+      return found
+    }
+
+    /** Une page de Ventes, à ce cas seulement. */
+    async function pageDeVentes(): Promise<{ id: string; path: string }> {
+      const path = `ventes/page_${hex(3)}`
+      return { id: await fx.createNode(o.org.id, { parentId: o.nodes.ventes, path, title: "Page" }), path }
+    }
+
+    const levels = (nodeId: string) => fx.admin`select subject_team_id, subject_user_id, level from platform.access_rules where node_id = ${nodeId}`
+
+    beforeAll(async () => {
+      fx = createSqlFixtures()
+      o = await fx.buildReferenceOrg()
+      autre = await fx.buildReferenceOrg(o.people)
+      for (const who of ["ada", "claire", "lea", "paul"] as const) {
+        const person = o.people[who]
+        const db = fx.as(person)
+        sessions.set(who, { db, identity: await resolveIdentity(db, o.host, { userId: person.id, email: person.email }) })
+      }
+    }, SETUP_TIMEOUT)
+
+    afterAll(async () => {
+      await fx?.cleanup()
+    }, SETUP_TIMEOUT)
+
+    describe("setNodeRule (AC17, fiche D4)", () => {
+      it("should create a rule, then replace the level of the same subject", async () => {
+        const page = await pageDeVentes()
+        const input = { path: page.path, subject: { kind: "team" as const, id: o.teams.support }, level: "read" as const }
+
+        const created = await setNodeRule(as("claire").db, as("claire").identity, input)
+        const replaced = await setNodeRule(as("claire").db, as("claire").identity, { ...input, level: "write" })
+
+        expect(created).toMatchObject({ data: { path: page.path, level: "read", created: true }, target: page.path, teamId: o.teams.ventes })
+        expect(replaced.data).toMatchObject({ id: created.data.id, level: "write", created: false })
+        expect(await levels(page.id)).toEqual([{ subject_team_id: o.teams.support, subject_user_id: null, level: "write" }])
+      })
+
+      it("should let a lead share with a person of the organisation (fiche D4)", async () => {
+        const page = await pageDeVentes()
+        const set = await setNodeRule(as("claire").db, as("claire").identity, { path: page.path, subject: { kind: "user", id: o.people.marc.id }, level: "read" })
+        expect(set.data.created).toBe(true)
+      })
+
+      it("should refuse a subject of another organisation (invalid_arguments)", async () => {
+        const page = await pageDeVentes()
+        const error = await refusal(setNodeRule(as("ada").db, as("ada").identity, { path: page.path, subject: { kind: "team", id: autre.teams.ventes }, level: "read" }))
+        expect(error.code).toBe("invalid_arguments")
+      })
+
+      it("should answer an invisible node as unknown (not_found, H68)", async () => {
+        const page = await pageDeVentes()
+        const error = await refusal(setNodeRule(as("paul").db, as("paul").identity, { path: page.path, subject: { kind: "team", id: o.teams.support }, level: "read" }))
+        expect(error.code).toBe("not_found")
+        expect(error.message).toBe(`Unknown path ${page.path}.`)
+      })
+    })
+
+    describe("removeRule (AC17)", () => {
+      it("should remove a rule at the manage level, and refuse it below", async () => {
+        const page = await pageDeVentes()
+        const rule = await fx.addRule({ orgId: o.org.id, nodeId: page.id, teamId: o.teams.support, level: "read" })
+
+        const refused = await refusal(removeRule(as("lea").db, as("lea").identity, rule))
+        expect(refused.code).toBe("forbidden")
+
+        const removed = await removeRule(as("claire").db, as("claire").identity, rule)
+        expect(removed).toMatchObject({ data: { id: rule, path: page.path }, target: page.path, teamId: o.teams.ventes })
+        expect(await levels(page.id)).toEqual([])
+      })
+
+      it("should answer a rule that does not exist as not_found", async () => {
+        const error = await refusal(removeRule(as("ada").db, as("ada").identity, "3c2b1a09-8f7e-4d6c-9b5a-493827160514"))
+        expect(error.code).toBe("not_found")
+      })
+    })
+
+    describe("listNodeRules (AC16)", () => {
+      it("should give the owner team and its lead, the level of who looks, and the rules, teams first", async () => {
+        const page = await pageDeVentes()
+        await fx.addRule({ orgId: o.org.id, nodeId: page.id, userId: o.people.marc.id, level: "none" })
+        await fx.addRule({ orgId: o.org.id, nodeId: page.id, teamId: o.teams.support, level: "read" })
+
+        const vue = await listNodeRules(as("claire").db, as("claire").identity, page.path)
+
+        expect(vue).toMatchObject({ path: page.path, title: "Page", owner: { kind: "team", teamName: "Ventes", leadName: "Claire Morel" }, viewerLevel: 3 })
+        expect(vue.rules.map((rule) => [rule.subject.kind, rule.subject.name, rule.level])).toEqual([
+          ["team", "Support", "read"],
+          ["user", "Marc Petit", "none"],
+        ])
+        expect((await listNodeRules(as("lea").db, as("lea").identity, page.path)).viewerLevel).toBe(2)
+      })
+
+      it("should describe an organisation node and a personal node", async () => {
+        const annonces = `annonces_${hex(3)}`
+        await fx.createNode(o.org.id, { parentId: o.nodes.root, path: annonces, title: "Annonces" })
+
+        expect(await listNodeRules(as("lea").db, as("lea").identity, annonces)).toMatchObject({ owner: { kind: "org" }, viewerLevel: 1, rules: [] })
+        expect(await listNodeRules(as("lea").db, as("lea").identity, "private/lea")).toMatchObject({ owner: { kind: "user", userName: "Léa Roux" }, viewerLevel: 3 })
+      })
+
+      it.each([
+        ["an unknown path", "nulle_part"],
+        ["the personal space of another person", "private/claire"],
+        ["a malformed path", "Ventes/Devis"],
+      ])("should answer %s as not_found (H68)", async (_cas, path) => {
+        const error = await refusal(listNodeRules(as("lea").db, as("lea").identity, path))
+        expect(error.code).toBe("not_found")
+      })
+    })
+
+    describe("listRuledNodes (AC15)", () => {
+      it("should list the visible nodes that carry a rule, with their number of rules, and no invisible one", async () => {
+        // Deux partages nominatifs : ni Paul ni son équipe Support n'y sont, la page lui reste invisible.
+        const page = await pageDeVentes()
+        await fx.addRule({ orgId: o.org.id, nodeId: page.id, userId: o.people.lea.id, level: "read" })
+        await fx.addRule({ orgId: o.org.id, nodeId: page.id, userId: o.people.marc.id, level: "write" })
+
+        const pourClaire = await listRuledNodes(as("claire").db, as("claire").identity)
+        const pourPaul = await listRuledNodes(as("paul").db, as("paul").identity)
+
+        expect(pourClaire).toContainEqual({ path: page.path, title: "Page", rulesCount: 2 })
+        expect(pourPaul.map((node) => node.path)).not.toContain(page.path)
+        expect(pourClaire.map((node) => node.path)).toEqual([...pourClaire.map((node) => node.path)].sort((a, b) => a.localeCompare(b)))
+      })
+    })
+  },
+)

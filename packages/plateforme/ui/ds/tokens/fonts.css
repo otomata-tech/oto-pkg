@@ -1,0 +1,22 @@
+/* Porté d'oto-frontend (src/design-system/tokens/fonts.css) : les deux familles de l'application,
+   en woff2 variables servis avec le paquet (`ui/ds/assets/fonts/`, licence et mentions dans `OFL.txt`),
+   jamais par un CDN ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5).
+   Retiré : les familles du site. */
+
+/* Pas de CDN : une requête tierce est un point de panne de plus, un tiers dans le RGPD et un texte invisible au premier rendu ; `font-display: swap`, mieux vaut la lettre système une fraction de seconde qu'un écran vide ; des familles variables (axe `wght`), un fichier par famille, pas un par graisse. */
+
+@font-face {
+  font-family: "Inter";
+  src: url("../assets/fonts/inter-variable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/jetbrains-mono-variable.woff2") format("woff2-variations");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}

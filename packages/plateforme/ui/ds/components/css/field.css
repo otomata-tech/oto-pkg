@@ -1,0 +1,104 @@
+/* Porté d'oto-frontend (src/design-system/components/css/field.css), tel quel, sauf `color-scheme` suivi sur `.dark` ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Input · Textarea : 8 px, un champ CONTIENT ; le chrome écrit une fois (`.oto-input`), sinon un contrôle finit à 1 px d'un `<input>` voisin ; `--field` vaut `--base` de jour et `--desk-dk` de nuit (un champ est un endroit où l'on pose, pas un objet posé) ; la bordure tient parce que le reset est à spécificité nulle (`:where`) : ne pas monter celle de `.oto-input`. */
+
+.oto-input {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--ctrl-h-md);
+  padding-inline: var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-ctrl);
+  background: var(--field);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  transition: var(--tr-colors);
+}
+
+.oto-input::placeholder { color: var(--faint); }
+
+.oto-input:hover:not(:disabled):not(:focus) {
+  border-color: color-mix(in srgb, var(--ink) 26%, var(--island-bd));
+}
+
+/* Le champ prend la bordure primary en plus de l'anneau : l'anneau seul se perd sur un fond clair, la bordure seule ne se voit pas assez. */
+.oto-input:focus-visible {
+  border-color: var(--primary);
+  box-shadow: var(--focus-ring);
+}
+
+.oto-input:disabled {
+  background: var(--hair);
+  border-color: var(--hair);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+/* lecture seule n'est pas désactivé : le texte reste pleinement lisible, seul le fond dit qu'on ne peut pas écrire */
+.oto-input[readonly] { background: var(--hair); border-color: var(--hair); }
+
+.oto-input[data-size="sm"] { block-size: var(--ctrl-h-sm); font-size: var(--fs-xs);  padding-inline: var(--space-2); }
+.oto-input[data-size="lg"] { block-size: var(--ctrl-h-lg); font-size: var(--fs-base); }
+
+/* les chiffres en tabulaire, toujours */
+.oto-input[type="number"],
+.oto-input[inputmode="numeric"],
+.oto-input[inputmode="decimal"] { font-variant-numeric: tabular-nums; }
+
+/* ── champ avec affixes (glyphe, raccourci, unité) : l'anneau se porte sur l'enveloppe, sinon il dessine un rectangle à l'intérieur du champ. */
+.oto-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  block-size: var(--ctrl-h-md);
+  padding-inline: var(--space-2-5);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-ctrl);
+  background: var(--field);
+  color: var(--faint);
+  transition: var(--tr-colors);
+}
+.oto-input-wrap:hover:not([data-disabled]) { border-color: color-mix(in srgb, var(--ink) 26%, var(--island-bd)); }
+.oto-input-wrap:focus-within { border-color: var(--primary); box-shadow: var(--focus-ring); }
+.oto-input-wrap[aria-invalid="true"] { border-color: var(--st-fail); }
+.oto-input-wrap[data-disabled] { background: var(--hair); border-color: var(--hair); cursor: not-allowed; }
+
+/* l'input nu à l'intérieur : il ne porte plus aucun chrome */
+.oto-input-wrap > input {
+  flex: 1;
+  min-inline-size: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-sm);
+  block-size: 100%;
+}
+.oto-input-wrap > input:focus-visible { outline: none; box-shadow: none; }
+.oto-input-wrap > input::placeholder { color: var(--faint); }
+.oto-input-wrap > .oto-affix {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  color: var(--faint);
+}
+
+/* Textarea */
+
+.oto-textarea {
+  block-size: auto;
+  min-block-size: calc(var(--ctrl-h-md) * 2);
+  padding-block: var(--space-2);
+  line-height: var(--lh-normal);
+  /* vertical uniquement : redimensionner en largeur casserait la colonne du formulaire */
+  resize: vertical;
+  field-sizing: content;      /* progressive enhancement */
+}
+
+/* Les contrôles natifs (le calendrier d'une date, les barres de défilement) sont rendus par le système, sans `--island` ni `--ink` : `color-scheme` est le seul levier qui les fait passer en sombre ; la liste de choix est le `Select` (`combobox.css`) ; la nuit suit la classe `.dark` de l'hôte (ADR-008 § 3), pas l'attribut `data-theme` d'oto-frontend. */
+.oto { color-scheme: light; }
+.dark .oto { color-scheme: dark; }

@@ -1,0 +1,412 @@
+// @vitest-environment node
+// Routage de `context` (E03-S02 : AC1 à AC5, AC7, AC17, AC18) : le mélange, les bonus, la décision et la
+// question de données en fonctions pures ; `rankCandidates`, `context` (par `connectDeps`) et `find` sur la
+// base réelle (E01-S10, lot t1-e2b2), Acme semée sur O (`seedAcme`, `tests/integration/fixtures/acme-sql.ts`),
+// sous le client de la personne (`ref.db`). `route_candidates` et `search_content` y
+// sont servies par le test (`watchDb`, `tests/helpers/spy-t1-e2b2.ts`) : elles rendent ce que le test leur fait
+// rendre, lignes interdites comprises, et le service prouve qu'il les filtre
+// (`security-patterns.md § Droits dans le service`) ; leur classement réel est le sujet de
+// `tests/integration/routing.test.ts` et de `tests/integration/search-content.test.ts`. Les niveaux, le
+// bonus d'usage (journal), le réglage de O, les blocs servis et les Contextes viennent de la base ; les blocs
+// de la procédure servie y arrivent à rebours (AC7, `reverse` de `watchDb`).
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import { connectDeps } from "../helpers/mcp"
+import { ORG, OTHER_ORG, PEOPLE, TEAMS, type Person } from "../helpers/reference-org"
+import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
+import type { Row } from "../helpers/simulated-db"
+import { callsFunction, touches, watchDb, type DbCall, type WatchOptions } from "../helpers/spy-t1-e2b2"
+import { sqlConfigured, seedWithAdmin, type SeededData, portable } from "../helpers/sql"
+import { acmeNode, acmeSearchRow, candidate, NO_CATALOG, simulatedBlockId } from "../integration/fixtures/acme"
+import { seedAcme } from "../integration/fixtures/acme-sql"
+import type { McpDeps } from "../../packages/plateforme/mcp/server"
+import { renderBlocks } from "../../packages/plateforme/schemas"
+import { buildContext } from "../../packages/plateforme/server/context"
+import { find } from "../../packages/plateforme/server/find"
+import {
+  applyBonuses,
+  blendScore,
+  decide,
+  isDataQuestion,
+  loadRoutingSettings,
+  rankCandidates,
+  routingSettings,
+  type Components,
+} from "../../packages/plateforme/server/routing"
+
+const NETWORK_TIMEOUT = 60_000
+const SETUP_TIMEOUT = 180_000
+const DAY_MS = 86_400_000
+/** La consigne d'une panne, au préfixe de l'organisation (jetable sur la base réelle). */
+const internal = (prefix: string) => `Internal error. Retry once, then report it with ${prefix}_feedback (type error).`
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+/** Une ligne de journal de `person`, `days` jours avant maintenant, en identifiants simulés (`ref.write` les traduit). */
+function journalRow(person: Person, target: string | null, days: number, orgId: string = ORG.id): Row {
+  const ts = new Date(Date.now() - days * DAY_MS).toISOString()
+  return { org_id: orgId, user_id: PEOPLE[person].id, method: "tools/call", target, ts }
+}
+
+type AcmeDbOptions = {
+  route?: Row[]
+  search?: (query: unknown) => Row[]
+  journal?: Row[]
+  fail?: WatchOptions["fail"]
+  reverse?: WatchOptions["reverse"]
+  /** `orgs.settings` de O ; sans lui, `{}` (réglage par défaut). */
+  settings?: Row
+}
+
+const rpcCalls = (calls: DbCall[], name: string) => calls.filter((call) => call.kind === "rpc" && call.name === name)
+
+/** La valeur liée à l'égalité `<colonne> = ${…}` d'une requête de la face SQL ; `undefined` sans elle. */
+function boundTo(call: Extract<DbCall, { kind: "sql" }>, column: string): unknown {
+  const before = call.text.split("?")
+  const index = before.findIndex((part) => new RegExp(`\\b${column}\\s*=\\s*$`).test(part))
+  return index === -1 ? undefined : call.values[index]
+}
+
+describe("blendScore (AC1)", () => {
+  it("should weigh the summary or the title and the lexemes, halve a single lexeme, and stay within [0, 1]", () => {
+    expect(blendScore({ s_summary: 1, s_title: 0.5, lexical: 1, query_lexemes: 4 })).toBe(1)
+    expect(blendScore({ s_summary: 0, s_title: 0.8, lexical: 0.5, query_lexemes: 3 })).toBeCloseTo(0.55 * 0.8 + 0.45 * 0.5)
+    expect(blendScore({ s_summary: 0.9, s_title: 0.2, lexical: 0, query_lexemes: 2 })).toBeCloseTo(0.55 * 0.9)
+    expect(blendScore({ s_summary: 0, s_title: 0, lexical: 0, query_lexemes: 3 })).toBe(0)
+    const single = blendScore({ s_summary: 0.4, s_title: 0, lexical: 1, query_lexemes: 1 })
+    const pair = blendScore({ s_summary: 0.4, s_title: 0, lexical: 1, query_lexemes: 2 })
+    expect(pair - single).toBeCloseTo(0.45 / 2)
+  })
+})
+
+describe("applyBonuses (AC2)", () => {
+  it("should add 0.03 for the person's team and 0.03 for a recent use, capped at 1", () => {
+    expect(applyBonuses(0.5, { team: false, usage: false })).toBe(0.5)
+    expect(applyBonuses(0.5, { team: true, usage: false })).toBeCloseTo(0.53)
+    expect(applyBonuses(0.5, { team: true, usage: true })).toBeCloseTo(0.56)
+    expect(applyBonuses(0.99, { team: true, usage: true })).toBe(1)
+  })
+})
+
+describe("decide and routingSettings (AC3)", () => {
+  it("should serve the first at the threshold with the set gap, nothing otherwise, and fall back key by key", () => {
+    const settings = { threshold: 0.65, gap: 0.25 }
+    expect(decide([candidate("a", 0.75), candidate("b", 0.5)], settings)?.path).toBe("a")
+    expect(decide([candidate("a", 0.75), candidate("b", 0.5 + 2 ** -10)], settings)).toBeNull()
+    expect(decide([candidate("a", 0.65)], settings)?.path).toBe("a")
+    expect(decide([candidate("a", 0.649)], settings)).toBeNull()
+    expect(decide([], settings)).toBeNull()
+
+    expect(routingSettings({})).toEqual({ threshold: 0.65, gap: 0.1 })
+    expect(routingSettings({ routing: { threshold: 0.8 } })).toEqual({ threshold: 0.8, gap: 0.1 })
+    expect(routingSettings({ routing: { threshold: 1.5, gap: 0.2 } })).toEqual({ threshold: 0.65, gap: 0.2 })
+    expect(routingSettings({ routing: { threshold: "0.9", gap: -0.1 } })).toEqual({ threshold: 0.65, gap: 0.1 })
+  })
+})
+
+describe("isDataQuestion (AC4)", () => {
+  it("should tell a data question from an action", () => {
+    const questions = [
+      "Combien de prospects avons-nous à Valbrune, et lesquels ?",
+      "combien de devis en attente",
+      "Qui n'a toujours pas répondu à nos propositions commerciales",
+      "Quels sont nos tarifs d'étude",
+      "Où en est le pipe",
+      "Est-ce qu'il reste des prospects",
+      "Est-ce qu’il reste des prospects",
+      "Y a-t-il des devis en attente",
+      "la grille tarifaire ?",
+    ]
+    const actions = [
+      "Relance les devis en attente.",
+      "prospects",
+      "Qualifie les prospects à traiter",
+      "Quittance à envoyer",
+      "Commente ce devis",
+      "Quelconque action",
+    ]
+    for (const phrase of questions) expect(isDataQuestion(phrase), phrase).toBe(true)
+    for (const phrase of actions) expect(isDataQuestion(phrase), phrase).toBe(false)
+  })
+})
+
+describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on O"), { timeout: NETWORK_TIMEOUT }, () => {
+  let seed: SeededData
+  let ref: ReferenceOrgSql
+
+  beforeAll(async () => {
+    seed = seedWithAdmin()
+    ref = await seedAcme(seed)
+  }, SETUP_TIMEOUT)
+
+  afterAll(async () => {
+    await seed?.cleanup()
+  }, SETUP_TIMEOUT)
+
+  // Chaque test pose son journal et son réglage : ceux d'un autre ne comptent jamais dans ses bonus ni dans sa décision.
+  afterEach(async () => {
+    await seed.admin`delete from platform.journal where org_id in ${seed.admin([ref.org.id, ref.other.id])}`
+    await ref.write({ orgs: [{ id: ORG.id, settings: {} }] })
+  })
+
+  /** Une ligne de `route_candidates` pour un nœud d'Acme, sous ses identifiants réels ; l'équipe propriétaire effective est Ventes par défaut. */
+  function routeRow(path: string, components: Components, ownerTeamId: string | null = TEAMS.ventes.id): Row {
+    const { title, summary, kind } = acmeNode(path)
+    return { node_id: ref.nodeId(path), path, title, summary, kind, owner_team_id: ownerTeamId === null ? null : ref.id(ownerTeamId), ...components }
+  }
+
+  /**
+   * Le client de `person` sur Acme, `route_candidates` et `search_content` rendant les lignes données, quel
+   * que soit l'appelant (nœuds sous leur identifiant réel) ; le journal et le réglage de O donnés sont
+   * écrits sur la base, et retirés après le test.
+   */
+  async function acmeDb(person: Person, options: AcmeDbOptions = {}) {
+    if (options.journal) await ref.write({ journal: options.journal })
+    if (options.settings) await ref.write({ orgs: [{ id: ORG.id, settings: options.settings }] })
+    const found = (row: Row): Row => ({ ...row, node_id: ref.nodeId(String(row.path)) })
+    return watchDb(await ref.db(person), {
+      rpc: {
+        route_candidates: () => options.route ?? [],
+        search_content: (args) => (options.search?.(args.p_query) ?? []).map(found),
+      },
+      fail: options.fail,
+      reverse: options.reverse,
+    })
+  }
+
+  function mcpDeps(db: McpDeps["db"], person: Person): McpDeps {
+    const identity = ref.identityOf(person)
+    return { db, org: identity.org, caller: { kind: "member", identity }, userAgent: "unit-test", journal: [], activeConnectors: () => Promise.resolve(new Set<string>()), origin: "https://acme.test" }
+  }
+
+  describe("decide at the organisation's setting (AC3)", () => {
+    it("should route at the setting read in orgs.settings", async () => {
+      // `context` décide au réglage lu dans `orgs.settings` : 0,81 serait servi au seuil par défaut (0,65), pas à 0,9.
+      const { db } = await acmeDb("claire", {
+        route: [routeRow("ventes/relance_devis", { s_summary: 0.6, s_title: 0.5, lexical: 1, query_lexemes: 3 })],
+        settings: { routing: { threshold: 0.9 } },
+      })
+      const routed = await buildContext(db, ref.identityOf("claire"), { phrase: "relance les devis" }, { userAgent: null })
+      expect(routed.data).toMatchObject({ served: null, candidates: [{ path: "ventes/relance_devis", score: 0.81 }] })
+    })
+  })
+
+  describe("rankCandidates (AC5)", () => {
+    it("should call route_candidates once, drop unreadable nodes before the cut, add the bonuses and keep scores ≥ 0.30", async () => {
+      const { db, calls } = await acmeDb("claire", {
+        route: [
+          // Support : invisible de Claire, le meilleur score ; retiré avant la coupe.
+          // Depuis E01-S13 (AC-a2), `route_candidates` ne le rend plus à Claire ; la doublure le rend : le filtre prouvé est celui du service.
+          routeRow("support/escalade_incident", { s_summary: 1, s_title: 1, lexical: 1, query_lexemes: 3 }, TEAMS.support.id),
+          routeRow("ventes/relance_devis", { s_summary: 0.9, s_title: 0.5, lexical: 1, query_lexemes: 3 }),
+          routeRow("ventes/relance_prospects", { s_summary: 0.5, s_title: 0.3, lexical: 0.5, query_lexemes: 2 }),
+          // 0,2825 avec l'équipe : un bonus d'usage compté à tort le ferait montrer.
+          routeRow("ventes/point_pipeline", { s_summary: 0.05, s_title: 0, lexical: 0.5, query_lexemes: 2 }),
+          routeRow("conseil/preparer_rdv", { s_summary: 0.6, s_title: 0.2, lexical: 0.5, query_lexemes: 2 }, null),
+        ],
+        journal: [
+          journalRow("claire", "ventes/relance_prospects", 2),
+          journalRow("claire", "ventes/point_pipeline", 31),
+          journalRow("lea", "ventes/point_pipeline", 1),
+          journalRow("claire", "ventes/point_pipeline", 1, OTHER_ORG.id),
+          journalRow("claire", null, 1),
+        ],
+      })
+      const claire = ref.identityOf("claire")
+
+      const ranked = await rankCandidates(db, claire, { query: "relance les devis", limit: 3 })
+      expect(ranked.map(({ path, score }) => [path, Number(score.toFixed(4))])).toEqual([
+        ["ventes/relance_devis", 0.975],
+        ["ventes/relance_prospects", 0.56],
+        ["conseil/preparer_rdv", 0.555],
+      ])
+      expect(ref.readable(rpcCalls(calls, "route_candidates"))).toEqual([
+        { kind: "rpc", name: "route_candidates", args: { p_org: ORG.id, p_query: "relance les devis", p_kind: "procedure", p_limit: 50 } },
+      ])
+      // La lecture du journal filtrée sur l'organisation et la personne, dans la requête (face SQL, lot e2b).
+      const journal = calls.find((call) => touches(call, "journal"))
+      expect(ref.readable(journal?.kind === "sql" ? { org_id: boundTo(journal, "org_id"), user_id: boundTo(journal, "user_id") } : null)).toEqual({
+        org_id: ORG.id,
+        user_id: PEOPLE.claire.id,
+      })
+      expect((await rankCandidates(db, claire, { query: "relance les devis", limit: 1 })).map((candidate) => candidate.path)).toEqual([
+        "ventes/relance_devis",
+      ])
+    })
+  })
+
+  describe("context serves the steps (AC7)", () => {
+    it("should serve the published blocks of the matched procedure, never its open draft, with data and journal target", async () => {
+      const path = "ventes/relance_devis"
+      const node = ref.nodeId(path)
+      // Les blocs publiés de la procédure servie, que `procedureBlock` lit sans `order` : la base les rend déjà par
+      // `position` (semés dans cet ordre, index `(node_id, state, position)`), l'espion les rend à rebours. L'ordre
+      // servi vient de `position` (`orderBlocks`), jamais de l'ordre de lecture (revue d'E03-S02, cycle 1).
+      const servedBlocks = (call: DbCall) => touches(call, "blocks") && call.kind === "sql" && call.values.includes(node)
+      // Un brouillon ouvert, que la base rend à qui la lit : le service ne sert que les blocs publiés.
+      await ref.openDraft(path)
+      await ref.addBlocks(path, "draft", [{ type: "paragraph", text: "BROUILLON : une étape en cours d'écriture." }])
+      try {
+        const { db, calls } = await acmeDb("claire", {
+          route: [
+            routeRow(path, { s_summary: 1, s_title: 0.7, lexical: 1, query_lexemes: 3 }),
+            routeRow("ventes/relance_prospects", { s_summary: 0.45, s_title: 0.4, lexical: 0.33, query_lexemes: 3 }),
+            routeRow("ventes/qualifier_prospects", { s_summary: 0.4, s_title: 0.3, lexical: 0.33, query_lexemes: 3 }),
+            // Quatrième candidat de score ≥ 0,30 (0,34) : trois au plus sont montrés.
+            routeRow("ventes/point_pipeline", { s_summary: 0.3, s_title: 0.2, lexical: 0.33, query_lexemes: 3 }),
+          ],
+          reverse: servedBlocks,
+        })
+        const session = await connectDeps(mcpDeps(db, "claire"))
+        const { text, result } = await session.call("context", { phrase: "relance les devis en attente" })
+        // La lecture rendue à rebours est bien celle des étapes servies : sans elle, l'ordre ne serait plus prouvé.
+        expect(calls.filter(servedBlocks)).toHaveLength(1)
+
+        const relance = acmeNode(path)
+        // Le rendu attendu des lignes relues : `jsonb` range à sa façon les clés des arguments d'un bloc `call`.
+        const published = await seed.admin<{ type: string; text: string | null; data: unknown; key: string | null }[]>`
+          select type, text, data, key from platform.blocks where node_id = ${ref.nodeId(path)} and state = 'published' order by position`
+        const steps = renderBlocks([...published], { headingBase: 3 })
+        const [code, procedure, everyone] = text.split("\n\n## ")
+        // E05-S12 (AC-9) : la ligne du routage finit le bloc code, sous ses règles, juste avant les étapes.
+        expect(code.split("\n").at(-1)).toBe(
+          "Request « relance les devis en attente » matches ventes/relance_devis (score 1.00): its steps follow. Other candidates: ventes/relance_prospects (0.43), ventes/qualifier_prospects (0.40).",
+        )
+        // E03-S06 (AC7) : la ligne qui dit comment recopier un bloc `call` en appel, après la consigne.
+        const callLine = `A \`\`\`call block holds <function> <arguments JSON>: run it with ${ref.org.prefix}_call {"function": "<function>", "arguments": <arguments JSON>}, replacing each "<…>" value with the real one.`
+        expect(text).toContain(
+          `\n\n## Procedure ventes/relance_devis (v1): Relancer les devis en attente\nFollow these steps now. Ask the user's explicit approval before anything that sends, or that changes data beyond the steps of the procedure the user asked for.\n${callLine}\n\n${steps}\n\n## Context: everyone`,
+        )
+        expect(procedure.startsWith("Procedure ")).toBe(true)
+        expect(everyone.startsWith("Context: everyone")).toBe(true)
+        for (const title of ["### Quand l'utiliser", "### Étapes", "### Règles"]) expect(steps).toContain(title)
+        expect(steps).toContain('```call\nsellsy.list_estimates {"status":"sent","older_than_days":7}\n```')
+        expect(text).not.toContain("BROUILLON")
+        expect(result.structuredContent).toMatchObject({
+          served: { path: "ventes/relance_devis", revision: 1, score: 1 },
+          candidates: [
+            { path: "ventes/relance_devis", title: relance.title, kind: "procedure", score: 1 },
+            { path: "ventes/relance_prospects", title: acmeNode("ventes/relance_prospects").title, kind: "procedure", score: 0.43 },
+            { path: "ventes/qualifier_prospects", title: acmeNode("ventes/qualifier_prospects").title, kind: "procedure", score: 0.4 },
+          ],
+          data_question: false,
+        })
+        expect(session.journal.at(-1)?.target).toBe("ventes/relance_devis")
+      } finally {
+        await seed.admin`delete from platform.blocks where node_id = ${ref.nodeId(path)} and state = 'draft'`
+        await seed.admin`delete from platform.node_drafts where node_id = ${ref.nodeId(path)}`
+      }
+    })
+  })
+
+  describe("filtering by the service (AC17)", () => {
+    it("should never give Paul a ventes/ node, row or usage bonus that the database returns", async () => {
+      const valbrune = (key: string, index: number) =>
+        acmeSearchRow("ventes/suivi_prospects", {
+          match: "block",
+          block_id: simulatedBlockId(index),
+          block_type: "row",
+          block_key: key,
+          column_name: "ville",
+          snippet: "ville: **Valbrune**",
+          rank: 0.1,
+        })
+      const { db } = await acmeDb("paul", {
+        route: [
+          // Ventes, que Paul ne lit pas : `route_candidates` ne la lui rend plus depuis E01-S13 (AC-a2) ; la doublure la rend.
+          routeRow("ventes/relance_devis", { s_summary: 1, s_title: 0.8, lexical: 1, query_lexemes: 3 }),
+          routeRow("support/reponse_ticket", { s_summary: 0.5, s_title: 0.2, lexical: 0.5, query_lexemes: 2 }, TEAMS.support.id),
+        ],
+        search: (query) =>
+          query === "Valbrune"
+            ? [valbrune("P-003", 701), valbrune("P-001", 702)]
+            : [
+                acmeSearchRow("ventes/relance_devis", { snippet: "**Relancer** les **devis** en attente", rank: 2.6 }),
+                acmeSearchRow("ventes/relance_prospects", { snippet: "**Relancer** les prospects à traiter", rank: 2.5 }),
+                acmeSearchRow("ventes/modele_relance", { match: "summary", snippet: "Le modèle d'email de **relance** d'un **devis**", rank: 1.4 }),
+                // Quatrième nœud, que Paul lit : le filtre de niveau passe avant la borne de trois nœuds.
+                acmeSearchRow("support/faq", { match: "block", block_id: simulatedBlockId(703), block_type: "paragraph", snippet: "**Relance** du fournisseur", rank: 0.1 }),
+              ],
+        journal: [journalRow("lea", "support/reponse_ticket", 1)],
+      })
+      const paul = ref.identityOf("paul")
+
+      const ranked = await rankCandidates(db, paul, { query: "relance les devis en attente", limit: 3 })
+      expect(ranked.map(({ path, score }) => [path, Number(score.toFixed(4))])).toEqual([["support/reponse_ticket", 0.53]])
+
+      const session = await connectDeps(mcpDeps(db, "paul"))
+      const context = await session.call("context", { phrase: "relance les devis en attente" })
+      // E03-S08 : le Contexte de Tout le monde, que Paul lit, cite `ventes/suivi_prospects` dans son Lexique ;
+      // du contenu écrit, pas un chemin servi par le service : aucune autre ligne ne nomme Ventes.
+      expect(context.text.split("\n").filter((line) => line.includes("ventes/"))).toEqual([acmeNode("contexte").blocks[3].text])
+      expect(context.result.structuredContent).toMatchObject({ served: null, candidates: [{ path: "support/reponse_ticket", score: 0.53 }] })
+
+      const byWords = await find(db, paul, { query: "relance devis" }, NO_CATALOG)
+      expect(byWords.text).not.toContain("ventes/")
+      expect(byWords.data).toMatchObject({ matches: [{ path: "support/faq" }], more_nodes: 0 })
+      const byRow = await find(db, paul, { query: "Valbrune" }, NO_CATALOG)
+      expect(byRow.text).toBe("No match for « Valbrune ». Ask the user to rephrase or to say what they are looking for; do not guess.")
+    })
+  })
+
+  describe("failures (AC18)", () => {
+    it("should answer find with the internal instruction when search_content fails, never the database message", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {})
+      const { db } = await acmeDb("claire", {
+        fail: (call) => (callsFunction(call, "search_content") ? { code: "57014", message: "timeout on platform.blocks" } : null),
+      })
+      const session = await connectDeps(mcpDeps(db, "claire"))
+      const { code } = await session.openContext()
+      const failed = await session.call("find", { ctx: code, query: "grille tarifaire" })
+      expect(failed.isError).toBe(true)
+      expect(failed.text).toBe(internal(ref.org.prefix))
+      expect(session.journal.at(-1)?.error).toBe(`internal: ${internal(ref.org.prefix)}`)
+      expect(log).toHaveBeenCalledWith("[platform] find: search_content", "57014")
+    })
+
+    it("should still answer context without steps nor candidates when route_candidates fails or the served procedure cannot be read (N30)", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {})
+      const route = [
+        routeRow("ventes/relance_devis", { s_summary: 1, s_title: 0.7, lexical: 1, query_lexemes: 3 }),
+        routeRow("ventes/relance_prospects", { s_summary: 0.45, s_title: 0.4, lexical: 0.33, query_lexemes: 3 }),
+      ]
+      // Revue du cycle 2 : la procédure décidée (1.00, écart net) mais illisible faisait demander à l'utilisateur de choisir.
+      const failures = {
+        "routing failed": await acmeDb("claire", { route, fail: (call) => (callsFunction(call, "route_candidates") ? { code: "57014" } : null) }),
+        // Toute lecture des blocs, d'une face ou de l'autre : celle de la procédure servie comprise.
+        "procedure read failed": await acmeDb("claire", { route, fail: (call) => (touches(call, "blocks") ? { code: "57014" } : null) }),
+      }
+      for (const [failure, { db }] of Object.entries(failures)) {
+        const session = await connectDeps(mcpDeps(db, "claire"))
+        const { text, result, isError } = await session.call("context", { phrase: "relance les devis en attente" })
+        expect(isError, failure).toBe(false)
+        expect(text.split("\n\n")[0].split("\n").at(-1), failure).toBe(
+          `Request « relance les devis en attente »: no procedure could be matched right now. ${ref.org.prefix}_find can search pages, tables and functions.`,
+        )
+        // E03-S08 : « ## Procedures you can run » (procédures utiles) reste servi ; aucune procédure servie.
+        expect(text, failure).not.toContain("## Procedure ")
+        expect(result.structuredContent, failure).toMatchObject({ served: null, candidates: [], data_question: false })
+        expect(session.journal.at(-1)?.target, failure).toBe("relance les devis en attente")
+        expect(log).toHaveBeenCalledWith(`[platform] context: ${failure}`, expect.anything())
+      }
+    })
+
+    it("should fall back to the default settings and to no usage bonus when their reads fail", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {})
+      // Le réglage posé en base (seuil 0,9) n'est pas lu : sa lecture échoue.
+      const settingsDown = await acmeDb("claire", { settings: { routing: { threshold: 0.9 } }, fail: (call) => (touches(call, "orgs") ? { code: "57014" } : null) })
+      expect(await loadRoutingSettings(settingsDown.db, ref.org.id)).toEqual({ threshold: 0.65, gap: 0.1 })
+      expect(log).toHaveBeenCalledWith("[platform] routing: orgs.settings read failed", "57014")
+
+      const { db } = await acmeDb("claire", {
+        route: [routeRow("ventes/relance_prospects", { s_summary: 0.5, s_title: 0.3, lexical: 0.5, query_lexemes: 2 })],
+        journal: [journalRow("claire", "ventes/relance_prospects", 1)],
+        fail: (call) => (touches(call, "journal") ? { code: "57014" } : null),
+      })
+      const ranked = await rankCandidates(db, ref.identityOf("claire"), { query: "relance les prospects", limit: 3 })
+      expect(ranked.map(({ score }) => Number(score.toFixed(4)))).toEqual([0.53])
+      expect(log).toHaveBeenCalledWith("[platform] routing: journal read failed", "57014")
+    })
+  })
+})

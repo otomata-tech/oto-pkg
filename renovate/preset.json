@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Mises à jour de @otomata_tech/oto_platform dans une application hôte (ADR-006, ADR-010)",
+  "packageRules": [
+    {
+      "description": "Mineures et correctifs : version épinglée, fusion automatique si la CI est verte",
+      "matchPackageNames": ["@otomata_tech/oto_platform"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "rangeStrategy": "pin",
+      "automerge": true
+    },
+    {
+      "description": "Majeures : revue humaine",
+      "matchPackageNames": ["@otomata_tech/oto_platform"],
+      "matchUpdateTypes": ["major"],
+      "rangeStrategy": "pin",
+      "automerge": false,
+      "labels": ["oto-platform-major"]
+    }
+  ]
+}

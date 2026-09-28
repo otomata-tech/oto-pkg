@@ -1,0 +1,102 @@
+/* Porté d'oto-frontend (src/design-system/icons/lucide-anim.css) : les gestes du glyphe ENTIER, joués
+   au survol ou au focus clavier de l'hôte (`.anim-host`), une fois ; `a-spin`, seule boucle ; chaque
+   pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). Retiré : les gestes par parties
+   (`draw`, `hands`, `flow`, `twinkle`, `lock`, `stack`), écrits sur la géométrie lucide (cadre de 24,
+   traits) que les glyphes Phosphor n'ont pas (portage-ecrans.md § 3), et `.oto-site`. */
+
+/* Rien ne s'anime tout seul : le geste part quand l'objet qui contient le glyphe (`.anim-host`) est survolé ou reçoit le focus clavier, pas l'icône de 16 px qu'on ne vise pas ; tout est scopé sous `.oto`, `.a-pop` est un nom trop générique pour le document global. */
+
+/* Ne vise que les hôtes qui n'agissent pas (une carte qui contient du texte montrerait un curseur de sélection) : écrite pour tous, à (0,2,0), elle éteignait le curseur main sur chaque bouton et chaque lien du DS. */
+.oto .anim-host:not(:is(a[href], button, [role="button"], summary, label, input, select, textarea)) {
+  cursor: default;
+}
+
+/* Le repère du glyphe entier est `center` : le `<svg>` est un élément remplacé, une origine en pixels du cadre de 24 le ferait tourner en orbite au lieu de sur place ; une liste nommée plutôt que `[class*="a-"]`, qui attraperait `data-table`. */
+.oto :is(.a-nudge, .a-rise, .a-turn, .a-pop, .a-swing, .a-pulse, .a-spin, .a-cross) svg {
+  transform-origin: center;
+  transition: transform 260ms cubic-bezier(.22, 1, .36, 1),
+              opacity   260ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Un hôte imbriqué reprend la main : un glyphe suit son hôte le plus proche, sinon survoler une ligne animerait aussi les boutons qu'elle contient ; écrite avant les gestes et d'un cran plus lourde (0,5,1), elle vaut pour tous. */
+.oto .anim-host .anim-host:not(:is(:hover, :focus-visible)) [class*="a-"] svg {
+  transform: none;
+  animation: none;
+}
+
+/* Le déclencheur, une fois par geste : `:is(:hover, :focus-visible)` répond au clavier comme à la souris, pas deux fois au clic (`:focus` rejouerait le geste), et `:is()` indulgent garde le survol sur un moteur qui ignorerait `:focus-visible`. */
+
+/* nudge : un lien, une action qui pousse vers l'avant */
+.oto .anim-host:is(:hover, :focus-visible) .a-nudge svg,
+.oto .a-nudge:is(:hover, :focus-visible) svg { transform: translateX(3px); }
+
+/* rise : quelque chose qui monte (export, envoi, publication) */
+.oto .anim-host:is(:hover, :focus-visible) .a-rise svg,
+.oto .a-rise:is(:hover, :focus-visible) svg { transform: translateY(-3px); }
+
+/* turn : un quart de tour net (réglages, engrenage) */
+.oto .anim-host:is(:hover, :focus-visible) .a-turn svg,
+.oto .a-turn:is(:hover, :focus-visible) svg { transform: rotate(90deg); }
+
+/* pop : une prise en main ; le geste par défaut d'un glyphe sans mariage */
+.oto .anim-host:is(:hover, :focus-visible) .a-pop svg,
+.oto .a-pop:is(:hover, :focus-visible) svg { animation: otoAPop 420ms cubic-bezier(.22, 1, .36, 1); }
+@keyframes otoAPop { 0% { transform: scale(1) } 40% { transform: scale(.86) } 100% { transform: scale(1) } }
+
+/* swing : un objet qu'on secoue (clé, cloche) */
+.oto .anim-host:is(:hover, :focus-visible) .a-swing svg,
+.oto .a-swing:is(:hover, :focus-visible) svg { animation: otoASwing 620ms cubic-bezier(.36, .07, .19, .97); }
+@keyframes otoASwing {
+  0%, 100% { transform: rotate(0) }
+  22% { transform: rotate(-13deg) }
+  55% { transform: rotate(9deg) }
+  80% { transform: rotate(-4deg) }
+}
+
+/* pulse : une présence (personnes, réseau, connexion) */
+.oto .anim-host:is(:hover, :focus-visible) .a-pulse svg,
+.oto .a-pulse:is(:hover, :focus-visible) svg { animation: otoAPulse 900ms cubic-bezier(.22, 1, .36, 1); }
+@keyframes otoAPulse { 0%, 100% { transform: scale(1) } 45% { transform: scale(1.13) } }
+
+/* drop : ce qui se déplie vers le bas, l'inverse de `rise` */
+.oto .anim-host:is(:hover, :focus-visible) .a-drop svg,
+.oto .a-drop:is(:hover, :focus-visible) svg { transform: translateY(2px); }
+
+/* magnify : la loupe grossit sans bouger ; une loupe qui bouge cherche ailleurs */
+.oto .anim-host:is(:hover, :focus-visible) .a-magnify svg,
+.oto .a-magnify:is(:hover, :focus-visible) svg { transform: scale(1.14); }
+
+/* tilt : l'objet qu'on saisit et qu'on incline, douze degrés ; rien ne crante, à la différence de `turn` */
+.oto .anim-host:is(:hover, :focus-visible) .a-tilt svg,
+.oto .a-tilt:is(:hover, :focus-visible) svg { transform: rotate(-12deg); }
+
+/* back : ce qui remonte le temps (historique, versions), le sens antihoraire porte le sens */
+.oto .anim-host:is(:hover, :focus-visible) .a-back svg,
+.oto .a-back:is(:hover, :focus-visible) svg { transform: rotate(-40deg); }
+
+/* sift : l'entonnoir descend et se resserre (filtre), ce qui le distingue de `drop` */
+.oto .anim-host:is(:hover, :focus-visible) .a-sift svg,
+.oto .a-sift:is(:hover, :focus-visible) svg { transform: translateY(1.5px) scale(.94); }
+
+/* bounce : le rebond de ce qui appelle l'attention ; une animation qui revient, un signal se remarque sans s'installer */
+.oto .anim-host:is(:hover, :focus-visible) .a-bounce svg,
+.oto .a-bounce:is(:hover, :focus-visible) svg { animation: otoABounce 560ms cubic-bezier(.22, 1, .36, 1); }
+@keyframes otoABounce { 0%, 100% { transform: translateY(0) } 35% { transform: translateY(-3px) } 70% { transform: translateY(1px) } }
+
+/* spin : la seule boucle, un travail réellement en vol ; sans déclencheur, elle tourne tant que la classe est là */
+.oto .a-spin svg { animation: otoASpin 900ms linear infinite; }
+@keyframes otoASpin { to { transform: rotate(360deg) } }
+
+/* cross : un refus, deux traits qui se resserrent */
+.oto .anim-host:is(:hover, :focus-visible) .a-cross svg,
+.oto .a-cross:is(:hover, :focus-visible) svg { animation: otoACross 420ms cubic-bezier(.22, 1, .36, 1); }
+@keyframes otoACross { 0%, 100% { transform: rotate(0) } 50% { transform: rotate(-90deg) scale(.9) } }
+
+/* Mouvement réduit, le seul bloc brutal : il ne cite aucun déclencheur et désarme les glyphes en `!important`, qu'aucun déclencheur ajouté ne contourne. */
+@media (prefers-reduced-motion: reduce) {
+  .oto :is(.a-nudge, .a-rise, .a-turn, .a-pop, .a-swing, .a-pulse, .a-spin, .a-cross) svg {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

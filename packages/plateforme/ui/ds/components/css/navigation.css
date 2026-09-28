@@ -1,0 +1,413 @@
+/* Porté d'oto-frontend (src/design-system/components/css/navigation.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Tabs · SegmentedControl · Breadcrumb · Pagination · Stepper */
+
+/* Tabs, 8 px, ils contiennent une vue : le soulignement, pas la pilule ; un onglet change ce que la page montre, une pilule dirait « filtre », ce que fait le SegmentedControl. */
+
+.oto-tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-block-end: 1px solid var(--hair);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.oto-tabs::-webkit-scrollbar { display: none; }
+
+.oto-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  block-size: var(--ctrl-h-lg);
+  padding-inline: var(--space-3);
+  border-radius: var(--r-tab) var(--r-tab) 0 0;
+  color: var(--mute);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  flex: none;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+/* Le survol ne change que la couleur : un fond sous une barre de soulignement ferait deux signaux pour une information, et l'onglet actif ne se détacherait plus. */
+.oto-tab:hover:not([aria-disabled="true"]) { color: var(--ink); }
+.oto-tab[aria-selected="true"] { color: var(--ink); font-weight: var(--fw-semibold); }
+.oto-tab[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+.oto-tab > .oto-icon { color: var(--faint); }
+.oto-tab[aria-selected="true"] > .oto-icon { color: var(--primary-text); }
+
+/* le compteur d'un onglet se calme quand l'onglet est actif : on y est, il n'a plus à attirer l'œil */
+.oto-tab > .oto-badge { margin-inline-start: 0; }
+.oto-tab[aria-selected="true"] > .oto-badge[data-tone] { background: var(--hair); color: var(--mute); }
+
+/* ── le curseur qui glisse : un seul élément déplacé (sa position en variables posées par l'enveloppe), pas deux barres qui s'allument ; le regard suit le changement de vue. */
+.oto-tabs-indicator {
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline-start: 0;
+  block-size: 2px;
+  inline-size: var(--tab-w, 0);
+  transform: translateX(var(--tab-x, 0));
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  transition: transform var(--dur-base) var(--ease-standard),
+              inline-size var(--dur-base) var(--ease-standard);
+  pointer-events: none;
+}
+
+/* Repli sans JS et sans `:has()` : le soulignement reste porté par l'onglet actif, il ne glisse simplement pas. */
+.oto-tabs:not(:has(.oto-tabs-indicator)) .oto-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: var(--space-2);
+  inset-block-end: -1px;
+  block-size: 2px;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+}
+
+.oto-tabpanel { padding-block-start: var(--space-3); }
+.oto-tabpanel:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-card); }
+
+/* La barre d'onglets en-tête de l'îlot (`[data-island-head]`), une variante d'`oto-tabs` : quand l'îlot n'a pas de titre, la barre nomme le contenu et prend la bande d'un en-tête, pleine largeur, onglets à parts égales, l'actif à la couleur de l'îlot ; `oto-card-tabs` dessine le même objet sans clavier, un écran qui a besoin des deux prend celle-ci. */
+
+/* ── elle garde l'`overflow-x: auto` de la barre de base : un `hidden` rognait en étroit sans rien laisser atteindre (le dernier onglet invisible et injoignable) ; au repos rien ne change, la barre de défilement reste masquée ; le focus clavier ne fait pas encore défiler un onglet dans la vue, défaut commun à toutes les barres, qui relève de l'enveloppe. */
+.oto-tabs[data-island-head] {
+  gap: 0;
+  background: color-mix(in oklab, var(--primary) 14%, var(--island));
+}
+
+.oto-tabs[data-island-head] .oto-tab {
+  flex: 1;
+  justify-content: center;
+  /* `block-size: auto` : la hauteur vient du rembourrage, un onglet plein cadre n'est pas un bouton. */
+  block-size: auto;
+  padding-block: var(--space-3);
+  border-radius: 0;
+}
+
+.oto-tabs[data-island-head] .oto-tab + .oto-tab {
+  border-inline-start: 1px solid color-mix(in oklab, var(--ink) 7%, transparent);
+}
+
+.oto-tabs[data-island-head] .oto-tab[aria-selected="true"] { background: var(--island); }
+
+/* ── le grain de l'onglet ouvert, celui des en-têtes d'îlot (11 % d'encre, extinction à 70 %) ; pas d'`overflow: hidden` ici : le soulignement est hors de la boîte, et cette absence garde le plancher de l'onglet (la taille minimale automatique, qui ne vaut qu'en `overflow: visible`), sinon un libellé serait coupé net. */
+.oto-tabs[data-island-head] .oto-tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 1px 1px,
+    color-mix(in oklab, var(--ink) 11%, transparent) 1px, transparent 0) 0 0 / 9px 9px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 70%);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 70%);
+}
+/* Un `::before` positionné est peint au-dessus du contenu en ligne. */
+.oto-tabs[data-island-head] .oto-tab > * { position: relative; }
+
+/* Le filet de l'onglet actif court sur toute sa largeur : rentré, il flotterait au milieu d'un onglet qui fait la moitié de la carte. */
+.oto-tabs[data-island-head] .oto-tab[aria-selected="true"]::after { inset-inline: 0; }
+
+/* ── le panneau porte l'attribut lui aussi : frère de la barre, aucun sélecteur ne descend de l'une à l'autre, l'enveloppe le pose aux deux ; sans ce rembourrage, les lignes touchent le bord de l'îlot. */
+.oto-tabpanel[data-island-head] { padding: var(--space-3) var(--island-pad); }
+
+/* SegmentedControl, pilule, il filtre : `role="radiogroup"`, un choix parmi n, pas une navigation ; un seul curseur qui se déplace. */
+
+.oto-segmented {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-pill);
+  background: var(--field);
+  isolation: isolate;
+}
+
+.oto-segment {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  block-size: calc(var(--ctrl-h-sm) - 4px);
+  padding-inline: var(--space-3);
+  border-radius: var(--r-pill);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+.oto-segment:hover { color: var(--ink); }
+.oto-segment[aria-checked="true"] { color: var(--btn-fg); }
+
+/* ── le curseur, déplacé par deux variables posées à la mesure ; sans elles il s'efface (largeur nulle) et le segment coché porte la pilule : un composant qui a besoin du JS pour être juste est faux partout où le JS ne tourne pas. */
+.oto-segmented-thumb {
+  position: absolute;
+  z-index: 0;
+  inset-block: 2px;
+  inset-inline-start: 0;
+  inline-size: var(--seg-w, 0);
+  transform: translateX(var(--seg-x, 0));
+  border-radius: var(--r-pill);
+  background: var(--btn-bg);
+  transition: transform var(--dur-base) var(--ease-standard),
+              inline-size var(--dur-base) var(--ease-standard);
+}
+
+/* repli : pas de curseur du tout, ou un curseur sans mesure */
+.oto-segmented:not(:has(.oto-segmented-thumb)) .oto-segment[aria-checked="true"],
+.oto-segmented:has(.oto-segmented-thumb:not([style*="--seg-w"])) .oto-segment[aria-checked="true"] {
+  background: var(--btn-bg);
+}
+
+.oto-segmented[data-size="lg"] .oto-segment { block-size: calc(var(--ctrl-h-md) - 4px); font-size: var(--fs-sm); }
+.oto-segmented[data-block] { display: flex; inline-size: 100%; }
+.oto-segmented[data-block] .oto-segment { flex: 1; }
+
+/* Breadcrumb, le fil d'Oto : chaque maillon est un bouton qui ouvre la liste de ses frères, on bascule à son niveau ; en corps de texte, il nomme des objets du client ; troncature par le milieu, la racine et la feuille gardées ; le plancher ne dépend d'aucun script (`nowrap`, puis l'ordre de rétrécissement). */
+
+.oto-breadcrumb {
+  display: flex;
+  align-items: center;
+  /* `nowrap` et non `wrap` : le fil dit « où je suis », il tient sur une ligne ou il n'est plus un repère ; sur deux lignes, il poussait tout l'en-tête vers le bas. */
+  flex-wrap: nowrap;
+  gap: var(--space-0-5);
+  min-inline-size: 0;
+  /* Garde-fou de dernier recours : `nowrap` interdit la deuxième ligne, celui-ci de déborder l'îlot par la droite. */
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+
+/* L'ordre de rétrécissement : le dernier maillon (l'objet ouvert) cède en dernier, puis l'avant-dernier qui le situe, puis la racine ; le milieu d'abord ; des facteurs très écartés, `flex-shrink` répartit au prorata de la largeur. */
+.oto-breadcrumb > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-inline-size: 0;
+  flex-shrink: 999;
+}
+.oto-breadcrumb > li:first-child { flex-shrink: 60; }
+.oto-breadcrumb > li:nth-last-child(2) { flex-shrink: 8; }
+/* En dernier : à spécificité égale l'ordre tranche, et un fil d'un seul maillon est le dernier. */
+.oto-breadcrumb > li:last-child { flex-shrink: 1; }
+
+/* Le maillon : `max-inline-size`, un nom long ne pousse pas la pile d'avatars hors de l'écran, la seule troncature admise, sur un maillon ; `min-inline-size: 0`, sinon c'est le fil entier qui déborde. */
+.oto-breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-ctrl);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  max-inline-size: 220px;
+  min-inline-size: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: var(--tr-colors);
+}
+
+/* Le libellé a son propre élément : `text-overflow` n'ellipse que du contenu en ligne dans un bloc, sur l'`inline-flex` du maillon il coupait net. */
+.oto-breadcrumb-label {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oto-breadcrumb-item > .oto-icon { flex: none; color: var(--mute); }
+/* Le survol n'éclaire que ce qui agit : un maillon texte (ni frères ni adresse, M31) ne promet rien. */
+.oto-breadcrumb-item:not(span):hover,
+.oto-breadcrumb-item[aria-expanded="true"] { background: var(--hair); color: var(--ink); }
+
+/* Le maillon courant, l'objet qu'on regarde, reste un déclencheur (le plus ouvert, pour passer au frère d'à côté) ; `aria-current`, que le lecteur d'écran annonce. */
+.oto-breadcrumb-item[aria-current] { color: var(--ink); font-weight: var(--fw-semibold); }
+.oto-breadcrumb-item[aria-current] > .oto-icon { color: var(--primary); }
+
+.oto-breadcrumb-sep { color: var(--faint); flex: none; user-select: none; }
+.oto-breadcrumb-more {
+  color: var(--faint);
+  padding-inline: var(--space-1);
+  border-radius: var(--r-ctrl);
+  transition: var(--tr-colors);
+}
+.oto-breadcrumb-more:hover { color: var(--ink); background: var(--hair); }
+
+/* Pagination : chiffres tabulaires, les numéros ne changent pas de largeur entre 9 et 10. */
+
+.oto-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+.oto-pagination-pages { display: flex; align-items: center; gap: var(--space-1); }
+.oto-pagination-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--ctrl-h-sm);
+  block-size: var(--ctrl-h-sm);
+  padding-inline: var(--space-2);
+  border-radius: var(--r-btn);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--mute);
+  transition: var(--tr-colors);
+}
+.oto-pagination-page:hover:not([aria-current]) { background: var(--hair); color: var(--ink); }
+.oto-pagination-page[aria-current="page"] { background: var(--btn-bg); color: var(--btn-fg); }
+.oto-pagination-gap { color: var(--faint); padding-inline: var(--space-1); }
+.oto-pagination-info { font-family: var(--mono); font-size: var(--fs-2xs); letter-spacing: var(--tr-mono); text-transform: uppercase; color: var(--faint); }
+.oto-pagination-size { margin-inline-start: auto; display: flex; align-items: center; gap: var(--space-2); }
+
+@media (max-width: 639px) {
+  /* sur téléphone, seuls précédent / suivant / position restent */
+  .oto-pagination-pages, .oto-pagination-size { display: none; }
+}
+
+/* Stepper : terminé, en cours, à venir, distingués par la forme autant que par la couleur (coche pleine, anneau, cercle creux), lisibles en niveaux de gris. */
+
+.oto-stepper { display: flex; gap: var(--space-4); }
+.oto-stepper[data-orientation="vertical"] { flex-direction: column; gap: 0; }
+
+.oto-step { display: flex; align-items: flex-start; gap: var(--space-2-5); flex: 1; min-inline-size: 0; }
+
+.oto-step-marker {
+  flex: none;
+  inline-size: 22px;
+  block-size: 22px;
+  border-radius: var(--r-dot);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--island-bd);
+  background: var(--island);
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.oto-step[data-state="done"] .oto-step-marker    { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-fg); }
+.oto-step[data-state="current"] .oto-step-marker { border-color: var(--primary); border-width: 2px; color: var(--primary-text); background: var(--oto-bg); }
+.oto-step[data-state="failed"] .oto-step-marker  { background: var(--st-fail); border-color: var(--st-fail); color: #ffffff; }
+
+.oto-step-body { min-inline-size: 0; padding-block-end: var(--space-4); }
+
+/* `display: block` n'est pas optionnel : titre et description sont des `<span>`, sinon sur la même ligne et sans marge verticale. */
+.oto-step-title {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+}
+.oto-step[data-state="upcoming"] .oto-step-title { color: var(--mute); font-weight: var(--fw-medium); }
+.oto-step-desc {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  line-height: var(--lh-normal);
+  margin-block-start: var(--space-1);
+}
+
+/* le trait de liaison — il part du marqueur, pas du bord du bloc */
+.oto-stepper[data-orientation="horizontal"] .oto-step:not(:last-child)::after {
+  content: "";
+  flex: 1;
+  block-size: 1px;
+  background: var(--hair);
+  margin-block-start: 11px;
+}
+.oto-stepper[data-orientation="vertical"] .oto-step:not(:last-child) { position: relative; }
+.oto-stepper[data-orientation="vertical"] .oto-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 11px;
+  inset-block: 26px var(--space-1);
+  inline-size: 1px;
+  background: var(--hair);
+}
+.oto-stepper[data-orientation="vertical"] .oto-step[data-state="done"]:not(:last-child)::before { background: var(--primary); }
+
+/* CardTabs, la barre d'onglets qui est l'en-tête de la carte : les onglets se partagent la largeur, la barre porte la bande d'un en-tête et l'actif remonte à `--island`, un contraste de surface ; un filet vertical sépare deux onglets de même teinte. */
+
+.oto-card-tabs {
+  display: flex;
+  background: color-mix(in oklab, var(--primary) 14%, var(--island));
+  border-block-end: 1px solid var(--hair);
+}
+
+.oto-card-tab {
+  flex: 1;
+  /* Le plancher que `overflow: hidden` retire, rendu explicitement : `max-content` (la ligne entière, `min-content` ne suffit pas sous `nowrap`) ; parts égales tant qu'il y a la place, aucun onglet sous son libellé ; jamais `overflow: clip`, qui cacherait la coupe au contrôle. */
+  min-width: max-content;
+  /* `position` et `overflow` sont là pour le grain de l'onglet actif, pas pour la mise en page. */
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  padding: var(--space-3) var(--space-2);
+  color: var(--mute);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  /* Le soulignement est réservé au repos aussi, sinon l'onglet actif gagne 2 px et la barre se décale. */
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+.oto-card-tab + .oto-card-tab { border-inline-start: 1px solid var(--hair); }
+.oto-card-tab:hover:not([aria-disabled="true"]) { color: var(--ink); }
+
+.oto-card-tab[aria-selected="true"] {
+  background: var(--island);
+  color: var(--ink);
+  font-weight: var(--fw-semibold);
+  border-block-end-color: var(--primary);
+}
+/* ── le grain de l'onglet ouvert, celui des en-têtes : à 11 % et éteint à 70 %, un onglet est plus court qu'une barre et la même pente le grainerait sous son libellé. */
+.oto-card-tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in oklab, var(--ink) 11%, transparent) 1px,
+      transparent 0
+    ) 0 0 / 9px 9px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 70%);
+  mask-image: linear-gradient(90deg, #000 0%, transparent 70%);
+}
+/* Le `::before` positionné est peint au-dessus du contenu en ligne : sans ce relèvement, le grain passerait sur le libellé. */
+.oto-card-tab > * { position: relative; }
+.oto-card-tab > .oto-icon { color: var(--ink); }
+.oto-card-tab[aria-selected="true"] > .oto-icon { color: var(--primary); }
+.oto-card-tab[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+
+/* Le compte, une pastille discrète en chiffres tabulaires : il ne change pas de teinte avec l'onglet actif, une quantité et pas un état. */
+.oto-card-tab-count {
+  font-size: var(--fs-2xs);
+  color: var(--mute);
+  background: var(--hair);
+  border-radius: var(--r-pill);
+  padding: 1px var(--space-1-5);
+}
+
+.oto-card-tabpanel { padding: var(--space-3); }

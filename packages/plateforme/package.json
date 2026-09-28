@@ -1,0 +1,57 @@
+{
+  "name": "@otomata_tech/oto_platform",
+  "version": "1.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/otomata-tech/oto-pkg.git",
+    "directory": "packages/plateforme"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "bin": {
+    "oto-platform": "./cli/bin.mjs"
+  },
+  "files": [
+    "ui",
+    "schemas",
+    "mcp",
+    "api",
+    "server",
+    "migrations",
+    "cli",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "exports": {
+    "./ui": "./ui/index.ts",
+    "./ui/styles.css": "./ui/styles.css",
+    "./schemas": "./schemas/index.ts",
+    "./mcp": "./mcp/index.ts",
+    "./api": "./api/index.ts",
+    "./server": "./server/index.ts",
+    "./migrations/*": "./migrations/*",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "jose": "6.2.12",
+    "mcp-handler": "1.1.0",
+    "nodemailer": "10.0.10",
+    "postgres": "3.4.9"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2",
+    "next": "^15",
+    "react": "^19",
+    "react-dom": "^19",
+    "@phosphor-icons/react": "^2",
+    "zod": "^3.25",
+    "react-hook-form": "^7.55",
+    "@hookform/resolvers": "^5"
+  }
+}

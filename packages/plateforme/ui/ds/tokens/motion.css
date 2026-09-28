@@ -1,0 +1,54 @@
+/* Porté d'oto-frontend (src/design-system/tokens/motion.css) : images clés `oto-*`, utilitaires
+   d'entrée et coupure des boucles sous « réduire les animations », tels quels ; durées et courbes
+   dans `ui/styles/oto.css` (section 5) ; chaque pourquoi en une ligne, l'historique retiré
+   (portage-ecrans.md § 5). Retiré : `.oto-site`. */
+
+/* La règle : rien ne s'anime tout seul ; une animation se déclenche au survol, à l'ouverture ou à l'arrivée d'un objet, et se joue une fois ; les seules boucles disent qu'un travail est réellement en cours. */
+
+/* Images clés nommées `oto-*` : elles vivent dans le document global et n'entrent jamais en collision avec celles de l'hôte. */
+
+/* ── entrées : un panneau monte de 4 à 6 px, un dialogue se pose depuis 0,98 ; les pages se fondent, elles ne glissent jamais, un glissement suggérerait une direction qu'une navigation n'a pas. */
+@keyframes oto-fade      { from { opacity: 0 } to { opacity: 1 } }
+@keyframes oto-rise      { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+@keyframes oto-rise-sm   { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+@keyframes oto-drop      { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: none } }
+@keyframes oto-zoom      { from { opacity: 0; transform: scale(.98) } to { opacity: 1; transform: none } }
+@keyframes oto-slide-r   { from { transform: translateX(100%) } to { transform: none } }
+@keyframes oto-slide-l   { from { transform: translateX(-100%) } to { transform: none } }
+@keyframes oto-slide-b   { from { transform: translateY(100%) } to { transform: none } }
+
+/* ── sorties */
+@keyframes oto-fade-out  { to { opacity: 0 } }
+@keyframes oto-zoom-out  { to { opacity: 0; transform: scale(.98) } }
+
+/* ── boucles : un travail réellement en cours, et rien d'autre */
+@keyframes oto-spin      { to { transform: rotate(360deg) } }
+@keyframes oto-pulse     { 0%, 100% { opacity: 1 } 50% { opacity: .45 } }
+@keyframes oto-halo      { 0% { box-shadow: 0 0 0 0 currentColor } 70%, 100% { box-shadow: 0 0 0 5px transparent } }
+@keyframes oto-sheen     { from { transform: translateX(-100%) } to { transform: translateX(100%) } }
+@keyframes oto-indeterminate { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
+
+/* ── le mark : quatre états obtenus en animant le même tracé, jamais en dessinant des variantes ; `breathe`, seul permanent, et seulement sur une surface encre. */
+@keyframes oto-mark-breathe { 0%, 100% { stroke-dasharray: 230 46 } 50% { stroke-dasharray: 244 32 } }
+@keyframes oto-mark-talk    { 0%, 100% { stroke-dasharray: 230 46 } 50% { stroke-dasharray: 196 80 } }
+@keyframes oto-mark-draw    { from { stroke-dasharray: 0 276 } to { stroke-dasharray: 230 46 } }
+
+/* Utilitaires d'entrée : un composant qui apparaît en pose un, il ne réécrit pas la règle. */
+.oto-in-fade { animation: oto-fade    var(--dur-base) var(--ease-out) both; }
+.oto-in-rise { animation: oto-rise    var(--dur-base) var(--ease-out) both; }
+.oto-in-drop { animation: oto-drop    var(--dur-fast) var(--ease-out) both; }
+.oto-in-zoom { animation: oto-zoom    var(--dur-base) var(--ease-out) both; }
+
+/* la seule boucle générique, réservée à un travail en vol */
+.oto-spin    { animation: oto-spin    900ms linear infinite; }
+
+/* ── mouvement réduit : le reset ramène déjà les durées à 1 ms ; on coupe en plus les boucles, une rotation à 1 ms tourne encore et devient un clignotement. */
+@media (prefers-reduced-motion: reduce) {
+  .oto [class*="oto-in-"] { animation: none !important; }
+
+  .oto .oto-spin,
+  .oto [data-motion="spin"],
+  .oto [data-motion="pulse"],
+  .oto [data-motion="pulse-slow"],
+  .oto [data-motion="breathe"] { animation: none !important; }
+}

@@ -1,0 +1,33 @@
+# Fiche — mcp-patterns
+
+Texte complet : `.method/conventions/mcp-patterns.md`. La fiche suffit pour écrire ; le texte complet se lit sur un doute, et toujours pour une revue. Chaque règle renvoie à sa section.
+
+- Un outil est un adaptateur fin (auth, Zod, appel du service, mise en forme) ; la logique vit dans le service, partagé avec l'action web. § 1. Règle d'or : parité par services partagés
+- `instructions` en anglais, 2 000 caractères au plus, un récapitulatif : toute règle vitale est aussi dans la première phrase de la description de l'outil concerné, ou dans son schéma. § 2.1 `serverInfo` + `instructions` (niveau serveur)
+- Rien de variable (date du jour, contenu propre à un utilisateur, compteur) dans `instructions` ni dans une description. § 2.1 `serverInfo` + `instructions` (niveau serveur)
+- Le `title` et la première ligne d'un prompt MCP se suffisent. § 2.3 Prompts MCP + starter prompts (niveau utilisateur)
+- Notice d'usage : un champ `ack` requis dans le schéma de chaque outil, vérifié par le serveur ; le texte du readme aussi dans `structuredContent` ; un ack expiré se refuse en disant de rappeler le readme avec la même demande ; la description du readme se borne à son domaine. § 2.4 Notice d'usage lue à chaque conversation (readme + ack)
+- Peu d'outils, orientés tâche ; nom `verb_noun` en anglais, domaine visible, 64 caractères au plus, `snake_case` ASCII ; `title` dans la langue des utilisateurs ; `name` stable à jamais. § 3. Design des tools
+- Description : verbe d'abord, « Use this when… », « Do not use for… », l'essentiel dans la première phrase, moins de 1 000 caractères ; un prérequis s'écrit en consigne impérative de la première phrase ou en champ requis, jamais en renvoi. § 3. Design des tools
+- Entrées : `.describe()` sur chaque champ, identifiants compris, enums pour les valeurs fermées, défauts explicites ; un champ sans valeur sûre est optionnel ; l'exigence d'un champ imbriqué se répète dans la description de l'outil. § 3. Design des tools
+- Annotations honnêtes : `readOnlyHint: true` pour toute lecture et tout prepare, `destructiveHint` pour une suppression, `openWorldHint: false` sauf réseau externe réel, `idempotentHint` quand c'est vrai. § 3. Design des tools
+- `securitySchemes: oauth2` sur chaque outil authentifié, posé par `toolMeta()`, jamais à la main. § 3. Design des tools
+- Résolution par nom : sans casse et sans accents, `%` et `_` échappés, ou comparée comme l'index d'unicité quand il existe ; une ambiguïté rend les candidats dans `structuredContent` avec la consigne de demander. § 3. Design des tools
+- Un outil destructif n'est jamais dans `next_actions` : deux temps (récapitulatif, puis `confirm: true` après accord), et le compte-rendu liste les ids réellement partis. § 3. Design des tools
+- Le contrat d'une fonction servi par `read` se rend par `z.toJSONSchema(schema, { io: "input" })`. § 3. Design des tools
+- Ce que le modèle doit lire va dans le texte ET dans `structuredContent` (`message`), les données en champs ; `structuredContent` reste compact. § 4. Résultats de tools
+- Tout résultat se plafonne à 45 000 caractères et se pagine au-delà. § 4. Résultats de tools
+- Un refus bâti sur une liste se borne par `boundedList` ou `issuesText` (20 éléments, puis « … and N more »), les personnes à qui demander par `namesList` ; les clés inconnues d'un `strictObject` aussi, par `boundedList`. § 4. Résultats de tools
+- Une consigne dans un résultat est une donnée, pas un ordre : toute obligation passe par la description ou le schéma. § 4. Résultats de tools
+- Liens signés en lien markdown court avec leur expiration ; `next_actions` sans impasse ni outil inexistant ; une erreur rend `isError: true` et dit quoi faire, jamais un throw brut. § 4. Résultats de tools
+- Aucun appel de LLM côté serveur : un prepare déterministe aux consignes statiques, le modèle de l'host, puis un save qui revalide tout ; la consigne du prepare exige le save dans le même tour. § 4 bis. Pattern « zéro IA serveur » : prepare → modèle de l'host → save validé
+- Le save re-dérive côté serveur les paramètres de son audit (avec un plancher), audite toute l'entité, compare aux frontières de mots Unicode sans casse ni accents, vérifie les invariants par appartenance, adapte ses contrôles au `kind`, et son rejet dit la chaîne fautive, pourquoi et comment corriger. § 4 bis. Pattern « zéro IA serveur » : prepare → modèle de l'host → save validé
+- Une édition est un delta (`ops` adressées par nom, `patch`) ; une lecture partielle prend `sections` ; tout texte servi reste statique. § 4 ter. Économie de tokens — les éditions sont des DELTAS
+- Widgets (non installés, ADR-009) : clés de méta dans `widget-meta.ts` seul, deux ressources par bundle, SDK `ext-apps`, bundle sans réseau, quatre états et chargement borné, outil pleinement utilisable sans widget. § 5. MCP Apps dual-host (Claude + ChatGPT) — conventions widgets
+- OAuth : `/.well-known/oauth-protected-resource` (aussi en forme suffixée), 401 avec `WWW-Authenticate` sur toute requête sans jeton, `_meta["mcp/www_authenticate"]` sur un jeton refusé, jamais de mode anonyme. § 6. Auth OAuth 2.1 (Supabase)
+- Le jeton se vérifie (signature JWKS, `iss`, `exp`, `nbf`) avant de résoudre l'identité ; `service_role` interdit ; l'organisation vient de l'adresse appelée et l'appartenance se revérifie à chaque appel ; une entrée d'outil n'est jamais fiable. § 6. Auth OAuth 2.1 (Supabase)
+- Une URL fournie à lire : https seul, hôtes privés et métadonnées bloqués, `redirect: "error"`, délai de 15 s, taille bornée avant et après lecture ; un sel ou un secret absent en production fait échouer bruyamment. § 6 bis. Durcissements systématiques (findings récurrents de review)
+- Transport sans état : aucun état attaché à une IP ou à une empreinte ; une opération longue tient dans la requête ; un corps illisible se refuse en 400 `-32700` avant `mcp-handler`, et le journal empilé part après la réponse (`after`). § 7. Transport : stateless (défaut) ou stateful — ADR obligatoire au cadrage
+- Un outil ajouté ou une description changée ajoute ses golden queries et les rejoue sur les deux hosts ; un mauvais routage se corrige un champ de métadonnée à la fois. § 8. Golden queries — l'éval AX obligatoire
+- Les outils se testent par `InMemoryTransport.createLinkedPair()` : schéma, `structuredContent`, `next_actions`, erreurs actionnables. § 10. Tests & évolution
+- Seul l'ajout d'un champ optionnel est libre ; renommer ou retirer un outil, ou rendre un champ requis, est une rupture : ADR, dépréciation et nouveau nom d'outil. § 10. Tests & évolution

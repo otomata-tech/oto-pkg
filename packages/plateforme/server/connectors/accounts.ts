@@ -1,0 +1,275 @@
+// Comptes de connecteurs (H67, H85, FR-ADMIN-02, FR-ADMIN-03) : créer un compte simulé, lister les
+// comptes qu'une personne peut utiliser, désactiver ; et la lecture commune aux résolutions (équipe
+// porteuse, compte) et au bloc `team`. Sans ce module, aucun compte simulé ne se pose hors de
+// l'outillage. Aucune colonne de secret n'est lue ni rendue (NFR-ADMIN-01) : chaque requête liste
+// ses colonnes, et `secret_ciphertext` n'est pas accordée à `authenticated`. Chaque droit et chaque
+// filtre se décident ici, avant la requête, par `access.ts` (E01-S07 AC23) : la RLS n'est qu'un
+// garde-fou. Face SQL (E01-S10, lot d1) : chaque lecture ou écriture dans une transaction `db.tx`, les
+// décisions d'`access.ts` et l'annuaire hors d'elle.
+//
+// Repris d'Oto (`docs\roles-and-resolution.md`) : un libellé déjà pris est refusé. Retiré : compte par
+// défaut `is_default`, paliers tenant et plateforme (architecture § 10).
+import {
+  ACCESS_LEVEL_NAMES,
+  connectorRefSchema,
+  createAccountSchema,
+  disableAccountSchema,
+  type AccessLevelName,
+  type AccountMode,
+  type AccountView,
+} from "../../schemas"
+import {
+  ACCESS_LEVELS,
+  accountLevel,
+  accountLevels,
+  administrators,
+  describeOwner,
+  isOrgAdmin,
+  leadsTeam,
+  type AccessLevel,
+  type Owner,
+} from "../access"
+import { catalogFunctions } from "../catalog/registry"
+import type { PlatformDb } from "../db"
+import { leadNames, leadWord, memberDirectory, teamsWithLeads } from "../directory"
+import { fromDatabaseError, inTransaction, invalidInput, isUniqueViolation, PlatformError } from "../errors"
+import type { Identity } from "../identity"
+import type { Tx } from "../sql"
+import { requireActivable } from "./activations"
+import { accountMode } from "./modes"
+
+/** Niveau sur un compte tel que le lit le modèle : 1 lecture, 2 écriture, 3 gestion (H65) ; les noms d'`ACCESS_LEVEL_NAMES`. */
+export type LevelName = Exclude<AccessLevelName, "none">
+
+/** Propriétaire d'un compte, décrit comme le lit le modèle : « team Ventes », « organisation », « personal ». */
+export type AccountOwner = Owner & { description: string }
+
+/** Un compte tel que les services le rendent : jamais de secret. */
+export type AccountSummary = { id: string; label: string; connector: string; mode: AccountMode; owner: AccountOwner }
+
+/** Un compte visible de la personne, avec son état et son niveau : ce que lisent les résolutions. */
+export type ConnectorAccount = AccountSummary & { status: string; level: AccessLevel }
+
+/** Un compte lu, et le nom de son équipe propriétaire (`team_name`, sous RLS : `null` quand elle ne se lit pas). */
+type AccountRow = {
+  id: string
+  label: string
+  connector: string
+  mode: string
+  status: string
+  owner_kind: string
+  owner_team_id: string | null
+  owner_user_id: string | null
+  team_name: string | null
+}
+
+/**
+ * Les comptes de l'organisation : ceux d'un connecteur, un seul par son identifiant, ou tous (un filtre
+ * absent, `null`, ne retient rien). Colonnes listées, jamais `secret_ciphertext`, que la base n'accorde
+ * pas à `authenticated`.
+ */
+function accountRows(sql: Tx, orgId: string, only: { connector?: string; id?: string } = {}) {
+  return sql<AccountRow[]>`
+    select a.id, a.label, a.connector, a.mode, a.status, a.owner_kind, a.owner_team_id, a.owner_user_id, t.name as team_name
+      from platform.accounts a left join platform.teams t on t.id = a.owner_team_id
+     where a.org_id = ${orgId}
+       and a.connector = coalesce(${only.connector ?? null}, a.connector)
+       and a.id = coalesce(${only.id ?? null}::uuid, a.id)`
+}
+
+/** Niveau d'un compte visible (1 au moins) : `read`, `write` ou `manage`, le nom de son rang (N34). */
+export function levelName(level: AccessLevel): LevelName {
+  const name = ACCESS_LEVEL_NAMES[level]
+  return name === "none" ? "read" : name
+}
+
+function accountOwner(row: AccountRow): AccountOwner {
+  if (row.owner_kind === "team") {
+    return { kind: "team", teamId: row.owner_team_id, userId: null, description: `team ${row.team_name ?? "?"}` }
+  }
+  if (row.owner_kind === "user") return { kind: "user", teamId: null, userId: row.owner_user_id, description: "personal" }
+  return { kind: "org", teamId: null, userId: null, description: "organisation" }
+}
+
+function summary(row: AccountRow): AccountSummary {
+  return { id: row.id, label: row.label, connector: row.connector, mode: accountMode(row.mode), owner: accountOwner(row) }
+}
+
+/**
+ * Les comptes du connecteur que la personne voit (niveau 1 au moins), tous états, avec son niveau
+ * sur chacun, triés par libellé. Les niveaux se lisent en un lot (`accountLevels`,
+ * database-patterns.md § N+1 Queries).
+ */
+export async function connectorAccounts(db: PlatformDb, identity: Identity, connector: string): Promise<ConnectorAccount[]> {
+  const rows = await inTransaction(db, "connectorAccounts: accounts", (sql) => accountRows(sql, identity.org.id, { connector }))
+  const levels = await accountLevels(db, identity, rows.map((row) => row.id))
+  return (
+    rows
+      .map((row) => ({ ...summary(row), status: row.status, level: levels.get(row.id) ?? ACCESS_LEVELS.none }))
+      // Niveau 0 : un compte que la personne ne voit pas n'est ni servi, ni retenu, ni nommé (H83).
+      .filter((account) => account.level >= ACCESS_LEVELS.read)
+      .sort((a, b) => a.label.localeCompare(b.label, "fr"))
+  )
+}
+
+/**
+ * Qui crée quoi (AC5, AC7), décidé avant l'insertion : un administrateur (`isOrgAdmin`), des comptes
+ * d'organisation et d'équipe ; chaque responsable (`leadsTeam`, E05-S13 : une équipe peut en avoir
+ * plusieurs), ceux de son équipe ; chacun, son propre compte personnel (N15).
+ */
+async function requireCreationRight(db: PlatformDb, identity: Identity, account: { owner_kind: string; team_id?: string }): Promise<void> {
+  if (account.owner_kind === "user") return
+  const isAdmin = isOrgAdmin(identity)
+  if (account.owner_kind === "org") {
+    if (isAdmin) return
+    const who = administrators(identity, await memberDirectory(db, identity.org.id))
+    throw new PlatformError("forbidden", `Creating an organisation account is reserved to ${who}.`)
+  }
+  // `createAccountSchema` exige `team_id` pour un compte d'équipe et le refuse avec son message ;
+  // TypeScript ne le sait pas, ce cas est une erreur de câblage.
+  if (!account.team_id) {
+    console.error("[platform] createAccount: team account without team_id after validation")
+    throw new PlatformError("internal", "Internal error.")
+  }
+  const teamId = account.team_id
+  const [team] = await inTransaction(db, "createAccount: teams", (sql) => teamsWithLeads(sql, identity.org.id, teamId))
+  if (!team) throw new PlatformError("invalid_arguments", `Unknown team ${account.team_id} in ${identity.org.name}.`)
+  if (isAdmin || leadsTeam(identity, account.team_id)) return
+  const directory = await memberDirectory(db, identity.org.id)
+  const names = leadNames(team.leads, (userId) => directory.find((person) => person.userId === userId)?.name)
+  const leads = names.length > 0 ? `its ${leadWord(names.length)} (${names.join(", ")}) and ` : ""
+  throw new PlatformError("forbidden", `Creating an account for team ${team.name} is reserved to ${leads}${administrators(identity, directory)}.`)
+}
+
+/**
+ * Crée un compte simulé (H85) pour un connecteur activable, actif ou non (N12). Le mode est posé
+ * explicitement : le défaut de la colonne est `reel`. Un libellé déjà pris dans l'organisation,
+ * sans casse, tous connecteurs et comptes invisibles compris, est refusé par l'index unique
+ * d'E01-S06 (`23505` → `conflict`).
+ */
+export async function createAccount(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountSummary> {
+  const parsed = createAccountSchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const account = parsed.data
+  requireActivable(account.connector, catalogFunctions())
+  if (account.mode !== "simule") {
+    throw new PlatformError(
+      "unavailable_in_v1",
+      "Live and sandbox accounts arrive with the connector service in V2. In this version, accounts are simulated: create it with mode simule.",
+    )
+  }
+  await requireCreationRight(db, identity, account)
+  const teamId = account.owner_kind === "team" ? (account.team_id ?? null) : null
+  const userId = account.owner_kind === "user" ? identity.user.id : null
+  // Une moitié de paire de substitution ne s'écrit jamais telle quelle : U+FFFD.
+  const label = account.label.toWellFormed()
+  const orgId = identity.org.id
+  const row = await db
+    .tx(async (sql) => {
+      const [created] = await sql<{ id: string }[]>`
+        insert into platform.accounts (org_id, connector, owner_kind, owner_team_id, owner_user_id, label, mode, status)
+        values (${orgId}, ${account.connector}, ${account.owner_kind}, ${teamId}, ${userId}, ${label}, 'simule', 'active')
+        returning id`
+      const [written] = await accountRows(sql, orgId, { id: created.id })
+      // Relue dans la transaction qui l'écrit, la ligne ne manque que si sa lecture la refuse : une panne,
+      // annulée avec l'insertion, jamais un succès sans compte (M32, revue de d1).
+      if (!written) {
+        console.error(`[platform] createAccount: account ${created.id} written but not read back`)
+        throw new PlatformError("internal", "Internal error.")
+      }
+      return written
+    })
+    .catch((error) => {
+      if (isUniqueViolation(error)) {
+        throw new PlatformError("conflict", `An account labelled ${account.label} already exists in ${identity.org.name}.`)
+      }
+      throw fromDatabaseError(error, "createAccount: accounts")
+    })
+  return summary(row)
+}
+
+/** État lu en base (colonne texte sous contrainte `check`) ; une valeur inconnue compte comme en erreur. */
+function accountStatus(value: string): AccountView["status"] {
+  return value === "active" || value === "disabled" ? value : "error"
+}
+
+function accountView(row: AccountRow): AccountView {
+  const { kind } = accountOwner(row)
+  return {
+    id: row.id,
+    label: row.label,
+    connector: row.connector,
+    owner: kind === "team" && row.team_name !== null ? { kind, teamName: row.team_name } : { kind },
+    mode: accountMode(row.mode),
+    status: accountStatus(row.status),
+  }
+}
+
+/**
+ * Les comptes de l'organisation que l'appelant voit, désactivés compris, triés par libellé (E08-S03,
+ * AC6, AC11 ; `admin_connector` d'E08-S06) : tous lus, puis filtrés au niveau 1 au moins par
+ * `accountLevels`, en un lot, jamais par la RLS (H123) : un compte de niveau 0 n'est ni servi ni nommé.
+ */
+export async function listOrgAccounts(db: PlatformDb, identity: Identity): Promise<AccountView[]> {
+  const rows = await inTransaction(db, "listOrgAccounts: accounts", (sql) => accountRows(sql, identity.org.id))
+  const levels = await accountLevels(db, identity, rows.map((row) => row.id))
+  return rows
+    .filter((row) => (levels.get(row.id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read)
+    .map(accountView)
+    .sort((a, b) => a.label.localeCompare(b.label, "fr"))
+}
+
+/**
+ * Les comptes actifs du connecteur que la personne peut utiliser (AC8) : ceux qu'elle voit
+ * (`connectorAccounts`), avec son niveau (`read`, `write`, `manage`), le mode et le propriétaire décrit. Un
+ * connecteur inconnu ou natif est refusé comme à la création d'un compte (N35).
+ */
+export async function listUsableAccounts(
+  db: PlatformDb,
+  identity: Identity,
+  input: unknown,
+): Promise<(AccountSummary & { level: LevelName })[]> {
+  const parsed = connectorRefSchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  requireActivable(parsed.data.connector, catalogFunctions())
+  const accounts = await connectorAccounts(db, identity, parsed.data.connector)
+  return accounts
+    .filter((account) => account.status === "active")
+    .map(({ id, label, connector: name, mode, owner, level }) => ({ id, label, connector: name, mode, owner, level: levelName(level) }))
+}
+
+/**
+ * Désactive un compte (AC9) : réservé à qui le gère (niveau 3 : responsable d'un compte d'équipe,
+ * administrateur d'un compte d'organisation, propriétaire d'un compte personnel), décidé avant
+ * l'écriture. Inconnu ou invisible (niveau 0) : `not_found`. Déjà désactivé : rien n'est écrit. Une
+ * écriture qui ne rend aucune ligne après la décision est un conflit (HN-E01S07-6).
+ */
+export async function disableAccount(
+  db: PlatformDb,
+  identity: Identity,
+  input: unknown,
+): Promise<AccountSummary & { status: "disabled" }> {
+  const parsed = disableAccountSchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const id = parsed.data.account_id
+  const [row] = await inTransaction(db, "disableAccount: accounts", (sql) => accountRows(sql, identity.org.id, { id }))
+  const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
+  if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
+  if (level < ACCESS_LEVELS.manage) {
+    const who = await describeOwner(db, identity, accountOwner(row))
+    throw new PlatformError("forbidden", `Disabling « ${row.label} » is reserved to those who manage it: ${who}.`)
+  }
+  if (row.status !== "disabled") {
+    const updated = await inTransaction(
+      db,
+      "disableAccount: accounts update",
+      (sql) => sql`update platform.accounts set status = 'disabled' where id = ${id} returning id`,
+    )
+    // Aucune ligne après la décision : le compte a changé entre la lecture et l'écriture.
+    if (updated.length === 0) {
+      console.error(`[platform] disableAccount: no row written for account ${id}`)
+      throw new PlatformError("conflict", `Account « ${row.label} » changed meanwhile. Reload it and retry.`)
+    }
+  }
+  return { ...summary(row), status: "disabled" }
+}

@@ -1,0 +1,192 @@
+/* Porté d'oto-frontend (src/design-system/components/css/overlay.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Popover · DropdownMenu · Tooltip : tout ce qui flotte partage `.oto-pop` (8 px, `--island`, filet, `--sh-pop`) ; ils se distinguent par ce qu'ils font (le tooltip explique sans prendre le focus, le popover contient, le menu commande aux flèches) ; la position se calcule dans `useAnchor`, le CSS lit `data-side` pour orienter l'entrée. */
+
+.oto-pop {
+  position: fixed;
+  z-index: 60;
+  min-inline-size: 180px;
+  max-inline-size: min(360px, calc(100vw - var(--space-4)));
+  background: var(--island);
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-menu);
+  box-shadow: var(--sh-pop);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+}
+
+/* ── la seconde largeur : un panneau (avatar, nom, rôle sur trois colonnes) ne tient pas dans la colonne d'un menu ; un seul pas, 404 px, jamais plus large que la fenêtre. */
+.oto-pop[data-size="lg"] { max-inline-size: min(404px, calc(100vw - var(--space-4))); }
+
+/* l'entrée vient du côté opposé à l'ancre : un menu ancré en bas monte, un menu ancré en haut descend */
+/* `backwards` et non `both` : une animation de `transform` qui persiste fait du panneau le bloc conteneur de ses éléments fixes, et la liste d'un `Select` monté dedans (« Partager ») s'y posait décalée puis découpée ; l'état final est celui du repos (E05-S11, lot f). */
+.oto-pop[data-side="bottom"] { animation: oto-drop var(--dur-fast) var(--ease-out) backwards; }
+.oto-pop[data-side="top"]    { animation: oto-rise-sm var(--dur-fast) var(--ease-out) backwards; }
+.oto-pop[data-side="left"],
+.oto-pop[data-side="right"]  { animation: oto-fade var(--dur-fast) var(--ease-out) both; }
+
+.oto-pop[data-closing] { animation: oto-fade-out var(--dur-fast) var(--ease-in) both; }
+
+/* un popover qui contient du contenu long découpe et fait défiler */
+.oto-pop-body { max-block-size: min(420px, 60vh); overflow: auto; padding: var(--space-3); }
+.oto-pop-head {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  border-block-end: 1px solid var(--hair);
+  font-weight: var(--fw-semibold);
+}
+.oto-pop-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  border-block-start: 1px solid var(--hair);
+}
+
+/* ── la ligne d'un panneau (avatar, nom, méta) : pas un `.oto-menu-item`, elle ne s'active pas, et un survol promettrait un clic qui n'arrive jamais ; le corps vient de `.oto-pop`. */
+.oto-pop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  padding: var(--space-2) 0;
+}
+
+/* ── l'intertitre d'un panneau (« Peuvent la modifier ») : pas `.oto-menu-group-label`, qui coiffe un groupe d'actions ; le blanc au-dessus sépare, sans filet ni graisse : un intertitre nomme une liste, il ne la concurrence pas. */
+.oto-pop-label {
+  margin: var(--space-6) 0 var(--space-2);
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.oto-pop-label:first-child { margin-block-start: 0; }
+
+/* La méta de fin de ligne (« 12 personnes », « propriétaire ») : poussée par `margin-inline-start: auto`, elle tient dans un `.oto-pop-row` comme dans un `.oto-menu-item` ; `--mute` et non `--faint`, c'est du texte à lire, que `--faint` à `--fs-xs` ferait passer sous le contraste. */
+.oto-pop-meta {
+  margin-inline-start: auto;
+  text-align: end;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+}
+
+/* DropdownMenu */
+
+.oto-menu {
+  padding: var(--space-1);
+  max-block-size: min(420px, 60vh);
+  overflow: auto;
+}
+
+.oto-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  min-block-size: var(--ctrl-h-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--r-ctrl);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: start;
+  white-space: nowrap;
+  transition: background-color var(--dur-instant) var(--ease-standard);
+}
+
+/* Le survol et la ligne surlignée au clavier sont le même état visuel (`data-highlighted`, posé par l'enveloppe), sinon le clavier ne sait plus où il est quand la souris a bougé. */
+.oto-menu-item:hover:not([aria-disabled="true"]),
+.oto-menu-item[data-highlighted] { background: var(--hair); }
+
+.oto-menu-item[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+.oto-menu-item > .oto-menu-label { flex: 1; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.oto-menu-item > .oto-icon:first-child { color: var(--faint); }
+.oto-menu-item:hover > .oto-icon:first-child,
+.oto-menu-item[data-highlighted] > .oto-icon:first-child { color: var(--ink); }
+
+/* le raccourci en mono, aligné à droite — c'est un repère, donc du mono */
+.oto-menu-shortcut {
+  margin-inline-start: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  letter-spacing: var(--tr-mono);
+  color: var(--faint);
+}
+
+/* ── élément destructeur : rouge au survol seulement ; rouge en permanence, il attirerait l'œil sur ce qu'on ne veut pas cliquer. */
+.oto-menu-item[data-destructive] { color: var(--st-fail-text); }
+.oto-menu-item[data-destructive]:hover,
+.oto-menu-item[data-destructive][data-highlighted] {
+  background: color-mix(in srgb, var(--st-fail) 12%, var(--island));
+  color: var(--st-fail-text);
+}
+.oto-menu-item[data-destructive] > .oto-icon:first-child { color: inherit; }
+
+/* état sélectionné d'un menu de choix : une coche, pas un fond, déjà pris par la ligne surlignée */
+.oto-menu-item[aria-checked="true"] > .oto-menu-check { color: var(--primary-text); }
+.oto-menu-item > .oto-menu-check { inline-size: 16px; flex: none; }
+
+/* ── variante radio, un choix parmi n : la coche en fin de ligne (un radio se lit « quoi, puis lequel »), dernière dans le DOM, poussée par `margin-inline-start: auto`. */
+.oto-menu-item[role="menuitemradio"] > .oto-menu-check { margin-inline-start: auto; }
+
+/* Le libellé du choix courant s'épaissit : la coche, à l'autre bout de la ligne, ne suffit pas, et ne parle qu'à qui distingue `--primary-text`. */
+.oto-menu-item[role="menuitemradio"][aria-checked="true"] { font-weight: var(--fw-semibold); }
+
+/* ── le maillon courant d'un popover de navigation : `aria-current` marque le lien comme `aria-checked` le radio, même graisse ; la teinte de l'icône vient après le survol, « où je suis » l'emporte sur « ce que je survole ». */
+.oto-menu-item[aria-current] { font-weight: var(--fw-semibold); }
+.oto-menu-item[aria-current] > .oto-icon:first-child { color: var(--primary); }
+
+/* La pastille de couleur : le DS pose la forme, la teinte arrive dans `--dot` ; le filet est le seul contour d'un aplat, sans lui la pastille se noie sur un îlot de sa couleur. */
+.oto-menu-dot {
+  flex: 0 0 auto;
+  inline-size: 16px;
+  block-size: 16px;
+  border-radius: var(--r-dot);
+  background: var(--dot);
+  border: 1px solid color-mix(in oklab, var(--ink) 22%, transparent);
+}
+
+/* ── la pastille qui nomme un thème porte sa propre portée (`.oto` et `data-oto-theme`) et y lit `--primary` : elle suit le jour et la nuit sans un hex figé ni une ligne de JS. */
+.oto-menu-dot[data-oto-theme] { background: var(--primary); }
+
+.oto-menu-sep { block-size: 1px; background: var(--hair); margin: var(--space-1) 0; }
+
+.oto-menu-group-label {
+  font-family: var(--mono);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  /* Ce libellé peut porter une donnée (« Dans <espace> », un nom choisi par le client) : coupé d'une ellipse, sinon un nom long passe à la ligne dans une surface qui découpe. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* sous-menu : le chevron dit qu'il y en a un, l'enveloppe gère → et ← */
+.oto-menu-item[aria-haspopup] > .oto-menu-chevron { margin-inline-start: auto; color: var(--faint); }
+
+/* Tooltip : fond encre, la seule surface flottante inversée, pour se lire au-dessus de tout ; jamais le seul porteur d'une information. */
+
+.oto-tooltip {
+  position: fixed;
+  z-index: 70;
+  max-inline-size: 260px;
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--r-ctrl);
+  background: var(--ink);
+  color: var(--island);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-snug);
+  pointer-events: none;
+  animation: oto-fade var(--dur-fast) var(--ease-out) both;
+}
+.oto-tooltip[data-side="top"]    { animation-name: oto-rise-sm; }
+.oto-tooltip[data-side="bottom"] { animation-name: oto-drop; }
+
+/* le raccourci clavier dans une infobulle : mono, un ton en dessous */
+.oto-tooltip .oto-kbd {
+  background: color-mix(in srgb, var(--island) 18%, transparent);
+  border-color: transparent;
+  color: inherit;
+}

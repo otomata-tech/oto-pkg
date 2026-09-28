@@ -1,0 +1,109 @@
+/* Porté d'oto-frontend (src/design-system/components/css/button.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* Button · IconButton : rond (999 px), un bouton AGIT ; cinq variantes par rang (primary, une seule par écran ; secondary ; ghost pour le chrome et les listes ; danger, la seule couleur d'état admise dans une action ; link) ; trois tailles, 28, 34 et 40, prises aux constantes de gabarit. */
+
+.oto-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  block-size: var(--ctrl-h-md);
+  padding-inline: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--r-btn);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-base);
+  white-space: nowrap;
+  user-select: none;
+  transition: var(--tr-colors), var(--tr-press);
+}
+
+/* ── tailles ─────────────────────────────────────────────────────── */
+.oto-btn[data-size="sm"] { block-size: var(--ctrl-h-sm); padding-inline: var(--space-3);  font-size: var(--fs-xs); }
+.oto-btn[data-size="md"] { block-size: var(--ctrl-h-md); padding-inline: var(--space-4); }
+.oto-btn[data-size="lg"] { block-size: var(--ctrl-h-lg); padding-inline: var(--space-5);  font-size: var(--fs-base); }
+
+/* ── primary : le survol FONCE le remplissage vers l'encre au lieu de changer de teinte (le safran reste safran) ; un survol qui vire de teinte casse le thème. */
+.oto-btn[data-variant="primary"] {
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+}
+.oto-btn[data-variant="primary"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--btn-bg) 88%, var(--ink));
+}
+
+/* ── secondary : la bordure monte d'un cran (de `--island-bd` vers `--mute`) et le fond ne s'allume pas, sinon secondary et primary se confondraient au survol. */
+.oto-btn[data-variant="secondary"] {
+  background: var(--island);
+  border-color: var(--island-bd);
+  color: var(--ink);
+}
+.oto-btn[data-variant="secondary"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ink) 32%, var(--island-bd));
+  background: var(--hair);
+}
+
+/* ── ghost ───────────────────────────────────────────────────────── */
+.oto-btn[data-variant="ghost"] {
+  background: transparent;
+  color: var(--ink);
+}
+.oto-btn[data-variant="ghost"]:hover:not(:disabled) { background: var(--hair); }
+
+/* ── danger ──────────────────────────────────────────────────────── */
+.oto-btn[data-variant="danger"] {
+  background: var(--st-fail);
+  color: #ffffff;
+}
+.oto-btn[data-variant="danger"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--st-fail) 86%, var(--ink));
+}
+
+/* ── link ────────────────────────────────────────────────────────── */
+.oto-btn[data-variant="link"] {
+  background: none;
+  color: var(--link);
+  padding-inline: 0;
+  block-size: auto;
+}
+.oto-btn[data-variant="link"]:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── pleine largeur ──────────────────────────────────────────────── */
+.oto-btn[data-block] { inline-size: 100%; }
+
+/* ── chargement : le spinner remplace le glyphe de gauche, jamais le libellé (la largeur ne bouge pas sous le curseur) ; le seul spinner admis, pour une action, jamais pour du contenu. */
+.oto-btn[data-loading] { cursor: progress; }
+.oto-btn[data-loading] > .oto-icon:first-child > svg { animation: oto-spin 900ms linear infinite; }
+
+/* IconButton : carré, rond, sans libellé visible ; `aria-label` obligatoire, sans lui l'objet n'existe pas pour un lecteur d'écran. */
+
+/* ── le glyphe au repos est à `--mute`, pas à `--faint`, qui tombait à 3,38:1 la nuit pour un bouton dont le glyphe est tout le contenu ; `--mute` passe 4,5:1 sur l'îlot, la carte et le bureau, jour et nuit (4,78:1 au pire, sur la carte), mesuré sur les huit thèmes dans oto-frontend ; le survol reste `--ink`. */
+.oto-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--ctrl-h-md);
+  block-size: var(--ctrl-h-md);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-btn);
+  color: var(--mute);
+  transition: var(--tr-colors), var(--tr-press);
+}
+/* le glyphe seul passe de `--mute` à `--ink`, c'est tout le survol */
+.oto-icon-btn:hover:not(:disabled) { color: var(--ink); background: var(--hair); }
+
+.oto-icon-btn[data-size="sm"] { inline-size: var(--ctrl-h-sm); block-size: var(--ctrl-h-sm); }
+.oto-icon-btn[data-size="lg"] { inline-size: var(--ctrl-h-lg); block-size: var(--ctrl-h-lg); }
+
+.oto-icon-btn[data-variant="secondary"] { border-color: var(--island-bd); background: var(--island); color: var(--ink); }
+.oto-icon-btn[data-variant="primary"]   { background: var(--btn-bg); color: var(--btn-fg); }
+.oto-icon-btn[data-variant="primary"]:hover:not(:disabled) { background: color-mix(in srgb, var(--btn-bg) 88%, var(--ink)); color: var(--btn-fg); }
+.oto-icon-btn[aria-pressed="true"]      { background: var(--oto-bg); color: var(--oto-ink); }
+
+/* ── groupe de boutons : deux boutons collés partageraient un bord, que la grammaire interdit ; un groupe est un simple alignement à `--space-1-5`. */
+.oto-btn-group { display: inline-flex; align-items: center; gap: var(--space-1-5); }
+.oto-btn-group[data-block] { display: flex; }
+.oto-btn-group[data-block] > .oto-btn { flex: 1; }

@@ -1,0 +1,272 @@
+/* Porté d'oto-frontend (src/design-system/components/css/home.css), tel quel ; chaque pourquoi en une ligne, l'historique retiré (portage-ecrans.md § 5). */
+
+/* L'écran d'accueil (HomeLayout, WaitList, PromptBar, FeedItem, PlugLine) : le CSS est la source de vérité, comme `lists.css` ; les motifs portés par deux écrans ou plus sont ici, et la mise en page de l'accueil aussi, qui n'a nulle part ailleurs où vivre. */
+
+/* HomeLayout : deux colonnes et deux piles, pas quatre cases ; les créneaux nommés empêchent l'ordre du JSX de décider où va quoi. Changé (E05-S12, AC-18) : 2fr / 1fr au lieu de 55/45, le fil d'activités à gauche tient sur une ligne par activité ; la recherche passe à droite. */
+
+.oto-home {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+
+/* ── deux piles indépendantes et non quatre cases d'une grille : dans une grille, un rang partagé prend la hauteur de sa plus haute pièce, et une voisine qui grandit étirait l'autre ; l'ordre du DOM devient colonne par colonne, celui de la lecture et de la tabulation. */
+.oto-home-col {
+  display: grid;
+  gap: var(--gap);
+  /* La pile ne remplit pas la hauteur de la grille : ses éléments se posent en haut et gardent leur hauteur. */
+  align-content: start;
+}
+
+/* Les créneaux ne portent plus de placement, leur colonne le porte ; ils gardent leur classe (l'écran et les tests les désignent par elle), et la mesure zéro évite d'élargir leur pile. */
+.oto-home-find,
+.oto-home-main,
+.oto-home-side { min-inline-size: 0; }
+
+/* La pile de droite garde l'écart du bureau entre ses îlots : deux îlots ne partagent jamais un bord. */
+.oto-home-cards {
+  display: grid;
+  gap: var(--gap);
+}
+
+/* Le repli se cale sur un palier déclaré (`--bp-lg`), comme `CounterStrip` ; les piles étant déjà des piles, la grille passe simplement à une colonne. */
+@media (max-width: 1023px) {
+  .oto-home { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── les en-têtes d'îlot de l'accueil, en capitales mono sur une bande chaude : la signature de cette page, portée par sa mise en page, pas par `.oto-island-head`, qui changerait les autres écrans. */
+.oto-home .oto-island-head {
+  background: color-mix(in oklab, var(--primary) 5%, var(--island));
+  align-items: baseline;
+}
+
+.oto-home .oto-island-head > h2 {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--title);
+}
+
+/* La caption et le « tout voir » d'un en-tête se posent au bout. */
+.oto-home .oto-island-head > .oto-caption { margin-inline-start: auto; text-align: end; }
+
+/* La barre d'onglets en en-tête d'îlot vit dans `navigation.css` (`.oto-tabs[data-island-head]`), l'accueil pose l'attribut ; ne pas en remettre une copie ici : deux jeux de règles, c'est la cascade qui tranche. */
+
+/* WaitList, l'îlot qui appelle une décision : un filet safran au-dessus et une bande d'en-tête plus franche, deux gestes seulement ; des lignes, pas des cartes (la conséquence en gras, la provenance dessous, les actions au bout). */
+
+.oto-wait { border-block-start: 2px solid var(--primary); }
+
+.oto-wait > .oto-island-head { background: color-mix(in oklab, var(--primary) 13%, var(--island)); }
+
+/* Le titre reprend l'encre de tous les en-têtes d'îlot (`--title`) : deux en-têtes voisins en deux encres se liraient comme deux niveaux de titre. */
+
+.oto-wait-body { padding: var(--space-1) var(--space-2) var(--space-2); }
+
+/* ── la demande : une grille et non une rangée ; en colonne étroite, texte et boutons sur une ligne se marchaient dessus ; le glyphe tient sa colonne, les actions passent dessous. */
+.oto-wait-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2-5);
+  align-items: start;
+  padding: var(--space-2-5) var(--space-2);
+  border-radius: var(--r-ctrl);
+}
+
+.oto-wait-item + .oto-wait-item { border-block-start: 1px solid var(--hair); }
+
+.oto-wait-item-lead {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  color: var(--primary);
+}
+
+.oto-wait-item-main {
+  grid-column: 2;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-px);
+}
+
+/* La conséquence, énoncée d'abord et en gras : un bouton au-dessus de ce qu'il déclenche, c'est un clic pris sans savoir. */
+.oto-wait-item-demand { font-weight: var(--fw-semibold); }
+
+.oto-wait-item-source {
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  line-height: var(--lh-normal);
+}
+
+/* Les actions se rangent à droite et gardent leur largeur : un « GO » étiré sur 200 px n'est pas plus cliquable. */
+.oto-wait-item-actions {
+  grid-column: 2;
+  inline-size: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-block-start: var(--space-1-5);
+}
+
+.oto-wait-item-actions > .oto-btn { flex: none; }
+
+/* La zone de réponse en ligne — la variante que le run porte aussi. Changé : au moins 12rem, dans la colonne ; plus étroite, elle rognait son invite (« Pourquoi ? (facultatif) », 375 px) : les boutons passent dessous (M49). */
+.oto-wait-item-actions > .oto-input-wrap { flex: 1 1 130px; min-inline-size: min(100%, 12rem); }
+
+/* PromptBar, « dis ce que tu veux » : elle ne soumet rien, elle donne la phrase à dire, et le bouton la copie. */
+
+.oto-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--r-ctrl);
+  background: color-mix(in oklab, var(--primary) 9%, transparent);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-relaxed);
+  color: var(--ink);
+}
+
+.oto-prompt-text { flex: 1; min-inline-size: 0; margin: 0; }
+
+/* Le verbe de la phrase, celui qu'on garde : `em` sans italique, une emphase de sens, pas de mise en forme. */
+.oto-prompt-text em { font-style: normal; font-weight: var(--fw-semibold); }
+
+/* Le trou à remplir est un emplacement, pas du texte : le pointillé le dit, sinon la phrase se lit comme une consigne déjà écrite. */
+.oto-prompt-hole {
+  color: var(--mute);
+  border-block-end: 1px dashed var(--mute);
+  padding-block-end: var(--space-px);
+}
+
+.oto-prompt > .oto-btn { flex: none; }
+
+/* FeedItem, une ligne de fil (ce qui a bougé, sur quoi, quand) : une grille, sinon en colonne étroite le fait se faisait tronquer, et c'est lui qu'on venait lire ; le glyphe et l'heure gardent leur colonne, le fait passe sous le nom. */
+
+.oto-feed-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--space-2-5);
+  row-gap: var(--space-px);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--r-ctrl);
+  color: inherit;
+  text-decoration: none;
+}
+
+.oto-feed-item:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+
+.oto-feed-lead {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+}
+
+.oto-feed-name {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+
+.oto-feed-what {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-normal);
+  color: var(--mute);
+}
+
+/* L'heure ne se coupe jamais en deux : elle tient sa colonne. */
+.oto-feed-when {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: var(--fs-xs);
+  color: var(--mute);
+  white-space: nowrap;
+}
+
+/* Dans l'îlot principal de l'accueil, une activité tient sur une ligne (E05-S12, AC-13, HN-E05S12-21) : qui, puis ce qui est arrivé, lu comme une phrase et coupé par des points de suspension, puis l'heure, qui ne se coupe jamais ; le texte entier reste dans le lien. */
+.oto-home-main .oto-feed-item {
+  display: flex;
+  align-items: baseline;
+  column-gap: var(--space-1);
+}
+
+.oto-home-main .oto-feed-lead {
+  flex: none;
+  align-self: center;
+  margin-inline-end: var(--space-1-5);
+}
+
+.oto-home-main .oto-feed-name {
+  flex: none;
+  white-space: nowrap;
+}
+
+.oto-home-main .oto-feed-what {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.oto-home-main .oto-feed-when {
+  flex: none;
+  margin-inline-start: auto;
+  padding-inline-start: var(--space-2);
+}
+
+/* Une activité qui n'ouvre rien (contenu que la personne ne lit pas) ne s'éclaire pas au survol : seule une ligne qui est un lien le fait. */
+.oto-home-main .oto-feed-item:not([href]):hover { background: none; }
+
+/* PlugLine : l'état d'un branchement et l'action qui va avec, sur une ligne. */
+
+.oto-plug-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--island-pad);
+}
+
+.oto-plug-line > h2 {
+  flex: none;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tr-mono);
+  text-transform: uppercase;
+  color: var(--mute);
+}
+
+/* L'état pousse les actions sur la marge de droite. */
+.oto-plug-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.oto-plug-line > .oto-btn { flex: none; }
+
+/* Le déplié : ce qui n'est PAS branché, rangé sous la ligne. */
+.oto-plug-more {
+  padding: 0 var(--island-pad) var(--space-3);
+  border-block-start: 1px solid var(--hair);
+}

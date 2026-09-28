@@ -1,0 +1,11 @@
+# Fichiers lancés par un shebang : en CRLF, la première ligne devient `#!/usr/bin/env node\r` et
+# le script ne se charge plus (test de db-types en échec sur un checkout Windows, E05-S01).
+*.mjs text eol=lf
+*.sh text eol=lf
+.githooks/* text eol=lf
+# Copie octet pour octet de la LICENSE de la racine dans le paquet (E01-S03, test AC2) : les deux
+# copies restent en LF sur tout checkout, sinon Windows (autocrlf) les fait diverger.
+LICENSE text eol=lf
+# Instantanés de Vitest : il les réécrit en LF, et un checkout CRLF (autocrlf) les montrait
+# modifiés dans chaque worktree après un `pnpm test` (M09).
+*.snap text eol=lf

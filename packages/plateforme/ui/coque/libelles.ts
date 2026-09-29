@@ -24,10 +24,12 @@ export const ENTREPRISE = {
   equipes: "Équipes & accès",
 } as const
 
-/** Le menu du compte, ouvert par l'engrenage du pied : Profil, « Brancher un assistant », Corbeille, puis Déconnexion (E05-S11, AC-6, AC-e22). */
+/** Le menu du compte, ouvert par l'engrenage du pied : Contexte, Profil, « Brancher mon Claude, ChatGPT ou Mistral », Corbeille, puis Déconnexion (E05-S11, AC-6, AC-e22 ; E11-S09, AC-14). */
 export const COMPTE = {
+  /** La vue « Contexte », en tête du menu du compte (E11-S10, AC-e1). */
+  contexte: "Contexte",
   profil: "Profil",
-  brancher: "Brancher un assistant",
+  brancher: "Brancher mon Claude, ChatGPT ou Mistral",
   deconnexion: "Déconnexion",
   anonyme: "Mon compte",
 } as const

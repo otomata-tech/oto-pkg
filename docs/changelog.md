@@ -10,6 +10,16 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-29] — E11-S10 : espace Privé dès la première connexion, rail d'un admin, créateur d'une équipe, vue « Contexte » à `/context`
+
+**Quoi :** E11-S10 : l'espace « Privé » de chaque membre dès sa première connexion : handle posé par la base à l'insertion et réparation des espaces manquants (`ensure_private_space`, migration `20260929160000_private_spaces.sql`) ; le rail d'un administrateur ne montre que ses équipes (arbre de membre) ; le créateur d'une équipe en est le responsable (`createTeam`, texte d'`admin_team create`) ; vue « Contexte » à `/context`, ouverte par le menu du compte, l'accueil sans onglets ; vue et encart sans tête servie, sans « Règles Oto » ni lien vers Profil, « Nouveautés » toujours présente, l'ancre suivie ; publication d'un Contexte sans phrase de recharge.
+
+**Pourquoi :** retours d'écran du responsable d'Oto sur l'hôte de démo, du 2026-09-29 (invitée sans section « Privé », admin qui voit toutes les équipes, onglet « Contexte » de l'accueil à déplacer et à alléger).
+
+**Problèmes :** AC-a0 (relevé de diagnostic sur l'organisation Démo) en attente, par le responsable d'Oto.
+
+**Fichiers :** `packages/plateforme/migrations/20260929160000_private_spaces.sql` (et sa copie `supabase/migrations/`), `packages/plateforme/server/{nodes/tree.ts,teams.ts}`, `packages/plateforme/mcp/admin/tools/team.ts`, `packages/plateforme/ui/contexte/{ecran-du-contexte.tsx,contexte-servi.tsx,vers-la-partie.tsx,apercu-du-contexte.tsx,annexes-du-contexte.tsx,listes-servies.tsx,parties-du-contexte.ts,libelles.ts}`, `packages/plateforme/ui/{accueil/*,coque/{ecrans,types,libelles}.ts,noeud/publication.tsx,index.ts}`, `src/app/(dashboard)/{context/page.tsx,page.tsx,layout.tsx,n/[...chemin]/page.tsx}` ; tests : `tests/integration/pages/contexte-page.test.tsx` (nouveau), les suites de l'accueil, du rail, de la vue et de la page d'un Contexte, `espace-prive`, `invitations`, `equipes-services`, `nodes-personal-tree`, `mcp-admin-ops`, `e05s13-lignes-servies`, e2e de l'accueil et du Contexte ; `packages/plateforme/{CHANGELOG.md,migrations/README.md}`, registre, `portage-ecrans.md § 0`, `database-patterns.md § Règles SECURITY DEFINER`, `hypotheses.md`, `status.md`.
+
 ## [2026-09-29] — E11 : cadrage des retours de la démo (dix stories, D131 à D136)
 
 **Quoi :** Nouvelle epic E11 « Retours de la démo » : dix stories longues (S01 tableaux, S02 publication directe et brouillons, S03 contexte et ctx, S04 routage, S05 écrans d'un contenu, S06 éditeur, S07 adresses en anglais, S09 branchement, S10 rail et espaces, S14 harnais de test sans Supabase), ordre en vagues selon les fichiers communs. E10 et E11 sortent ensemble en 1.0.1 (D131, remplace D123) ; arbitrages des retours (D132), preuve par tableau (D133), plafond unique de `context` (D134), publication directe (D135), écrans (D136).

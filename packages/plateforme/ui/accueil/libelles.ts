@@ -7,18 +7,11 @@ export const ACCUEIL = {
   bonjour: (nom: string | null) => (nom ? `Bonjour ${nom}` : "Bonjour"),
   chercher: "Chercher",
   chargement: "Chargement de l'accueil…",
-  /** L'îlot principal et sa barre d'onglets (E05-S11, AC-12), nommés par leurs deux onglets. */
-  ilot: "Activités et contexte",
-  onglets: "Onglets de l'accueil",
+  /** L'îlot principal, sans onglets (E11-S10, AC-e3). */
+  ilot: "Activités",
 } as const
 
-/** Les onglets de l'îlot principal (E05-S11, AC-12), par leur clé dans l'adresse (`?onglet=`). */
-export const ONGLETS = {
-  activites: "Activités",
-  contexte: "Contexte",
-} as const
-
-/** L'onglet « Activités » : ce qui est arrivé aux contenus, lu au journal (E05-S12, AC-13). */
+/** L'îlot « Activités » : ce qui est arrivé aux contenus, lu au journal (E05-S12, AC-13). */
 export const ACTIVITES = {
   toutLeJournal: "Tout le journal",
   vous: "Vous",
@@ -59,19 +52,16 @@ export const PROCEDURES_UTILES = {
   rien: "Aucune procédure publiée",
 } as const
 
-/** L'aparté « Brancher un assistant » (E02-S04) : l'adresse, l'état et le dialogue. */
+/** L'aparté « Brancher mon Claude, ChatGPT ou Mistral » (E02-S04, E11-S09) : l'état et la fenêtre du guide. */
 export const BRANCHEMENT = {
   brancher: "Brancher",
   fermer: "Fermer",
-  adresse: "l'adresse du serveur",
   aucun: "Aucun assistant branché",
   derniere: (famille: string, date: string) => `${famille} · dernière connexion le ${date}`,
-  guides: "Guides d'installation",
-  assistants: "claude.ai · Claude Desktop · ChatGPT · Claude Code",
 } as const
 
 export const PREMIER_JOUR = {
   rien: "Rien n'a encore tourné",
   texte:
-    "Votre assistant lit vos pages, suit vos procédures et appelle vos outils, dans la limite de vos droits. Branchez-le d'abord : « Brancher un assistant » vous donne l'adresse à coller.",
+    "Votre assistant lit vos pages, suit vos procédures et appelle vos outils, dans la limite de vos droits. Branchez-le d'abord : « Brancher mon Claude, ChatGPT ou Mistral » vous guide pas à pas.",
 } as const

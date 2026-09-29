@@ -85,10 +85,16 @@ export const APERCU_DU_CONTEXTE = {
   echec: "L'aperçu n'a pas pu être calculé.",
 } as const
 
-/** La vue « Contexte » de l'accueil (E05-S11, AC-13 à AC-15) : les parties du texte servi, empilées, sans chiffres (E05-S13). */
+/**
+ * La vue « Contexte » (E05-S11, AC-13 à AC-15) : les parties du texte servi, empilées, sans chiffres (E05-S13) ; son écran
+ * (E11-S10, AC-e2), la partie sans corps (AC-f2) et « Nouveautés » sans nouveauté servie (AC-f5).
+ */
 export const CONTEXTE_SERVI = {
+  titre: "Contexte",
+  chargement: "Chargement du contexte…",
   omise: "Cette partie ne tient pas dans le budget : l'assistant ne la lit pas.",
-  profil: "Modifier dans Profil",
+  vide: "L'assistant ne reçoit rien de ce contexte pour l'instant.",
+  aucuneNouveaute: "Aucune nouveauté n'est servie à l'assistant en ce moment.",
   fin: "Fin du texte",
 } as const
 
@@ -122,28 +128,8 @@ export const LIGNES_SERVIES = {
   budget: (noms: string) => `Budget atteint : l'assistant ne lit pas ${noms}.`,
 } as const
 
-/**
- * « Règles Oto » en français (HN-E05S13-14) : une phrase par règle de `WORKSPACE_RULES` (`server/context/blocks/code.ts`),
- * dans le même ordre, sans les noms d'outils ; servies en anglais, inchangées. Un test compte les deux listes.
- */
-export const REGLES_OTO: readonly string[] = [
-  "Six outils : le contexte (d'abord, une fois par conversation), la recherche, la lecture, l'appel, l'écriture et le retour. Tous, sauf le contexte, demandent le code de la conversation.",
-  "L'ordre habituel : le contexte, puis la recherche pour trouver, la lecture pour apprendre (un contenu, ou le contrat d'une fonction), l'appel ou l'écriture pour agir, et un retour quand un outil, une procédure ou une consigne était flou, manquant ou faux.",
-  "Chaque contenu a un chemin (par exemple <équipe>/<page>) et une nature : page (du texte en blocs), tableau (des lignes, lues, agrégées et écrites par des fonctions), procédure (des étapes à suivre, chaque appel dans un bloc d'appel) ou contexte (les parties de ce texte : déjà servies, relues seulement quand elles disent avoir été coupées).",
-  "Les espaces : les contenus de l'organisation sont à la racine, ceux d'une équipe sous son dossier (<équipe>/…), les vôtres sous private/<identifiant>/, servis à vous seul.",
-  "Les droits se règlent contenu par contenu, pour l'organisation, une équipe ou une personne : lire, écrire ou gérer. Un refus dit à qui demander : ne jamais le contourner.",
-  "L'écriture enregistre un brouillon ; la publication le met en ligne. Pour modifier, l'assistant repart de la version qu'il a lue.",
-  "Un contenu renommé ou déplacé garde son ancien chemin : il y mène toujours.",
-  "Dans un texte, [[chemin]] ou [[chemin|titre]] renvoie à un autre contenu.",
-  "Une fonction qui envoie, supprime ou paie rend d'abord un récapitulatif sans rien faire : l'assistant le montre, obtient votre accord explicite, puis relance l'appel en le confirmant.",
-  "Quand une demande correspond à une procédure, ses étapes suivent cette partie : l'assistant les suit dans l'ordre. Sinon il cherche, et vous demande plutôt que de deviner.",
-  "Le journal montre ce qui a été fait, appel par appel : il fait foi, plus que la mémoire.",
-  "Ne jamais inventer un chemin, un chiffre ni un résultat : le lire, ou dire qu'on n'a pas pu.",
-]
-
-/** La publication d'un Contexte (AC11, HN-E05S04-10). */
+/** La publication d'un Contexte (AC11, HN-E05S04-10) ; sans phrase de recharge (E11-S10, AC-g3). */
 export const PUBLICATION_DU_CONTEXTE = {
-  recharge: "Les conversations en cours rechargeront le contexte.",
   question: "Publier un contexte vide ? Le modèle ne recevra plus rien de ce contexte.",
   confirmer: "Publier quand même",
 } as const

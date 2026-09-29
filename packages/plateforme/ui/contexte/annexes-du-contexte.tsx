@@ -35,7 +35,7 @@ type AnnexesDuContexteProps = {
   apercu: Resultat<DonneesDeLApercu>
   /** Les équipes de l'organisation (`listTeams`) : le nom d'un Contexte d'équipe. */
   equipes: EquipesNommees
-  /** L'adresse de la vue « Contexte » de l'accueil (`/?onglet=contexte`), où mène chaque ligne de l'encart (AC-11). */
+  /** L'adresse de la vue « Contexte » (`/context`, E11-S10), où mène chaque ligne de l'encart (AC-11). */
   hrefDuContexteServi: string
   /** L'adresse de la page, pour « Réessayer ». */
   ici: string

@@ -11,7 +11,8 @@ import { bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 // de nœud d'E05-S02 en deux colonnes et ses annexes (la note de ce qu'il est et de qui le reçoit, l'encart
 // de ce que l'agent va lire), la publication d'un Contexte. E05-S11 (AC-8 à AC-11) : « Ma fiche » quitte la
 // colonne ; l'encart se titre « Voici ce que votre agent va lire », sans texte servi replié, le total en
-// dernière ligne, chaque ligne un lien vers la vue « Contexte » de l'accueil. `fetch` simulé pour
+// dernière ligne, chaque ligne un lien vers la vue « Contexte » de l'accueil. E11-S10 (lot g) : l'encart sans titre
+// visible ni « Règles Oto », ses lignes vers `/context` ; la publication sans phrase de recharge. `fetch` simulé pour
 // `POST /api/plateforme/nodes`, relecture espionnée.
 
 const rafraichir = vi.fn()
@@ -48,7 +49,7 @@ function annexes(props: Partial<AnnexesProps> = {}) {
       handle="lea"
       apercu={APERCU}
       equipes={EQUIPES}
-      hrefDuContexteServi="/?onglet=contexte"
+      hrefDuContexteServi="/context"
       ici="/n/ventes/contexte"
       Lien={LienDeTest}
       {...props}
@@ -106,7 +107,9 @@ describe("écran d'un Contexte (AC10)", () => {
       ["P", "", "Vous l'écrivez comme n'importe quelle page."],
     ])
     expect(note().queryByText("Reçu par")).toBeNull()
-    expect(apercu().getByText("Voici ce que votre agent va lire")).toHaveClass("oto-note-head")
+    // E11-S10 (AC-g1) : l'encart n'a plus de titre visible ; son nom accessible reste.
+    expect(screen.getByRole("note", { name: "Voici ce que votre agent va lire" }).querySelector(".oto-note-head")).toBeNull()
+    expect(screen.queryByText("Voici ce que votre agent va lire")).toBeNull()
   })
 
   // E05-S13 (AC-17 ; D128) : la première phrase dit, par portée, qui le reçoit.
@@ -168,11 +171,13 @@ describe("publier un Contexte (AC11)", () => {
     act(() => window.dispatchEvent(new Event("pagehide")))
   }
 
-  it("should say the conversations will reload the context once a Contexte is published", async () => {
+  it("should publish a Contexte without saying the conversations will reload it (E11-S10, AC-g3)", async () => {
     editeur([TUTOIE])
     await ecrireEtQuitter("Tutoie les clients, toujours.")
-    expect(await screen.findByText("Les conversations en cours rechargeront le contexte.")).toHaveAttribute("role", "status")
+    await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[1]).toEqual({ path: "ventes/contexte", base_revision: 4, draft_stamp: "2026-09-24T10:00:01.000000+00:00", publish: true })
+    await waitFor(() => expect(rafraichir).toHaveBeenCalled())
+    expect(screen.queryByText("Les conversations en cours rechargeront le contexte.")).toBeNull()
   })
 
   it("should ask before publishing an empty Contexte, without taking the focus of the writer, nothing sent before « Publier quand même »", async () => {
@@ -187,7 +192,8 @@ describe("publier un Contexte (AC11)", () => {
     fireEvent.click(confirmer)
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[1]).toMatchObject({ publish: true })
-    expect(await screen.findByText("Les conversations en cours rechargeront le contexte.")).toBeInTheDocument()
+    await waitFor(() => expect(rafraichir).toHaveBeenCalled())
+    expect(screen.queryByText("Les conversations en cours rechargeront le contexte.")).toBeNull()
   })
 
   // La confirmation est propre à un Contexte (AC11) : une page vide se publie sans question.
@@ -209,8 +215,8 @@ describe("voici ce que votre agent va lire (AC12 ; E05-S11, AC-9 à AC-11)", () 
       .getAllByRole("listitem")
       .map((couche) => within(couche).getByRole("link"))
       .map((couche) => [couche.textContent, couche.getAttribute("aria-current")])
+    // Sans « Règles Oto » (E11-S10, AC-g2) : les autres lignes gardent l'ancre de leur rang d'origine.
     expect(couches).toEqual([
-      ["Règles Oto", null],
       ["Contexte : Tout le monde", null],
       ["Contexte : Privé", null],
       ["Contexte : équipe Ventes (ce contexte)", "page"],
@@ -220,7 +226,7 @@ describe("voici ce que votre agent va lire (AC12 ; E05-S11, AC-9 à AC-11)", () 
       ["calendar", null],
     ])
     expect(within(apercu().getByRole("list", { name: "Ordre de lecture" })).getAllByRole("link").map((lien) => lien.getAttribute("href"))).toEqual(
-      ["regles", "contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "nouveautes", "procedures", "contenus", "partie-8"].map((ancre) => `/?onglet=contexte#${ancre}`),
+      ["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "nouveautes", "procedures", "contenus", "partie-8"].map((ancre) => `/context#${ancre}`),
     )
     for (const lien of apercu().getAllByRole("link")) expect(lien).not.toHaveAttribute("tabindex", "-1")
     // AC-10 : le texte servi replié est parti (il se lit dans la vue « Contexte »).

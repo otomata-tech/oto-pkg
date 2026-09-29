@@ -81,10 +81,9 @@ export type { MenuItem } from "./ds/react/overlays"
 export { EcranDAccueil, EcranDAccueilChargement } from "./accueil/ecran-accueil"
 export type { EcranDAccueilProps } from "./accueil/ecran-accueil"
 export type { DonneesDeLAccueil } from "./accueil/types"
-// E05-S11 (lot c) : l'onglet « Contexte » de l'accueil, ce que lit l'assistant, lu par la page de l'hôte.
-export { ONGLETS_DE_L_ACCUEIL } from "./accueil/types"
-export type { OngletDeLAccueil } from "./accueil/types"
+// E11-S10 (lot e) : l'écran « Contexte », ce que lit l'assistant, lu par la page de l'hôte (`/context`).
 export type { DonneesDuContexteServi } from "./contexte/contexte-servi"
+export { EcranDuContexte, EcranDuContexteChargement } from "./contexte/ecran-du-contexte"
 // E05-S09 (partie d3) : les primitives du design system que composent les formulaires d'authentification
 // de l'hôte (connexion, mot de passe oublié, réinitialisation), rendus dans l'îlot du gabarit.
 export { Alert, Button } from "./ds/react/primitives"

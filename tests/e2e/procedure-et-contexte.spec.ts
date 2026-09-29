@@ -14,7 +14,7 @@ import { attendreLEnregistrement, lireLeHtml, seConnecterSurLEspace } from "./fi
 // `handle` lu par « Profil » du menu du compte), une étape écrite en texte est ajoutée, publiée seule, puis
 // retirée (la procédure revient à son état de départ) ; le Contexte de l'équipe et le Contexte Perso disent en une phrase qui
 // les lit (E05-S13, AC-17), sans « Ma fiche » (E05-S11, AC-8), et la ligne « Contexte : Privé » de l'encart ouvre la vue
-// « Contexte » de l'accueil sur sa partie (AC-11, AC-12) ; aucune erreur d'hydratation. Une capture par écran et
+// « Contexte » (`/context`) sur sa partie (AC-11) ; aucune erreur d'hydratation. Une capture par écran et
 // par thème dans `test-results/`.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
@@ -183,17 +183,17 @@ test.describe("procédure et contexte", () => {
       await capturer(page, testInfo, `contexte-equipe-${theme}`)
 
       // Le Contexte Perso : ses annexes, sans « Ma fiche » (E05-S11, AC-8) ; une ligne de l'encart, « Contexte :
-      // Privé », toujours servie (E05-S12, AC-3), ouvre la vue « Contexte » de l'accueil sur sa partie (AC-11, AC-12).
+      // Privé », toujours servie (E05-S12, AC-3), ouvre la vue « Contexte » (`/context`, E11-S10) sur sa partie (AC-11).
       await page.goto(`${ADRESSE}/n/private/${handle}/contexte`)
       await attendre(page.getByRole("note", { name: "À quoi sert cette page" }).getByText(/vous seul le recevez\.$/)).toBeVisible()
       await expect(page.getByRole("region", { name: "Ma fiche" })).toHaveCount(0)
       await page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("link", { name: /^Contexte : Privé/ }).click()
-      await attendre(page).toHaveURL(`${ADRESSE}/?onglet=contexte#contexte-prive`)
-      // L'adresse change aussitôt, l'accueil paraît quand ses lectures finissent (aperçu du Contexte compris,
+      await attendre(page).toHaveURL(`${ADRESSE}/context#contexte-prive`)
+      // L'adresse change aussitôt, la vue paraît quand ses lectures finissent (aperçu du Contexte compris,
       // `<Suspense>`) : 2,8 s au calme, 3,9 s sous une campagne complète, au-delà de 5 s au plus chargé (mesuré).
-      await attendre(page.getByRole("tab", { name: "Contexte" })).toHaveAttribute("aria-selected", "true")
-      await attendre(page.getByRole("tabpanel", { name: "Contexte" }).getByRole("region", { name: "Contexte : Privé" })).toBeInViewport()
-      await capturer(page, testInfo, `accueil-contexte-${theme}`)
+      await attendre(page.getByRole("heading", { level: 1, name: "Contexte" })).toBeVisible()
+      await attendre(page.getByRole("region", { name: "Contexte : Privé" })).toBeInViewport()
+      await capturer(page, testInfo, `vue-contexte-${theme}`)
       expect(hydratation).toEqual([])
       await context.close()
     })

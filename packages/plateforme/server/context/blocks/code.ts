@@ -8,7 +8,7 @@
 // retiré : un guide à lire d'abord, modifiable par organisation (architecture § 10) — ici une section fixe.
 import { SERVED_RULES } from "../../../schemas"
 import { clip, MAX_TARGET_CHARS } from "../../journal"
-import { formatScore, type Candidate } from "../../routing"
+import { formatScore, type Candidate, type RequestKind } from "../../routing"
 import type { ContextBlock } from "../engine"
 
 /**
@@ -44,16 +44,31 @@ type CodeBlockInput = {
   /** Candidats montrés, triés ; `null` : le routage n'a pas abouti (AC18, N30). */
   candidates: readonly Candidate[] | null
   served: Candidate | null
-  /** `isDataQuestion(phrase)` ; `null` sans phrase. */
-  dataQuestion: boolean | null
+  /** `requestKind(phrase)` ; `null` sans phrase. */
+  kind: RequestKind | null
 }
 
 function candidateList(candidates: readonly Candidate[]): string {
   return candidates.map((candidate) => `${candidate.path} (${formatScore(candidate.score)})`).join(", ")
 }
 
+/**
+ * Sans étapes servies, la consigne qui suit les candidats, selon le genre de la demande (E11-S04, AC-b3,
+ * HN-E11S04-6) : une action fait choisir ; une question, une demande « comment » ou polie ne suit aucune
+ * procédure d'elle-même et propose en choix tous les candidats montrés, jamais le premier seul.
+ */
+function unmatchedInstruction(prefix: string, kind: RequestKind | null): string {
+  const offer = "offer the user all the candidates above as choices"
+  if (kind === "how") return `It asks how to do something: ${offer}, read the one they pick with ${prefix}_read and explain its steps; run nothing unless the user asks.`
+  if (kind === "request") return `It asks for an action: ${offer}, and run only the one they pick, after their yes.`
+  if (kind === "data") {
+    return `It is a question: answer it without changing data, searching with ${prefix}_find, ${prefix}_read or ${prefix}_call table.rows; then ${offer}, and run one only if they pick it.`
+  }
+  return "Ask the user which one to run; do not guess."
+}
+
 /** La ligne du routage (AC7, AC8, AC18) : servie, candidats et consigne, rien, ou routage en panne. */
-function routingLine({ prefix, phrase, candidates, served, dataQuestion }: CodeBlockInput & { phrase: string }): string {
+function routingLine({ prefix, phrase, candidates, served, kind }: CodeBlockInput & { phrase: string }): string {
   // Phrase reprise, bornée comme la cible du journal (N4).
   const request = `Request « ${clip(phrase, MAX_TARGET_CHARS)} »`
   const search = `${prefix}_find can search pages, tables and functions.`
@@ -61,14 +76,12 @@ function routingLine({ prefix, phrase, candidates, served, dataQuestion }: CodeB
   if (served) {
     const others = candidates.filter((candidate) => candidate.path !== served.path)
     const tail = others.length > 0 ? ` Other candidates: ${candidateList(others)}.` : ""
-    return `${request} matches ${served.path} (score ${formatScore(served.score)}): its steps follow.${tail}`
+    const how = kind === "how" ? " It asks how: explain these steps, and run them only if the user asks." : ""
+    return `${request} matches ${served.path} (score ${formatScore(served.score)}): its steps follow.${tail}${how}`
   }
+  if (candidates.length > 0) return `${request}: no clear match. Candidates: ${candidateList(candidates)}. ${unmatchedInstruction(prefix, kind)}`
   const question = `It is a question: search with ${prefix}_find, ${prefix}_read or ${prefix}_call table.rows and answer it`
-  if (candidates.length > 0) {
-    const instruction = dataQuestion ? `${question}; do not ask which procedure to run.` : "Ask the user which one to run; do not guess."
-    return `${request}: no clear match. Candidates: ${candidateList(candidates)}. ${instruction}`
-  }
-  return dataQuestion ? `${request}: no procedure matches. ${question}.` : `${request}: no procedure matches. Say so instead of guessing; ${search}`
+  return kind === "data" ? `${request}: no procedure matches. ${question}.` : `${request}: no procedure matches. Say so instead of guessing; ${search}`
 }
 
 export function codeBlock(input: CodeBlockInput): ContextBlock {

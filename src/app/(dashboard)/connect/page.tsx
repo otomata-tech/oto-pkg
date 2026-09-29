@@ -1,42 +1,30 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import {
-  connectAddress,
-  lastConnections,
-  listPrompts,
-  type ConnectAddress,
-  type LastConnection,
-  type ProcedurePrompt,
-} from "@otomata_tech/oto_platform/server"
-import {
-  EcranConnexion,
-  resultatDe,
-  type AdresseDeConnexion,
-  type DerniereConnexion,
-  type ExempleDePrompt,
-} from "@otomata_tech/oto_platform/ui"
+import type { UsefulProcedure } from "@otomata_tech/oto_platform/schemas"
+import { connectAddress, lastConnections, usefulProcedures, type LastConnection } from "@otomata_tech/oto_platform/server"
+import { EcranConnexion, resultatDe, type DerniereConnexion, type ExempleDePrompt } from "@otomata_tech/oto_platform/ui"
+import { adresseDe } from "@/lib/plateforme/connexion"
 import { getPlatformIdentity, getRequestOrigin } from "@/lib/plateforme/session"
 import { loginPath } from "@/lib/schemas/auth"
 
-// « Brancher un assistant » (E02-S04) : l'adresse du serveur de l'organisation de l'adresse, les
-// guides par assistant, des prompts à essayer et les dernières connexions de la personne. La page lit
-// les services du paquet avec le jeton de la session ; `resource_documentation` des métadonnées OAuth
-// y mène (E02-S02).
+// « Brancher mon Claude, ChatGPT ou Mistral » (E02-S04, E11-S09) : le guide par assistant, pour
+// l'organisation de l'adresse, ses demandes à essayer (les procédures utiles, comme à l'accueil) et les
+// dernières connexions de la personne. La page lit les services du paquet avec le jeton de la session ;
+// `resource_documentation` des métadonnées OAuth y mène (E02-S02).
 export const metadata: Metadata = {
-  title: "Brancher un assistant",
+  title: "Brancher mon Claude, ChatGPT ou Mistral",
   robots: { index: false },
 }
 
 const ICI = "/connect"
 
-function adresseDe({ url, name, cliName, preferenceSentence }: ConnectAddress): AdresseDeConnexion {
-  return { url, nom: name, nomCli: cliName, phrase: preferenceSentence }
-}
+/** Les demandes à essayer du guide : trois au plus, complétées par les exemples génériques (AC-7). */
+const DEMANDES = 3
 
-/** Le titre de chaque procédure, le message que `prompts/get` envoie ; l'écran en montre cinq (AC6). */
-function promptsDe(prompts: ProcedurePrompt[]): ExempleDePrompt[] {
-  return prompts.map(({ title }) => ({ titre: title }))
+/** Le titre de chaque procédure utile, dans l'ordre du bloc servi par `context` (HN-E11S09-5). */
+function exemplesDe(procedures: UsefulProcedure[]): ExempleDePrompt[] {
+  return procedures.map(({ title }) => ({ titre: title }))
 }
 
 function connexionsDe(connexions: LastConnection[]): DerniereConnexion[] {
@@ -54,9 +42,9 @@ export default async function ConnectPage() {
   if (!origine) redirect("/aucune-organisation")
 
   const { identity, session } = identite.data
-  // Deux lectures indépendantes, en parallèle ; chacune se dit seule quand elle échoue (AC8).
+  // Deux lectures indépendantes, en parallèle ; chacune se dit seule quand elle échoue (AC-13).
   const [prompts, connexions] = await Promise.all([
-    resultatDe(listPrompts(session.db, identity).then(promptsDe)),
+    resultatDe(usefulProcedures(session.db, identity, DEMANDES).then(exemplesDe)),
     resultatDe(lastConnections(session.db, identity).then(connexionsDe)),
   ])
   return (

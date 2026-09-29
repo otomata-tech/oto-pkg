@@ -121,7 +121,7 @@ jetons et l'option `verifyToken`.
   (`rg -c "\bit(\.skipIf\(.*\))?\(" <fichier>`) est égal avant et après, sauf `mcp-http` (+1). Aucun
   bloc déplacé ni réindenté : une partie qui reste sur le projet se garde en place.
 - [ ] **AC-a5 — Le vrai jeton reste prouvé.** **Given** le projet configuré **When** `mcp-http` tourne
-  **Then** un `describe` `onProject` ouvre une session (`createFixtures().signIn`), la passe à
+  **Then** un `describe` `onProject` ouvre une session du projet (`createFixtures().sessionFor`, pas `signIn` : `testing-strategy.md § Anti-patterns`, décision du pilote le 2026-09-29), la passe à
   `makeVerifyToken()` sans argument, et `initialize` répond 200. Sans le projet, lui seul se saute.
 - [ ] **AC-a6 — Portabilité du schéma.** AC1 et AC2 de `portabilite-schema` portent
   `it.skipIf(!supabaseConfigured)`, leur nom dit pourquoi ; AC3 à AC7 tournent par `createSqlFixtures`.

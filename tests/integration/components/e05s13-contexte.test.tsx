@@ -111,8 +111,7 @@ describe("the parts of the « Contexte » view as read-only cards in French (AC-
         donnees={{ apercu: { data: apercu(PARTIES) }, contextes: {}, equipes: [], nomOrganisation: "Démo" }}
         Lien={LienDeTest}
         prefixeDesPages="/n/"
-        hrefDuProfil="/profil"
-        ici="/?onglet=contexte"
+        ici="/context"
       />,
     )
   }
@@ -156,13 +155,10 @@ describe("the parts of the « Contexte » view as read-only cards in French (AC-
     ])
   })
 
-  it("should read the twelve rules of « Règles Oto » in French, what surrounds them as served", () => {
+  it("should render no card for « Règles Oto » (E11-S10, AC-f4)", () => {
     monter()
-    const regles = carte("Règles Oto")
-    const liste = regles.getAllByRole("list").at(-1) as HTMLElement
-    expect(within(liste).getAllByRole("listitem")).toHaveLength(12)
-    expect(within(liste).getAllByRole("listitem")[0]).toHaveTextContent(/^Six outils : le contexte/)
-    expect(regles.getByText(/^ctx: XXXX-XXXX/, { selector: "pre" })).toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "Règles Oto" })).toBeNull()
+    expect(document.body.textContent).not.toContain("ctx: XXXX-XXXX")
   })
 
   it("should leave none of the served English headers in the page", () => {

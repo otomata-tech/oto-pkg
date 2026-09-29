@@ -113,8 +113,9 @@ export async function listTeams(db: PlatformDb, identity: Identity): Promise<Tea
 }
 
 /**
- * Crée une équipe (AC11). Son dossier et son Contexte naissent par `teams_tree_sync` ; un chemin
- * déjà pris par une page d'organisation fait échouer toute la création (`23505`, `path_taken`).
+ * Crée une équipe (AC11). Son dossier et son Contexte naissent par `teams_tree_sync` ; un chemin déjà pris par une page
+ * d'organisation fait échouer toute la création (`23505`, `path_taken`). Le créateur en devient le responsable, dans la
+ * même transaction (E11-S10, AC-c1), sauf entré par un accès plateforme : `team_members_insert_admin` refuserait sa ligne.
  */
 export async function createTeam(
   db: PlatformDb,
@@ -133,7 +134,7 @@ export async function createTeam(
       const [team] = await sql<{ id: string; slug: string; name: string }[]>`
         insert into platform.teams (org_id, slug, name) values (${identity.org.id}, ${slug}, ${name})
         returning id, slug, name`
-      return team
+      return identity.viaGrant ? team : setSoleLead(sql, team.id, identity.user.id).then(() => team)
     })
     .catch((error: { code?: string; message?: string }) => {
       if (isUniqueViolation(error)) {

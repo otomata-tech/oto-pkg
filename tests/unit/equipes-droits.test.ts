@@ -375,8 +375,9 @@ describe.skipIf(!sqlConfigured)(portable(SUITE), { timeout: NETWORK_TIMEOUT }, (
 
   describe("memberDirectory (E01-S07c)", () => {
     it("should read every member beyond the rows PostgREST returns at once, page after page", async () => {
-      // 1 005 membres de plus, sans nom ni email : sans pages, la lecture s'arrêtait à 1 000.
-      await ref.write({ members: Array.from({ length: 1005 }, () => ({ org_id: ORG.id, user_id: randomUUID(), role: "member" })) })
+      // 1 005 membres de plus, sans nom ni email : sans pages, la lecture s'arrêtait à 1 000. Chacun a son handle : sans
+      // lui, la base en tirerait un de l'email absent (`membre`, `membre_2`…), en temps quadratique (E11-S10, lot a).
+      await ref.write({ members: Array.from({ length: 1005 }, (_, rang) => ({ org_id: ORG.id, user_id: randomUUID(), role: "member", profile: { handle: `page_${rang}` } })) })
 
       const people = await memberDirectory(await ref.db("ada"), ref.org.id)
 

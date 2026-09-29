@@ -63,8 +63,8 @@ import { loginPath } from "@/lib/schemas/auth"
 
 const PREFIXE = "/n/"
 const CONTEXTE = "contexte"
-/** La vue « Contexte » de l'accueil (E05-S11, AC-12) : l'encart d'un Contexte y mène, ligne par ligne (AC-11). */
-const CONTEXTE_SERVI = "/?onglet=contexte"
+/** La vue « Contexte » (E11-S10, AC-e4) : l'encart d'un Contexte y mène, ligne par ligne (AC-11). */
+const CONTEXTE_SERVI = "/context"
 /** Une lecture impossible sans identité (panne de sa résolution) : l'écran la dit à chaque place. */
 const ECHEC: { data?: never; error: string } = { error: "Une erreur est survenue. Réessayez." }
 /**

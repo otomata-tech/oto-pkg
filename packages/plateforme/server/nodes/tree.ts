@@ -3,6 +3,10 @@
 // puis par chemin, E05-S10 AC-b9). Visible = niveau ≥ 1 calculé par `access.ts` en un lot (un nœud à la
 // corbeille vaut 0, E05-S10) ; la base rend tous les nœuds de l'organisation sous la RLS d'isolation
 // d'E01-S08 : le filtre est ici (H123). Sans lui, l'arbre d'E05-S02 n'a pas de données.
+//
+// E11-S10 (lot b, HN-E11S10-5) : l'arbre des écrans se calcule sur l'identité de membre de la personne,
+// sans le pouvoir d'administrateur ni l'accès plateforme ; un administrateur n'y voit que ce qu'un membre
+// verrait (ses équipes, ce qui lui est partagé), ses droits réels ne changeant pas ailleurs.
 import type { TreeNode } from "../../schemas"
 import { ACCESS_LEVELS, nodeLevels } from "../access"
 import type { PlatformDb } from "../db"
@@ -20,11 +24,19 @@ function orderSiblings(nodes: TreeNode[], positions: ReadonlyMap<string, number 
 }
 
 /**
+ * L'identité de membre (HN-E11S10-5) : ni rôle d'administrateur, ni équipe plateforme, ni accès en cours ;
+ * ses niveaux ne dépassent jamais ceux de l'identité réelle (`security-patterns.md § Droits dans le service`).
+ */
+function asMember(identity: Identity): Identity {
+  return { ...identity, member: { ...identity.member, role: "member" }, isStaff: false, hasOpenGrant: false }
+}
+
+/**
  * `{ tree, truncated }` (AC36) : `tree` porte les nœuds visibles sans ancêtre visible (la racine
  * `guide` d'ordinaire), chacun avec ses enfants visibles, les frères dans leur ordre ; un nœud visible
  * sous un parent invisible est rattaché à son ancêtre visible le plus proche. 5 000 nœuds au plus,
  * comptés après le filtre et pris dans l'ordre des chemins (un parent avant ses enfants, HN-E01S07-8) ;
- * au-delà, `truncated`.
+ * au-delà, `truncated`. Visible : au niveau de lecture de la personne comme membre (`asMember`).
  */
 export async function visibleTree(db: PlatformDb, identity: Identity): Promise<{ tree: TreeNode[]; truncated: boolean }> {
   // Les nœuds de l'organisation, en une lecture : la face SQL n'a pas la coupe de `max_rows` (N48) ; puis leurs
@@ -33,7 +45,7 @@ export async function visibleTree(db: PlatformDb, identity: Identity): Promise<{
     const read = await sql<{ id: string; path: string; title: string; kind: string; status: string; position: number | null }[]>`
       select id, path, title, kind, status, position from platform.nodes where org_id = ${identity.org.id}`
     // Un filtre de liste compare `nodeLevels` à 1 seulement (`security-patterns.md § Droits dans le service`).
-    return { rows: read, levels: await nodeLevels(db, identity, read.map((row) => row.id)) }
+    return { rows: read, levels: await nodeLevels(db, asMember(identity), read.map((row) => row.id)) }
   })
   const visible = rows.filter((row) => (levels.get(row.id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read).sort(comparePaths)
   const kept = visible.slice(0, TREE_MAX)

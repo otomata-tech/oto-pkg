@@ -1298,6 +1298,7 @@ export type Database = {
       is_org_admin: { Args: { org: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
       level_rank: { Args: { p_level: string }; Returns: number }
+      lexicon_fix: { Args: { p_org: string; p_word: string }; Returns: string }
       lexicon_rebuild: { Args: { p_org: string }; Returns: undefined }
       lexicon_words: { Args: { p_text: string }; Returns: string[] }
       member_directory: {
@@ -1421,10 +1422,12 @@ export type Database = {
         Returns: {
           kind: string
           lexical: number
+          lexical_title: number
           node_id: string
           owner_team_id: string
           path: string
           query_lexemes: number
+          s_phrase: number
           s_summary: number
           s_title: number
           summary: string

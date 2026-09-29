@@ -5,11 +5,13 @@
 // adresses redirigent vers « Organisation » et « Équipes & accès ») ; « Connecteurs » passe au pied du rail
 // (AC-32) ; la Corbeille et Profil au menu du compte (AC-e22, AC-6). E05-S13 (AC-10) : « Journal » se range dans
 // les réglages, après « Équipes & accès » ; au suivi restent Usage et Retours, que l'hôte ne donne qu'à qui y a droit.
+// E11-S10 (AC-e1) : la vue « Contexte » en tête du menu du compte, hors de l'accueil.
 import { Buildings } from "@phosphor-icons/react/dist/csr/Buildings"
 import { ChartBar } from "@phosphor-icons/react/dist/csr/ChartBar"
 import { ChatCircleText } from "@phosphor-icons/react/dist/csr/ChatCircleText"
 import { ClockCounterClockwise } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise"
 import { Plug } from "@phosphor-icons/react/dist/csr/Plug"
+import { Info } from "@phosphor-icons/react/dist/csr/Info"
 import { Robot } from "@phosphor-icons/react/dist/csr/Robot"
 import { SquaresFour } from "@phosphor-icons/react/dist/csr/SquaresFour"
 import { Trash } from "@phosphor-icons/react/dist/csr/Trash"
@@ -35,6 +37,7 @@ const ECRANS: readonly Ecran[] = [
   { cle: "equipes", libelle: ENTREPRISE.equipes, glyphe: Users, rangement: "reglages", admin: false },
   { cle: "journal", libelle: ENTREPRISE.journal, glyphe: ClockCounterClockwise, rangement: "reglages", admin: false },
   { cle: "connecteurs", libelle: RAIL.connecteurs, glyphe: Plug, rangement: "pied", admin: true },
+  { cle: "contexte", libelle: COMPTE.contexte, glyphe: Info, rangement: "compte", admin: false },
   { cle: "profil", libelle: COMPTE.profil, glyphe: UserCircle, rangement: "compte", admin: false },
   { cle: "brancher", libelle: COMPTE.brancher, glyphe: Robot, rangement: "compte", admin: false },
   { cle: "corbeille", libelle: RAIL.corbeille, glyphe: Trash, rangement: "compte", admin: false },

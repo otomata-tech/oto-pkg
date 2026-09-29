@@ -233,6 +233,14 @@ contrôle de `auth.uid()` est l'une de ces deux fonctions, qui rend les colonnes
 rien d'autre, ou une fonction qu'une section de `docs/architecture.md` ou un ADR ouvre
 explicitement ; sinon, défaut HAUTE.
 
+**Exception écrite — fonctions internes.** Une fonction exécutable par aucun rôle (`REVOKE` de
+`public`, aucun `GRANT`) ne contrôle pas `auth.uid()` et n'a pas de `GRANT` : seuls d'autres
+fonctions ou déclencheurs l'appellent, et c'est leur appelant qui porte le contrôle d'accès.
+Exemples : `ensure_private_space`, `unique_handle`, `members_tree_sync`. **Vérifiable :** dans le
+diff, la fonction n'a aucun `GRANT … ON FUNCTION`, son `REVOKE … FROM public` est écrit, et chacun de
+ses appelants est une fonction, un déclencheur ou une migration du schéma `platform` ; sinon, défaut
+HAUTE.
+
 ## Paramètres des requêtes (postgres.js)
 
 Les règles de la face SQL (paramètres `json` et `jsonb`, `sql(rows)`, `timestamptz`) vivent dans

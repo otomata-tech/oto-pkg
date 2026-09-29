@@ -12,7 +12,7 @@
 //
 // M71 : les listes d'index d'une partie (enfants, pages liées) ne sont que dans son texte servi, pas dans les blocs
 // de son Contexte ; `morceauxDuContexte` les en relit par les textes que le service écrit (`CONTEXT_INDEX`).
-import { CONTEXT_INDEX, NODE_PATH_PATTERN, SERVED_BUDGET, SERVED_NEWS, SERVED_PROCEDURES, SERVED_RECENT, SERVED_RULES } from "../../schemas"
+import { CONTEXT_INDEX, NODE_PATH_PATTERN, SERVED_BUDGET, SERVED_NEWS, SERVED_PROCEDURES, SERVED_RECENT } from "../../schemas"
 import { PERSO } from "../arbre/depuis-l-arbre"
 import type { DonneesDeLApercu } from "./apercu-du-contexte"
 
@@ -111,13 +111,11 @@ export type LigneServie =
 /** La légende d'une liste servie : l'en-tête du bloc relu, ou le titre d'une liste d'index d'un Contexte. */
 export type Legende = { genre: "procedures"; nombre: number } | { genre: "nouveautes"; depuis: string } | { genre: "children" } | { genre: "linked" }
 
-/** Un morceau d'une partie relue : une liste, une phrase fixe, les règles de l'espace, l'avis de budget, ou du texte tel que servi. */
+/** Un morceau d'une partie relue : une liste, une phrase fixe, l'avis de budget, ou du texte tel que servi. */
 export type MorceauServi =
   | { genre: "liste"; legende: Legende | null; lignes: LigneServie[] }
   | { genre: "phrase"; phrase: "aucune-procedure" | "rien-de-nouveau" | "suite" | "non-charge" }
   | { genre: "autres-procedures"; nombre: number }
-  /** Les règles de l'espace : une ligne par règle, et la section telle que servie (en-tête compris). */
-  | { genre: "regles"; lignes: string[]; texte: string }
   | { genre: "budget"; noms: { nom: string; coupe: boolean }[]; autres: number }
   | { genre: "brut"; texte: string }
 
@@ -249,24 +247,10 @@ function recents(lignes: readonly string[]): MorceauServi[] | null {
   return lignes[0] === SERVED_RECENT.title ? lignesDuBloc(lignes.slice(1), null, ligneRecente, () => null) : null
 }
 
-/** Le bloc `code` : les règles de l'espace (en-tête, puis une ligne `- ` par règle) ; ce qui les entoure, tel que servi. */
-function regles(lignes: readonly string[]): MorceauServi[] | null {
-  const debut = lignes.indexOf(SERVED_RULES.title)
-  if (debut < 0) return null
-  let fin = debut + 1
-  while (fin < lignes.length && lignes[fin].startsWith(SERVED_RULES.item)) fin += 1
-  const { morceaux, brut } = assembleur()
-  for (const ligne of lignes.slice(0, debut)) brut(ligne)
-  morceaux.push({ genre: "regles", lignes: lignes.slice(debut + 1, fin).map((ligne) => ligne.slice(SERVED_RULES.item.length)), texte: lignes.slice(debut, fin).join("\n") })
-  for (const ligne of lignes.slice(fin)) brut(ligne)
-  return morceaux
-}
-
 const LECTURES_DES_BLOCS: Readonly<Record<string, (lignes: readonly string[]) => MorceauServi[] | null>> = {
   procedures,
   news: nouveautes,
   "recent content": recents,
-  code: regles,
 }
 
 /**
@@ -276,15 +260,6 @@ const LECTURES_DES_BLOCS: Readonly<Record<string, (lignes: readonly string[]) =>
 export function morceauxDuBloc(nom: string, texte: string): MorceauServi[] {
   if (texte === "") return []
   return LECTURES_DES_BLOCS[nom]?.(texte.split("\n")) ?? [{ genre: "brut", texte }]
-}
-
-/**
- * La tête d'une partie de Contexte sans sa première ligne, l'en-tête `## Context: …` (HN-E05S13-13) : le titre de la
- * partie le dit ; les faits et les connecteurs restent tels que servis.
- */
-export function teteSansEnTete(tete: string): string {
-  const fin = tete.indexOf("\n")
-  return fin < 0 ? "" : tete.slice(fin + 1)
 }
 
 /**

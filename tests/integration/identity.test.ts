@@ -73,7 +73,8 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
     const identity = await resolveAtO(newcomer)
 
     expect(identity.user).toEqual({ id: newcomer.id, email: newcomer.email, name: newcomer.email.split("@")[0] })
-    expect(identity.member).toEqual({ role: "member", profile: {} })
+    // Sans handle à l'insertion, la base lui en pose un, tiré de son email (E11-S10, AC-a1).
+    expect(identity.member).toEqual({ role: "member", profile: { handle: newcomer.email.split("@")[0].replaceAll("-", "_") } })
     expect(identity.org).toEqual({ id: ref.org.id, slug: ref.org.slug, name: "Acme Test", prefix: ref.org.prefix, brand: {}, domains: "sales" })
   })
 

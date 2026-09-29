@@ -57,6 +57,15 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   `members_tree_sync` posent le résumé du Contexte au modèle par portée ; un résumé resté l'ancien texte
   généré est remplacé, `updated_at` gardé. Mêmes signatures, privilèges redits ; aucune table, colonne,
   policy ni index.
+- `20260929160000_private_spaces.sql` (E11-S10, lot a) : l'espace « Privé » de chaque membre dès sa
+  première connexion. `platform.ensure_private_space(org, user)`, `security definer`, accordée à
+  personne (`revoke` de `public`, aucun `grant`) : sans dossier `private` ni ligne `members`, elle
+  rend sans rien écrire ; sinon elle pose le handle manquant (`unique_handle`, depuis
+  `members.email`), puis crée `private/<handle>` et son Contexte s'ils manquent ; un espace tenu par
+  une autre personne n'est pas touché, un second appel n'écrit rien. `members_tree_sync` l'appelle
+  (signature et privilèges inchangés, déclencheur inchangé). La migration répare tous les membres,
+  un à la fois, pour que `unique_handle` voie les handles posés aux tours précédents. Aucune table,
+  colonne, policy ni index.
 
 ## Installer sur un hôte neuf
 
@@ -300,7 +309,8 @@ garde ; la ligne de base V1 les porte toutes.
   bloc publié y entrent par ses déclencheurs pour tout écrivain, outillage et import compris, dans
   l'ordre des mots ; `lexicon_rebuild(org)` le reconstruit, appelée par la migration et par
   `forget_user` ; aucune écriture accordée, une lecture qui ne rend aucune ligne à `authenticated` ;
-  seule `search_content` le lit. Jamais exporté (`NEVER_EXPORTED`), il se reconstruit à l'import.
+  seule `lexicon_fix` le lit (depuis `20260929140000`), pour `search_content` et `route_candidates`.
+  Jamais exporté (`NEVER_EXPORTED`), il se reconstruit à l'import.
 - **Aucune fonction ne lève `40001`** (depuis `20260924130100`) : PostgREST rejoue sans fin une
   transaction en échec de sérialisation ; un conflit de révision lève `PT409`.
 - **Un bloc `draft` ne s'écrit sous un jeton qu'avec son brouillon** (depuis `20260924140000`) :

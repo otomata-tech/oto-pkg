@@ -28,6 +28,8 @@ export type AdressesDuRail = {
   corbeille?: string
   /** La page « Profil » (E05-S11, AC-6) : au menu du compte, et dans la palette. */
   profil?: string
+  /** La vue « Contexte », ce que lit l'assistant (E11-S10, AC-e1) : en tête du menu du compte, et dans la palette. */
+  contexte?: string
 }
 
 export type EquipeDuRail = { slug: string; name: string }

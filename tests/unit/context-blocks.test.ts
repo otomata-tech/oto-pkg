@@ -24,7 +24,7 @@ import { lastCtxAt } from "../../packages/plateforme/server/ctx"
 import { fromDatabaseError, READ_PAGE_ROWS } from "../../packages/plateforme/server/errors"
 import { day } from "../../packages/plateforme/server/nodes/read-format"
 import type { Identity, IdentityTeam } from "../../packages/plateforme/server/identity"
-import type { Candidate } from "../../packages/plateforme/server/routing"
+import type { Candidate, RequestKind } from "../../packages/plateforme/server/routing"
 import { connectDeps } from "../helpers/mcp"
 import { hex } from "../helpers/plateforme"
 import {
@@ -142,7 +142,7 @@ function routingLineOf(text: string): string | undefined {
 }
 
 describe("codeBlock", () => {
-  const unmatched = { candidates: [], served: null, dataQuestion: false }
+  const unmatched = { candidates: [], served: null, kind: "action" as const }
 
   // E05-S12 (AC-9) : les règles de l'espace entre la consigne du code et la ligne du routage.
   it("should give the code, the instruction to pass it, the rules of the workspace, then the request", () => {
@@ -159,31 +159,63 @@ describe("codeBlock", () => {
   })
 
   it("should ask for the request when none was given", () => {
-    expect(codeBlock({ prefix: "acme", code: "7K3Q-M2XA", candidates: [], served: null, dataQuestion: null }).text.split("\n").at(-1)).toBe(
+    expect(codeBlock({ prefix: "acme", code: "7K3Q-M2XA", candidates: [], served: null, kind: null }).text.split("\n").at(-1)).toBe(
       "No request given: call acme_context again with the user's request as phrase to get the matching procedure.",
     )
   })
 
-  // E03-S02, AC8 : sans étape servie, la consigne dépend de la demande (H37).
-  it("should ask which one to run for an action, search and answer for a question, and say when nothing matches (AC8)", () => {
+  // E03-S02, AC8 : sans étape servie, la consigne dépend de la demande (H37) ; E11-S04 (AC-b3,
+  // HN-E11S04-6) : une question propose aussi, après sa réponse, toutes les candidates montrées.
+  it("should ask which one to run for an action, answer then offer the candidates for a question, and say when nothing matches (AC8)", () => {
     const candidates = [candidate("ventes/relance_prospects", 0.62), candidate("ventes/qualifier_prospects", 0.6)]
-    const line = (phrase: string, fields: { candidates: Candidate[]; dataQuestion: boolean }) =>
+    const line = (phrase: string, fields: { candidates: Candidate[]; kind: RequestKind }) =>
       codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase, served: null, ...fields }).text.split("\n").at(-1) ?? ""
 
-    expect(line("prospects", { candidates, dataQuestion: false })).toBe(
+    expect(line("prospects", { candidates, kind: "action" })).toBe(
       "Request « prospects »: no clear match. Candidates: ventes/relance_prospects (0.62), ventes/qualifier_prospects (0.60). Ask the user which one to run; do not guess.",
     )
     const question = "Combien de prospects avons-nous à Valbrune, et lesquels ?"
-    expect(line(question, { candidates, dataQuestion: true })).toBe(
-      `Request « ${question} »: no clear match. Candidates: ventes/relance_prospects (0.62), ventes/qualifier_prospects (0.60). It is a question: search with acme_find, acme_read or acme_call table.rows and answer it; do not ask which procedure to run.`,
+    expect(line(question, { candidates, kind: "data" })).toBe(
+      `Request « ${question} »: no clear match. Candidates: ventes/relance_prospects (0.62), ventes/qualifier_prospects (0.60). It is a question: answer it without changing data, searching with acme_find, acme_read or acme_call table.rows; then offer the user all the candidates above as choices, and run one only if they pick it.`,
     )
-    expect(line(question, { candidates: [], dataQuestion: true })).toBe(
+    expect(line(question, { candidates: [], kind: "data" })).toBe(
       `Request « ${question} »: no procedure matches. It is a question: search with acme_find, acme_read or acme_call table.rows and answer it.`,
     )
-    expect(line("donne-moi une recette de crêpes", { candidates: [], dataQuestion: false })).toBe(
+    expect(line("donne-moi une recette de crêpes", { candidates: [], kind: "action" })).toBe(
       "Request « donne-moi une recette de crêpes »: no procedure matches. Say so instead of guessing; acme_find can search pages, tables and functions.",
     )
-    expect(line("x".repeat(250), { candidates: [], dataQuestion: false }).startsWith(`Request « ${"x".repeat(200)} »: no procedure`)).toBe(true)
+    expect(line("x".repeat(250), { candidates: [], kind: "action" }).startsWith(`Request « ${"x".repeat(200)} »: no procedure`)).toBe(true)
+  })
+
+  // E11-S04 (AC-b3, HN-E11S04-6, -14, -15) : une demande « comment » ou polie ne suit aucune procédure
+  // d'elle-même ; toutes les candidates montrées sont proposées, une seule quand il n'y en a qu'une.
+  it("should explain served steps for a how question, and offer every candidate shown for a how question or a polite request", () => {
+    const project = candidate("todo/creer_un_projet", 0.62)
+    const task = candidate("todo/ajouter_une_tache", 0.58)
+    const served = candidate("todo/creer_un_projet", 0.78)
+    const line = (phrase: string, kind: RequestKind, candidates: Candidate[], matched: Candidate | null = null) =>
+      codeBlock({ prefix: "demo", code: "7K3Q-M2XA", phrase, served: matched, candidates, kind }).text.split("\n").at(-1) ?? ""
+    const how = "Comment je crée un projet ?"
+    const asked = "Peux-tu créer un projet ?"
+
+    expect(line(how, "how", [served, task], served)).toBe(
+      `Request « ${how} » matches todo/creer_un_projet (score 0.78): its steps follow. Other candidates: todo/ajouter_une_tache (0.58). It asks how: explain these steps, and run them only if the user asks.`,
+    )
+    expect(line(asked, "request", [served, task], served)).toBe(
+      `Request « ${asked} » matches todo/creer_un_projet (score 0.78): its steps follow. Other candidates: todo/ajouter_une_tache (0.58).`,
+    )
+    expect(line(how, "how", [project, task])).toBe(
+      `Request « ${how} »: no clear match. Candidates: todo/creer_un_projet (0.62), todo/ajouter_une_tache (0.58). It asks how to do something: offer the user all the candidates above as choices, read the one they pick with demo_read and explain its steps; run nothing unless the user asks.`,
+    )
+    expect(line(asked, "request", [project, task])).toBe(
+      `Request « ${asked} »: no clear match. Candidates: todo/creer_un_projet (0.62), todo/ajouter_une_tache (0.58). It asks for an action: offer the user all the candidates above as choices, and run only the one they pick, after their yes.`,
+    )
+    expect(line(asked, "request", [project])).toBe(
+      `Request « ${asked} »: no clear match. Candidates: todo/creer_un_projet (0.62). It asks for an action: offer the user all the candidates above as choices, and run only the one they pick, after their yes.`,
+    )
+    expect(line(how, "how", [])).toBe(
+      `Request « ${how} »: no procedure matches. Say so instead of guessing; demo_find can search pages, tables and functions.`,
+    )
   })
 })
 
@@ -296,7 +328,7 @@ describe.skipIf(!sqlConfigured)(portable("buildContext target (AC16, N31)"), { t
     const unmatched = await buildContext(db, claire, { phrase: "donne-moi une recette de crêpes" }, { userAgent: null })
     expect(unmatched.data).toMatchObject({ served: null, candidates: [], data_question: false })
     expect(unmatched.target).toBe("donne-moi une recette de crêpes")
-    // La question passe par `isDataQuestion` jusqu'à la consigne « chercher et répondre » (banc, preuve 11).
+    // La question passe par `requestKind` jusqu'à la consigne « chercher et répondre » (banc, preuve 11).
     const question = "Combien de prospects avons-nous à Valbrune, et lesquels ?"
     const asked = await buildContext(db, claire, { phrase: question }, { userAgent: null })
     expect(asked.data).toMatchObject({ served: null, candidates: [], data_question: true })

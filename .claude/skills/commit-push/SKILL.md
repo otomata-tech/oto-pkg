@@ -103,6 +103,9 @@ supposé vert : une CI qui ne démarre plus ne se voit que là.
 ## Règles
 
 - Les 4 checks passent **avant** le commit, sans exception
+- **Un seul commit par `pnpm verify`** : un commit change `HEAD` et invalide le reçu, donc un
+  second commit exige un second `verify` complet. Documents et code d'une même fusion partent
+  dans le même commit.
 - `--no-verify`, `--force`, `--force-with-lease` : bloqués par le hook, sans échappement
 - `--amend` : uniquement sur demande explicite de l'utilisateur
 - Ne jamais commiter sur `main` si une branche de travail est attendue

@@ -1,24 +1,21 @@
 // E05-S13 (retour 8, AC-15, AC-16 ; HN-E05S13-12 à -14) : l'écran relit le texte servi par `context` pour le dire en
 // français, par les formats de `schemas/context-index.ts`. Chaque bloc est rendu ici par le service même
-// (`proceduresText`, `newsBlock`, `recentText`, `codeBlock`, `contextParts`, `renderContext`), puis relu par
+// (`proceduresText`, `newsBlock`, `recentText`, `contextParts`, `renderContext`), puis relu par
 // `ui/contexte/parties-du-contexte.ts` : un format changé d'un côté seulement fait échouer ce test. Les listes d'index
 // d'un Contexte sont écrites en toutes lettres (le corps d'un Contexte se lit en base, `contextBody`) : ce sont celles
 // du contrat, M71. Une ligne non reconnue reste telle que servie.
 import { describe, expect, it } from "vitest"
-import { codeBlock, WORKSPACE_RULES } from "../../packages/plateforme/server/context/blocks/code"
 import { contextParts, type PartFacts } from "../../packages/plateforme/server/context/blocks/contexts"
 import { activationItem, newsBlock, versionItem } from "../../packages/plateforme/server/context/blocks/news"
 import { proceduresText } from "../../packages/plateforme/server/context/blocks/procedures"
 import { recentText } from "../../packages/plateforme/server/context/blocks/recent"
 import { renderContext, type ContextBlock } from "../../packages/plateforme/server/context/engine"
 import type { Identity } from "../../packages/plateforme/server/identity"
-import { REGLES_OTO } from "../../packages/plateforme/ui/contexte/libelles"
 import {
   morceauxDeLaFin,
   morceauxDuBloc,
   morceauxDuContexte,
   partiesDuContexte,
-  teteSansEnTete,
 } from "../../packages/plateforme/ui/contexte/parties-du-contexte"
 
 /** Le bloc rendu par le service, relu par l'écran. */
@@ -102,29 +99,14 @@ describe("the recent content block read back (AC-16)", () => {
   })
 })
 
-describe("« Règles Oto » (AC-16, HN-E05S13-14)", () => {
-  it("should translate as many rules as the served section carries, and keep what surrounds them as served", () => {
-    const servies = WORKSPACE_RULES.split("\n").filter((ligne) => ligne.startsWith("- "))
-    expect(servies).toHaveLength(12)
-    expect(REGLES_OTO).toHaveLength(servies.length)
-    const morceaux = relu(codeBlock({ prefix: "demo", code: "XXXX-XXXX", candidates: [], served: null, dataQuestion: null }))
-    expect(morceaux.map((morceau) => morceau.genre)).toEqual(["brut", "regles", "brut"])
-    expect(morceaux[1]).toMatchObject({ genre: "regles", lignes: servies.map((ligne) => ligne.slice(2).replaceAll("<p>", "demo")) })
-    // Rien n'est perdu : recomposés, les morceaux sont le texte servi.
-    const texte = morceaux.map((morceau) => (morceau.genre === "brut" || morceau.genre === "regles" ? morceau.texte : "")).join("\n")
-    expect(texte).toBe(codeBlock({ prefix: "demo", code: "XXXX-XXXX", candidates: [], served: null, dataQuestion: null }).text)
-  })
-})
-
 describe("a Contexte part read back (AC-15)", () => {
   const LISTES = ["Pages, tables and procedures here:", "- contexte/tarifs — Tarifs — Les tarifs.", "Linked pages:", "- support/faq — FAQ — Réponses — types."]
 
-  it("should read its facts without the header, its body as served, its lists, then the cut pointer", () => {
+  it("should read its body as served, its lists, then the cut pointer", () => {
     // Des listes arrêtées à 20 lignes (`listsCut`) : la partie finit par le pointeur vers `read`.
     const corps = new Map([["contexte", { text: ["Corps du Contexte.", "", ...LISTES].join("\n"), listsCut: true }]])
     const { text, report } = renderContext(contextParts(LEA, FAITS, corps), 20_000, "demo")
     const partie = partiesDuContexte({ text, blocks: report }).parties[0]
-    expect(teteSansEnTete(partie.tete)).toBe(FAITS.everyone)
     expect(morceauxDuContexte(partie.suite)).toEqual([
       { genre: "brut", texte: "Corps du Contexte." },
       { genre: "liste", legende: { genre: "children" }, lignes: [{ genre: "index", chemin: "contexte/tarifs", titre: "Tarifs", resume: "Les tarifs." }] },

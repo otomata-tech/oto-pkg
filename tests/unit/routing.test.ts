@@ -29,6 +29,7 @@ import {
   isDataQuestion,
   loadRoutingSettings,
   rankCandidates,
+  requestKind,
   routingSettings,
   type Components,
 } from "../../packages/plateforme/server/routing"
@@ -68,14 +69,16 @@ function boundTo(call: Extract<DbCall, { kind: "sql" }>, column: string): unknow
   return index === -1 ? undefined : call.values[index]
 }
 
-describe("blendScore (AC1)", () => {
-  it("should weigh the summary or the title and the lexemes, halve a single lexeme, and stay within [0, 1]", () => {
-    expect(blendScore({ s_summary: 1, s_title: 0.5, lexical: 1, query_lexemes: 4 })).toBe(1)
-    expect(blendScore({ s_summary: 0, s_title: 0.8, lexical: 0.5, query_lexemes: 3 })).toBeCloseTo(0.55 * 0.8 + 0.45 * 0.5)
-    expect(blendScore({ s_summary: 0.9, s_title: 0.2, lexical: 0, query_lexemes: 2 })).toBeCloseTo(0.55 * 0.9)
-    expect(blendScore({ s_summary: 0, s_title: 0, lexical: 0, query_lexemes: 3 })).toBe(0)
-    const single = blendScore({ s_summary: 0.4, s_title: 0, lexical: 1, query_lexemes: 1 })
-    const pair = blendScore({ s_summary: 0.4, s_title: 0, lexical: 1, query_lexemes: 2 })
+describe("blendScore (AC1 ; E11-S04 AC-b1)", () => {
+  it("should weigh the summary or the title, the best formulation and the lexemes (all, then the title's), halve a single lexeme, and stay within [0, 1]", () => {
+    const none = { s_summary: 0, s_title: 0, s_phrase: 0, lexical: 0, lexical_title: 0, query_lexemes: 3 }
+    expect(blendScore({ s_summary: 1, s_title: 0.5, s_phrase: 1, lexical: 1, lexical_title: 1, query_lexemes: 4 })).toBe(1)
+    expect(blendScore({ ...none, s_title: 0.8, lexical: 0.5 })).toBeCloseTo(0.25 * 0.8 + 0.45 * 0.75 * 0.5)
+    expect(blendScore({ ...none, s_summary: 0.9, s_title: 0.2, s_phrase: 0.6, query_lexemes: 2 })).toBeCloseTo(0.25 * 0.9 + 0.3 * 0.6)
+    expect(blendScore({ ...none, lexical_title: 1 })).toBeCloseTo(0.45 * 0.25)
+    expect(blendScore(none)).toBe(0)
+    const single = blendScore({ ...none, s_summary: 0.4, lexical: 1, lexical_title: 1, query_lexemes: 1 })
+    const pair = blendScore({ ...none, s_summary: 0.4, lexical: 1, lexical_title: 1, query_lexemes: 2 })
     expect(pair - single).toBeCloseTo(0.45 / 2)
   })
 })
@@ -129,6 +132,13 @@ describe("isDataQuestion (AC4)", () => {
     for (const phrase of questions) expect(isDataQuestion(phrase), phrase).toBe(true)
     for (const phrase of actions) expect(isDataQuestion(phrase), phrase).toBe(false)
   })
+
+  // E11-S04 (AC-b2) : « comment » et les formules de demande quittent les questions de données.
+  it("should tell a how question and a polite request from a data question", () => {
+    const kinds = ["Comment je crée un projet ?", "Peux-tu ajouter une tâche ?", "Est-ce que tu peux relancer les devis ?", "Est-ce qu'il reste des prospects", "Relance les devis en attente."]
+    expect(kinds.map(requestKind)).toEqual(["how", "request", "request", "data", "action"])
+    expect(isDataQuestion("Comment je crée un projet ?")).toBe(false)
+  })
 })
 
 describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on O"), { timeout: NETWORK_TIMEOUT }, () => {
@@ -150,10 +160,17 @@ describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on 
     await ref.write({ orgs: [{ id: ORG.id, settings: {} }] })
   })
 
-  /** Une ligne de `route_candidates` pour un nœud d'Acme, sous ses identifiants réels ; l'équipe propriétaire effective est Ventes par défaut. */
-  function routeRow(path: string, components: Components, ownerTeamId: string | null = TEAMS.ventes.id): Row {
+  /**
+   * Une ligne de `route_candidates` pour un nœud d'Acme, sous ses identifiants réels ; l'équipe propriétaire
+   * effective est Ventes par défaut. La formulation vaut le texte (`s_phrase` = le plus grand du résumé et
+   * du titre) et le titre porte les lexèmes du nœud (`lexical_title` = `lexical`) : le mélange d'E11-S04 y
+   * vaut, pour un résumé au moins égal au titre, celui d'avant (0,55 et 0,45), et les scores attendus
+   * restent ceux des filtres, bonus et coupes que ces tests prouvent.
+   */
+  function routeRow(path: string, components: Omit<Components, "s_phrase" | "lexical_title">, ownerTeamId: string | null = TEAMS.ventes.id): Row {
     const { title, summary, kind } = acmeNode(path)
-    return { node_id: ref.nodeId(path), path, title, summary, kind, owner_team_id: ownerTeamId === null ? null : ref.id(ownerTeamId), ...components }
+    const derived = { s_phrase: Math.max(components.s_summary, components.s_title), lexical_title: components.lexical }
+    return { node_id: ref.nodeId(path), path, title, summary, kind, owner_team_id: ownerTeamId === null ? null : ref.id(ownerTeamId), ...components, ...derived }
   }
 
   /**

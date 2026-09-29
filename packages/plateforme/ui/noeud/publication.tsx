@@ -12,8 +12,8 @@
 //
 // E05-S04 : un refus du contrôle d'une procédure se dit refus par refus, chacun menant à son bloc (AC7) ; un
 // Contexte vide ne se publie qu'après confirmation (AC11), sans que la question prenne le focus de celui qui
-// écrit, et sa publication dit la recharge des conversations. E05-S10 retire le bouton, « Publié en révision
-// N. » et, au niveau gestion, le bandeau d'un brouillon que la personne vient d'écrire.
+// écrit. E05-S10 retire le bouton, « Publié en révision N. » et, au niveau gestion, le bandeau d'un brouillon
+// que la personne vient d'écrire. E11-S10 (AC-g3) retire la phrase de recharge des conversations.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import type { NodeKind } from "../../schemas"
 import type { ErreurPlateforme } from "../api/client"
@@ -35,7 +35,7 @@ type PublicationProps = {
   /** Gestion (3) : la publication seule ; écriture (2) : `phrase`, à qui revient la publication. */
   niveau: 2 | 3
   phrase: string
-  /** Le genre du nœud (E05-S04) : un Contexte confirme sa publication vide et dit la recharge des conversations. */
+  /** Le genre du nœud (E05-S04) : un Contexte confirme sa publication vide. */
   genre?: NodeKind
   /**
    * Les blocs du brouillon (E05-S04) : un refus y trouve la référence de son bloc (AC7) ; sans bloc, un
@@ -83,7 +83,6 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
   const rafraichir = useRafraichir()
   const [erreur, setErreur] = useState("")
   const [refus, setRefus] = useState<RefusLu[] | null>(null)
-  const [statut, setStatut] = useState("")
   const [contexteVide, setContexteVide] = useState(false)
   // Le dernier rendu, lu au départ de la publication : un minuteur armé plus tôt publie l'état courant.
   const lus = useRef({ genre, blocs, rafraichir })
@@ -107,7 +106,6 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
             setErreur("")
             setRefus(null)
             setContexteVide(false)
-            if (lus.current.genre === "context") setStatut(PUBLICATION_DU_CONTEXTE.recharge)
             return lus.current.rafraichir()
           }
           // Un refus n'arrête pas l'édition : la publication sort de la file, le texte reste dans le brouillon.
@@ -165,17 +163,13 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
     }
   }, [envoyer, ecouterLesFrappes, preparer, aUnBrouillon, remplacerLArret])
 
-  return { erreur, refus, statut, contexteVide, commandes }
+  return { erreur, refus, contexteVide, commandes }
 }
 
 function PublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readonly BlocAncre[] }) {
-  const { erreur, refus, statut, contexteVide, commandes } = usePublicationSeule({ genre, blocs })
+  const { erreur, refus, contexteVide, commandes } = usePublicationSeule({ genre, blocs })
   return (
     <div role="group" aria-label="Publication" className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${refus ? "basis-full" : ""}`}>
-      {/* Montée vide : elle ne dit que la recharge des conversations d'un Contexte publié. */}
-      <p role="status" className="oto-caption">
-        {statut}
-      </p>
       {erreur && (
         <>
           <p role="alert" className="text-sm text-ink">

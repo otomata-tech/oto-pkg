@@ -190,7 +190,7 @@ function nodeOrder(hits: Hit[]): string[] {
 }
 
 // ------------------------------------------------------------ Composantes du routage (AC27, AC28)
-const CANDIDATE_COLUMNS = ["node_id", "path", "title", "summary", "kind", "owner_team_id", "s_summary", "s_title", "lexical", "query_lexemes"]
+const CANDIDATE_COLUMNS = ["node_id", "path", "title", "summary", "kind", "owner_team_id", "s_summary", "s_title", "lexical", "query_lexemes", "s_phrase", "lexical_title"]
 
 describe.skipIf(!sqlConfigured || privatePending)(
   privateFolderSuite(sqlConfigured ? "search_content" : `search_content (${SQL_SKIP_REASON})`, privatePending),
@@ -389,6 +389,20 @@ describe.skipIf(!sqlConfigured || privatePending)(
     describe("drafts, rights, kinds, errors (AC24)", () => {
       it("should never find a draft, of a node never published or of a published one", async () => {
         expect(await search("lea", "zanzibar")).toEqual([])
+      })
+
+      // M58 (E11-S04, AC-a8) : un nœud à la corbeille ne prend plus de place sous la coupe ; la fonction
+      // d'avant le rendait en tête, par son titre, et le service le retirait après.
+      it("should leave a node in the trash out before the cut, by its title, its summary and its blocks, a living node taking its place", async () => {
+        const trashed = await published(o.nodes.ventes, "ventes/ornithorynque_corbeille", {
+          title: "Ornithorynque",
+          summary: "L'ornithorynque de la corbeille.",
+          blocks: [{ type: "paragraph", text: "Un ornithorynque dans un bloc." }],
+        })
+        await published(o.nodes.ventes, "ventes/ornithorynque_vivant", { title: "Page vivante", summary: "Un ornithorynque dans le résumé." })
+        await fx.admin`update platform.nodes set deleted_at = now() where id = ${trashed}`
+        expect((await search("lea", "ornithorynque", { limit: 1 })).map(at)).toEqual([["ventes/ornithorynque_vivant", "summary", null, null]])
+        expect((await search("lea", "ornithorynque")).map(at)).toEqual([["ventes/ornithorynque_vivant", "summary", null, null]])
       })
 
       it("should keep Support from Léa and give it to Paul, summary then block", async () => {

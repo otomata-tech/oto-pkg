@@ -6,16 +6,16 @@ import { connectAddress } from "../../../packages/plateforme/server/connect"
 import { section } from "../../helpers/ecran"
 import { identityOf, ORG } from "../../helpers/reference-org"
 
-// L'écran « Brancher un assistant » (E02-S04 : AC1 à AC8, AC11), porté sur le design system d'oto-frontend
-// (E05-S09, partie d3), rendu comme la page de l'hôte le monte : adresse de `connectAddress`, prompts et
-// connexions en `resultat`.
+// L'écran « Brancher mon Claude, ChatGPT ou Mistral » (E02-S04 ; E11-S09, AC-12, AC-13), porté sur le
+// design system d'oto-frontend (E05-S09, partie d3), rendu comme la page de l'hôte le monte : adresse de
+// `connectAddress`, exemples et connexions en `resultat`. Le détail des onglets et des étapes est éprouvé par
+// `guide-de-branchement.test.tsx`.
 
 // Slug, nom et préfixe distincts : le nom de serveur de Claude Code est le préfixe, et lui seul (AC5).
 const ACME = identityOf("lea", { org: { id: ORG.id, slug: "acme-energies", name: "Acme Énergies", prefix: "acme", brand: {}, domains: null } })
 const URL_ACME = "https://acme.example.test/api/mcp"
-const PHRASE = "Quand une demande concerne mon travail, commence par l'outil de contexte du connecteur « Acme Énergies »."
 const ECHEC = "Une erreur est survenue. Réessayez."
-const GUIDES = ["claude.ai et Claude Desktop", "ChatGPT", "Claude Code"]
+const TITRE = "Brancher mon Claude, ChatGPT ou Mistral"
 
 type Props = Parameters<typeof EcranConnexion>[0]
 
@@ -40,9 +40,6 @@ function poserLePressePapiers(writeText: (texte: string) => Promise<void>) {
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
 }
 
-/** Les textes d'une étape qui porte une copie : paragraphes et valeurs, sans la région de statut. */
-const textes = (etape: HTMLElement) => [...etape.querySelectorAll("p:not([role]), code")].map((element) => element.textContent)
-
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
@@ -51,21 +48,19 @@ afterEach(() => {
 })
 
 describe("EcranConnexion address (AC1)", () => {
-  it("should show the whole address in code, copy exactly it, say « Copié » in a region mounted empty, then clear it", async () => {
+  it("should show the whole address in code in the guide, copy exactly it, say « Copié » in a region mounted empty, then clear it", async () => {
     vi.useFakeTimers()
     const writeText = vi.fn().mockResolvedValue(undefined)
     poserLePressePapiers(writeText)
     rendre()
-    const bloc = section("Adresse du serveur")
+    const guide = screen.getByRole("tabpanel", { name: "claude.ai" })
 
-    const valeur = within(bloc).getByText(URL_ACME)
+    const valeur = within(guide).getByText(URL_ACME)
     expect(valeur.tagName).toBe("CODE")
     expect(valeur).toHaveClass("break-words")
-    expect(valeur).not.toHaveClass("truncate")
-    expect(within(bloc).getByText("Une adresse par organisation : si vous travaillez pour plusieurs organisations, ajoutez un connecteur pour chacune.")).toBeInTheDocument()
-    const statut = within(bloc).getByRole("status")
+    const bouton = within(guide).getByRole("button", { name: "Copier l'adresse du serveur" })
+    const statut = within(bouton.closest("dd") ?? guide).getByRole("status")
     expect(statut).toBeEmptyDOMElement()
-    const bouton = within(bloc).getByRole("button", { name: "Copier l'adresse du serveur" })
     // Le libellé visible est « Copier » ; la cible n'est lue que par le nom accessible, qui commence par lui.
     expect(bouton).toHaveTextContent(/^Copier$/)
 
@@ -80,108 +75,15 @@ describe("EcranConnexion address (AC1)", () => {
   it("should say the copy failed when the clipboard refuses it", async () => {
     poserLePressePapiers(vi.fn().mockRejectedValue(new DOMException("Write permission denied.", "NotAllowedError")))
     rendre()
-    const bloc = section("Adresse du serveur")
+    const guide = screen.getByRole("tabpanel", { name: "claude.ai" })
 
-    fireEvent.click(within(bloc).getByRole("button", { name: "Copier l'adresse du serveur" }))
+    fireEvent.click(within(guide).getByRole("button", { name: "Copier l'adresse du serveur" }))
 
-    expect(await within(bloc).findByText("Copie impossible : sélectionnez le texte.")).toHaveAttribute("role", "status")
+    expect(await within(guide).findByText("Copie impossible : sélectionnez le texte.")).toHaveAttribute("role", "status")
   })
 
   it("should build the address of the organisation from the origin of the request", () => {
     expect(connectAddress(ACME, "http://localhost:3000").url).toBe("http://localhost:3000/api/mcp")
-  })
-})
-
-describe("EcranConnexion connector name (AC2)", () => {
-  it("should recommend the organisation name, with its copy and why", () => {
-    rendre()
-    const bloc = section("Nom du connecteur")
-
-    expect(within(bloc).getByText("Acme Énergies").tagName).toBe("CODE")
-    expect(within(bloc).getByRole("button", { name: "Copier le nom du connecteur" })).toBeInTheDocument()
-    expect(within(bloc).getByText("Donnez ce nom au connecteur : c'est lui que l'assistant voit.")).toBeInTheDocument()
-  })
-})
-
-describe("EcranConnexion guides (AC3 to AC5)", () => {
-  it("should guide claude.ai in an ordered list, with the preference sentence to copy and its warning (AC3)", () => {
-    rendre()
-    const guide = section("claude.ai et Claude Desktop")
-    const etapes = within(guide).getAllByRole("listitem")
-
-    expect(guide.querySelector("ol")).toContainElement(etapes[0])
-    expect(etapes.map((etape) => (etape.querySelector("button") ? textes(etape) : etape.textContent))).toEqual([
-      "Dans claude.ai, ouvrez Paramètres → Connecteurs, puis ajoutez un connecteur personnalisé.",
-      `Nom : Acme Énergies ; adresse : ${URL_ACME}.`,
-      "Connectez-vous avec votre compte Acme Énergies, puis cliquez sur « Autoriser ».",
-      "Sur la fiche du connecteur, menu ⋯ → « Actualiser la liste d'outils ». Refaites ce geste après chaque mise à jour annoncée.",
-      [
-        "Ajoutez cette phrase à vos préférences personnelles de claude.ai :",
-        PHRASE,
-        "Vous avez plusieurs connecteurs d'organisation ? N'ajoutez pas cette phrase : elle attirerait les demandes des autres.",
-      ],
-      "Rechargez la page, attendez quelques secondes, puis ouvrez une nouvelle conversation.",
-    ])
-    expect(within(etapes[4]).getByRole("button", { name: "Copier la phrase de préférences" })).toBeInTheDocument()
-  })
-
-  it("should guide ChatGPT step by step, with nothing to add to its instructions (AC4)", () => {
-    rendre()
-    const guide = section("ChatGPT")
-
-    expect(within(guide).getAllByRole("listitem").map((etape) => etape.textContent)).toEqual([
-      "Activez le mode développeur dans les paramètres de ChatGPT.",
-      `Créez un connecteur : nom Acme Énergies, adresse ${URL_ACME}, authentification OAuth.`,
-      "Connectez-vous avec votre compte Acme Énergies, puis cliquez sur « Autoriser ».",
-      "Sur la fiche du connecteur, cliquez sur « Actualiser » : sans ce geste, aucun outil n'apparaît.",
-      "Dans une nouvelle conversation, sélectionnez le connecteur (@Acme Énergies) la première fois.",
-    ])
-    expect(
-      within(guide).getByText("Aucune phrase à ajouter dans ChatGPT. Si plusieurs comptes sont connectés au même connecteur, ChatGPT utilise le compte principal."),
-    ).toBeInTheDocument()
-  })
-
-  it("should give the two Claude Code commands to copy, named by the organisation prefix, and their help (AC5)", () => {
-    rendre()
-    const guide = section("Claude Code")
-    const [ajout, connexion, session] = within(guide).getAllByRole("listitem")
-
-    expect(textes(ajout)).toEqual([`claude mcp add --transport http acme ${URL_ACME}`])
-    expect(within(ajout).getByRole("button", { name: "Copier la commande d'ajout du serveur" })).toBeInTheDocument()
-    expect(textes(connexion)).toEqual([
-      "claude mcp login acme",
-      "Dans un terminal interactif : le navigateur s'ouvre pour la connexion et l'autorisation.",
-    ])
-    expect(within(connexion).getByRole("button", { name: "Copier la commande de connexion" })).toBeInTheDocument()
-    expect(session.textContent).toBe("Ouvrez une nouvelle session ; la commande /mcp montre l'état du serveur.")
-  })
-})
-
-describe("EcranConnexion prompts to try (AC6)", () => {
-  const TITRES = [
-    "Qualifier un prospect",
-    "Relancer les devis en attente",
-    "Préparer un rendez-vous",
-    "Répondre à un ticket",
-    "Clore le mois",
-    "Sixième procédure",
-    "Septième procédure",
-  ]
-
-  it("should list the first five procedures by their title, in the order received, each with its copy", () => {
-    rendre({ prompts: { data: TITRES.map((titre) => ({ titre })) } })
-    const bloc = section("À essayer")
-
-    expect(within(bloc).getAllByRole("listitem").map((prompt) => prompt.querySelector("code")?.textContent)).toEqual(TITRES.slice(0, 5))
-    for (const titre of TITRES.slice(0, 5)) {
-      expect(within(bloc).getByRole("button", { name: `Copier le prompt « ${titre} »` })).toBeInTheDocument()
-    }
-  })
-
-  it("should suggest a first question when no procedure is published", () => {
-    rendre({ prompts: { data: [] } })
-
-    expect(within(section("À essayer")).getByText("Aucune procédure publiée pour l'instant. Essayez : « Qu'est-ce que je peux te demander ici ? »")).toBeInTheDocument()
   })
 })
 
@@ -210,18 +112,25 @@ describe("EcranConnexion connections (AC7)", () => {
   })
 })
 
-describe("EcranConnexion states (AC8)", () => {
-  it.each<[string, Partial<Props>]>([
-    ["À essayer", { prompts: { error: ECHEC } }],
-    ["Vos connexions", { connexions: { error: ECHEC } }],
-  ])("should say a failed read in « %s » only, with « Réessayer », the address and the guides still shown", (titre, echec) => {
-    rendre(echec)
+describe("EcranConnexion states (AC-13)", () => {
+  it("should say a failed read of the examples in the guide only, with « Réessayer » reading the page again, the guide and the connections intact", () => {
+    rendre({ prompts: { error: ECHEC }, connexions: { data: [{ famille: "Claude Code", signature: "claude-code@2.1.280", date: "2026-09-23T09:00:00Z" }] } })
 
-    expect(screen.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(within(section(titre)).getByRole("alert")).toBeInTheDocument()
-    expect(within(section(titre)).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/connect")
-    expect(within(section("Adresse du serveur")).getByText(URL_ACME)).toBeInTheDocument()
-    for (const guide of GUIDES) expect(screen.getByRole("heading", { level: 2, name: guide })).toBeInTheDocument()
+    const guide = screen.getByRole("tabpanel", { name: "Claude Code" })
+    expect(screen.getAllByRole("alert")).toHaveLength(1)
+    expect(within(guide).getByRole("alert")).toHaveTextContent(ECHEC)
+    expect(within(guide).getByRole("button", { name: "Réessayer" })).toBeInTheDocument()
+    expect(within(guide).getByRole("button", { name: "Copier la commande d'ajout du serveur" })).toBeInTheDocument()
+    expect(within(section("Vos connexions")).getByRole("listitem")).toBeInTheDocument()
+  })
+
+  it("should say a failed read of the connections in « Vos connexions » only, with « Réessayer » on /connect, the guide open on claude.ai", () => {
+    rendre({ connexions: { error: ECHEC } })
+
+    expect(screen.getAllByRole("alert")).toHaveLength(1)
+    expect(within(section("Vos connexions")).getByRole("alert")).toHaveTextContent(ECHEC)
+    expect(within(section("Vos connexions")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/connect")
+    expect(within(screen.getByRole("tabpanel", { name: "claude.ai" })).getByText(URL_ACME)).toBeInTheDocument()
   })
 
   it("should render a busy loading state with a readable label", () => {
@@ -233,29 +142,17 @@ describe("EcranConnexion states (AC8)", () => {
   })
 })
 
-describe("EcranConnexion structure (AC11, AC-d3)", () => {
-  it("should title the page once, give each section its island and its h2, and keep values selectable in code", () => {
-    rendre({ prompts: { data: [{ titre: "Qualifier un prospect" }] } })
+describe("EcranConnexion structure (AC-12)", () => {
+  it("should title the page once, then carry the intro and the guide, then « Vos connexions », and nothing else", () => {
+    rendre()
 
-    expect(screen.getAllByRole("heading", { level: 1 }).map((titre) => titre.textContent)).toEqual(["Brancher un assistant"])
-    expect(
-      screen.getByText("Ajoutez Acme Énergies à votre assistant : il se connectera avec votre compte et agira dans la limite de vos droits."),
-    ).toBeInTheDocument()
-    expect(screen.getAllByRole("heading", { level: 2 }).map((titre) => titre.textContent)).toEqual([
-      "Adresse du serveur",
-      "Nom du connecteur",
-      ...GUIDES,
-      "À essayer",
-      "Vos connexions",
-    ])
-    for (const titre of screen.getAllByRole("heading", { level: 2 })) {
-      expect(screen.getByRole("region", { name: titre.textContent ?? "" })).toContainElement(titre)
-    }
-    // L'anneau de focus des copies est celui du design system (`--focus-ring`, encre).
-    const boutons = screen.getAllByRole("button")
-    expect(boutons).toHaveLength(6)
-    for (const bouton of boutons) {
-      expect(bouton.parentElement?.querySelector("code")).toHaveClass("select-all")
-    }
+    expect(screen.getAllByRole("heading", { level: 1 }).map((titre) => titre.textContent)).toEqual([TITRE])
+    const intro = screen.getByText("Ajoutez Acme Énergies à votre assistant : il agira avec votre compte, dans la limite de vos droits.")
+    const onglets = screen.getByRole("tablist", { name: "Votre assistant" })
+    const connexions = section("Vos connexions")
+    expect(intro.closest("section")).toContainElement(onglets)
+    expect(intro.closest("section")?.compareDocumentPosition(connexions)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(screen.getAllByRole("heading", { level: 2 }).map((titre) => titre.textContent)).toEqual(["Vos connexions"])
+    for (const ancien of ["Adresse du serveur", "Nom du connecteur", "À essayer"]) expect(screen.queryByText(ancien)).toBeNull()
   })
 })

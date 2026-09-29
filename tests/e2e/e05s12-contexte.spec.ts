@@ -9,9 +9,8 @@ import { CHEMINS, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 // repliable et la carte, le seul écart de la colonne, le même sur la page et sur le Contexte, sans l'ancienne marge de
 // 20 px (AC-22) ; à 1 280 px, rail ouvert, le haut de « À quoi sert cette page » est au niveau du haut de la carte,
 // dans une colonne d'au moins 270 px, le chapô et « Contenus liés » au-dessus d'elle ; à 375 px, l'ordre chapô,
-// Contenus liés, carte, annexes (AC-21) ; aucun défilement horizontal du contenu, sur le Contexte et sur l'accueil ;
-// « Règles Oto » est repliée à l'arrivée sur la vue « Contexte » de l'accueil, s'ouvre par Entrée, en français
-// (E05-S13, AC-14), et se referme par Espace (AC-11). Une capture par étape dans `test-results/`.
+// Contenus liés, carte, annexes (AC-21) ; aucun défilement horizontal du contenu, sur le Contexte et sur la vue
+// « Contexte », à `/context` depuis E11-S10, sans « Règles Oto » ni tête servie. Une capture par étape dans `test-results/`.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -102,30 +101,18 @@ test.describe("écrans du Contexte (E05-S12, lot C)", () => {
         expect(await sansDefilementHorizontal(page)).toBe(true)
         await capturer(page, testInfo, `contexte-${nom}`)
 
-        // AC-11 : « Règles Oto » repliée à l'arrivée, ouverte par Entrée, refermée par Espace, depuis son résumé.
-        await page.goto(`${ESPACE.adresse}/?onglet=contexte`)
-        const regles = page.locator("#regles details")
-        await attendre(regles).toBeAttached()
-        await expect(regles).not.toHaveAttribute("open")
-        const resume = regles.locator("summary")
-        await expect(resume).toContainText("Règles Oto")
-        await resume.focus()
-        await page.keyboard.press("Enter")
-        await attendre(regles).toHaveAttribute("open")
-        // En français à l'écran, servies en anglais (E05-S13, AC-14, HN-E05S13-14).
-        await expect(regles).not.toContainText("How this workspace works")
-        await expect(page.getByRole("region", { name: "Règles Oto" }).getByRole("textbox")).toHaveCount(0)
-        await capturer(page, testInfo, `regles-${nom}`)
-        await page.keyboard.press("Space")
-        await attendre(regles).not.toHaveAttribute("open")
-        // La partie Privé renvoie à Profil (AC-7), sans sa ligne `## Context:` (E05-S13, HN-E05S13-13) ; aucune
-        // ancienne partie (AC-6).
+        // E11-S10 (lot f) : la vue « Contexte », à `/context`, sans « Règles Oto », sans tête servie ni lien vers
+        // Profil dans la partie Privé ; aucune ancienne partie (AC-6).
+        await page.goto(`${ESPACE.adresse}/context`)
         const prive = page.getByRole("region", { name: "Contexte : Privé" })
-        await expect(prive.getByText(/^## Context:/)).toHaveCount(0)
-        await expect(prive.getByRole("link", { name: "Modifier dans Profil" })).toBeVisible()
+        await attendre(prive).toBeVisible()
+        await expect(page.getByRole("region", { name: "Règles Oto" })).toHaveCount(0)
+        await expect(page.getByRole("main")).not.toContainText("How this workspace works")
+        await expect(prive.getByText(/^## Context:|^You: /)).toHaveCount(0)
+        await expect(prive.getByRole("link", { name: "Modifier dans Profil" })).toHaveCount(0)
         await expect(page.getByRole("region", { name: "Vous", exact: true })).toHaveCount(0)
         expect(await sansDefilementHorizontal(page)).toBe(true)
-        await capturer(page, testInfo, `accueil-contexte-${nom}`)
+        await capturer(page, testInfo, `contexte-vue-${nom}`)
         await context.close()
       })
     }

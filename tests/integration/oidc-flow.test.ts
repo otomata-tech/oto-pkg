@@ -422,16 +422,13 @@ describe("the pages of each mode (AC-b5)", () => {
 })
 
 describe("the rest of the host in both modes (AC-b6)", () => {
-  /** L'adresse de l'accueil nu : l'onglet « Activités » (E05-S11, AC-12). */
-  const ACCUEIL = { searchParams: Promise.resolve({}) }
-
   /** Ce que l'hôte donne au paquet et montre, pour la session du moment. */
   async function answers() {
     vi.mocked(createPlatformDb).mockClear()
     vi.mocked(resolveIdentity).mockClear()
     const session = await getPlatformSession()
     const caller = vi.mocked(createPlatformDb).mock.calls[0]?.[0].caller
-    const pages = [await DashboardPage(ACCUEIL), await PlateformePage()]
+    const pages = [await DashboardPage(), await PlateformePage()]
     // La personne dont l'accueil résout l'identité, à l'hôte de la requête.
     const resolved = vi.mocked(resolveIdentity).mock.lastCall?.slice(1)
     await apiRoute(new Request(`${ORIGIN}/api/plateforme/teams`))
@@ -466,7 +463,7 @@ describe("the rest of the host in both modes (AC-b6)", () => {
     else vi.stubEnv("PLATFORM_OIDC_ISSUER", "")
     supabaseSignedIn(mode === "oidc")
 
-    await expect(DashboardPage(ACCUEIL)).rejects.toThrow("NEXT_REDIRECT:/login")
+    await expect(DashboardPage()).rejects.toThrow("NEXT_REDIRECT:/login")
     await expect(PlateformePage()).rejects.toThrow("NEXT_REDIRECT:/login")
   })
 })

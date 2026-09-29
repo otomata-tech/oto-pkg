@@ -1,11 +1,11 @@
-// La page `/connect` (E02-S04 : AC1, AC6 à AC10) : la session revérifiée par la page
+// La page `/connect` (E02-S04 : AC1, AC6 à AC10 ; E11-S09 : AC-12, AC-13) : la session revérifiée par la page
 // (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`), les deux lectures des
 // services avec le client de la session, chacune passée par `resultatDe`, et les noms des services
 // adaptés pour l'écran. Session de l'hôte et services du paquet simulés ; `connectAddress` et l'écran
 // sont les vrais.
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { lastConnections, listPrompts, PlatformError, type PlatformDb } from "@otomata_tech/oto_platform/server"
+import { lastConnections, listPrompts, PlatformError, usefulProcedures, type PlatformDb } from "@otomata_tech/oto_platform/server"
 import ConnectLoading from "@/app/(dashboard)/connect/loading"
 import ConnectPage, { metadata } from "@/app/(dashboard)/connect/page"
 import { getPlatformIdentity, getRequestOrigin, type PlatformSession } from "@/lib/plateforme/session"
@@ -26,6 +26,7 @@ vi.mock("@otomata_tech/oto_platform/server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@otomata_tech/oto_platform/server")>()),
   lastConnections: vi.fn(),
   listPrompts: vi.fn(),
+  usefulProcedures: vi.fn(),
 }))
 
 const ECHEC = "Une erreur est survenue. Réessayez."
@@ -42,7 +43,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getPlatformIdentity).mockResolvedValue({ data: { identity: IDENTITE, session: SESSION } })
   vi.mocked(getRequestOrigin).mockResolvedValue("https://acme.example.test")
-  vi.mocked(listPrompts).mockResolvedValue([{ name: "qualifier_prospects", title: "Qualifier un prospect", description: "Qualifie un prospect entrant." }])
+  vi.mocked(usefulProcedures).mockResolvedValue([{ path: "ventes/qualifier_prospects", title: "Qualifier un prospect" }])
   vi.mocked(lastConnections).mockResolvedValue([{ family: "Claude Code", signature: "claude-code@2.1.280", at: "2026-09-23T09:00:00Z" }])
 })
 
@@ -56,7 +57,7 @@ describe("/connect page session (AC9)", () => {
     vi.mocked(getPlatformIdentity).mockResolvedValue({ error: { code: "unauthenticated" } })
 
     await expect(ConnectPage()).rejects.toThrow("NEXT_REDIRECT:/login?redirect=%2Fconnect")
-    expect(listPrompts).not.toHaveBeenCalled()
+    expect(usefulProcedures).not.toHaveBeenCalled()
     expect(lastConnections).not.toHaveBeenCalled()
   })
 
@@ -64,46 +65,56 @@ describe("/connect page session (AC9)", () => {
     vi.mocked(getPlatformIdentity).mockResolvedValue({ error: { code } })
 
     await expect(ConnectPage()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
-    expect(listPrompts).not.toHaveBeenCalled()
+    expect(usefulProcedures).not.toHaveBeenCalled()
     expect(lastConnections).not.toHaveBeenCalled()
   })
 })
 
-describe("/connect page reads (AC1, AC6, AC7)", () => {
-  it("should read with the session client, and show the address of the request origin, each procedure by its title and each connection", async () => {
+describe("/connect page reads (AC1, AC7, AC-13)", () => {
+  it("should read three useful procedures, not the prompts, and the connections with the session client, and show the address of the request origin, each procedure as a request and each connection", async () => {
     render(await ConnectPage())
 
-    expect(listPrompts).toHaveBeenCalledWith(SESSION.db, IDENTITE)
+    expect(usefulProcedures).toHaveBeenCalledWith(SESSION.db, IDENTITE, 3)
+    expect(listPrompts).not.toHaveBeenCalled()
     expect(lastConnections).toHaveBeenCalledWith(SESSION.db, IDENTITE)
-    expect(within(section("Adresse du serveur")).getByText("https://acme.example.test/api/mcp")).toBeInTheDocument()
-    expect(within(section("À essayer")).getByRole("listitem")).toHaveTextContent("Qualifier un prospect")
-    expect(screen.queryByText("qualifier_prospects")).toBeNull()
+    // La dernière connexion vient de Claude Code : le guide s'ouvre sur son onglet (AC-2).
+    const guide = screen.getByRole("tabpanel", { name: "Claude Code" })
+    expect(within(guide).getByText("claude mcp add --transport http acme https://acme.example.test/api/mcp")).toBeInTheDocument()
+    expect(within(guide).getByRole("button", { name: "Copier la demande « Qualifier un prospect »" })).toBeInTheDocument()
     expect(within(section("Vos connexions")).getByRole("listitem")).toHaveTextContent(
       "Claude Code : dernière connexion le 23 septembre 2026 (claude-code@2.1.280)",
     )
   })
 })
 
-describe("/connect page failed reads (AC8)", () => {
-  it.each<[string, string, () => void]>([
-    ["À essayer", "Vos connexions", () => vi.mocked(listPrompts).mockRejectedValue(new PlatformError("internal", "Internal error."))],
-    ["Vos connexions", "À essayer", () => vi.mocked(lastConnections).mockRejectedValue(new PlatformError("internal", "Internal error."))],
-  ])("should say a failed read in « %s » only, with « Réessayer » on /connect, « %s » still shown", async (titre, autre, echouer) => {
+describe("/connect page failed reads (AC-13)", () => {
+  it("should say a failed read of the procedures in the guide only, « Vos connexions » still shown", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
-    echouer()
+    vi.mocked(usefulProcedures).mockRejectedValue(new PlatformError("internal", "Internal error."))
 
     render(await ConnectPage())
 
     expect(screen.getAllByRole("alert")).toHaveLength(1)
-    expect(within(section(titre)).getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(within(section(titre)).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/connect")
-    expect(within(section(autre)).getByRole("listitem")).toBeInTheDocument()
+    expect(within(screen.getByRole("tabpanel")).getByRole("alert")).toHaveTextContent(ECHEC)
+    expect(within(section("Vos connexions")).getByRole("listitem")).toBeInTheDocument()
+  })
+
+  it("should say a failed read of the connections in « Vos connexions » only, with « Réessayer » on /connect, the requests still shown", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.mocked(lastConnections).mockRejectedValue(new PlatformError("internal", "Internal error."))
+
+    render(await ConnectPage())
+
+    expect(screen.getAllByRole("alert")).toHaveLength(1)
+    expect(within(section("Vos connexions")).getByRole("alert")).toHaveTextContent(ECHEC)
+    expect(within(section("Vos connexions")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/connect")
+    expect(within(screen.getByRole("tabpanel", { name: "claude.ai" })).getByRole("button", { name: "Copier la demande « Qualifier un prospect »" })).toBeInTheDocument()
   })
 })
 
-describe("/connect page metadata and loading (AC8, AC10)", () => {
-  it("should be titled Brancher un assistant and not indexed", () => {
-    expect(metadata).toMatchObject({ title: "Brancher un assistant", robots: { index: false } })
+describe("/connect page metadata and loading (AC8, AC-12)", () => {
+  it("should be titled with the new name and not indexed", () => {
+    expect(metadata).toMatchObject({ title: "Brancher mon Claude, ChatGPT ou Mistral", robots: { index: false } })
   })
 
   it("should show the loading state while the page loads", () => {

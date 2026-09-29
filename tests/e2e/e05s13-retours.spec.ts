@@ -7,7 +7,7 @@ import { attendre, capturer, ouvrirLeRail, seConnecterSurLEspace } from "./fixtu
 // (`espace.ts`), en clair puis en sombre, à 375 et 1 280 px : le menu de l'entreprise range Journal dans les
 // réglages, sans Usage, deux groupes sous-titrés pour le staff et un seul sans sous-titre sinon (AC-10) ; le titre
 // d'une section du rail la plie et la déplie comme le chevron, un seul contrôle, le pli retenu (AC-12) ; la vue
-// « Contexte » de l'accueil montre ses parties en cartes, en français, sans chiffres (AC-13, AC-14) ; l'encart
+// « Contexte » (`/context` depuis E11-S10) montre ses parties en cartes, en français, sans chiffres (AC-13, AC-14) ; l'encart
 // « Voici ce que votre agent va lire » sans chiffres ni légende visible (AC-13) ; « À quoi sert cette page » en une
 // phrase par portée, plus « Vous l'écrivez comme n'importe quelle page. » (AC-17) ; aucun « Déplacer » en tête d'un
 // contenu (AC-20) ; l'encart « Contexte · Tout le monde » d'Organisation porte les pages que cite ce Contexte
@@ -91,7 +91,8 @@ test.describe("E05-S13 : les retours du soir", () => {
         await expect(rail.getByRole("button", { name: "Replier Privé", exact: true })).toHaveAttribute("aria-expanded", "true")
         if (largeur < 768) await page.keyboard.press("Escape")
 
-        // AC-13, AC-14 : la vue « Contexte » de l'accueil, ses parties en cartes et en français, sans chiffres.
+        // AC-13, AC-14 : la vue « Contexte » (`/context`, E11-S10), ses parties en cartes et en français, sans chiffres ni
+        // « Règles Oto ».
         // Un connecteur parmi les nouveautés (AC-14), qui n'en gardent que les 10 plus récentes : les specs parallèles
         // publient des versions du Privé du compte, qui chassent l'activation semée. Elle est redatée juste avant la
         // lecture, comme une réactivation (`updated_at`, la date que lit le bloc).
@@ -103,10 +104,11 @@ test.describe("E05-S13 : les retours du soir", () => {
             returning a.connector`,
         )
         expect(redatees, "active mail connector of the campaign organisation").toHaveLength(1)
-        await page.goto(`${ESPACE.adresse}/?onglet=contexte`)
-        const vue = main.getByRole("tabpanel", { name: "Contexte" })
+        await page.goto(`${ESPACE.adresse}/context`)
+        const vue = main
         await attendre(vue.getByRole("region", { name: "Contexte : Tout le monde" })).toBeVisible()
-        for (const partie of ["Nouveautés", "Procédures utiles", "Contenus récents", "Règles Oto"]) await expect(vue.getByRole("region", { name: new RegExp(`^${partie}`) })).toBeVisible()
+        for (const partie of ["Nouveautés", "Procédures utiles", "Contenus récents"]) await expect(vue.getByRole("region", { name: new RegExp(`^${partie}`) })).toBeVisible()
+        await expect(vue.getByRole("region", { name: "Règles Oto" })).toHaveCount(0)
         for (const retire of RETIRES) await expect(vue, retire).not.toContainText(retire)
         await expect(vue.getByRole("region", { name: /^Procédures utiles/ }).locator(`a[href="/n/${CHEMINS.procedure}"]`)).toBeVisible()
         await expect(vue.getByRole("region", { name: /^Nouveautés/ }).getByText(/^Connecteur .+ activé le /).first()).toBeVisible()

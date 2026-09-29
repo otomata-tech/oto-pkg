@@ -84,7 +84,8 @@ async function create(call: OpCall): Promise<AdminOutput> {
   const { slug } = created.data
   const head = `Team ${created.data.name} created in ${identity.org.slug} with the slug ${slug} (folder ${slug}, context page ${slug}/contexte)`
   const output = { data: { team: created.data }, target: `team:${slug}`, nextActions: AFTER_WRITE }
-  if (!lead) return { ...output, text: `${head}, no lead yet.` }
+  // Sans email, le créateur membre de l'organisation en est le responsable (`createTeam`, E11-S10 AC-c3).
+  if (!lead) return { ...output, text: identity.viaGrant ? `${head}, no lead yet.` : `${head}, lead ${identity.user.name} ${identity.user.email} (you).` }
   try {
     await updateTeam(db, identity, created.data.id, { leadUserId: lead.userId })
   } catch (failure) {

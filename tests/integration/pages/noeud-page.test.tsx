@@ -280,9 +280,15 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     // Le Contexte Perso d'une autre personne, qui l'a partagé : il n'est servi qu'à elle (HN-E05S04-22).
     ["private/marc/contexte", "Ce que l'assistant de la personne de cet espace lit à chaque conversation ; elle seule le reçoit."],
     ["ventes/contexte", "Ce que les assistants des membres de l'équipe Ventes lisent à chaque conversation."],
-  ])("should give the Contexte %s its annexes and what the agent will read, each line leading to the home's « Contexte » view, without « Ma fiche »", async (chemin, recu) => {
+  ])("should give the Contexte %s its annexes and what the agent will read, each line leading to the « Contexte » view, without « Ma fiche »", async (chemin, recu) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: lea(), session: SESSION } })
     vi.mocked(loadNode).mockResolvedValue(vueDuNoeud({ path: chemin, kind: "context", title: "Contexte", level: 2 }))
+    const toutLeMonde = "## Context: everyone (contexte)\nNous vendons."
+    vi.mocked(previewContext).mockResolvedValue({
+      ...APERCU,
+      text: `${APERCU.text}\n\n${toutLeMonde}`,
+      blocks: [...APERCU.blocks, { name: "contexte", chars: toutLeMonde.length, status: "full", path: "contexte", head: 0 }],
+    })
     await monter(await page(chemin.split("/")))
 
     expect(previewContext).toHaveBeenCalledWith(SESSION.db, lea(), {})
@@ -290,7 +296,9 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     // E05-S13 (AC-17) : qui le reçoit, dit en une phrase.
     expect(note.getByText(recu)).toBeInTheDocument()
     const encart = within(screen.getByRole("note", { name: "Voici ce que votre agent va lire" }))
-    expect(encart.getByRole("link", { name: "Règles Oto" })).toHaveAttribute("href", "/?onglet=contexte#regles")
+    // E11-S10 (AC-e4, AC-g2) : chaque ligne mène à `/context#<ancre>`, sans « Règles Oto » ; l'ancre garde son rang d'origine.
+    expect(encart.getByRole("link", { name: /^Contexte : Tout le monde/ })).toHaveAttribute("href", "/context#contexte-tout-le-monde")
+    expect(encart.queryByRole("link", { name: "Règles Oto" })).toBeNull()
     expect(screen.queryByRole("region", { name: "Ma fiche" })).toBeNull()
   })
 

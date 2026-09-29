@@ -37,8 +37,7 @@ function monterLaVue(suite: string, level: 1 | 3) {
       donnees={{ apercu: apercu(suite), contextes: contextes(level), equipes: [], nomOrganisation: "Démo" }}
       Lien={LienDeTest}
       prefixeDesPages="/n/"
-      hrefDuProfil="/profil"
-      ici="/?onglet=contexte"
+      ici="/context"
     />,
   )
 }

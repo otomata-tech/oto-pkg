@@ -36,12 +36,12 @@ lourdes.
 | 1 | E11-S04 | Routage des procédures : trois candidates proposées, égalités, formulations, fautes de frappe (routage et `find`, M58) | L | Ⓜ | — | ✅ approuvée, fusionnée sur main (non commitée) |
 | 1 | E11-S09 | Brancher mon Claude, ChatGPT ou Mistral : un guide par onglet, grande fenêtre et `/connect` | M | | — | ✅ approuvée, fusionnée sur main (non commitée) ; AC-15 en attente (banc Le Chat) |
 | 2 | E11-S03 | Contexte et conversations : invalidation ciblée des ctx, plafond seul et coupe dite, déplacer et compléter une liste | L | Ⓜ | E11-S04 (fichiers communs) ; lot c : E10-S04 | 🟢 Ready |
-| 2 | E11-S10 | Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu | L | Ⓜ | E11-S09 (accueil) ; E10-S01 (`ui/coque/`) | 🟢 Ready |
+| 2 | E11-S10 | Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu | L | Ⓜ | E11-S09 (accueil) ; E10-S01 (`ui/coque/`) | ✅ approuvée, fusionnée sur main avec S04 et S09 (commit à venir) ; AC-a0 : relevé de diagnostic sur Démo par le responsable d'Oto |
 | 3 | E11-S01 | Tableaux : créer sans écraser, colonne stricte, recherche par mots, révision et auteur, revue par l'agent, preuve par tableau, réglages à l'écran | L | | E10-S01 (fichiers des tableaux) ; lot g après E11-S02 | 🟢 Ready (lots a à f en vague 3, lot g en vague 4 après S02) |
 | 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | 🟢 Ready |
 | 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | 🟢 Ready |
 | 5 | E11-S06 | Éditeur : une puce par élément de liste, modifier un lien dans un panneau | M | | E10-S04, E10-S06 | 🟢 Ready |
-| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | 🔵 In progress (lot a, worktree `e11-s14`) |
+| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | 🔵 lot a approuvé (worktree `e11-s14`), à fusionner |
 | 6 | E11-S07 | Adresses en anglais : routes, paramètres, ancres, préfixe d'API | L | | toutes les autres | 🟢 Ready (cassante) |
 
 - **Livraison** : une seule version, 1.0.1, pour les quatre stories d'E10 et les neuf d'E11 (fiche
@@ -100,6 +100,7 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M72 | Vue « Contexte » de l'accueil : pour un Contexte écrivable, la ligne « Not loaded: … » (échec de lecture des Contextes) est masquée par l'éditeur, comme l'étaient les listes avant M71. |
 | M73 | Suites d'E05-S13 : `default_team_id` et `lead_user_id` vidés, à retirer en 1.1 ; services et API des règles d'accès et des accès plateforme sans écran client ; `EcranUsage` et `usageSummary` sans page ; `Onglets.titre` mort ; lignes de faits et de connecteurs du Contexte en anglais à l'écran (traduction : ADR-015). |
 | M74 | `oto-platform migrations sync` compare les copies de l'hôte octet pour octet : sur un checkout Windows (autocrlf), les copies en CRLF diffèrent toutes du paquet (LF) et la commande refuse d'écrire. Comparer sans les retours chariot, et dire dans le README des migrations d'ajouter `supabase/migrations/*.sql text eol=lf` au `.gitattributes` de l'hôte (fait dans oto-saas). |
+| M76 | `tests/unit/hooks.test.ts` (verify-receipt, `git add` d'un fichier de `src/lib/utils`) et `tests/unit/ui-boundary.test.ts` (délai de 30 s sur le premier `lintText`) échouent quand d'autres sessions travaillent dans le même checkout ou que la RAM manque : isoler le fichier de brouillon hors de l'arbre suivi et relever le délai ou charger la config une fois. |
 
 ## Actions réservées à JB
 

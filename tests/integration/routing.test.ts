@@ -13,9 +13,10 @@ import { createSqlFixtures, SQL_SKIP_REASON, sqlConfigured, type SqlFixtures } f
 import { blockInputSchema, normalizeTitle } from "../../packages/plateforme/schemas"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
 import { resolveIdentity, type Identity } from "../../packages/plateforme/server/identity"
-import { decide, rankCandidates, routingSettings } from "../../packages/plateforme/server/routing"
+import { CANDIDATES_SHOWN, decide, rankCandidates, routingSettings } from "../../packages/plateforme/server/routing"
 import { ACME_PEOPLE, ACME_PROCEDURES, ACME_TEAMS, acmeProfile, seedNodesOf, type AcmeTeam } from "./fixtures/acme"
 import { ACME_AMBIGUOUS, ACME_FORMULATIONS, ACME_NEGATIVES, ACME_PARAPHRASES, type RoutingCase } from "./fixtures/acme-routing.cases"
+import { TODO_CASES, TODO_PROCEDURES, type TodoRoutingCase } from "./fixtures/todo-routing.cases"
 
 const NETWORK_TIMEOUT = 180_000
 const SETUP_TIMEOUT = 240_000
@@ -128,6 +129,51 @@ describe.skipIf(!sqlConfigured)(
       expect(metrics.precision).toBeGreaterThanOrEqual(0.95)
       for (const outcome of outcomes.filter((candidate) => candidate.forbid)) expect(outcome.served, outcome.phrase).not.toBe(outcome.forbid)
       for (const outcome of outcomes.filter((candidate) => candidate.expect === null)) expect(outcome.served, outcome.phrase).toBeNull()
+    })
+  },
+)
+
+// Jeu « todo » (E11-S04, AC-c1) : une organisation jetable, une personne membre, les quatre procédures
+// d'organisation du rapport de tests, sans bonus d'équipe ni d'usage, au réglage par défaut.
+describe.skipIf(!sqlConfigured)(
+  sqlConfigured ? "routing without a host on the todo (E11-S04, AC-c1)" : `routing without a host on the todo (E11-S04, AC-c1) (${SQL_SKIP_REASON})`,
+  { timeout: NETWORK_TIMEOUT },
+  () => {
+    let fx: SqlFixtures
+    let db: PlatformDb
+    let member: Identity
+
+    beforeAll(async () => {
+      fx = createSqlFixtures()
+      const host = `t${hex(4)}.example.invalid`
+      const org = await fx.createOrg({ name: "Todo Test", hosts: [host] })
+      await fx.createTree(org.id)
+      const user = await fx.createUser({ fullName: "Membre Todo" })
+      await fx.addMember(org.id, user.id, { role: "member" })
+      await fx.seedNodes(org.id, TODO_PROCEDURES)
+      db = fx.as(user)
+      member = await resolveIdentity(db, host, { userId: user.id, email: user.email })
+    }, SETUP_TIMEOUT)
+
+    afterAll(async () => {
+      await fx?.cleanup()
+    }, SETUP_TIMEOUT)
+
+    it("should serve, rank first or show the expected procedure for each phrase of the report, and never serve the others", async () => {
+      const outcomes: (TodoRoutingCase & { served: string | null; shown: string[] })[] = []
+      for (const todoCase of TODO_CASES) {
+        const candidates = await rankCandidates(db, member, { query: todoCase.phrase, limit: CANDIDATES_SHOWN })
+        const served = decide(candidates, routingSettings(null))?.path ?? null
+        console.log(`[routage todo] « ${todoCase.phrase} » → ${served ?? "rien de servi"} ; ${candidates.map((c) => `${c.path} ${c.score.toFixed(2)}`).join(", ")}`)
+        outcomes.push({ ...todoCase, served, shown: candidates.map((candidate) => candidate.path) })
+      }
+      const verdict = (outcome: (typeof outcomes)[number]) => {
+        if (outcome.expect === "served") return outcome.served === outcome.path
+        if (outcome.expect === "first") return outcome.shown[0] === outcome.path && [null, outcome.path].includes(outcome.served)
+        if (outcome.expect === "shown") return outcome.shown.includes(outcome.path ?? "") && [null, outcome.path].includes(outcome.served)
+        return outcome.served === null
+      }
+      expect(outcomes.filter((outcome) => !verdict(outcome)).map(({ phrase, served, shown }) => ({ phrase, served, shown }))).toEqual([])
     })
   },
 )

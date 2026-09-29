@@ -120,6 +120,33 @@ describe.skipIf(!sqlConfigured || privatePending)(
         expect(await paths(created.data.slug)).toEqual([created.data.slug, `${created.data.slug}/contexte`])
       })
 
+      it("should enter its creator as its lead in the same transaction, and write no membership on a refusal (E11-S10, AC-c1)", async () => {
+        const created = await newTeam("Achats")
+        expect(await roles(created.id)).toEqual({ [o.people.ada.id]: "lead" })
+        const lead = (await listTeams(as("ada").db, as("ada").identity)).find((team) => team.id === created.id)
+        expect(lead).toMatchObject({ leadName: "Ada Martin", members: [{ userId: o.people.ada.id, role: "lead" }] })
+
+        const memberships = async () => (await fx.admin`select team_id from platform.team_members tm join platform.teams t on t.id = tm.team_id where t.org_id = ${o.org.id}`).length
+        const before = await memberships()
+        const slug = `stock_${hex(3)}`
+        await fx.createNode(o.org.id, { parentId: o.nodes.root, path: slug, title: "Stock" })
+        expect((await refusal(createTeam(as("ada").db, as("ada").identity, { name: slug }))).details).toEqual({ reason: "path_taken" })
+        expect((await refusal(createTeam(as("ada").db, as("ada").identity, { name: created.name }))).details).toEqual({ reason: "name_taken" })
+        expect(await memberships()).toBe(before)
+      })
+
+      it("should create the team of a platform access without membership, and enter nobody (E11-S10, AC-c2)", async () => {
+        const s = await fx.createUser({ fullName: "Sam Staff" })
+        await fx.makeStaff(s.id)
+        await fx.grantPlatformAccess(o.org.id, s.id, null)
+        const db = fx.as(s)
+        const identity = await resolveIdentity(db, o.host, { userId: s.id, email: s.email })
+        expect(identity.viaGrant).toBe(true)
+        const { data } = await createTeam(db, identity, { name: `Conseil ${hex(3)}` })
+        expect(await roles(data.id)).toEqual({})
+        expect(await paths(data.slug)).toEqual([data.slug, `${data.slug}/contexte`])
+      })
+
       it("should refuse a name already taken, by its slug or without case nor accents (name_taken)", async () => {
         const first = await newTeam("Équipe Achats")
         for (const name of [first.name.toUpperCase(), first.name.replace("Équipe", "Equipe"), `${first.name}!`]) {
@@ -177,11 +204,12 @@ describe.skipIf(!sqlConfigured || privatePending)(
         const team = await newTeam("Direction")
         await updateTeam(as("ada").db, as("ada").identity, team.id, { leadUserId: o.people.paul.id })
         await updateTeam(as("ada").db, as("ada").identity, team.id, { leadUserId: o.people.marc.id })
-        expect(await roles(team.id)).toEqual({ [o.people.paul.id]: "member", [o.people.marc.id]: "lead" })
+        // Ada, qui l'a créée, en était la responsable (E11-S10, AC-c1) : elle en reste membre.
+        expect(await roles(team.id)).toEqual({ [o.people.ada.id]: "member", [o.people.paul.id]: "member", [o.people.marc.id]: "lead" })
 
         await updateTeam(as("ada").db, as("ada").identity, team.id, { leadUserId: null })
         expect((await teamRow(team.slug))[0]?.lead_user_id).toBeNull()
-        expect(await roles(team.id)).toEqual({ [o.people.paul.id]: "member", [o.people.marc.id]: "member" })
+        expect(await roles(team.id)).toEqual({ [o.people.ada.id]: "member", [o.people.paul.id]: "member", [o.people.marc.id]: "member" })
       })
 
       it("should refuse a lead who is not a member of the organisation (invalid_arguments)", async () => {

@@ -155,14 +155,15 @@ describe("(dashboard) layout brand (AC3, AC4)", () => {
 
   // E05-S11 (AC-32, AC-6, AC-e22) : les adresses que le layout donne au pied du rail ; le menu de
   // l'entreprise (AC-31, AC-33) : `admin-pages.test.tsx`.
-  it("should give the rail Connecteurs at its foot, then Profil and Corbeille in the account menu", async () => {
+  // E11-S10 (AC-e1) : « Contexte » en tête du menu du compte, à `/context`.
+  it("should give the rail Connecteurs at its foot, then Contexte, Profil and Corbeille in the account menu", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(membre({}))
 
     render(await DashboardLayout({ children: <p>Contenu</p> }))
 
     expect(screen.getByRole("link", { name: "Connecteurs" })).toHaveAttribute("href", "/admin/connecteurs")
     fireEvent.click(screen.getByRole("button", { name: /^Compte : / }))
-    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Profil", "Brancher un assistant", "Corbeille", "Déconnexion"])
+    expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Contexte", "Profil", "Brancher mon Claude, ChatGPT ou Mistral", "Corbeille", "Déconnexion"])
   })
 })
 

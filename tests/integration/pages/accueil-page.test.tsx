@@ -3,15 +3,16 @@
 // avec le client de la session, chacune passée par `resultatDe`, la semaine du journal prise au défaut de
 // `/journal`, l'adresse du serveur tirée de l'origine de la requête, et les noms des services adaptés pour
 // l'écran. Session de l'hôte et services du paquet simulés ; `connectAddress` et l'écran sont les vrais.
-// E05-S11 (AC-12 à AC-14) : l'onglet est lu dans l'adresse ; sur « Contexte », la page lit l'aperçu sans
-// phrase, puis chaque Contexte servi par son chemin, dont le niveau (décidé par le service) choisit l'éditeur.
+// E11-S10 (AC-e3) : l'accueil n'a plus d'onglets ni ne lit l'adresse ; la vue « Contexte » est éprouvée par
+// `contexte-page.test.tsx`.
+// E11-S09 (AC-11) : la fenêtre de « Brancher » reçoit l'adresse entière et les procédures déjà lues.
 import type { ReactNode } from "react"
-import { act, cleanup, render, screen, within } from "@testing-library/react"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { lastConnections, listActivities, loadNode, PlatformError, previewContext, usefulProcedures, type PlatformDb } from "@otomata_tech/oto_platform/server"
 import AccueilPage, { metadata } from "@/app/(dashboard)/page"
 import { getPlatformIdentitySafely, getRequestOrigin, type PlatformSession } from "@/lib/plateforme/session"
-import { bloc, vueDuNoeud } from "../../helpers/noeud"
+import { simulerLesDialogues } from "../../helpers/dialogue"
 import { identityOf, ORG } from "../../helpers/reference-org"
 
 vi.mock("@/lib/plateforme/session", () => ({ getPlatformIdentitySafely: vi.fn(), getRequestOrigin: vi.fn() }))
@@ -33,10 +34,11 @@ vi.mock("@otomata_tech/oto_platform/server", async (importOriginal) => ({
   loadNode: vi.fn(),
 }))
 
-/** La page, son adresse réduite à ses paramètres (`?onglet=`). */
-const page = (parametres: Record<string, string> = {}) => AccueilPage({ searchParams: Promise.resolve(parametres) })
+/** La page : elle ne lit plus son adresse (E11-S10, AC-e3). */
+const page = () => AccueilPage()
 
 const ECHEC = "Une erreur est survenue. Réessayez."
+const BRANCHER = "Brancher mon Claude, ChatGPT ou Mistral"
 const IDENTITE = identityOf("lea", { org: { id: ORG.id, slug: "demo", name: "Démo", prefix: "demo", brand: {}, domains: null } })
 const SESSION: PlatformSession = {
   user: { id: IDENTITE.user.id, email: IDENTITE.user.email },
@@ -54,8 +56,8 @@ async function montrer(page: ReactNode) {
 }
 
 const ilot = (nom: string) => within(screen.getByRole("region", { name: nom }))
-/** Le panneau d'un onglet de l'îlot principal, nommé par son onglet (E05-S11, AC-12). */
-const panneau = (nom: string) => within(screen.getByRole("tabpanel", { name: nom }))
+
+beforeAll(simulerLesDialogues)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -109,11 +111,15 @@ describe("/ page reads (AC-b1)", () => {
     expect(usefulProcedures).toHaveBeenCalledWith(SESSION.db, IDENTITE, 6)
     expect(lastConnections).toHaveBeenCalledWith(SESSION.db, IDENTITE)
     expect(screen.getByRole("heading", { level: 1, name: `Bonjour ${IDENTITE.member.profile.name}` })).toBeInTheDocument()
-    expect(panneau("Activités").getByRole("link", { name: /^Vous avez lancé la procédure Relancer les impayés/ })).toHaveAttribute("href", "/journal?conversation=K7M2-9QXR")
+    expect(ilot("Activités").getByRole("link", { name: /^Vous avez lancé la procédure Relancer les impayés/ })).toHaveAttribute("href", "/journal?conversation=K7M2-9QXR")
     expect(ilot("Procédures les plus utilisées").getByRole("link", { name: "Relancer les impayés" })).toHaveAttribute("href", "/n/ventes/relance")
-    expect(ilot("Brancher un assistant").getByRole("listitem")).toHaveTextContent("Claude Code · dernière connexion le 23 septembre 2026")
-    // Un assistant est branché : l'adresse, lue à l'origine de la requête, est dans le dialogue.
-    expect(screen.getByText("https://demo.example.test/api/mcp", { selector: "code" })).toBeInTheDocument()
+    expect(ilot(BRANCHER).getByRole("listitem")).toHaveTextContent("Claude Code · dernière connexion le 23 septembre 2026")
+    // La fenêtre reçoit l'adresse entière, lue à l'origine de la requête, et les procédures déjà lues (AC-11).
+    fireEvent.click(ilot(BRANCHER).getByRole("button", { name: "Brancher" }))
+    const guide = within(screen.getByRole("dialog", { name: BRANCHER })).getByRole("tabpanel", { name: "Claude Code" })
+    expect(within(guide).getByText("claude mcp add --transport http demo https://demo.example.test/api/mcp")).toBeInTheDocument()
+    expect(within(guide).getByRole("button", { name: "Copier la demande « Relancer les impayés »" })).toBeInTheDocument()
+    expect(usefulProcedures).toHaveBeenCalledTimes(1)
     expect(previewContext).not.toHaveBeenCalled()
     expect(loadNode).not.toHaveBeenCalled()
   })
@@ -125,8 +131,8 @@ describe("/ page reads (AC-b1)", () => {
     await montrer(await page())
 
     expect(screen.getAllByRole("alert")).toHaveLength(1)
-    expect(panneau("Activités").getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(ilot("Brancher un assistant").getByRole("listitem")).toHaveTextContent("Claude Code")
+    expect(ilot("Activités").getByRole("alert")).toHaveTextContent(ECHEC)
+    expect(ilot(BRANCHER).getByRole("listitem")).toHaveTextContent("Claude Code")
   })
 
   it("should say once that the home could not be read when the identity cannot be resolved, reading nothing", async () => {
@@ -141,78 +147,16 @@ describe("/ page reads (AC-b1)", () => {
   })
 })
 
-// E05-S11 (AC-12 à AC-14) : l'onglet « Contexte », ce que lit l'assistant ; les Contextes lus par leur chemin.
-describe("/ page, « Contexte » tab (E05-S11)", () => {
-  const TEXTE = "ctx: XXXX-XXXX\n\n## Context: everyone (contexte)\nNous vendons.\n\n## Context: team Ventes (ventes/contexte)\nTutoie."
-  const APERCU = {
-    text: TEXTE,
-    budget: 20_000,
-    blocks: [
-      { name: "code", chars: 14, status: "full" as const, path: null },
-      { name: "contexte", chars: 45, status: "full" as const, path: "contexte" },
-      { name: "ventes/contexte", chars: 49, status: "full" as const, path: "ventes/contexte" },
-    ],
-    served: null,
-    candidates: [],
-  }
+// E11-S10 (AC-e3) : `/?onglet=contexte` rend l'accueil comme `/`, sans rien lire du Contexte.
+describe("/ page without tabs (E11-S10, AC-e3)", () => {
+  it("should read no parameter of its address, show « Activités » without tabs, and read nothing of the Contexte", async () => {
+    // La page ne prend plus `searchParams` : `?onglet=contexte` ne l'atteint pas.
+    expect(AccueilPage.length).toBe(0)
+    await montrer(await page())
 
-  beforeEach(() => {
-    vi.mocked(previewContext).mockResolvedValue(APERCU)
-    // Le service décide des niveaux : Tout le monde en lecture, Ventes en gestion.
-    vi.mocked(loadNode).mockImplementation(async (_db, _identite, { path }) =>
-      path === "contexte"
-        ? vueDuNoeud({ id: "n-contexte", path, kind: "context", level: 1 })
-        : vueDuNoeud({ id: "n-ventes", path, kind: "context", level: 3, blocks: [bloc("b2000000-0000-4000-8000-000000000002", "paragraph", "Tutoie.")] }),
-    )
-  })
-
-  it("should read the preview without a phrase, then each served Contexte by its path, with the session client, writing in place the one the service lets the person write", async () => {
-    await montrer(await page({ onglet: "contexte" }))
-
-    expect(previewContext).toHaveBeenCalledWith(SESSION.db, IDENTITE, {})
-    expect(vi.mocked(loadNode).mock.calls.map(([db, identite, lu]) => [db, identite, lu.path])).toEqual([
-      [SESSION.db, IDENTITE, "contexte"],
-      [SESSION.db, IDENTITE, "ventes/contexte"],
-    ])
-    expect(screen.getByRole("tab", { name: "Contexte" })).toHaveAttribute("aria-selected", "true")
-    const vue = panneau("Contexte")
-    expect(within(vue.getByRole("region", { name: "Contexte : Tout le monde" })).queryByRole("textbox")).toBeNull()
-    expect(within(vue.getByRole("region", { name: "Contexte : équipe Ventes" })).getByRole("textbox", { name: "Modifier ce texte — Tutoie." })).toBeInTheDocument()
-  })
-
-  // E05-S12 (AC-7, HN-E05S12-C10) : le Contexte d'une partie non servie se lit aussi ; absent (`not_found`), sa
-  // partie garde sa tête sans alerte ; toute autre panne se dit dans sa partie.
-  it("should read the Contexte of a part not served, say its failed read, and say nothing of an absent one", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {})
-    const conseil = "## Context: team Conseil (conseil/contexte)\nTeam Conseil."
-    const support = "## Context: team Support (support/contexte)\nTeam Support."
-    vi.mocked(previewContext).mockResolvedValue({
-      ...APERCU,
-      text: [TEXTE, conseil, support].join("\n\n"),
-      blocks: [
-        ...APERCU.blocks,
-        { name: "conseil/contexte", chars: conseil.length, status: "full", path: null, head: conseil.length },
-        { name: "support/contexte", chars: support.length, status: "full", path: null, head: support.length },
-      ],
-    })
-    vi.mocked(loadNode).mockImplementation(async (_db, _identite, { path }) => {
-      if (path === "conseil/contexte") throw new PlatformError("not_found", "Not found.")
-      if (path === "support/contexte") throw new PlatformError("internal", "Internal error.")
-      return vueDuNoeud({ id: `n-${path}`, path, kind: "context", level: 1 })
-    })
-
-    await montrer(await page({ onglet: "contexte" }))
-
-    expect(vi.mocked(loadNode).mock.calls.map(([, , lu]) => lu.path)).toEqual(["contexte", "ventes/contexte", "conseil/contexte", "support/contexte"])
-    const vue = panneau("Contexte")
-    expect(within(vue.getByRole("region", { name: /conseil/i })).queryByRole("alert")).toBeNull()
-    expect(within(vue.getByRole("region", { name: /support/i })).getByRole("alert")).toHaveTextContent(ECHEC)
-  })
-
-  it("should open « Activités » on an unknown tab, reading nothing of the Contexte", async () => {
-    await montrer(await page({ onglet: "inconnu" }))
-
-    expect(screen.getByRole("tab", { name: "Activités" })).toHaveAttribute("aria-selected", "true")
+    expect(ilot("Activités").getByRole("heading", { level: 2, name: "Activités" })).toBeInTheDocument()
+    expect(screen.queryByRole("tablist")).toBeNull()
     expect(previewContext).not.toHaveBeenCalled()
+    expect(loadNode).not.toHaveBeenCalled()
   })
 })

@@ -54,7 +54,7 @@ export function promptNames(paths: readonly string[]): string[] {
  * Les procédures publiées de l'organisation que la personne lit (niveau 1 au moins, H66, décidé ici
  * par `nodeLevels`), triées par chemin, 20 au plus : la borne s'applique après le filtre, sur
  * l'ensemble des procédures publiées lu en une fois (HN-E01S07-8) ; les noms sont calculés sur cette
- * liste. Lue aussi par la page `/connect` (E02-S04), qui en garde les cinq premières.
+ * liste.
  */
 export async function listPrompts(db: PlatformDb, identity: Identity): Promise<ProcedurePrompt[]> {
   const nodes = await inTransaction(db, "listPrompts: nodes", (sql) => sql<{ id: string; path: string; title: string; summary: string }[]>`

@@ -18,9 +18,13 @@ import {
   invitationOptions,
   inviteMember,
   listInvitations,
+  resolveIdentity,
   revokeInvitation,
+  visibleTree,
   type PlatformDb,
 } from "@otomata_tech/oto_platform/server"
+import type { TreeNode } from "@otomata_tech/oto_platform/schemas"
+import { sectionsDeLArbre } from "../../packages/plateforme/ui/arbre/depuis-l-arbre"
 import { hex } from "../helpers/plateforme"
 import { contentTables, ORG, OTHER_ORG, PEOPLE, TEAMS, type Person } from "../helpers/reference-org"
 import { personDb, seedReferenceTables, type ReferenceOrgSql } from "../helpers/reference-org-sql"
@@ -366,6 +370,15 @@ describe.skipIf(!sqlConfigured)(
         expect(ref.readable(joined)).toEqual([{ orgId: ORG.id, slug: ref.org.slug, name: "Acme Test", role: "admin" }])
         const [member] = await seed.admin`select role, email, name from platform.members where org_id = ${ref.org.id} and user_id = ${nina.id}`
         expect(member).toEqual({ role: "admin", email: nina.email, name: "Nina Nouvelle" })
+        // Première connexion (E11-S10, AC-a5) : son espace et son Contexte sont dans son arbre, et le rail ouvre « Privé » sur lui.
+        const db = await personDb(nina)
+        const identity = await resolveIdentity(db, ref.org.host, { userId: nina.id, email: nina.email })
+        const handle = String(identity.member.profile.handle)
+        const { tree } = await visibleTree(db, identity)
+        const paths = (nodes: TreeNode[]): string[] => nodes.flatMap((node) => [node.path, ...paths(node.children)])
+        expect(paths(tree)).toContain(`private/${handle}/contexte`)
+        const prive = sectionsDeLArbre(tree, [], handle).find((section) => section.cle === "private")
+        expect(prive).toMatchObject({ titre: "Privé", noeuds: [{ chemin: `private/${handle}/contexte`, titre: "Contexte" }] })
       })
     })
   },

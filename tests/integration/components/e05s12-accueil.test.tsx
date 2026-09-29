@@ -32,7 +32,7 @@ const DONNEES: DonneesDeLAccueil = {
   nom: "Claire Morel",
   moi: MOI,
   activites: { data: { activities: [], truncated: false } },
-  adresse: "https://demo.example.test/api/mcp",
+  adresse: { url: "https://demo.example.test/api/mcp", nom: "Démo", nomCli: "demo", phrase: "Commence par le contexte de « Démo »." },
   connexions: { data: [{ famille: "claude.ai", signature: "claude-ai@1.0", date: "2026-09-24T09:00:00Z" }] },
   procedures: { data: [] },
 }
@@ -55,11 +55,7 @@ function monter(donnees: Partial<DonneesDeLAccueil>) {
             Lien={LienDeLHote}
             hrefDuJournal="/journal"
             hrefDeConversation={(code) => `/journal?conversation=${code}`}
-            hrefDesGuides="/connect"
             prefixeDesPages="/n/"
-            onglet="activites"
-            hrefDOnglet={(cle) => (cle === "activites" ? "/" : `/?onglet=${cle}`)}
-            hrefDuProfil="/profil"
           />
         </ContexteDeLHote.Provider>
       </ContexteDeRafraichissement.Provider>
@@ -67,9 +63,9 @@ function monter(donnees: Partial<DonneesDeLAccueil>) {
   )
 }
 
-const fil = () => within(screen.getByRole("tabpanel", { name: "Activités" }))
+const fil = () => within(screen.getByRole("region", { name: "Activités" }))
 /** Les lignes du fil, liens ou non, dans l'ordre du document. */
-const lignes = () => [...screen.getByRole("tabpanel", { name: "Activités" }).querySelectorAll(".oto-feed-item")]
+const lignes = () => [...screen.getByRole("region", { name: "Activités" }).querySelectorAll(".oto-feed-item")]
 
 beforeEach(() => {
   vi.useFakeTimers({ now: MAINTENANT, toFake: ["Date"] })
@@ -142,12 +138,12 @@ describe("home right column (E05-S12, AC-18)", () => {
     { path: "achats/commande", title: "Passer une commande" },
   ]
 
-  it("should put the main island alone on the left, then the search, Brancher un assistant and the useful procedures on the right, in that order", () => {
+  it("should put the main island alone on the left, then the search, Brancher mon Claude, ChatGPT ou Mistral and the useful procedures on the right, in that order", () => {
     monter({ procedures: { data: PROCEDURES } })
 
-    const principal = screen.getByRole("region", { name: "Activités et contexte" })
+    const principal = screen.getByRole("region", { name: "Activités" })
     const recherche = screen.getByRole("search")
-    const brancher = screen.getByRole("region", { name: "Brancher un assistant" })
+    const brancher = screen.getByRole("region", { name: "Brancher mon Claude, ChatGPT ou Mistral" })
     const procedures = screen.getByRole("region", { name: "Procédures les plus utilisées" })
     const colonnes = [...document.querySelectorAll(".oto-home-col")]
     expect(colonnes).toHaveLength(2)

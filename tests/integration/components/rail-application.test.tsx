@@ -256,12 +256,17 @@ describe("RailApplication menus (AC-a4)", () => {
   })
 
   // E05-S11 (AC-6, AC-e22) : « Profil » ouvre la page Profil, la Corbeille s'ouvre d'ici ; ni « Apparence » ni « Couleur ».
-  it.each([false, true])("should offer Profil, Brancher un assistant, Corbeille, then Déconnexion in the account menu, the same whatever the administration right (%s)", (administre) => {
-    const rail = monter({ administre })
+  // E11-S10 (AC-e1) : « Contexte » en tête, quand l'hôte en donne l'adresse.
+  it.each([false, true])("should offer Contexte, Profil, Brancher mon Claude, ChatGPT ou Mistral, Corbeille, then Déconnexion in the account menu, the same whatever the administration right (%s)", (administre) => {
+    const rail = monter({ administre, adresses: { ...ADRESSES, contexte: "/context" } })
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
-    expect(itemsDuMenu()).toEqual(["Profil", "Brancher un assistant", "Corbeille", "Déconnexion"])
+    expect(itemsDuMenu()).toEqual(["Contexte", "Profil", "Brancher mon Claude, ChatGPT ou Mistral", "Corbeille", "Déconnexion"])
+    fireEvent.click(menu().getByRole("menuitem", { name: "Contexte" }))
+    expect(hote.naviguer).toHaveBeenCalledWith("/context")
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Profil" }))
-    expect(hote.naviguer).toHaveBeenCalledWith("/profil")
+    expect(hote.naviguer).toHaveBeenLastCalledWith("/profil")
 
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Corbeille" }))
@@ -270,6 +275,24 @@ describe("RailApplication menus (AC-a4)", () => {
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Déconnexion" }))
     expect(hote.deconnecter).toHaveBeenCalledTimes(1)
+  })
+
+  // E11-S10 (AC-e1, HN-E11S10-18) : sans l'adresse de la vue, ni entrée au menu du compte ni commande de la palette ;
+  // avec elle, la palette la propose sous « Aller à ».
+  it("should offer « Contexte » in the palette under « Aller à » only when the host gives its address", () => {
+    let rail = monter()
+    fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
+    expect(itemsDuMenu()).not.toContain("Contexte")
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
+    fireEvent.click(within(rail).getByRole("searchbox", { name: "Rechercher" }))
+    expect(within(within(screen.getByRole("dialog", { name: "Palette de commandes" })).getByRole("group", { name: "Aller à" })).queryByRole("option", { name: "Contexte" })).toBeNull()
+    cleanup()
+
+    rail = monter({ adresses: { ...ADRESSES, contexte: "/context" } })
+    fireEvent.click(within(rail).getByRole("searchbox", { name: "Rechercher" }))
+    const allerA = within(within(screen.getByRole("dialog", { name: "Palette de commandes" })).getByRole("group", { name: "Aller à" }))
+    fireEvent.click(allerA.getByRole("option", { name: "Contexte" }))
+    expect(hote.naviguer).toHaveBeenCalledWith("/context")
   })
 
   it("should create a table in a team from the « + » of its section at once, untitled with its key column, then open it where the service put it and re-read the page (AC-b3)", async () => {

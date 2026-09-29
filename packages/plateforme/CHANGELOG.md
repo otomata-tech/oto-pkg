@@ -17,6 +17,21 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Assistants
+- Without a clear match, `context` offers every shown candidate as a choice for a question, a « comment » question or a polite request; it answers or explains first and runs nothing unpicked.
+- `context` matches a procedure on each phrasing its summary lists, weighs rare words above common ones, and forgives a typo in the request through the organisation's lexicon.
+- Content in the trash no longer takes a place among `find` and `context` results before their cut: a live match ranked lower now shows instead.
+
+### Hosts
+- Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
+- Server: routing scores change for every organisation; an `orgs.settings.routing` threshold keeps its 0 to 1 scale, not its calibration: replay your routing phrases after upgrading.
+- UI: `EcranDAccueilProps` loses `hrefDesGuides`; `DonneesDeLAccueil.adresse` is a whole `AdresseDeConnexion` (url, nom, nomCli, phrase), no longer a string.
+- UI: the `prompts` prop of `EcranConnexion` takes the useful procedures (`usefulProcedures(db, identity, 3)`), no longer `listPrompts`; `/connect` shows the connection guide, then « Vos connexions ».
+- UI: « Brancher mon Claude, ChatGPT ou Mistral » replaces « Brancher un assistant » in the account menu, the palette, the home card and `/connect`; the home card no longer shows the server address.
+- Migrations: applying `20260929160000_private_spaces.sql` sets every missing member handle and creates the « Privé » space and its Context of each member who had none; run `oto-platform migrations sync`.
+- UI: the home page no longer reads `?onglet=`; give the rail `adresses.contexte` (`/context`) and mount `EcranDuContexte` on that route (example: `src/app/(dashboard)/context/page.tsx`).
+- UI: `ContexteServi` and `EcranDAccueil` lose `hrefDuProfil`; `EcranDAccueil` loses `onglet` and `hrefDOnglet`; `ONGLETS_DE_L_ACCUEIL` and `OngletDeLAccueil` are no longer exported.
+
 ## 1.0.0 — 2026-09-28
 
 ### Assistants

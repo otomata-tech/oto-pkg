@@ -34,6 +34,8 @@ const ADRESSES: AdressesDuRail = {
   connecteurs: "/admin/connecteurs",
   corbeille: "/corbeille",
   profil: "/profil",
+  // E11-S10 (AC-e1) : la vue « Contexte », en tête du menu du compte.
+  contexte: "/context",
 }
 
 /** Les adresses du rail de la personne : les Retours au membre de l'équipe plateforme qui administre l'organisation. */

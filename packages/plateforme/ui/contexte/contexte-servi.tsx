@@ -14,11 +14,17 @@
 // E05-S13 (retours 7 et 8, AC-13 à AC-15) : ni taille, ni état, ni note des versions, ni total ; chaque partie est une
 // carte (`Island`) sous son titre, ses lignes dites en français (`ListesServies`), les listes d'index d'un Contexte
 // écrivable dans la carte de son éditeur ; l'en-tête `## Context: …` d'une partie retiré (HN-E05S13-13).
+//
+// E11-S10 (lot f, HN-E11S10-14, -15, -22) : la vue quitte l'accueil pour son écran (`EcranDuContexte`) ; la tête
+// servie d'une partie de Contexte (faits, connecteurs) n'est plus montrée, l'assistant la reçoit toujours ; ni lien
+// vers Profil, ni « Règles Oto » (le bloc `code`, sauté, les autres parties gardant leur ancre) ; une partie sans
+// corps le dit ; « Nouveautés » a toujours sa section, même quand rien n'en est servi ; l'ancre de l'adresse est
+// suivie au montage et à chaque changement (`VersLaPartie`).
 import type { ReactNode } from "react"
 import type { NodeView } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
-import { FOCUS, LIEN } from "../components/classes"
+import { LIEN } from "../components/classes"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
 import { Island, IslandBody } from "../ds/react/island"
 import { blocsAffiches, niveauDEcritureDe } from "../noeud/corps-du-noeud"
@@ -26,17 +32,16 @@ import { EditeurDeBlocs } from "../noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../noeud/editeur/file-d-operations"
 import { ECRAN, phraseDePublication } from "../noeud/libelles"
 import type { DonneesDeLApercu } from "./apercu-du-contexte"
-import { APERCU_DU_CONTEXTE, CONTEXTE_SERVI, nomDuBloc, type EquipesNommees } from "./libelles"
+import { APERCU_DU_CONTEXTE, CONTEXTE_SERVI, NOMS_DES_BLOCS, nomDuBloc, type EquipesNommees } from "./libelles"
 import { ListesServies } from "./listes-servies"
 import {
+  ancreDeLaPartie,
   cheminDuContexte,
-  estLePrive,
   estUnContexte,
   morceauxDeLaFin,
   morceauxDuBloc,
   morceauxDuContexte,
   partiesDuContexte,
-  teteSansEnTete,
   type PartieServie,
 } from "./parties-du-contexte"
 import { VersLaPartie } from "./vers-la-partie"
@@ -58,8 +63,6 @@ export type ContexteServiProps = {
   Lien: LienDeLHote
   /** Le préfixe des pages de l'arbre (« /n/ ») : la version publiée d'un Contexte, et les liens de l'éditeur. */
   prefixeDesPages: string
-  /** L'adresse de la page Profil : la partie Privé y renvoie (ses faits : nom, langue). */
-  hrefDuProfil: string
   /** L'adresse de la vue, pour « Réessayer ». */
   ici: string
 }
@@ -73,12 +76,6 @@ function Carte({ children }: { children: ReactNode }) {
       <IslandBody>{children}</IslandBody>
     </Island>
   )
-}
-
-/** Les faits et les connecteurs en tête d'une partie de Contexte, tels que servis (HN-E05S13-13). */
-function Faits({ tete }: { tete: string }) {
-  const faits = teteSansEnTete(tete)
-  return faits === "" ? null : <pre className="oto-code whitespace-pre-wrap break-words p-3">{faits}</pre>
 }
 
 /**
@@ -111,11 +108,11 @@ function EditeurDuContexte({ vue, niveau, nomOrganisation, prefixeDesPages, Lien
 }
 
 /**
- * Le corps d'une partie de Contexte (AC-7) : ses faits servis, toujours lus (et, sous ceux du Privé, le lien vers
- * Profil), puis l'éditeur de son Contexte quand la personne peut l'écrire, servi ou non, ses listes servies dans sa
- * carte ; sinon la suite servie dans une carte (corps tel que servi, listes et fin en français).
+ * Le corps d'une partie de Contexte (AC-7), sans sa tête servie (E11-S10, AC-f1) : l'éditeur de son Contexte quand
+ * la personne peut l'écrire, servi ou non, ses listes servies dans sa carte ; sinon la suite servie dans une carte
+ * (corps tel que servi, listes et fin en français), ou, rien n'étant servi après la tête, la phrase qui le dit (AC-f2).
  */
-function CorpsDuContexte({ partie, contextes, nomOrganisation, prefixeDesPages, hrefDuProfil, ici, Lien }: CorpsProps) {
+function CorpsDuContexte({ partie, contextes, nomOrganisation, prefixeDesPages, ici, Lien }: CorpsProps) {
   const chemin = cheminDuContexte(partie)
   const lu = chemin === null ? undefined : contextes[chemin]
   const vue = lu?.data ?? null
@@ -125,22 +122,16 @@ function CorpsDuContexte({ partie, contextes, nomOrganisation, prefixeDesPages, 
   const listes = morceauxDuContexte(partie.suite, { sansCorps: true })
   return (
     <>
-      <Faits tete={partie.tete} />
-      {estLePrive(partie.name) && (
-        <Lien href={hrefDuProfil} className={LIEN}>
-          {CONTEXTE_SERVI.profil}
-        </Lien>
-      )}
       {vue && niveau !== null ? (
         <EditeurDuContexte vue={vue} niveau={niveau} nomOrganisation={nomOrganisation} prefixeDesPages={prefixeDesPages} Lien={Lien}>
           {listes.length > 0 && <ListesServies morceaux={listes} {...navigation} />}
         </EditeurDuContexte>
+      ) : partie.suite !== "" ? (
+        <Carte>
+          <ListesServies morceaux={morceauxDuContexte(partie.suite)} {...navigation} />
+        </Carte>
       ) : (
-        partie.suite !== "" && (
-          <Carte>
-            <ListesServies morceaux={morceauxDuContexte(partie.suite)} {...navigation} />
-          </Carte>
-        )
+        <p className="oto-caption">{CONTEXTE_SERVI.vide}</p>
       )}
       {/* Un Contexte illisible à l'instant : son texte servi reste lu, l'échec se dit (portage-ecrans.md § 4). Un
           Contexte absent ou hors de portée (`not_found`) n'est pas un échec : la page ne le lit pas en erreur. */}
@@ -163,31 +154,8 @@ function CorpsDeLaPartie(props: CorpsProps) {
 
 type PartieProps = Omit<CorpsProps, "partie"> & { partie: PartieServie; nom: string }
 
-/**
- * « Règles Oto », le bloc `code` (AC-11) : un `<details>` natif, fermé à chaque affichage (aucune mémoire),
- * ouvert au clavier par son résumé (Entrée, Espace) ; le résumé porte son titre ; sa carte dessous, jamais écrivable.
- */
-function Regles({ nom, ...corps }: PartieProps) {
-  const { partie } = corps
-  return (
-    <section id={partie.ancre} aria-labelledby={`${partie.ancre}-titre`}>
-      <details>
-        <summary className={`rounded-sm ${FOCUS}`}>
-          <h2 id={`${partie.ancre}-titre`} className="inline text-base font-semibold text-ink">
-            {nom}
-          </h2>
-        </summary>
-        <div className="mt-2">
-          <CorpsDeLaPartie {...corps} />
-        </div>
-      </details>
-    </section>
-  )
-}
-
 function Partie({ nom, ...corps }: PartieProps) {
   const { partie } = corps
-  if (partie.name === "code") return <Regles nom={nom} {...corps} />
   return (
     <section id={partie.ancre} aria-labelledby={`${partie.ancre}-titre`} className="flex flex-col gap-2">
       <h2 id={`${partie.ancre}-titre`} className="text-base font-semibold text-ink">
@@ -200,15 +168,40 @@ function Partie({ nom, ...corps }: PartieProps) {
 
 type PartiesProps = Omit<CorpsProps, "partie"> & { apercu: DonneesDeLApercu }
 
-/** Les parties, dans l'ordre servi, puis la fin du texte (l'avis qui nomme les blocs omis) s'il y en a une. */
+/** Le nom servi du bloc des nouveautés, et ceux des blocs servis après lui (P39) : procédures utiles, contenus récents. */
+const NOUVEAUTES = "news"
+const APRES_LES_NOUVEAUTES = new Set(["procedures", "recent content"])
+
+/** « Nouveautés » quand le rapport n'en sert pas (AC-f5, HN-E11S10-22) : sa section, son ancre, et ce qui en est. */
+function AucuneNouveaute() {
+  const ancre = ancreDeLaPartie({ name: NOUVEAUTES }, 0)
+  return (
+    <section id={ancre} aria-labelledby={`${ancre}-titre`} className="flex flex-col gap-2">
+      <h2 id={`${ancre}-titre`} className="text-base font-semibold text-ink">
+        {NOMS_DES_BLOCS[NOUVEAUTES]}
+      </h2>
+      <p className="oto-caption">{CONTEXTE_SERVI.aucuneNouveaute}</p>
+    </section>
+  )
+}
+
+/**
+ * Les parties, dans l'ordre servi, sans « Règles Oto » (le bloc `code`, AC-f4 : chacune garde l'ancre de son rang
+ * d'origine) ; « Nouveautés » à sa place quand rien n'en est servi, avant les procédures ; puis la fin du texte
+ * (l'avis qui nomme les blocs omis) s'il y en a une.
+ */
 function Parties({ apercu, ...corps }: PartiesProps) {
   const { parties, reste } = partiesDuContexte(apercu)
+  const montrees = parties.filter((partie) => partie.name !== "code")
+  const rendre = (partie: PartieServie) => (
+    // Une partie n'a pas d'identité propre : son ancre, tirée de son rang dans l'ordre servi, que rien ne réordonne.
+    <Partie key={partie.ancre} partie={partie} nom={nomDuBloc(partie, corps.equipes)} {...corps} />
+  )
   return (
     <>
-      {parties.map((partie, rang) => (
-        // Une partie n'a pas d'identité propre : son rang dans l'ordre servi, que rien ne réordonne.
-        <Partie key={rang} partie={partie} nom={nomDuBloc(partie, corps.equipes)} {...corps} />
-      ))}
+      {montrees.filter((partie) => !APRES_LES_NOUVEAUTES.has(partie.name)).map(rendre)}
+      {!montrees.some((partie) => partie.name === NOUVEAUTES) && <AucuneNouveaute />}
+      {montrees.filter((partie) => APRES_LES_NOUVEAUTES.has(partie.name)).map(rendre)}
       {reste !== "" && (
         <section aria-label={CONTEXTE_SERVI.fin} className="flex flex-col gap-2">
           <ListesServies morceaux={morceauxDeLaFin(reste)} ancre="fin" equipes={corps.equipes} prefixeDesPages={corps.prefixeDesPages} Lien={corps.Lien} />
@@ -218,13 +211,16 @@ function Parties({ apercu, ...corps }: PartiesProps) {
   )
 }
 
+/** Le conteneur de la vue : le haut où mène une ancre sans partie (AC-f6). */
+const HAUT_DE_LA_VUE = "haut-de-la-vue"
+
 export function ContexteServi({ donnees, ...props }: ContexteServiProps) {
   const { apercu, contextes, equipes, nomOrganisation } = donnees
   if (apercu.error !== undefined) return <ErreurDeLecture titre={APERCU_DU_CONTEXTE.echec} message={apercu.error} href={props.ici} Lien={props.Lien} />
   return (
-    <div className="flex flex-col gap-5">
+    <div id={HAUT_DE_LA_VUE} className="flex flex-col gap-5">
       <Parties apercu={apercu.data} equipes={equipes} contextes={contextes} nomOrganisation={nomOrganisation} {...props} />
-      <VersLaPartie />
+      <VersLaPartie haut={HAUT_DE_LA_VUE} />
     </div>
   )
 }

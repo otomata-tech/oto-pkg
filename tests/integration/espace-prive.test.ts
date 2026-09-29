@@ -5,7 +5,7 @@
 // n'a plus rien à renommer sur une installation neuve. Portable : connexion d'administration seule.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { seedWithAdmin, SQL_SKIP_REASON, sqlConfigured, type SeededData } from "../helpers/sql"
-import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
+import { pendingMigrations, pendingReason, privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
 // 20260928120000 n'est pas appliquée au projet (`database-patterns.md § Règles`).
@@ -55,3 +55,102 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
     ])
   })
 })
+
+// E11-S10, lot a (AC-a1, AC-a2) : le handle posé à l'insertion d'un membre qui n'en a pas, et la réparation
+// d'un membre inséré avant le dossier `private` (`ensure_private_space`). Sautés, la version nommée, tant que
+// la migration n'est pas appliquée au projet (`database-patterns.md § Règles`).
+const PRIVATE_SPACES_VERSION = "20260929160000"
+const spacesPending = privatePending || (await pendingMigrations()).includes(PRIVATE_SPACES_VERSION)
+const SPACES_SUITE = "private space of a member without handle (E11-S10, lot a)"
+
+describe.skipIf(!sqlConfigured || spacesPending)(
+  !sqlConfigured ? `${SPACES_SUITE} (${SQL_SKIP_REASON})` : spacesPending ? `${SPACES_SUITE} (${pendingReason([PRIVATE_SPACES_VERSION])})` : SPACES_SUITE,
+  { timeout: NETWORK_TIMEOUT },
+  () => {
+    let seed: SeededData
+
+    beforeAll(() => {
+      seed = seedWithAdmin()
+    })
+
+    afterAll(async () => {
+      await seed?.cleanup()
+    }, SETUP_TIMEOUT)
+
+    /** Une organisation et sa racine ; `withPrivate` : le dossier `private` aussi, comme le pose `create_org`. */
+    async function org(withPrivate: boolean): Promise<{ id: string; root: string }> {
+      const { id } = await seed.createOrg()
+      const [root] = await seed.admin<{ id: string }[]>`
+        insert into platform.nodes (org_id, parent_id, path, title, summary, owner_kind)
+        values (${id}, null, 'guide', 'Guide', 'Racine.', 'org') returning id`
+      if (withPrivate) await privateFolder(id, root.id)
+      return { id, root: root.id }
+    }
+
+    const privateFolder = (orgId: string, root: string) =>
+      seed.admin`insert into platform.nodes (org_id, parent_id, path, title, summary)
+                 values (${orgId}, ${root}, 'private', 'Espaces personnels', 'Un espace par personne.')`
+
+    /** Le membre, relu : son handle et la version de sa ligne (`xmin` change à toute écriture). */
+    const memberRow = async (orgId: string, userId: string) =>
+      (await seed.admin<{ handle: string | null; version: string }[]>`
+        select profile ->> 'handle' as handle, xmin::text as version from platform.members where org_id = ${orgId} and user_id = ${userId}`)[0]
+
+    /** Les nœuds de l'organisation sous `private/`, relus avec leur version. */
+    const spaces = (orgId: string) =>
+      seed.admin<{ path: string; title: string; summary: string; owner_kind: string | null; owner_user_id: string | null; version: string }[]>`
+        select path, title, summary, owner_kind, owner_user_id, xmin::text as version
+          from platform.nodes where org_id = ${orgId} and path like 'private/%' order by path`
+
+    const expectedSpace = (handle: string, userId: string) => [
+      { path: `private/${handle}`, title: "Privé", summary: "Votre espace privé, visible de vous seul.", owner_kind: "user", owner_user_id: userId },
+      {
+        path: `private/${handle}/contexte`,
+        title: "Contexte",
+        summary: "Ce que votre assistant lit à chaque conversation ; vous seul le recevez.",
+        owner_kind: null,
+        owner_user_id: null,
+      },
+    ]
+    const withoutVersion = (rows: Awaited<ReturnType<typeof spaces>>) =>
+      rows.map(({ path, title, summary, owner_kind, owner_user_id }) => ({ path, title, summary, owner_kind, owner_user_id }))
+
+    it("should give a member inserted without handle the handle of unique_handle, then its space and Contexte (AC-a1)", async () => {
+      const { id } = await org(true)
+      const person = seed.person()
+      const [{ handle }] = await seed.admin<{ handle: string }[]>`select platform.unique_handle(${id}, ${person.email}) as handle`
+      await seed.addMember(id, person)
+      expect((await memberRow(id, person.id)).handle).toBe(handle)
+      expect(withoutVersion(await spaces(id))).toEqual(expectedSpace(handle, person.id))
+    })
+
+    it("should repair a member inserted before the private folder, then write nothing on a second call (AC-a2)", async () => {
+      const { id, root } = await org(false)
+      const person = seed.person()
+      await seed.addMember(id, person)
+      expect((await memberRow(id, person.id)).handle).toBeNull()
+      await privateFolder(id, root)
+
+      await seed.admin`select platform.ensure_private_space(${id}, ${person.id})`
+      const repaired = await memberRow(id, person.id)
+      expect(repaired.handle).toMatch(/^test_[0-9a-f]{12}$/)
+      const created = await spaces(id)
+      expect(withoutVersion(created)).toEqual(expectedSpace(String(repaired.handle), person.id))
+
+      await seed.admin`select platform.ensure_private_space(${id}, ${person.id})`
+      expect(await memberRow(id, person.id)).toEqual(repaired)
+      expect(await spaces(id)).toEqual(created)
+    })
+
+    it("should return without error nor write in an organisation without private folder (AC-a2)", async () => {
+      const { id } = await org(false)
+      const person = seed.person()
+      await seed.addMember(id, person)
+      const before = await memberRow(id, person.id)
+
+      await seed.admin`select platform.ensure_private_space(${id}, ${person.id})`
+      expect(await memberRow(id, person.id)).toEqual(before)
+      expect(await seed.admin`select id from platform.nodes where org_id = ${id} and path <> 'guide'`).toEqual([])
+    })
+  },
+)

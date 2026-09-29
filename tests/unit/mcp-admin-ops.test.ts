@@ -383,6 +383,39 @@ describe.skipIf(!sqlConfigured)(portable("admin MCP on a real database"), { time
       expect((await team({ op: "remove_member", team: "support", email: marc.email })).text).toBe("Marc Petit removed from team Support (1 member; lead: none).")
     })
 
+    it("should name its creator as the lead of a team created without email, unless she enters by a platform access (E11-S10, AC-c3)", async () => {
+      const mine = await ownSeed()
+      const { session, code } = await opened(mine.admin)
+      const { acme, demo } = mine.admin.orgs
+      const { sam, marc } = mine.admin.persons
+      const team = (org: string, args: Record<string, unknown>) => session.call("admin_team", { ctx: code, org, ...args })
+      const roles = async (orgId: string, slug: string) => {
+        const rows = await mine.seed.admin<Row[]>`
+          select tm.user_id, tm.role from platform.team_members tm join platform.teams t on t.id = tm.team_id
+           where t.org_id = ${orgId} and t.slug = ${slug} order by tm.role`
+        return rows.map((row) => mine.admin.readable(row))
+      }
+      // Membre de Demo : Sam en est le responsable.
+      expect((await team(demo.slug, { op: "create", name: "Achats" })).text).toBe(
+        `Team Achats created in ${demo.slug} with the slug achats (folder achats, context page achats/contexte), lead Sam Staff ${sam.email} (you).`,
+      )
+      expect(await roles(demo.id, "achats")).toEqual([{ user_id: PERSONS.sam.id, role: "lead" }])
+      // Entrée dans Acme par un accès plateforme, sans ligne `members` : personne n'entre.
+      expect((await team(acme.slug, { op: "create", name: "Achats" })).text).toBe(
+        `Team Achats created in ${acme.slug} with the slug achats (folder achats, context page achats/contexte), no lead yet.`,
+      )
+      expect(await roles(acme.id, "achats")).toEqual([])
+      // Avec `email` : la personne nommée est la seule responsable, le créateur reste membre (HN-E11S10-9).
+      await mine.seed.admin`insert into platform.members (org_id, user_id, role, email, name) values (${demo.id}, ${marc.id}, 'member', ${marc.email}, 'Marc Petit')`
+      expect((await team(demo.slug, { op: "create", name: "Stock", email: marc.email })).text).toBe(
+        `Team Stock created in ${demo.slug} with the slug stock (folder stock, context page stock/contexte), lead Marc Petit ${marc.email}.`,
+      )
+      expect(await roles(demo.id, "stock")).toEqual([
+        { user_id: PERSONS.marc.id, role: "lead" },
+        { user_id: PERSONS.sam.id, role: "member" },
+      ])
+    })
+
     it("should refuse an unknown team or email, a taken name and a person out of the team, and accept a member already in", async () => {
       const { session, code } = await opened()
       const acme = admin.orgs.acme.slug

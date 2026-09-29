@@ -972,6 +972,29 @@
 | HN-E11S09-7 | La fenêtre de l'accueil n'a plus de lien « Guides d'installation » ; `/connect` reste au menu du compte et dans les métadonnées OAuth. |
 | HN-E11S09-8 | Le lien direct de ChatGPT reste `https://chatgpt.com/#settings/Connectors`, non vérifié : l'aide d'OpenAI nomme d'autres chemins (« Settings → Security and login », `chatgpt.com/plugins`) ; relu au banc. |
 
+### E11-S10 — Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu
+
+| Id | Règle |
+|---|---|
+| HN-E11S10-5 | Validée par le responsable d'Oto : l'arbre des écrans d'un admin est celui d'un membre, calculé par le service (`visibleTree` sur l'identité de membre) ; il y voit aussi une page partagée avec lui, son équipe ou toute l'organisation ; ses droits ne changent pas. |
+| HN-E11S10-9 | `admin_team create` avec `email` : la personne nommée devient la seule responsable, le créateur reste membre ; la description de l'outil ne change pas. |
+| HN-E11S10-10 | Validée par le responsable d'Oto : rien ne relit le rail sans geste ; une personne ajoutée à une équipe par un autre la voit au prochain chargement ou après son prochain geste. |
+| HN-E11S10-13 | Tranchée par le responsable d'Oto : le Contexte reste dans le rail (ligne « Contexte · <section> », son « + », glisser-déposer) ; ni bouton info ni ligne retirée ; la fiche D110 ne change pas. |
+| HN-E11S10-14 | Tranchée par le responsable d'Oto : les lignes techniques sous chaque titre de la vue « Contexte » (organisation, personne, équipe, connecteurs) sont cachées à l'écran ; l'assistant les reçoit toujours. |
+| HN-E11S10-15 | Le code rendu mort part avec la story (`REGLES_OTO`, morceau `regles`, les deux `Regles`, `teteSansEnTete`) ; `SERVED_RULES` reste, servi par `blocks/code.ts`. |
+| HN-E11S10-18 | « Contexte » en tête du menu du compte, glyphe `Info`, clé `contexte` ; sans `adresses.contexte`, ni entrée ni commande de la palette. |
+| HN-E11S10-22 | « Nouveautés » manquait quand `newsBlock` rend `null` : la vue rend sa section de repli dans les trois cas d'absence. |
+| HN-E11S10-A | `ensure_private_space` n'écrit rien sous un `private/<handle>` tenu par une autre personne : ni Contexte, ni changement de propriétaire. |
+| HN-E11S10-B | La renumérotation `<handle>_<n>` (handle ancien chemin d'un autre nœud) est sautée quand l'espace de la personne est déjà à `private/<handle>` : un second appel n'écrit rien. |
+| HN-E11S10-C | Horodatage de la migration : `20260929160000`, après `20260929140000` d'E11-S04 ; le pilote la réunit dans la migration unique de 1.0.1 (fiches D131, D124). |
+| HN-E11S10-D | La section « Nouveautés » de repli se place avant les blocs `procedures` et `recent content`, après toutes les autres parties. |
+| HN-E11S10-E | `VersLaPartie` ne défile au montage que si l'adresse porte une ancre ; une ancre sans partie amène le haut de la vue (`#haut-de-la-vue`). |
+| HN-E11S10-F | Dans l'îlot « Activités » de l'accueil (`h2`), les titres de journée sont des `h3`. |
+
+Limites connues : deux insertions concurrentes sans handle dont l'email a le même radical peuvent
+recevoir le même handle, et la seconde échoue (`23505`) ; `unique_handle` est quadratique pour une
+organisation qui compte beaucoup de membres sans email.
+
 ### Tâches de suite
 
 | Id | Règle |

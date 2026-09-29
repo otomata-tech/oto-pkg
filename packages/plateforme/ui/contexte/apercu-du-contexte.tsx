@@ -6,8 +6,9 @@
 //
 // E05-S11 (retour 4 de JB, AC-9 à AC-11) : « Voici ce que votre agent va lire », « Ordre de lecture », le
 // total en dernière ligne ; le texte servi replié part (il se lit dans la vue « Contexte » de l'accueil), et
-// chaque ligne y mène, ouverte sur la même partie (`/?onglet=contexte#<ancre>`). E05-S13 (retour 7, AC-13) : plus
-// aucun chiffre (taille, état, total), ni note des versions, ni légende visible.
+// chaque ligne y mène, ouverte sur la même partie (`/context#<ancre>`, E11-S10). E05-S13 (retour 7, AC-13) : plus
+// aucun chiffre (taille, état, total), ni note des versions, ni légende visible. E11-S10 (AC-g1, AC-g2) : ni titre
+// visible, le nom accessible gardé, ni « Règles Oto » (le bloc `code`).
 //
 // Porté d'oto-frontend (`contexte/annexes-du-contexte.tsx`, DS `context.jsx` `NotePanel`, `LayerStack`,
 // `LayerLink`) : les couches empilées et leur poids, la couche regardée marquée (`data-here`,
@@ -42,7 +43,7 @@ type ApercuDuContexteProps = {
   apercu: Resultat<DonneesDeLApercu>
   cheminCourant: string
   equipes: EquipesNommees
-  /** L'adresse de la vue « Contexte » de l'accueil (`/?onglet=contexte`) : chaque ligne y mène, à son ancre. */
+  /** L'adresse de la vue « Contexte » (`/context`) : chaque ligne y mène, à son ancre. */
   hrefDuContexteServi: string
   /** L'adresse de la page, pour « Réessayer ». */
   ici: string
@@ -53,12 +54,14 @@ type CouchesProps = Pick<ApercuDuContexteProps, "cheminCourant" | "equipes" | "h
 
 /**
  * Les couches servies, dans l'ordre, chacune un lien vers sa partie ; le Contexte ouvert marqué. Sans taille ni état
- * (E05-S13, AC-13) ; « Ordre de lecture » reste le nom accessible de la liste.
+ * (E05-S13, AC-13) ; « Ordre de lecture » reste le nom accessible de la liste. Sans « Règles Oto » (E11-S10, AC-g2) :
+ * chaque autre ligne garde l'ancre de son rang d'origine.
  */
 function Couches({ apercu, cheminCourant, equipes, hrefDuContexteServi, Lien }: CouchesProps) {
   return (
     <LayerStack role="list" aria-label={APERCU_DU_CONTEXTE.legende}>
       {apercu.blocks.map((bloc, rang) => {
+        if (bloc.name === "code") return null
         // Par le nom, le chemin du Contexte même quand il n'est pas servi (brouillon, vide : E05-S12, AC-8).
         const ici = bloc.name === cheminCourant
         const nom = `${nomDuBloc(bloc, equipes)}${ici ? ` ${APERCU_DU_CONTEXTE.ceContexte}` : ""}`
@@ -76,13 +79,13 @@ function Couches({ apercu, cheminCourant, equipes, hrefDuContexteServi, Lien }: 
 export function ApercuDuContexte({ apercu, cheminCourant, equipes, hrefDuContexteServi, ici, Lien }: ApercuDuContexteProps) {
   if (apercu.error !== undefined) {
     return (
-      <NotePanel title={APERCU_DU_CONTEXTE.titre}>
+      <NotePanel aria-label={APERCU_DU_CONTEXTE.titre}>
         <ErreurDeLecture titre={APERCU_DU_CONTEXTE.echec} message={apercu.error} href={ici} Lien={Lien} />
       </NotePanel>
     )
   }
   return (
-    <NotePanel title={APERCU_DU_CONTEXTE.titre}>
+    <NotePanel aria-label={APERCU_DU_CONTEXTE.titre}>
       <Couches apercu={apercu.data} cheminCourant={cheminCourant} equipes={equipes} hrefDuContexteServi={hrefDuContexteServi} Lien={Lien} />
     </NotePanel>
   )

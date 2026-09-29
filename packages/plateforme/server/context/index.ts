@@ -18,11 +18,12 @@ import { clip, lastHostSignature, MAX_TARGET_CHARS } from "../journal"
 import {
   CANDIDATES_SHOWN,
   decide,
-  isDataQuestion,
   loadRoutingSettings,
   rankCandidates,
+  requestKind,
   roundScore,
   type Candidate,
+  type RequestKind,
 } from "../routing"
 import type { ToolOutput } from "../tool-output"
 import { codeBlock } from "./blocks/code"
@@ -40,11 +41,12 @@ import { CONTEXT_BUDGET, daysAgo, renderContext, type BlockReport, type ContextB
 type Routing = {
   candidates: Candidate[] | null
   served: Candidate | null
-  dataQuestion: boolean | null
+  /** Le genre de la phrase (E11-S04, AC-b2) ; `null` sans phrase. */
+  kind: RequestKind | null
   procedure: { block: ContextBlock; revision: number } | null
 }
 
-const NO_REQUEST: Routing = { candidates: [], served: null, dataQuestion: null, procedure: null }
+const NO_REQUEST: Routing = { candidates: [], served: null, kind: null, procedure: null }
 
 /** Sans conversation antérieure, les nouveautés remontent à 14 jours (H34). */
 const NEWS_WINDOW_DAYS = 14
@@ -73,17 +75,18 @@ async function routePhrase(db: PlatformDb, identity: Identity, phrase: string): 
         return null
       })
     : null
-  if (decided && !procedure) return { candidates: null, served: null, dataQuestion: isDataQuestion(phrase), procedure: null }
-  return { candidates, served: decided, dataQuestion: isDataQuestion(phrase), procedure }
+  if (decided && !procedure) return { candidates: null, served: null, kind: requestKind(phrase), procedure: null }
+  return { candidates, served: decided, kind: requestKind(phrase), procedure }
 }
 
 /** Données en champs (H26) : la procédure servie, les candidats montrés, scores à deux décimales. */
-function routingData({ candidates, served, dataQuestion, procedure }: Routing) {
+function routingData({ candidates, served, kind, procedure }: Routing) {
   const score = (candidate: Candidate) => roundScore(candidate.score)
   return {
     served: served && procedure ? { path: served.path, revision: procedure.revision, score: score(served) } : null,
     candidates: (candidates ?? []).map((candidate) => ({ path: candidate.path, title: candidate.title, kind: candidate.kind, score: score(candidate) })),
-    data_question: dataQuestion,
+    // `true` pour une question de données seule (HN-E11S04-8) : ni `how` ni `request`.
+    data_question: kind === null ? null : kind === "data",
   }
 }
 
@@ -151,10 +154,10 @@ export async function assembleContext(db: PlatformDb, identity: Identity, assemb
     orOmitted(() => proceduresBlock(db, identity), "procedures"),
     orOmitted(() => recentBlock(db, identity), "recent content"),
   ])
-  const { candidates, served, dataQuestion, procedure } = routing
+  const { candidates, served, kind, procedure } = routing
   const facts = { everyone: orgFacts(identity.org), private: personFacts(identity), ...teams }
   const blocks = [
-    codeBlock({ prefix: identity.org.prefix, code, phrase, candidates, served, dataQuestion }),
+    codeBlock({ prefix: identity.org.prefix, code, phrase, candidates, served, kind }),
     ...(procedure ? [procedure.block] : []),
     ...contextParts(identity, facts, bodies),
     ...[news, procedures, recent].filter((block) => block !== null),

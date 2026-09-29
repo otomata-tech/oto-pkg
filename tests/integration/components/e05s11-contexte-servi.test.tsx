@@ -1,6 +1,7 @@
 // La vue « Contexte » de l'accueil (E05-S11, retours 4 et 6 de JB, AC-13 à AC-15) : les parties du texte que
 // `context` servirait, empilées dans l'ordre, chacune nommée et à son ancre (sans chiffres depuis E05-S13) ; un Contexte que la personne peut écrire (niveau décidé par le service, lu par la page) s'y écrit en
-// place avec l'éditeur d'une page, les autres se lisent ; la partie Privé renvoie à Profil ; les échecs se disent.
+// place avec l'éditeur d'une page, les autres se lisent ; les échecs se disent. E11-S10 (lot f) : ni tête servie, ni
+// lien vers Profil, ni « Règles Oto » ; une partie sans corps le dit ; « Nouveautés » toujours là ; l'ancre suivie.
 // `fetch` simulé pour `POST /api/plateforme/nodes`, relecture espionnée.
 import type { ReactNode } from "react"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -70,7 +71,7 @@ const DONNEES: DonneesDuContexteServi = { apercu: APERCU, contextes: CONTEXTES, 
 function monter(donnees: Partial<DonneesDuContexteServi> = {}) {
   render(
     <ContexteDeRafraichissement.Provider value={rafraichir}>
-      <ContexteServi donnees={{ ...DONNEES, ...donnees }} Lien={LienDeTest} prefixeDesPages="/n/" hrefDuProfil="/profil" ici="/?onglet=contexte" />
+      <ContexteServi donnees={{ ...DONNEES, ...donnees }} Lien={LienDeTest} prefixeDesPages="/n/" ici="/context" />
     </ContexteDeRafraichissement.Provider>,
   )
 }
@@ -90,8 +91,8 @@ describe("la vue « Contexte » (AC-13)", () => {
   it("should stack every served part in order, each named and at its anchor, without figures (E05-S13, AC-13)", () => {
     monter()
     const parties = screen.getAllByRole("region")
+    // Sans « Règles Oto » (E11-S10, AC-f4) : les autres parties gardent leur ancre.
     expect(parties.map((une) => [une.getAttribute("aria-labelledby") ? within(une).getByRole("heading", { level: 2 }).textContent : une.getAttribute("aria-label"), une.id])).toEqual([
-      ["Règles Oto", "regles"],
       ["Contexte : Tout le monde", "contexte-tout-le-monde"],
       ["Contexte : Privé", "contexte-prive"],
       ["Contexte : équipe Ventes", "contexte-ventes"],
@@ -100,16 +101,16 @@ describe("la vue « Contexte » (AC-13)", () => {
     ])
     // E05-S13 (AC-13) : ni taille, ni état, ni note des versions, ni total.
     expect(document.body.textContent).not.toMatch(/caractères|reflète les versions/)
-    // Une partie en lecture : ses faits tels que servis (sans l'en-tête `## Context: …`, HN-E05S13-13), puis son
-    // corps tel que servi, dans sa carte ; l'avis de fin, en français.
-    expect(partie("Contexte : Tout le monde").getAllByText(/./, { selector: "pre" }).map((texte) => texte.textContent)).toEqual(["Organisation: Démo.", "Nous vendons des logiciels."])
+    // Une partie en lecture : son corps tel que servi, dans sa carte, sans la tête servie (E11-S10, AC-f1) ; l'avis de
+    // fin, en français.
+    expect(partie("Contexte : Tout le monde").getAllByText(/./, { selector: "pre" }).map((texte) => texte.textContent)).toEqual(["Nous vendons des logiciels."])
     expect(partie("Fin du texte").getByText("Budget atteint : l'assistant ne lit pas Nouveautés.")).toBeInTheDocument()
-    expect(document.body.textContent).not.toContain("## Context:")
+    expect(document.body.textContent).not.toMatch(/## Context:|Organisation: Démo\.|You: |Team Ventes, /)
   })
 })
 
 describe("écrire un Contexte dans la vue (AC-14)", () => {
-  it("should write in place the Contextes the person can write, read the others as served, and send the private part to Profil", () => {
+  it("should write in place the Contextes the person can write, and read the others as served, without a link to Profil", () => {
     monter()
     // Gestion (Ventes) et écriture (Privé) : l'éditeur d'une page, ses champs toujours montés.
     expect(partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })).toBeInTheDocument()
@@ -117,8 +118,9 @@ describe("écrire un Contexte dans la vue (AC-14)", () => {
     expect(partie("Contexte : Privé").getByText("La publication revient à Léa Martin.")).toBeInTheDocument()
     // Lecture (Tout le monde) : le texte servi, aucun champ.
     expect(partie("Contexte : Tout le monde").queryByRole("textbox")).toBeNull()
-    expect(partie("Contexte : Tout le monde").getByText("Organisation: Démo.", { selector: "pre" })).toBeInTheDocument()
-    expect(partie("Contexte : Privé").getByRole("link", { name: "Modifier dans Profil" })).toHaveAttribute("href", "/profil")
+    expect(partie("Contexte : Tout le monde").getByText("Nous vendons des logiciels.", { selector: "pre" })).toBeInTheDocument()
+    // E11-S10 (AC-f3) : la partie Privé ne renvoie plus à Profil.
+    expect(screen.queryByRole("link", { name: "Modifier dans Profil" })).toBeNull()
   })
 
   it("should publish a written Contexte on its own path, then read the view again", async () => {
@@ -142,20 +144,89 @@ describe("la vue « Contexte », états (AC-15)", () => {
   it("should say a failed preview with « Réessayer » on the view's address", () => {
     monter({ apercu: { error: ECHEC } })
     expect(screen.getByRole("alert")).toHaveTextContent(`L'aperçu n'a pas pu être calculé.${ECHEC}`)
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/?onglet=contexte")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/context")
     expect(screen.queryByRole("region")).toBeNull()
   })
 
   it("should say an omitted part is not read, and a Contexte that could not be read, its served text kept", () => {
     monter({ contextes: { ...CONTEXTES, contexte: { error: ECHEC } } })
     expect(partie("Nouveautés").getByText("Cette partie ne tient pas dans le budget : l'assistant ne la lit pas.")).toBeInTheDocument()
-    expect(partie("Contexte : Tout le monde").getByText("Organisation: Démo.", { selector: "pre" })).toBeInTheDocument()
+    expect(partie("Contexte : Tout le monde").getByText("Nous vendons des logiciels.", { selector: "pre" })).toBeInTheDocument()
     expect(partie("Contexte : Tout le monde").getByRole("alert")).toHaveTextContent(ECHEC)
   })
 
-  it("should read everything when no Contexte is writable", () => {
+  it("should read everything when no Contexte is writable, their served heads hidden (E11-S10, AC-f1)", () => {
     monter({ contextes: contextes({ toutLeMonde: 1, ventes: 1, prive: 1 }) })
     expect(screen.queryByRole("textbox")).toBeNull()
-    expect(screen.getAllByText(/^(Organisation:|You:|Team )/, { selector: "pre" })).toHaveLength(3)
+    expect(screen.getAllByText(/./, { selector: "pre" }).map((texte) => texte.textContent)).toEqual(["Nous vendons des logiciels.", "Signature : Léa.", "Tutoie les clients."])
+  })
+})
+
+/** Un aperçu fait de ces parties, dans cet ordre, chacune servie en entier ; `head` : la tête d'une partie de Contexte. */
+function apercuDe(parties: { name: string; texte: string; head?: number }[]): DonneesDuContexteServi["apercu"] {
+  return {
+    data: {
+      text: parties.map((une) => une.texte).join("\n\n"),
+      budget: 20_000,
+      blocks: parties.map(({ name, texte, head }) => ({ name, chars: texte.length, status: "full", path: null, head: head ?? 0 })),
+    },
+  }
+}
+
+describe("la vue « Contexte » allégée (E11-S10, lot f)", () => {
+  const SUPPORT = "## Context: team Support (support/contexte)\nTeam Support. Lead: Paul."
+
+  it("should say a part the person cannot write when nothing is served after its head (AC-f2)", () => {
+    monter({
+      apercu: apercuDe([{ name: "support/contexte", texte: SUPPORT, head: SUPPORT.length }]),
+      contextes: { "support/contexte": { data: vueDuNoeud({ id: "n-support", path: "support/contexte", kind: "context", level: 1, blocks: [] }) } },
+      equipes: [{ slug: "support", name: "Support" }],
+    })
+    expect(partie("Contexte : équipe Support").getByText("L'assistant ne reçoit rien de ce contexte pour l'instant.")).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain("Lead: Paul")
+  })
+
+  it("should keep a « Nouveautés » section when none is served, before the procedures, and only one when news are served (AC-f5)", () => {
+    monter({
+      apercu: apercuDe([
+        { name: "code", texte: "ctx: XXXX-XXXX" },
+        { name: "contexte", texte: PARTIES.toutLeMonde, head: TETES.toutLeMonde.length },
+        { name: "procedures", texte: "Procédures du jour." },
+      ]),
+    })
+    expect(screen.getAllByRole("region").map((une) => [within(une).getByRole("heading", { level: 2 }).textContent, une.id])).toEqual([
+      ["Contexte : Tout le monde", "contexte-tout-le-monde"],
+      ["Nouveautés", "nouveautes"],
+      ["Procédures utiles", "procedures"],
+    ])
+    expect(partie("Nouveautés").getByText("Aucune nouveauté n'est servie à l'assistant en ce moment.")).toBeInTheDocument()
+    cleanup()
+
+    monter({ apercu: apercuDe([{ name: "news", texte: "Nouveau depuis hier." }]) })
+    expect(document.querySelectorAll("#nouveautes")).toHaveLength(1)
+    expect(screen.queryByText("Aucune nouveauté n'est servie à l'assistant en ce moment.")).toBeNull()
+  })
+
+  it("should bring the part of the address on mount and on each hashchange, the top of the view for an unknown anchor, and stop at unmount (AC-f6)", () => {
+    const amenes: string[] = []
+    const avant = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+      amenes.push(this.id)
+    })
+    try {
+      window.history.replaceState(null, "", "#contexte-ventes")
+      monter()
+      window.history.replaceState(null, "", "#nouveautes")
+      act(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+      window.history.replaceState(null, "", "#regles")
+      act(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
+      expect(amenes).toEqual(["contexte-ventes", "nouveautes", "haut-de-la-vue"])
+      cleanup()
+      window.dispatchEvent(new HashChangeEvent("hashchange"))
+      expect(amenes).toHaveLength(3)
+    } finally {
+      Element.prototype.scrollIntoView = avant
+      window.history.replaceState(null, "", window.location.pathname)
+    }
   })
 })

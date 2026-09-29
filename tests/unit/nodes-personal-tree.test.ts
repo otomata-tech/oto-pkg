@@ -6,6 +6,7 @@
 // service`), et l'espion (`spyDb`) montre ce qui n'est pas lu. En suite portable (`sqlConfigured`) : le projet, ou le Postgres nu du job `bare-postgres`.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { BlockInput } from "../../packages/plateforme/schemas"
+import { ACCESS_LEVELS, nodeLevels } from "../../packages/plateforme/server/access"
 import { loadNode, readNode } from "../../packages/plateforme/server/nodes/read"
 import { visibleTree } from "../../packages/plateforme/server/nodes/tree"
 import { writeNode } from "../../packages/plateforme/server/nodes/write"
@@ -187,6 +188,33 @@ describe.skipIf(!sqlConfigured)(portable("personal space, screens and tree on a 
       await ref.addNodes([{ path: "conseil/n9999" }])
       const over = await visibleTree(await ref.db("marc"), who("marc"))
       expect([over.truncated, count(over.tree)]).toEqual([true, 5000])
+    })
+
+    it("should build the tree of an administrator as a member's, her rights unchanged (E11-S10, AC-b1 to AC-b3)", async () => {
+      await content(base([], [{ node: "support/faq", org: true, level: "read" }]))
+      const shape = (nodes: TreeNode[]): unknown[] => nodes.map((node) => (node.children.length > 0 ? [node.path, shape(node.children)] : node.path))
+      const ada = await ref.db("ada")
+      // Membre d'aucune équipe : « Tout le monde », son espace et la page que la règle d'organisation partage (AC-b1).
+      expect(shape((await visibleTree(ada, who("ada"))).tree)).toEqual([
+        ["guide", ["annonces", "conseil", "contexte", ["private", ["private/ada"]], "support/faq"]],
+      ])
+      // La gestion de l'administratrice reste entière hors de l'arbre (AC-b2).
+      expect(await nodeLevels(ada, who("ada"), [ref.nodeId("ventes/devis")])).toEqual(new Map([[ref.nodeId("ventes/devis"), ACCESS_LEVELS.manage]]))
+      // Entrée dans Ventes, l'arbre relu porte ses nœuds (AC-b3).
+      const inVentes = ref.identityOf("ada", { org: identityOf("ada").org, teams: [ref.teamOf("ventes", "ada")] })
+      expect(shape((await visibleTree(ada, inVentes)).tree)).toEqual([
+        [
+          "guide",
+          [
+            "annonces",
+            "conseil",
+            "contexte",
+            ["private", ["private/ada"]],
+            "support/faq",
+            ["ventes", ["ventes/contexte", ["ventes/devis", ["ventes/devis/modele"]], "ventes/tarifs"]],
+          ],
+        ],
+      ])
     })
   })
 })

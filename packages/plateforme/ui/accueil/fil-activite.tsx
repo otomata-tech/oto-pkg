@@ -131,7 +131,7 @@ function FilDActivite({ activites, ...ligne }: FilProps) {
   return parJournee(activities, Date.now()).map((journee) => (
     // La première activité d'une journée la désigne : l'identifiant d'une ligne de journal est unique.
     <Fragment key={journee.activites[0].id}>
-      <h2 className="oto-num-caption">{journee.titre}</h2>
+      <h3 className="oto-num-caption">{journee.titre}</h3>
       {journee.activites.map((activite) => (
         <LigneDuFil key={activite.id} activite={activite} {...ligne} />
       ))}

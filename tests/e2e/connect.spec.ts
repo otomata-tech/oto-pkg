@@ -5,20 +5,21 @@ import { baseAdminConfiguree, clientAuth, demoServieALocalhost, SANS_BASE_ADMIN 
 import { seConnecter } from "./fixtures/connexion"
 import { DEMO as DEMO_SERVIE } from "./fixtures/espace"
 
-// Contrôle visuel connecté de « Brancher un assistant » (E02-S04, AC10, AC12), porté sur le design system
-// d'oto-frontend (E05-S09, partie d3 : AC-x1, AC-x3) : le compte E2E, membre de Démo (`pnpm demo:seed`),
-// ouvre `/connect` depuis le menu du compte, au pied du rail (E05-S09, AC-a4), en clair puis en sombre :
-// l'adresse du serveur, les trois guides, la copie de l'adresse relue dans le presse-papiers, le titre et
-// `noindex` ; une capture par mode, puis une par thème posé sur la racine, dans `test-results/`.
+// Contrôle visuel connecté de « Brancher mon Claude, ChatGPT ou Mistral » (E02-S04, AC10, AC12 ; E11-S09,
+// AC-12, AC-14, AC-16), porté sur le design system d'oto-frontend (E05-S09, partie d3 : AC-x1, AC-x3) : le
+// compte E2E, membre de Démo (`pnpm demo:seed`), ouvre `/connect` depuis le menu du compte, au pied du rail
+// (E05-S09, AC-a4), en clair puis en sombre : le guide à quatre onglets, la copie de l'adresse dans l'onglet
+// claude.ai relue dans le presse-papiers, le titre et `noindex` ; une capture par mode, onglet Mistral
+// compris, puis une par thème posé sur la racine, dans `test-results/`.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
 const DEMO = DEMO_SERVIE.adresse
 const ADRESSE = `${DEMO}/api/mcp`
 const THEMES = ["light", "dark"] as const
-const GUIDES = ["claude.ai et Claude Desktop", "ChatGPT", "Claude Code"]
+const TITRE = "Brancher mon Claude, ChatGPT ou Mistral"
 
-test.describe("brancher un assistant", () => {
+test.describe("brancher mon assistant", () => {
   test.skip(!email || !password || !supabaseConfigured, "set E2E_USER_EMAIL, E2E_USER_PASSWORD and the Supabase variables in .env.local")
 
   test.beforeAll(async () => {
@@ -31,7 +32,7 @@ test.describe("brancher un assistant", () => {
   })
 
   for (const theme of THEMES) {
-    test(`should give the address and the three guides, and copy the address (${theme})`, async ({ browser }, testInfo) => {
+    test(`should give the guide in four tabs, and copy the address (${theme})`, async ({ browser }, testInfo) => {
       const context = await browser.newContext({ colorScheme: theme })
       // La copie se relit dans le presse-papiers : permission accordée au contexte (AC12).
       await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: DEMO })
@@ -39,16 +40,19 @@ test.describe("brancher un assistant", () => {
       await seConnecter(page, { baseURL: DEMO, email, password })
       const navigation = page.getByRole("navigation", { name: "Navigation principale" })
       await navigation.getByRole("button", { name: /^Compte : .+\. Ouvrir le menu$/ }).click()
-      await page.getByRole("menu").getByRole("menuitem", { name: "Brancher un assistant", exact: true }).click()
+      await page.getByRole("menu").getByRole("menuitem", { name: TITRE, exact: true }).click()
       await expect(page).toHaveURL(`${DEMO}/connect`)
 
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Brancher un assistant")
-      await expect(page).toHaveTitle(/^Brancher un assistant/)
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(TITRE)
+      await expect(page).toHaveTitle(new RegExp(`^${TITRE}`))
       await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/)
 
-      const adresse = page.locator("section").filter({ has: page.getByRole("heading", { level: 2, name: "Adresse du serveur" }) })
+      const onglets = page.getByRole("tablist", { name: "Votre assistant" })
+      await expect(onglets.getByRole("tab")).toHaveText(["claude.ai", "ChatGPT", "Mistral", "Claude Code"])
+      await onglets.getByRole("tab", { name: "claude.ai" }).click()
+      const adresse = page.getByRole("tabpanel", { name: "claude.ai" }).locator("dd").filter({ hasText: ADRESSE })
       await expect(adresse.locator("code")).toHaveText(ADRESSE)
-      for (const guide of GUIDES) await expect(page.getByRole("heading", { level: 2, name: guide, exact: true })).toBeVisible()
+      await expect(page.getByRole("heading", { level: 2, name: "Adresse du serveur" })).toHaveCount(0)
 
       await adresse.getByRole("button", { name: "Copier l'adresse du serveur" }).click()
       await expect(adresse.getByRole("status")).toHaveText("Copié")
@@ -58,6 +62,8 @@ test.describe("brancher un assistant", () => {
       expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0)
 
       await page.screenshot({ path: testInfo.outputPath(`connect-${theme}.png`), fullPage: true })
+      await onglets.getByRole("tab", { name: "Mistral" }).click()
+      await page.screenshot({ path: testInfo.outputPath(`connect-mistral-${theme}.png`), fullPage: true })
       // Les huit thèmes à l'œil (AC-x3) : posés sur la racine, rien d'écrit en base.
       for (const teinte of OTO_THEMES) {
         await page.locator(".oto").first().evaluate((racine, valeur) => racine.setAttribute("data-oto-theme", valeur), teinte)

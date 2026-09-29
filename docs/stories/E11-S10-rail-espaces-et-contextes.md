@@ -600,9 +600,33 @@ actuel (CLAUDE.md § Garde-fous conditionnels).
 
 ### Écarts avec l'architecture
 
+Aucun écart d'architecture. Écarts avec la story :
+- Hypothèses prises au dev (registre `docs/decisions/hypotheses.md § E11-S10`) : HN-E11S10-A,
+  `ensure_private_space` n'écrit rien sous un `private/<handle>` tenu par une autre personne ;
+  HN-E11S10-B, la renumérotation `<handle>_<n>` est sautée quand l'espace de la personne est déjà là.
+  Aussi C (horodatage `20260929160000`), D (place de « Nouveautés » de repli), E (défilement de
+  `VersLaPartie`), F (titres de journée en `h3`).
+- `tests/e2e/e05s10b.spec.ts` n'est pas réécrit : le rail est inchangé (lot d retiré).
+- Quatre suites hors de la liste des tests attendus ajustées : `tests/integration/identity.test.ts`,
+  `tests/unit/equipes-droits.test.ts`, `tests/integration/oidc-flow.test.ts`,
+  `tests/integration/pages/marque-layout-connexion.test.tsx` (handle posé à l'insertion, handles
+  donnés aux 1 005 membres sans email, accueil sans `searchParams`, « Contexte » en tête du menu du
+  compte).
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `EcranDuContexte` | `packages/plateforme/ui/contexte/ecran-du-contexte.tsx` | Server ; route `/context` : `ScreenHeader` « Contexte » (glyphe `Info`) puis `ContexteServi` ; échec d'identité avec « Réessayer » |
+| `EcranDuContexteChargement` | `packages/plateforme/ui/contexte/ecran-du-contexte.tsx` | `fallback` du `<Suspense>` de l'hôte : `role="status"`, `aria-busy` |
 
 ### Notes
-<!-- AC-a0 : relevé avant et après la migration (nombres par cas, sans e-mail ni nom), cause retenue. -->
+
+- **Revue :** deux constats MOYENNE corrigés (export `EcranDuContexteProps` retiré de `ui/index.ts` ;
+  titres de journée de l'îlot « Activités » en `h3` sous son `h2`) ; BASSE : id `haut-de-la-vue`,
+  commentaire de `COMPTE` ; BASSE sur `SECURITY DEFINER` sans contrôle d'`auth.uid()` : exception
+  écrite dans `database-patterns.md § Règles SECURITY DEFINER` (fonctions internes).
+- **E2E :** joués verts, 12 tests, deux thèmes, 375 et 1 280 px.
+- **Limites connues :** deux insertions concurrentes sans handle au même radical d'email → `23505`
+  possible ; `unique_handle` quadratique pour beaucoup de membres sans email.
+- **AC-a0 :** relevé de diagnostic sur l'organisation Démo en attente, par le responsable d'Oto
+  (nombres par cas, avant et après la migration, sans e-mail ni nom).

@@ -1,7 +1,7 @@
 // Les lignes d'une partie du texte servi, dites en français (E05-S13, retours 1 et 8, AC-4, AC-14, AC-15 ;
 // HN-E05S13-12, -13, -14) : les morceaux que `parties-du-contexte.ts` relit (listes sous leur légende, phrases fixes,
-// règles de l'espace, avis de budget), chaque chemin ou titre un lien vers son contenu ; une ligne non reconnue, telle
-// que servie, en police mono. Monté dans la carte d'une partie par la vue « Contexte » de l'accueil, sous l'éditeur
+// avis de budget), chaque chemin ou titre un lien vers son contenu ; une ligne non reconnue, telle
+// que servie, en police mono. Monté dans la carte d'une partie par la vue « Contexte », sous l'éditeur
 // d'un Contexte écrivable, et sous les blocs de l'encart « Contexte · Tout le monde » d'Organisation. Server
 // Component. Remplace `ListesDIndex` (M71), qui ne rendait que les listes d'index, en anglais. Sans lui, la personne
 // lit le texte anglais brut que reçoit son assistant.
@@ -9,7 +9,7 @@ import type { ReactNode } from "react"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
 import { dateLisible } from "../format/dates"
-import { LIGNES_SERVIES, nomDuBloc, REGLES_OTO, type EquipesNommees } from "./libelles"
+import { LIGNES_SERVIES, nomDuBloc, type EquipesNommees } from "./libelles"
 import type { Legende, LigneServie, MorceauServi } from "./parties-du-contexte"
 
 type Navigation = { prefixeDesPages: string; Lien: LienDeLHote }
@@ -88,18 +88,6 @@ function Brut({ texte }: { texte: string }) {
   return <pre className="oto-code whitespace-pre-wrap break-words p-3">{texte}</pre>
 }
 
-/** Les règles de l'espace en français, quand le texte servi en porte autant que la traduction ; sinon telles que servies. */
-function Regles({ lignes, texte }: { lignes: readonly string[]; texte: string }) {
-  if (lignes.length !== REGLES_OTO.length) return <Brut texte={texte} />
-  return (
-    <ul className="flex list-disc flex-col gap-1.5 ps-5">
-      {REGLES_OTO.map((regle) => (
-        <li key={regle}>{regle}</li>
-      ))}
-    </ul>
-  )
-}
-
 const PHRASES = {
   "aucune-procedure": LIGNES_SERVIES.aucuneProcedure,
   "rien-de-nouveau": LIGNES_SERVIES.rienDeNouveau,
@@ -115,8 +103,6 @@ function Morceau({ morceau, id, equipes = [], ...navigation }: Navigation & { mo
       return <p className="text-mute">{PHRASES[morceau.phrase]}</p>
     case "autres-procedures":
       return <p className="text-mute">{LIGNES_SERVIES.autresProcedures(morceau.nombre)}</p>
-    case "regles":
-      return <Regles lignes={morceau.lignes} texte={morceau.texte} />
     case "budget": {
       const noms = morceau.noms.map(({ nom, coupe }) => (coupe ? LIGNES_SERVIES.coupe(nomDuBloc({ name: nom }, equipes)) : nomDuBloc({ name: nom }, equipes)))
       const liste = [...noms, ...(morceau.autres > 0 ? [LIGNES_SERVIES.autres(morceau.autres)] : [])].join(", ")

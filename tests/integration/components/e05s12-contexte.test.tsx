@@ -1,8 +1,9 @@
 // Les écrans du Contexte après E05-S12, lot C (D109, retours 1, 2 et 4) : la vue « Contexte » de l'accueil et
 // l'encart d'un Contexte nomment une partie par Contexte, servie ou non (AC-6) ; dans une partie, la tête servie
 // se lit toujours, l'éditeur dessous quand la personne peut écrire le Contexte, même non servi (AC-7) ; ancres et
-// « (ce contexte) » par le nom de la partie (AC-8) ; « Règles Oto » repliée, jamais écrivable (AC-11). Le rapport
-// est celui du moteur (`head`, lot A) ; les parties servies nommées et leurs ancres sont aussi relues par
+// « (ce contexte) » par le nom de la partie (AC-8). E11-S10 (lot f, lot g) : la tête servie n'est plus montrée, ni
+// « Modifier dans Profil », ni « Règles Oto », dans la vue comme dans l'encart. Le rapport est celui du moteur
+// (`head`, lot A) ; les parties servies nommées et leurs ancres sont aussi relues par
 // `e05s11-contexte-servi.test.tsx` et `contexte.test.tsx`.
 import type { ReactNode } from "react"
 import { cleanup, render, screen, within } from "@testing-library/react"
@@ -25,9 +26,6 @@ const TETES = {
   ventes: "## Context: team Ventes (ventes/contexte)\nTeam Ventes, your default team. Lead: Claire Morel.\nConnectors (the team that runs each call unless the procedure's place says otherwise):\n- mail: team Ventes (write)",
   conseil: "## Context: team Conseil (conseil/contexte)\nTeam Conseil.",
 }
-
-/** Les faits et connecteurs d'une partie, sa tête sans l'en-tête `## Context: …` (E05-S13, HN-E05S13-13). */
-const FAITS = Object.fromEntries(Object.entries(TETES).map(([cle, tete]) => [cle, tete.slice(tete.indexOf("\n") + 1)])) as Record<keyof typeof TETES, string>
 
 const PARTIES = {
   code: "ctx: XXXX-XXXX\nPass this ctx to every other tool.\n## How this workspace works\n- Six tools.\n## This request\nNo request given.",
@@ -101,8 +99,7 @@ function monterLaVue(donnees: Partial<DonneesDuContexteServi> = {}) {
       donnees={{ apercu: APERCU, contextes: CONTEXTES, equipes: EQUIPES, nomOrganisation: "Démo", ...donnees }}
       Lien={LienDeTest}
       prefixeDesPages="/n/"
-      hrefDuProfil="/profil"
-      ici="/?onglet=contexte"
+      ici="/context"
     />,
   )
 }
@@ -114,7 +111,7 @@ function monterLEncart(cheminCourant: string) {
       handle="lea"
       apercu={APERCU}
       equipes={EQUIPES}
-      hrefDuContexteServi="/?onglet=contexte"
+      hrefDuContexteServi="/context"
       ici={`/n/${cheminCourant}`}
       Lien={LienDeTest}
     />,
@@ -129,8 +126,13 @@ afterEach(cleanup)
 describe("une partie par Contexte (AC-6)", () => {
   it("should name every part in the view and in the insert, a Contexte not served by its name, and none after the old blocks", () => {
     monterLaVue()
-    const noms = ["Règles Oto", "Contexte : Tout le monde", "Contexte : Privé", "Contexte : équipe Ventes", "Contexte : équipe Conseil", "Contenus récents"]
-    expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-labelledby") && document.getElementById(region.getAttribute("aria-labelledby") ?? "")?.textContent)).toEqual(noms)
+    // Sans « Règles Oto » (E11-S10, AC-f4, AC-g2) ; « Nouveautés » dans la vue même quand rien n'en est servi (AC-f5).
+    const noms = ["Contexte : Tout le monde", "Contexte : Privé", "Contexte : équipe Ventes", "Contexte : équipe Conseil", "Contenus récents"]
+    expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-labelledby") && document.getElementById(region.getAttribute("aria-labelledby") ?? "")?.textContent)).toEqual([
+      ...noms.slice(0, 4),
+      "Nouveautés",
+      "Contenus récents",
+    ])
     for (const ancien of ["Vous", "Organisation", "Vos équipes", "Connecteurs", "Code de la conversation", "Documents récents"]) {
       expect(screen.queryByRole("region", { name: ancien })).toBeNull()
     }
@@ -144,36 +146,31 @@ describe("une partie par Contexte (AC-6)", () => {
   })
 })
 
-describe("la tête d'une partie, puis son Contexte (AC-7)", () => {
-  it("should always read the served head, then the editor of a writable Contexte even not served, else the rest of the served text", () => {
+describe("une partie, puis son Contexte (AC-7 ; E11-S10, AC-f1 à AC-f3)", () => {
+  it("should hide the served head, then show the editor of a writable Contexte even not served, else the rest of the served text", () => {
     monterLaVue()
-    // Tout le monde, en lecture : ses faits (sa tête sans l'en-tête, E05-S13), puis la suite servie ; aucun champ.
-    expect(textesServis("Contexte : Tout le monde")).toEqual([FAITS.toutLeMonde, "Nous vendons des logiciels."])
+    // Ni faits ni connecteurs à l'écran : l'assistant les reçoit toujours (HN-E11S10-14).
+    expect(document.body.textContent).not.toMatch(/Organisation: Démo|You: Léa|Team Ventes|Team Conseil|Connectors/)
+    // Tout le monde, en lecture : la suite servie ; aucun champ.
+    expect(textesServis("Contexte : Tout le monde")).toEqual(["Nous vendons des logiciels."])
     expect(partie("Contexte : Tout le monde").queryByRole("textbox")).toBeNull()
-    // Ventes, en gestion : sa tête (faits et connecteurs) en lecture, l'éditeur dessous, le corps servi n'est pas répété.
-    expect(textesServis("Contexte : équipe Ventes")).toEqual([FAITS.ventes])
-    const tete = partie("Contexte : équipe Ventes").getByText(/^Team Ventes/, { selector: "pre" })
-    const champ = partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })
-    expect(tete.compareDocumentPosition(champ)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    // Le Privé, jamais publié donc non servi, mais écrivable : sa tête, « Modifier dans Profil », puis son éditeur.
-    expect(textesServis("Contexte : Privé")).toEqual([FAITS.prive])
-    const profil = partie("Contexte : Privé").getByRole("link", { name: "Modifier dans Profil" })
-    expect(profil).toHaveAttribute("href", "/profil")
-    const brouillon = partie("Contexte : Privé").getByRole("textbox", { name: "Modifier ce texte — Signature : Léa." })
-    expect(partie("Contexte : Privé").getByText(/^You: Léa Martin/, { selector: "pre" }).compareDocumentPosition(profil)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(profil.compareDocumentPosition(brouillon)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    // Conseil, non servi et en échec de lecture pour la page : sa tête, aucun champ, et l'échec se dit
+    // Ventes, en gestion : l'éditeur, le corps servi n'est pas répété.
+    expect(textesServis("Contexte : équipe Ventes")).toEqual([])
+    expect(partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })).toBeInTheDocument()
+    // Le Privé, jamais publié donc non servi, mais écrivable : son éditeur, sans lien vers Profil.
+    expect(textesServis("Contexte : Privé")).toEqual([])
+    expect(partie("Contexte : Privé").getByRole("textbox", { name: "Modifier ce texte — Signature : Léa." })).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Modifier dans Profil" })).toBeNull()
+    // Conseil, non servi et en échec de lecture pour la page : rien de servi, aucun champ, et l'échec se dit
     // (portage-ecrans.md § 4 ; un Contexte absent, `not_found`, la page ne le lit pas en erreur).
-    expect(textesServis("Contexte : équipe Conseil")).toEqual([FAITS.conseil])
+    expect(partie("Contexte : équipe Conseil").getByText("L'assistant ne reçoit rien de ce contexte pour l'instant.")).toBeInTheDocument()
     expect(partie("Contexte : équipe Conseil").queryByRole("textbox")).toBeNull()
     expect(partie("Contexte : équipe Conseil").getByRole("alert")).toHaveTextContent(ECHEC)
-    // Une seule partie renvoie à Profil.
-    expect(screen.getAllByRole("link", { name: "Modifier dans Profil" })).toHaveLength(1)
   })
 
   it("should say the failed read of a served Contexte under its served text", () => {
     monterLaVue({ contextes: { ...CONTEXTES, contexte: { error: ECHEC } } })
-    expect(textesServis("Contexte : Tout le monde")).toEqual([FAITS.toutLeMonde, "Nous vendons des logiciels."])
+    expect(textesServis("Contexte : Tout le monde")).toEqual(["Nous vendons des logiciels."])
     expect(partie("Contexte : Tout le monde").getByRole("alert")).toHaveTextContent(ECHEC)
   })
 })
@@ -183,31 +180,23 @@ describe("ancres et « (ce contexte) » par le nom de la partie (AC-8)", () => {
     monterLEncart("private/lea/contexte")
     const liste = within(screen.getByRole("list", { name: "Ordre de lecture" }))
     expect(liste.getAllByRole("link").map((lien) => lien.getAttribute("href"))).toEqual(
-      ["regles", "contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "contenus"].map((ancre) => `/?onglet=contexte#${ancre}`),
+      ["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "contenus"].map((ancre) => `/context#${ancre}`),
     )
     const marquees = liste.getAllByRole("link").filter((lien) => lien.getAttribute("aria-current") === "page")
     expect(marquees.map((lien) => lien.textContent?.startsWith("Contexte : Privé (ce contexte)"))).toEqual([true])
     cleanup()
     monterLaVue()
-    expect(screen.getAllByRole("region").map((region) => region.id)).toEqual(["regles", "contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "contenus"])
+    expect(screen.getAllByRole("region").map((region) => region.id)).toEqual(["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "nouveautes", "contenus"])
   })
 })
 
-describe("« Règles Oto » (AC-11)", () => {
-  it("should fold the rules at every display in a native disclosure whose summary gives its name, never writable", () => {
+describe("sans « Règles Oto » (E11-S10, AC-f4, AC-g2)", () => {
+  it("should render no part and no line for the code block, in the view as in the insert", () => {
     monterLaVue()
-    const region = screen.getByRole("region", { name: "Règles Oto" })
-    const repli = region.querySelector("details")
-    expect(repli).not.toBeNull()
-    expect(repli).not.toHaveAttribute("open")
-    const resume = repli?.firstElementChild
-    expect(resume?.tagName).toBe("SUMMARY")
-    // E05-S13 (AC-13) : le nom seul, sans taille ni état.
-    expect(resume?.textContent).toBe("Règles Oto")
-    expect(within(region).getByRole("heading", { level: 2, name: "Règles Oto" }).closest("summary")).toBe(resume)
-    // Son texte servi, sous le résumé, jamais perdu : des règles en nombre inattendu restent telles que servies (E05-S13,
-    // AC-15) ; aucun champ, aucun éditeur.
-    expect(textesServis("Règles Oto").join("\n")).toBe(PARTIES.code)
-    expect(within(region).queryByRole("textbox")).toBeNull()
+    expect(screen.queryByText("Règles Oto")).toBeNull()
+    expect(document.body.textContent).not.toContain("How this workspace works")
+    cleanup()
+    monterLEncart("contexte")
+    expect(screen.queryByText(/Règles Oto/)).toBeNull()
   })
 })

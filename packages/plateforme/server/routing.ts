@@ -14,8 +14,14 @@ import type { PlatformDb } from "./db"
 import { fromDatabaseError, inTransaction, PlatformError, READ_PAGE_ROWS } from "./errors"
 import type { Identity } from "./identity"
 
-/** Part du résumé (ou du titre) et part des lexèmes : calibration de la maquette sur 132 phrases. */
-export const WEIGHTS = { text: 0.55, lexical: 0.45 } as const
+/**
+ * Parts du résumé (ou du titre), de la meilleure formulation du résumé et des lexèmes (E11-S04, AC-b1),
+ * calibrées sur les jeux Acme, du pilote et « todo » (`tests/integration/routing.test.ts`). Les seuils de
+ * `pg_trgm` de `route_candidates` en dépendent (E01-S13 AC-a4) : les changer, c'est changer la migration.
+ */
+export const WEIGHTS = { text: 0.25, phrase: 0.3, lexical: 0.45 } as const
+/** Dans la part des lexèmes : ceux du titre et du résumé, puis ceux du titre seul (AC-a4). */
+const LEXICAL_PARTS = { all: 0.75, title: 0.25 } as const
 /** Sous ce nombre de lexèmes, la part lexicale est atténuée : « relance » seul trouvait tous les siens. */
 const SHORT_QUERY_LEXEMES = 2
 /** Procédure d'une équipe de la personne. */
@@ -39,7 +45,16 @@ export const CANDIDATES_SHOWN = 3
 const DAY_MS = 86_400_000
 
 /** Composantes rendues par `route_candidates` pour un nœud. */
-export type Components = { s_summary: number; s_title: number; lexical: number; query_lexemes: number }
+export type Components = {
+  s_summary: number
+  s_title: number
+  /** La meilleure formulation du résumé, comparée à la demande (E11-S04, AC-a2). */
+  s_phrase: number
+  lexical: number
+  /** La part des lexèmes de la demande que porte le titre seul (AC-a4). */
+  lexical_title: number
+  query_lexemes: number
+}
 
 export type Candidate = {
   nodeId: string
@@ -64,10 +79,15 @@ type RouteRow = Components & {
   owner_team_id: string | null
 }
 
-/** Mélange : le résumé ou le titre, puis les lexèmes partagés, atténués sous deux lexèmes ; dans [0, 1]. */
+/**
+ * Mélange : le résumé ou le titre, la meilleure formulation du résumé, puis les lexèmes partagés (titre
+ * et résumé, et titre seul), atténués sous deux lexèmes ; dans [0, 1].
+ */
 export function blendScore(components: Components): number {
-  const lexical = components.lexical * Math.min(1, components.query_lexemes / SHORT_QUERY_LEXEMES)
-  const score = WEIGHTS.text * Math.max(components.s_summary, components.s_title) + WEIGHTS.lexical * lexical
+  const damping = Math.min(1, components.query_lexemes / SHORT_QUERY_LEXEMES)
+  const lexical = (LEXICAL_PARTS.all * components.lexical + LEXICAL_PARTS.title * components.lexical_title) * damping
+  const score =
+    WEIGHTS.text * Math.max(components.s_summary, components.s_title) + WEIGHTS.phrase * components.s_phrase + WEIGHTS.lexical * lexical
   return Math.max(0, Math.min(1, score))
 }
 
@@ -155,18 +175,55 @@ export async function loadRoutingSettings(db: PlatformDb, orgId: string): Promis
   )
 }
 
-// H37, N1 : un interrogatif suivi d'une frontière de mot ; « est-ce qu' » sans condition.
-const INTERROGATIVE =
-  /^(?:(?:combien|lesquels|lesquelles|lequel|laquelle|qui|quel|quelle|quels|quelles|où|quand|comment|pourquoi|est-ce que|y a-t-il)(?:$|[\s,?!.])|est-ce qu')/
+/**
+ * Le genre d'une demande (E11-S04, AC-b2) : `how` demande comment faire, `request` demande poliment une
+ * action, `data` pose une question de données, `action` demande d'agir.
+ */
+export type RequestKind = "how" | "request" | "data" | "action"
+
+// Un mot ou une formule suivis d'une frontière de mot (H37, N1).
+const BOUNDARY = String.raw`(?:$|[\s,?!.])`
+const HOW = new RegExp(`^comment${BOUNDARY}`)
+// HN-E11S04-12 : les formules de demande, liste fermée écrite ici, comme les interrogatifs.
+const REQUEST_FORMULAS = [
+  "peux-tu",
+  "pouvez-vous",
+  "pourrais-tu",
+  "pourriez-vous",
+  "tu peux",
+  "vous pouvez",
+  "tu pourrais",
+  "vous pourriez",
+  "est-ce que tu peux",
+  "est-ce que vous pouvez",
+  "est-ce que tu pourrais",
+  "est-ce que vous pourriez",
+  "tu veux bien",
+  "vous voulez bien",
+]
+const REQUEST = new RegExp(`^(?:${REQUEST_FORMULAS.join("|")})${BOUNDARY}`)
+// H37, N1 : un interrogatif suivi d'une frontière de mot ; « est-ce qu' » sans condition. « comment »
+// est une demande `how` (AC-b2).
+const INTERROGATIVE = new RegExp(
+  `^(?:(?:combien|lesquels|lesquelles|lequel|laquelle|qui|quel|quelle|quels|quelles|où|quand|pourquoi|est-ce que|y a-t-il)${BOUNDARY}|est-ce qu')`,
+)
 
 /**
- * Une question de données (H37, N1) : après `trim`, la phrase finit par « ? » ou commence, sans casse
- * et l'apostrophe typographique ramenée à `'`, par un interrogatif. Elle appelle « cherche et
- * réponds » ; toute autre phrase est une action, qui appelle « demande laquelle ».
+ * Après `trim`, sans casse et l'apostrophe typographique ramenée à `'` : `how` quand la phrase commence
+ * par « comment », `request` par une formule de demande, `data` quand elle finit par « ? » ou commence
+ * par un interrogatif (H37, N1), `action` sinon. Chaque genre a sa consigne quand aucune étape n'est
+ * servie (`server/context/blocks/code.ts`).
  */
-export function isDataQuestion(phrase: string): boolean {
+export function requestKind(phrase: string): RequestKind {
   const text = phrase.trim().toLowerCase().replace(/’/g, "'")
-  return text.endsWith("?") || INTERROGATIVE.test(text)
+  if (HOW.test(text)) return "how"
+  if (REQUEST.test(text)) return "request"
+  return text.endsWith("?") || INTERROGATIVE.test(text) ? "data" : "action"
+}
+
+/** Une question de données (H37, N1) : elle appelle « cherche et réponds » (`structuredContent.data_question`). */
+export function isDataQuestion(phrase: string): boolean {
+  return requestKind(phrase) === "data"
 }
 
 export function formatScore(score: number): string {
@@ -184,7 +241,7 @@ export function roundScore(score: number): number {
  */
 async function routeRows(db: PlatformDb, identity: Identity, query: string): Promise<RouteRow[]> {
   return inTransaction(db, "rankCandidates: route_candidates", (sql) => sql<RouteRow[]>`
-    select r.node_id, r.path, r.title, r.summary, r.kind, r.owner_team_id, r.s_summary, r.s_title, r.lexical, r.query_lexemes
+    select r.node_id, r.path, r.title, r.summary, r.kind, r.owner_team_id, r.s_summary, r.s_title, r.s_phrase, r.lexical, r.lexical_title, r.query_lexemes
       from platform.route_candidates(p_org => ${identity.org.id}, p_query => ${query}, p_kind => ${ROUTED_KIND}, p_limit => ${PREFILTER}) r`)
 }
 

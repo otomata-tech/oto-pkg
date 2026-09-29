@@ -34,7 +34,7 @@
 | --space-4 | 16px | Espacement standard |
 
 **Composants partagés :** voir `docs/design/components/_index.md` _(si applicable)_
-**Design system complet :** voir `docs/design/system.md`
+**Design system complet :** voir oto-saas : `docs/design/system.md`
 
 ## 4. Parcours utilisateur
 

@@ -10,7 +10,7 @@
 | **Priorité** | Should |
 | **Référence UI** | N/A : aucun écran ; texte servi à l'assistant (`mcp-patterns.md`) |
 | **Conventions** | database, supabase, security, api, mcp, uploads, testing |
-| **Estimation** | M |
+| **Estimation** | L (M + hosts sans shell, D130) |
 | **Vague** | E10, après 1.0.0 ; dernière de l'epic (ordre E10-S04, E10-S01, E10-S06, E10-S02, E10-S03, E10-S05) |
 | **Dépend de** | ADR-018 (« ticket d'envoi », écrit par le pilote avant le code) ; E10-S01 (mode tolérant, `table.import`, provenance `import`) ; E10-S03 (bloc `html`, page artefact, `HTML_MAX`) |
 | **Porteuse de migration** | **Oui** (Ⓜ) : table `platform.upload_tickets`, fonction `platform.consume_upload_ticket` |
@@ -60,7 +60,40 @@ porte ») et à ADR-012 § 3.
 - Rate limiting : aucun store partagé dans le paquet ; le jeton de 256 bits en tient lieu (AC11).
 - Commande CLI du paquet avec connexion OAuth de l'appareil : écartée (option B de D117).
 
-## Critères d'acceptation
+## Hosts sans shell (fiche D130, 2026-09-29)
+
+Claude ou ChatGPT dans le navigateur n'ont pas de `curl` qui joigne la plateforme (bac à sable sans
+accès sortant, ou limité à une liste de domaines). Deux voies s'ajoutent, sans outil nouveau (ADR-002) :
+
+1. **Téléchargement par le serveur** : l'assistant passe à `upload.link` l'adresse publique de son
+   fichier (`source_url`, par exemple un artefact claude.ai publié) ; le serveur le télécharge et
+   l'écrit par la même porte que le ticket (droits relus, ADR-018 § 4).
+2. **Formulaire de dépôt**, si le téléchargement échoue : `call` rend `form_url`, le lien d'une page de
+   la plateforme où la personne dépose le fichier ; le modèle ne le réécrit jamais.
+
+**Critères** (s'ajoutent à ceux qui suivent) :
+- [ ] **W1** — **Given** une `source_url` en `https` publique **When** `upload.link` **Then** le serveur la
+  télécharge et écrit le contenu à la destination, comme un envoi par `curl` (mêmes types, même
+  plafond de 1 Mo, même provenance).
+- [ ] **W2** — Le téléchargement refuse, avant toute requête, un schéma autre que `https`, un port autre
+  que 443 et une adresse résolue privée, de bouclage, lien-local ou de métadonnées d'hébergeur ; il
+  suit au plus 3 redirections, chacune contrôlée de même ; il s'arrête à 10 s et au-delà de 1 Mo lus.
+  Test : un cas par règle, résolution DNS doublée.
+- [ ] **W3** — **Given** un téléchargement qui échoue (refus W2, réponse ≠ 2xx, trop gros, type refusé)
+  **Then** `call` rend une phrase courte (la cause) et `form_url`, sans le contenu ni l'adresse
+  d'origine au journal.
+- [ ] **W4** — `form_url` mène à une page de la plateforme, valable 15 minutes et une fois : elle
+  exige la session web de la personne du ticket (une autre personne, ou sans session : refus sans
+  rien consommer), affiche la destination (chemin, genre), prend un fichier par glisser-déposer ou
+  sélection, puis dit « Déposé » ; au tour suivant, l'assistant relit la destination par `read`.
+- [ ] **W5** — La description de `call` et le contrat d'`upload.link` disent la règle : avec un shell,
+  `curl` ; sans shell, `source_url` ; sinon, le lien du formulaire à donner à la personne.
+- [ ] **W6** — Banc : claude.ai (artefact publié, `source_url`) et ChatGPT (formulaire) jouent le dépôt
+  d'un rapport HTML de 100 ko ; le résultat se note dans `docs/mcp-golden-queries.md`.
+
+**Rayon d'impact à écrire avant le code** : la porte d'envoi (ADR-018 § 5 refuse un en-tête `Origin` :
+le formulaire passe par une route à session, distincte) ; `security-patterns.md` (téléchargement
+d'une adresse fournie : règle nouvelle) ; `mcp-patterns.md` (texte de `call`).
 
 ### Lot a — Le lien
 

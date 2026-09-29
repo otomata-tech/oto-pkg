@@ -43,6 +43,13 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
 
 Cet ADR amende ADR-012 § 3 et la garde de portabilité : la vérification du jeton de l'émetteur
 vaut sur chaque porte, **sauf** cette route, où le ticket en tient lieu.
+7. **Téléchargement d'une adresse fournie** (fiche D130, proposé) : pour un assistant sans shell,
+   `upload.link` accepte une adresse `https` publique que le serveur télécharge. C'est la seule
+   requête du paquet vers une adresse choisie par un appelant : schéma, port et adresse résolue sont
+   contrôlés avant la requête et à chaque redirection (E10-S05 W2), la taille et le délai bornés.
+8. **Formulaire de dépôt** (fiche D130, proposé) : si le téléchargement échoue, le ticket se consomme
+   depuis une page de la plateforme, sous la session web de la personne du ticket, par une route à
+   session distincte de la porte sans session (§ 5 garde son refus des requêtes à `Origin`).
 
 ## Conséquences
 

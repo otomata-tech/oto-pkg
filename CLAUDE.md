@@ -16,8 +16,8 @@ extérieur (GitHub, Supabase, Vercel, npm), ni vrai secret, sans l'accord de JB.
 
 **Effet produit — les systèmes de ce projet** (remplace la liste générique de « Rayon d'impact ») :
 l'autre face du paquet (`ui/` ↔ `api/` ↔ `server/`) ; le schéma `platform` et ses policies RLS ; la
-liste d'outils MCP servie aux hosts (surface figée : ajout seulement, ADR-002) ; le service
-connecteurs (contrat MCP, secret en en-tête) ; l'application hôte qui monte le paquet (route,
+liste d'outils MCP servie aux hosts (surface figée : ajout seulement, ADR-002) ; les connecteurs
+du paquet et le coffre de leurs secrets (ADR-019) ; l'application hôte qui monte le paquet (route,
 middleware, thème) ; les migrations copiées et appliquées par l'hôte.
 
 Stack : Next.js 15 (App Router) · TypeScript strict · Tailwind v4 · Shadcn/ui · pnpm workspace ·

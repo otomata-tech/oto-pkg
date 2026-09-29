@@ -128,7 +128,7 @@ Le nombre de lignes n'est pas un critère de review. Ce qui l'est : **un composa
 cumule pas plus de 3 responsabilités** parmi fetch de données, state local, effet de bord,
 branchement conditionnel de rendu, mapping de collection. Au-delà, extraire.
 
-Les pages catalogue (`src/app/design-system/**`) et les fichiers générés sont exemptés.
+Les pages catalogue (oto-saas : `src/app/design-system/**`) et les fichiers générés sont exemptés.
 
 ## TypeScript
 

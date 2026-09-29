@@ -10,6 +10,14 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-29] — Méthode après la coupe ; dépôt pour les hosts sans shell (D130)
+
+**Quoi :** Les documents de méthode citent l'hôte sous la forme « oto-saas : `<chemin>` » ; les deux renvois à `src/hooks/**` retirés ; `CLAUDE.md § Projet` nomme les connecteurs du paquet (ADR-019). D130 : E10-S05 s'étend aux hosts sans shell (téléchargement d'une adresse publique, sinon formulaire de dépôt), ADR-018 § 7 et § 8 proposés.
+
+**Pourquoi :** un chemin de l'autre dépôt cité comme local ne se trouve pas ; décision de JB pour claude.ai et ChatGPT en ligne.
+
+**Fichiers :** `CLAUDE.md`, `.method/**`, `docs/architecture.md`, `docs/prd.md`, `docs/decisions/{ADR-018-ticket-d-envoi.md,fiche-decisions.md,hypotheses.md}`, `docs/stories/{E05-S11,E10-S05}-*.md`, `packages/plateforme/migrations/README.md`.
+
 ## [2026-09-29] — Connecteurs dans le paquet (ADR-019)
 
 **Quoi :** ADR-019 : les connecteurs réels s'écrivent en TypeScript dans le paquet (`server/connectors/`), sans service connecteurs séparé ; ADR-007 § 1, § 2 et § 4 remplacés ; fiche D129 ; architecture, PRD (NFR-ADMIN-01 comprise) et stories E04-S02, E04-S03, E04-S05 alignés.

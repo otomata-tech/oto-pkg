@@ -357,7 +357,7 @@ L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platf
   assistant ne coupe qu'au rafraîchissement du jeton (3 600 s) ; retirer le membre coupe tout de
   suite. Les hosts ne purgent jamais `auth.oauth_clients` : `pnpm oauth:clients` fait le ménage.
 - Mode OIDC : l'enregistrement dynamique et le consentement sont ceux de l'émetteur, réglés comme
-  dans `docs/deploiement.md § 4`.
+  dans oto-saas : `docs/deploiement.md § 4`.
 
 ### Isolation et secrets
 - RLS activée sur toute table de `platform`, sans exception non documentée par un ADR ; chaque
@@ -377,7 +377,7 @@ L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platf
 
 ## 7. Installation et exploitation d'un hôte
 
-Pas à pas, variables et vérifications : `packages/plateforme/README.md` et `docs/deploiement.md`.
+Pas à pas, variables et vérifications : `packages/plateforme/README.md` et oto-saas : `docs/deploiement.md`.
 
 - **Installer** : `@otomata_tech/oto_platform` en version exacte et ses dépendances pairs ;
   `transpilePackages` ; `@source` et `ui/styles.css` dans le CSS de l'hôte ; les routes de § 3,
@@ -405,7 +405,7 @@ Pas à pas, variables et vérifications : `packages/plateforme/README.md` et `do
 - **Tests** : la suite portable tourne sur tout Postgres ; les suites propres à Supabase Auth sur
   le projet Supabase de l'hôte de test, avec des données jetables (`t<hex>`) nettoyées après chaque
   passage.
-- **Propre au SaaS** : les sous-domaines de la cellule (`src/lib/cellule/`, API Vercel, domaine de
+- **Propre au SaaS** : les sous-domaines de la cellule (oto-saas : `src/lib/cellule/`, API Vercel, domaine de
   base en variable, désactivés sans `CELL_BASE_DOMAIN`, `VERCEL_TOKEN` et `VERCEL_PROJECT_ID`) ;
   l'hébergement (ADR-005).
 

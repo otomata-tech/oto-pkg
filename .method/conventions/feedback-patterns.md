@@ -112,7 +112,7 @@ export function DeleteProjectDialog({
 
 ## Empty States
 
-**`EmptyState` existe déjà** : `src/components/empty-state.tsx`. Le réimplémenter est un
+**`EmptyState` existe déjà** : oto-saas : `src/components/empty-state.tsx`. Le réimplémenter est un
 défaut HAUTE (`CLAUDE.md` règle absolue n°3 — vérifier le registry avant de créer).
 
 Props réelles : `icon?: ReactNode` · `heading: string` · `description?: string` ·

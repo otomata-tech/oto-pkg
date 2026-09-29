@@ -323,7 +323,7 @@ Fichiers :
 - `packages/plateforme/ui/components/choix.tsx`, `packages/plateforme/ui/noeud/deplacement-du-noeud.tsx`,
   `packages/plateforme/ui/equipes/equipes-d-une-personne.tsx` (déclencheur), `packages/plateforme/ui/noeud/partage-du-noeud.tsx`
   (si le panneau doit laisser vivre la liste), `packages/plateforme/ui/profil/formulaire-du-profil.tsx` (si a y a posé
-  une liste native), `src/app/design-system/page.tsx`
+  une liste native), oto-saas : `src/app/design-system/page.tsx`
 - Tests : `tests/integration/components/deplacement-du-noeud.test.tsx`, `e05s10b-partage.test.tsx`,
   `e05s10d-partage-web.test.tsx`, `ecran-du-journal.test.tsx`, `ecran-usage.test.tsx`, `file-de-revue.test.tsx`,
   `grille.test.tsx`, `inviter-quelqu-un.test.tsx`, `ecran-connecteurs.test.tsx`, `regles-du-noeud.test.tsx`,
@@ -401,7 +401,7 @@ Fichiers (liste arrêtée par le pilote au lancement : g part seul, après f) :
 - `Select` et listes natives : `rg -n "<select|<Select\b" c:/apps/oto-platform/packages/plateforme/ui c:/apps/oto-platform/src`
   → `Select` du DS monté par `tableau/{filtre-de-colonne,decision-de-revue}`, `admin/connecteurs/creation-de-compte`,
   `admin/usage/ecran-usage`, `noeud/partage-du-noeud`, `equipes/{reglages-d-equipe,ajout-de-regle}`,
-  `journal/filtres-du-journal`, `invitations/inviter-quelqu-un`, `src/app/design-system/page.tsx` ; listes natives
+  `journal/filtres-du-journal`, `invitations/inviter-quelqu-un`, oto-saas : `src/app/design-system/page.tsx` ; listes natives
   écrites à la main : `components/choix.tsx`, `contexte/ma-fiche.tsx` (retirée par c), `noeud/deplacement-du-noeud.tsx`.
   Tests qui les pilotent : `rg -l "selectOption" c:/apps/oto-platform/tests` → `page.spec`, `procedure-et-contexte.spec` ;
   `fireEvent.change` : liste du lot f.
@@ -1318,7 +1318,7 @@ toucher `ECRANS` : un ERP qui passerait encore ces adresses les verrait revenir 
 
 Échelle Module (≥ 6 fichiers, composant du design system réécrit). Base : `main` à `198cfd1`. Conventions chargées :
 coding-standards, a11y, portage, registry, forms, testing ; nextjs, api, state, performance, seo (fiches, pour
-`src/app/design-system/page.tsx`).
+oto-saas : `src/app/design-system/page.tsx`).
 
 **État à la reprise.** Le worktree `agent-a36df641ac0fc3e77` n'était plus un worktree : `.git` absent, entrée retirée de
 `.git/worktrees`, `docs/`, `.method/`, fichiers à point et une partie de `node_modules` supprimés ; chaque fichier de
@@ -1350,7 +1350,7 @@ parent », en-tête et rail). `Select` du DS devenu popover, appelant inchangé 
 chevron retiré), `equipes/ajout-de-regle.tsx` (×2, groupes), `journal/filtres-du-journal.tsx`,
 `equipes/reglages-d-equipe.tsx` (dans un `<dialog>`), `invitations/inviter-quelqu-un.tsx`, `noeud/acces-general.tsx`
 (×3, niveaux passés en `options`), `noeud/partage-du-noeud.tsx` (niveaux en `options`, ref typée sur l'enveloppe).
-Hôte : `src/app/design-system/page.tsx` (Select Shadcn, HN-E05S11-f6). Lots en cours (E05-S12 A et B) :
+Hôte : oto-saas : `src/app/design-system/page.tsx` (Select Shadcn, HN-E05S11-f6). Lots en cours (E05-S12 A et B) :
 `rg -n "<select|<Select\b" packages/plateforme/server/context packages/plateforme/ui/accueil "src/app/(dashboard)/page.tsx"` → rien.
 
 ### Rayon d'impact (lot f)
@@ -1399,7 +1399,7 @@ Hôte : `src/app/design-system/page.tsx` (Select Shadcn, HN-E05S11-f6). Lots en 
 Paquet : `ui/ds/react/select.tsx`, `ui/ds/components/css/{combobox,field,product}.css`,
 `ui/components/{choix.tsx,classes.ts}`, `ui/noeud/{deplacement-du-noeud,partage-du-noeud,acces-general}.tsx`,
 `ui/equipes/equipes-d-une-personne.tsx`, `ui/tableau/filtre-de-colonne.tsx`, `ui/admin/usage/ecran-usage.tsx`. Hôte :
-`src/app/design-system/page.tsx`. Tests créés : `tests/helpers/liste-de-choix.ts` (ouvrir, lire, choisir),
+oto-saas : `src/app/design-system/page.tsx`. Tests créés : `tests/helpers/liste-de-choix.ts` (ouvrir, lire, choisir),
 `tests/integration/components/e05s11-select.test.tsx` (AC-19, AC-20) ; AC-21 dans `gestes-equipes.test.tsx`. Adaptés,
 sous `tests/integration/components/` : `deplacement-du-noeud`, `e05s10b-partage`, `e05s10d-partage-web`,
 `e05s11-profil`, `ecran-connecteurs`, `ecran-du-journal`, `ecran-equipes`, `ecran-usage`, `file-de-revue`, `grille`,

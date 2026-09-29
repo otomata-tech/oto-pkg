@@ -13,7 +13,7 @@
 
 - [ ] `docs/prd.md` est rempli, organisé par parcours utilisateur
 - [ ] `docs/architecture.md` est rempli, modèle de données défini (ou « sans base de données », déclaré)
-- [ ] `docs/design/system.md` a les tokens (couleurs, typo, spacing)
+- [ ] oto-saas : `docs/design/system.md` a les tokens (couleurs, typo, spacing)
 - [ ] Au moins 1 epic dans `docs/epics/` et 1 story 🟢 Ready dans `docs/stories/`
 - [ ] (niveau Initial) `docs/brief.md` est rempli et validé — en Évolution sur un projet qui n'a jamais eu de brief, déclarer sans objet
 

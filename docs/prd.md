@@ -125,7 +125,7 @@ choisit l'un des huit thèmes, son logo et son nom affiché, et la favicon prend
 l'hôte. Tout nœud (page, procédure, Contexte, tableau) s'ouvre à la même adresse de nœud, sans page
 de liste par type.
 
-Le jeu de tokens violet du gabarit (`docs/design/system.md`, aperçu `/design-system`) ne vaut que
+Le jeu de tokens violet du gabarit (oto-saas : `docs/design/system.md`, aperçu `/design-system`) ne vaut que
 pour l'hôte-gabarit, hors des écrans du paquet.
 
 Les outils MCP n'ont pas d'écran : l'host (Claude, ChatGPT, Claude Code) est l'interface, en texte

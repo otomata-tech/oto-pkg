@@ -106,7 +106,7 @@ const inter = Inter({
 pnpm build && pnpm audit:lh
 ```
 
-`lighthouserc.json` lance Lighthouse CI sur l'app buildée (`pnpm start`) et **échoue** sous les
+oto-saas : `lighthouserc.json` lance Lighthouse CI sur l'app buildée (`pnpm start`) et **échoue** sous les
 seuils : performance, accessibility, best-practices, seo ≥ 0.95. C'est ce qui rend les cibles
 ci-dessus opposables — sans mesure, « bundle trop gros » ou « contraste insuffisant » restent des
 opinions, et une review ne peut pas les bloquer.
@@ -117,7 +117,7 @@ complet suivi de l'audit se compte en minutes, le payer à chaque push pour un d
 ni rendu ni asset est du gaspillage (arbitrage assumé, pas un oubli).
 
 **Une page ajoutée au site ne s'audite pas toute seule** : la liste des URLs auditées est dans
-`lighthouserc.json`. Y ajouter tout nouvel archétype de page (une page de contenu, pas la
+oto-saas : `lighthouserc.json`. Y ajouter tout nouvel archétype de page (une page de contenu, pas la
 dix-septième page produit).
 
 **Exemption :** `/design-system` rend l'intégralité du catalogue de composants — sa note de

@@ -87,7 +87,7 @@ de la ligne de base V1 : elle ne se rejoue pas (son `create schema platform` éc
 schéma : seul l'historique change. Concerne notre projet Supabase et l'ERP du premier client ; une
 installation neuve n'a rien à faire. La procédure se lance à la main par qui exploite l'hôte, jamais
 par la CI : **avant** la poussée qui apporte la ligne de base dans `supabase/migrations/`, sinon
-`supabase db push` (workflow `supabase-migrations.yml` pour notre projet) refuse, l'historique nommant
+`supabase db push` (workflow oto-saas : `supabase-migrations.yml` pour notre projet) refuse, l'historique nommant
 des versions que le dossier n'a plus (`Remote migration versions not found in local migrations
 directory`), sans rien appliquer.
 

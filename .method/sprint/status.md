@@ -9,8 +9,8 @@ Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣
 
 | ID | Titre | Statut |
 |----|-------|--------|
-| E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | 🔵 parties a à d et f livrées ; e : licence exclue de la liste de refus ; coupe et publication ensuite |
-| E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | 🔵 lots A, B, E, M fusionnés (Ⓜ `20260929090000`) ; Démo vidée ensuite |
+| E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | ✅ `@otomata_tech/oto_platform` 1.0.0 publié avec provenance (2026-09-29) ; oto-pkg public, oto-saas privé |
+| E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | ✅ fusionné, bout en bout vert, Démo vidée |
 
 ## Contenus riches (epic E10, après le tag `v1.0.0`)
 
@@ -83,12 +83,13 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M70 | Fiche D125 pour toute création : une création titrée d'un assistant sur un chemin tenu par un nœud invisible ou à la corbeille refuse encore (`conflict`) au lieu de prendre le premier chemin libre ; branche `context` inatteignable de `createsElsewhere` (`write.ts`) à retirer ou dire défensive. |
 | M72 | Vue « Contexte » de l'accueil : pour un Contexte écrivable, la ligne « Not loaded: … » (échec de lecture des Contextes) est masquée par l'éditeur, comme l'étaient les listes avant M71. |
 | M73 | Suites d'E05-S13 : `default_team_id` et `lead_user_id` vidés, à retirer en 1.1 ; services et API des règles d'accès et des accès plateforme sans écran client ; `EcranUsage` et `usageSummary` sans page ; `Onglets.titre` mort ; lignes de faits et de connecteurs du Contexte en anglais à l'écran (traduction : ADR-015). |
+| M74 | `oto-platform migrations sync` compare les copies de l'hôte octet pour octet : sur un checkout Windows (autocrlf), les copies en CRLF diffèrent toutes du paquet (LF) et la commande refuse d'écrire. Comparer sans les retours chariot, et dire dans le README des migrations d'ajouter `supabase/migrations/*.sql text eol=lf` au `.gitattributes` de l'hôte (fait dans oto-saas). |
 
 ## Actions réservées à JB
 
 | Quand | Action |
 |-------|--------|
-| Fin de la V1 (D96, D98) | Dépôts neufs `oto-pkg` (public) et `oto-saas` (privé), `NPM_TOKEN` dans les secrets d'`oto-pkg`, tag `v1.0.0` ; après le split, le projet Vercel rebranché sur `oto-saas` et les secrets du déploiement des migrations posés. |
+| Fin de la V1 (D126) | oto-saas se déploie chez Scaleway (responsable du déploiement, `docs/deploiement.md § 3` d'oto-saas) ; le projet Vercel reste sur l'archive jusque-là. Désactiver le service Windows `postgresql-x64-16` du poste. |
 | Après la ligne de base V1 | `supabase migration repair` sur le projet du premier client, par la procédure de `packages/plateforme/migrations/README.md` (notre projet est réparé). |
 | Sur le poste | Désactiver le service Windows `postgresql-x64-16`, inutilisé par la base de test locale. |
 | Avant la campagne visuelle d'E10-S02 | Bucket du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3), règles CORS et variables `PLATFORM_STORAGE_*`. |

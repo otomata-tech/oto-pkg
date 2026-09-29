@@ -168,12 +168,15 @@ test.describe("page d'un nœud", () => {
 
       // Un « Titre », choisi au menu de la poignée (E05-S10, AC-a2), et un Texte ajoutés ; le Texte monte, est
       // supprimé puis rétabli (AC4). Le focus est dans le champ du bloc neuf : le clavier y écrit.
+      // Le « + » ouvre le choix du bloc (E10-S06, AC-a1) : un Texte.
       await page.getByRole("button", { name: `Ajouter un bloc après — Essai ${horodatage}` }).click()
+      await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
       await geste(page, page.getByRole("button", { name: "Actions sur ce bloc — bloc vide" }), "Titre", "menuitemradio")
       await attendre(page.getByRole("textbox", { name: "Modifier ce titre — bloc vide" })).toBeFocused()
       await page.keyboard.type(`Notes ${horodatage}`)
       await envoyerEtAttendre(page)
       await page.getByRole("button", { name: `Ajouter un bloc après — Notes ${horodatage}` }).click()
+      await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
       await attendre(page.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toBeFocused()
       await page.keyboard.type(`Texte ${horodatage}`)
       await envoyerEtAttendre(page)

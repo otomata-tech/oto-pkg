@@ -7,7 +7,7 @@
 // journal. Textes comparés mot pour mot (H04).
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { writeNodeSchema } from "../../packages/plateforme/schemas"
-import { tableHeaderPatchSchema } from "../../packages/plateforme/schemas/tables"
+import { tableColumnSchema, tableHeaderPatchSchema } from "../../packages/plateforme/schemas/tables"
 import { connectDeps } from "../helpers/mcp"
 import { ORG, PEOPLE } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
@@ -54,7 +54,27 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table through MCP"), {
       const [schema, rules, examples, refusals] = [at("Header (JSON Schema):"), at("Rules:"), at("Examples:"), at("Possible refusals:")]
       expect(1 < schema && schema < rules && rules < examples && examples < refusals).toBe(true)
       const { $schema, ...json } = JSON.parse(lines[schema + 1])
-      expect([$schema, Object.keys(json.properties)]).toEqual([undefined, ["columns", "remove_columns", "key", "lifecycle", "closed", "confirm_remove"]])
+      expect([$schema, Object.keys(json.properties)]).toEqual([undefined, ["columns", "remove_columns", "key", "lifecycle", "closed", "proof", "confirm_remove"]])
+      // E11-S01 : `required` dit ce qu'il exige (AC-b1), `proof` s'écrit par l'en-tête (AC-f5), la règle 1 nomme `allow_verified_empty` (AC-b6).
+      expect(json.properties.columns.items.properties.required.description).toBe(
+        "true: a row cannot lack this column: a value, or verified_empty with a reason, e.g. true (default: unchanged; false for a new column).",
+      )
+      expect(tableColumnSchema.shape.required.description).toBe("true: a row cannot lack this column: a value, or verified_empty with a reason (default false).")
+      expect(json.properties.lifecycle.properties.review.properties.agents_may_decide.description).toBe(
+        "true: an assistant may also set approve or reject, with table.write or table.release; its decision is traced with origin agent (default false).",
+      )
+      expect(json.properties.proof.description).toBe(
+        "true: every new value written by table.write needs its proof, {value, comment | link}, e.g. true (default: unchanged; false for a new table).",
+      )
+      expect(read.text).toContain(
+        "the work queue of the rows (lifecycle), whether new rows can be created (closed) and whether each new value needs its proof (proof). Create it",
+      )
+      expect(lines.slice(rules + 1, examples)).toEqual(
+        expect.arrayContaining([
+          "1. columns are merged by name: an existing column receives the attributes given (type, options, required, allow_verified_empty, max_length) and keeps the others; a new column needs its type and is added at the end; the order of the existing columns never changes.",
+          "3. key, lifecycle, closed and proof replace their value; lifecycle is replaced whole, and the options of its state column change in the same header as its states.",
+        ]),
+      )
       expect(lines.slice(rules + 1, examples).filter((line) => /renamed|type of a column|key changes/.test(line))).toHaveLength(3)
       // Trois exemples : créer, ajouter une colonne, retirer en deux temps ; chacun est une entrée valide de `write`.
       const writes = lines.slice(examples + 1, refusals).filter((line) => line.startsWith("acme_write ")).map((line) => JSON.parse(line.slice("acme_write ".length)))

@@ -172,7 +172,7 @@ describe.skipIf(!sqlConfigured)(portable("tables read on a real database"), { ti
       expect(output).toMatchObject({
         text: [
           "Table ventes/suivi_prospects: Suivi des prospects. Les prospects de l'équipe Ventes et la file des fiches à qualifier.",
-          "Owner: team Ventes (lead: Claire Morel). Your access: write. Rows: 12.",
+          `Owner: team Ventes (lead: Claire Morel). Your access: write. Rows: 12. Revision: 3 (the base_revision of ${prefix}_write to change the header).`,
           "Key: entreprise — each row is addressed by its entreprise value; a new value creates a row.",
           "Columns:",
           "- entreprise: text, required, 200 characters at most (key)",
@@ -188,6 +188,7 @@ describe.skipIf(!sqlConfigured)(portable("tables read on a real database"), { ti
           "Work queue on statut: rows enter « à traiter »; « en cours » marks a row a worker holds under a lease.",
           "Review: rows « à revoir » wait for a person, who approves them (« qualifié ») or rejects them (« écarté »).",
           "Closed: no — a new key creates a row.",
+          "Proof: required — every new value needs {value, comment | link}; a new value without it refuses the whole call.",
           `Example: ${prefix}_call {"function": "table.rows", "arguments": {"table":"ventes/suivi_prospects","filter":{"statut":"à traiter"},"columns":["contact","email","ville"]}}`,
         ].join("\n"),
         data: {
@@ -197,7 +198,9 @@ describe.skipIf(!sqlConfigured)(portable("tables read on a real database"), { ti
           columns: PROSPECTS_HEADER.columns,
           lifecycle: PROSPECTS_HEADER.lifecycle,
           closed: false,
+          proof: true,
           rows_count: 12,
+          revision: 3,
           your_level: "write",
         },
       })
@@ -264,7 +267,7 @@ describe.skipIf(!sqlConfigured)(portable("tables read on a real database"), { ti
       const rule: RuleSpec = { node: PROSPECTS.path, team: "support", level: "read" }
       await withRule(rule, async () => {
         const opened = await run(tableSchema, MARC_SUPPORT, { table: PROSPECTS.path })
-        expect(opened.output.text.split("\n")[1]).toBe("Owner: team Ventes (lead: Claire Morel). Your access: read. Rows: 12.")
+        expect(opened.output.text.split("\n")[1]).toBe(`Owner: team Ventes (lead: Claire Morel). Your access: read. Rows: 12. Revision: 3 (the base_revision of ${prefix}_write to change the header).`)
         const read = await run(tableRows, MARC_SUPPORT, { table: PROSPECTS.path, limit: 1 })
         expect(read.output.data).toMatchObject({ total: 12 })
       })

@@ -18,14 +18,27 @@
 // E05-S10 (AC-a2, AC-a5) : un seul niveau de titre, « Titre » (un titre de niveau 2 ou 3 déjà écrit se lit
 // comme lui, sans migration) ; trois formes de plus sur des types existants (liste à cocher `checklist`,
 // citation `callout`, code `code`) ; dupliquer un bloc ; cocher une case.
+//
+// E10-S06 : le repli s'écrit (forme `repli`, au menu « Style ») ; le tableau simple aussi (forme `tableau`, hors du
+// menu : il ne se convertit pas depuis un texte) ; un séparateur reste sans forme. Le « + » et « / » insèrent le bloc
+// choisi ; les préfixes de titre vont de `# ` à `###### ` ; `---`, `***` ou `___` tapé dans un Texte en fait un
+// séparateur. Ce qui est propre au tableau, au repli et aux niveaux de liste vit dans `blocs-de-page.ts`.
 import type { BlockView } from "../../../schemas"
+import { simpleTableOf } from "../../../schemas/blocks"
+import { isRecord } from "../../../schemas/tables"
 import { texteDUnAppel } from "../../procedure/libelles"
 import { texteLu } from "../en-ligne"
+import { CHOIX_DE_BLOC } from "../libelles"
+import { avecTableau, repliDuTexte, TABLEAU_NEUF, tableauDuTexte, texteDuRepli, texteDuTableau, type Tableau } from "./blocs-de-page"
 
-/** Les formes qu'écrit l'écran (E05-S10, AC-a2), dans l'ordre du menu du bloc ; tout autre bloc se lit, se déplace, se duplique et se supprime. */
-export const FORMES_ECRITES = ["texte", "titre", "puces", "numerotee", "cases", "citation", "code"] as const
+/** Les formes du menu « Style » (E05-S10, AC-a2 ; E10-S06, AC-a3), dans son ordre ; tout autre bloc se lit, se déplace, se duplique et se supprime. */
+export const FORMES_ECRITES = ["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "repli"] as const
 
-export type Forme = (typeof FORMES_ECRITES)[number]
+/** Une forme qu'écrit l'écran : celles du menu, et le tableau simple, qui s'insère sans se convertir (E10-S06, AC-a3). */
+export type Forme = (typeof FORMES_ECRITES)[number] | "tableau"
+
+/** Ce que le « + » et « / » insèrent (E10-S06, AC-a1, AC-a2) : une forme, ou un séparateur, qui n'a pas de champ. */
+export type Choix = Forme | "separateur"
 
 /** Un bloc du modèle : celui que le serveur a servi, ou un bloc neuf, sans `id`, `ref` ni révision. */
 export type BlocEdite = {
@@ -60,18 +73,33 @@ function nouvelleCle(): string {
 }
 
 /** Champs de `data` propres à une forme : un changement de forme les retire (E05-S02, § Schémas). */
-const PROPRES_A_LA_FORME = new Set(["level", "items", "ordered", "start", "language", "tone"])
+const PROPRES_A_LA_FORME = new Set(["level", "items", "ordered", "start", "language", "tone", "summary", "columns", "rows", "align"])
 
 /** Les formes qui s'écrivent en lignes (un élément par ligne, ou du code) : Entrée y passe à la ligne. */
 export const FORMES_EN_LIGNES: ReadonlySet<Forme> = new Set(["puces", "numerotee", "cases", "code"])
 
-/** Le préfixe tapé au début d'un Texte et la forme qu'il donne (AC11) ; un seul niveau de titre (E05-S10, AC-a5). */
-const PREFIXES: readonly (readonly [string, Forme])[] = [
-  ["# ", "titre"],
+/**
+ * Le préfixe tapé au début d'un Texte, la forme qu'il donne (AC11) et le niveau d'un titre : `# ` et `## ` le niveau 1,
+ * jusqu'à `###### ` le niveau 5, comme le markdown collé (E10-S06, AC-a5, HN-E10S06-5).
+ */
+const PREFIXES: readonly (readonly [string, Forme, number?])[] = [
+  ["# ", "titre", 1],
+  ["## ", "titre", 1],
+  ["### ", "titre", 2],
+  ["#### ", "titre", 3],
+  ["##### ", "titre", 4],
+  ["###### ", "titre", 5],
   ["- ", "puces"],
   ["* ", "puces"],
   ["1. ", "numerotee"],
 ]
+
+/** Tapé seul dans un Texte, il en fait un séparateur (E10-S06, AC-a4). */
+const SEPARATEURS: ReadonlySet<string> = new Set(["---", "***", "___"])
+
+/** Les formes qu'une fusion ne fond jamais : le focus va à leur rangée, comme pour un bloc sans forme (E10-S06). */
+const NON_FUSIONNEES: ReadonlySet<Forme> = new Set(["tableau", "repli"])
+const seFond = (forme: Forme | null) => forme !== null && !NON_FUSIONNEES.has(forme)
 
 /** La forme d'un bloc que l'écran écrit, `null` pour tout autre (il se modifie par l'assistant). */
 export function formeDe(bloc: Pick<BlocEdite, "type" | "data">): Forme | null {
@@ -83,6 +111,8 @@ export function formeDe(bloc: Pick<BlocEdite, "type" | "data">): Forme | null {
   if (bloc.type === "checklist") return "cases"
   if (bloc.type === "callout") return "citation"
   if (bloc.type === "code") return "code"
+  if (bloc.type === "toggle") return "repli"
+  if (bloc.type === "simple_table") return "tableau"
   return null
 }
 
@@ -94,12 +124,87 @@ function casesDe(data: Record<string, unknown>): { text: string; checked: boolea
   })
 }
 
+/** La sous-liste d'un élément servi (`children`), ou `null`. */
+const sousListeDe = (item: unknown): Record<string, unknown> | null => (isRecord(item) && isRecord(item.children) ? item.children : null)
+
+const elementsDe = (liste: Record<string, unknown> | null): unknown[] => (liste && Array.isArray(liste.items) ? liste.items : [])
+
+/** Le premier numéro d'une liste ou d'une sous-liste : son `start`, sinon 1. */
+const debutDeListe = (liste: Record<string, unknown> | null): number => (liste && typeof liste.start === "number" ? liste.start : 1)
+
+/**
+ * Les lignes d'une liste (E10-S04, AC-b2) : un élément par ligne ; un sous-élément indenté de deux espaces par
+ * niveau, sa marque comprise (`- `, ou `N. ` à partir du `start` de sa sous-liste). Chaque ligne d'un élément
+ * sur plusieurs lignes est à sa profondeur, avec sa marque : relue, elle devient un élément frère, et les
+ * enfants suivent sa dernière ligne (HN-E10S04-14) ; sans marque, elle remonterait d'un niveau et les
+ * enfants qui la suivent changeraient de parent.
+ */
+function lignesDeListe(liste: Record<string, unknown>, profondeur: number): string[] {
+  let numero = debutDeListe(liste)
+  const marque = () => (profondeur === 0 ? "" : `${"  ".repeat(profondeur)}${liste.ordered === true ? `${numero++}. ` : "- "}`)
+  return elementsDe(liste).flatMap((item) => {
+    const texte = typeof item === "string" ? item : isRecord(item) && typeof item.text === "string" ? item.text : ""
+    const sousListe = sousListeDe(item)
+    return [...texte.split("\n").map((ligne) => `${marque()}${ligne}`), ...(sousListe ? lignesDeListe(sousListe, profondeur + 1) : [])]
+  })
+}
+
 /** Le texte écrivable d'un bloc : une liste, ou une liste à cocher, s'écrit un élément par ligne. */
 export function texteDe(bloc: Pick<BlocEdite, "type" | "text" | "data">): string {
   if (bloc.type === "call") return texteDUnAppel(bloc.data)
+  // Un repli se lit résumé, ligne vide, corps ; un tableau, comme un tableur (E10-S06, AC-a3) : le texte d'un conflit.
+  if (bloc.type === "toggle") return texteDuRepli(typeof bloc.data.summary === "string" ? bloc.data.summary : "", bloc.text ?? "")
+  if (bloc.type === "simple_table") return texteDuTableau(simpleTableOf(bloc.data))
   if (bloc.type === "checklist") return casesDe(bloc.data).map((une) => une.text).join("\n")
   if (bloc.type !== "list") return bloc.text ?? ""
-  return (Array.isArray(bloc.data.items) ? bloc.data.items : []).map((item) => (typeof item === "string" ? item : "")).join("\n")
+  return lignesDeListe(bloc.data, 0).join("\n")
+}
+
+/** Un élément lu dans le champ : son texte, la marque de sa ligne, ses sous-éléments. */
+type Lu = { texte: string; marque: { numerotee: boolean; numero: number } | null; enfants: Lu[] }
+
+/** Les éléments d'un champ de liste : deux espaces de plus que l'élément d'avant ouvrent sa sous-liste. */
+function elementsLus(texte: string): Lu[] {
+  const racine: Lu[] = []
+  const derniers: Lu[] = []
+  for (const ligne of texte.split("\n")) {
+    const espaces = /^ */.exec(ligne)?.[0].length ?? 0
+    const profondeur = Math.min(Math.floor(espaces / 2), derniers.length)
+    const marque = /^(?:(\d{1,9})[.)]|[-*+]) /.exec(ligne.slice(espaces))
+    const lu: Lu =
+      profondeur === 0
+        ? { texte: ligne, marque: null, enfants: [] }
+        : { texte: ligne.slice(espaces + (marque?.[0].length ?? 0)), marque: marque ? { numerotee: marque[1] !== undefined, numero: Number(marque[1] ?? 1) } : null, enfants: [] }
+    ;(profondeur === 0 ? racine : derniers[profondeur - 1].enfants).push(lu)
+    derniers.length = profondeur
+    derniers.push(lu)
+  }
+  return racine
+}
+
+/**
+ * La numérotation d'une sous-liste frappée : celle de la sous-liste servie au même rang, que la marque du premier
+ * élément ne change que si elle en diffère (puces ou numéros, premier numéro).
+ */
+function numerotation(servie: Record<string, unknown> | null, premier: Lu): Record<string, unknown> {
+  const sauf = (champs: readonly string[]) => Object.fromEntries(Object.entries(servie ?? {}).filter(([champ]) => !champs.includes(champ)))
+  const reste = sauf(["items"])
+  const { marque } = premier
+  if (!marque) return reste
+  const numerotee = reste.ordered === true
+  if (!marque.numerotee) return numerotee ? sauf(["items", "ordered", "start"]) : reste
+  if (numerotee && marque.numero === debutDeListe(servie)) return reste
+  const sans = sauf(["items", "ordered", "start"])
+  return marque.numero === 1 ? { ...sans, ordered: true } : { ...sans, ordered: true, start: marque.numero }
+}
+
+/** Les éléments d'une liste frappée, sous-listes comprises, avec la numérotation des sous-listes servies au même rang. */
+function elementsDepuis(lus: readonly Lu[], servis: readonly unknown[]): unknown[] {
+  return lus.map((lu, rang) => {
+    if (lu.enfants.length === 0) return lu.texte
+    const servie = sousListeDe(servis[rang])
+    return { text: lu.texte, children: { ...numerotation(servie, lu.enfants[0]), items: elementsDepuis(lu.enfants, elementsDe(servie)) } }
+  })
 }
 
 /**
@@ -117,12 +222,18 @@ function enTexte(bloc: BlocEdite): BlocEdite {
  */
 export function avecTexte(bloc: BlocEdite, texte: string): BlocEdite {
   if (bloc.type === "call") return texte === texteDe(bloc) ? bloc : { ...enTexte(bloc), text: texte }
-  if (bloc.type === "list") return { ...bloc, data: { ...bloc.data, items: texte.split("\n") } }
+  // Les sous-éléments, leur numérotation par niveau, restent (E10-S04, AC-b2).
+  if (bloc.type === "list") return { ...bloc, data: { ...bloc.data, items: elementsDepuis(elementsLus(texte), elementsDe(bloc.data)) } }
   if (bloc.type === "checklist") {
     const avant = casesDe(bloc.data)
     const items = texte.split("\n").map((ligne, rang) => ({ ...avant[rang]?.reste, text: ligne, checked: avant[rang]?.checked ?? false }))
     return { ...bloc, data: { ...bloc.data, items } }
   }
+  if (bloc.type === "toggle") {
+    const { resume, corps } = repliDuTexte(texte)
+    return { ...bloc, text: corps, data: { ...bloc.data, summary: resume } }
+  }
+  if (bloc.type === "simple_table") return { ...bloc, data: avecTableau(bloc.data, tableauDuTexte(texte)) }
   return { ...bloc, text: texte }
 }
 
@@ -141,18 +252,25 @@ export function avecForme(servi: BlocEdite, forme: Forme): BlocEdite {
   const texte = texteDe(bloc)
   const data = Object.fromEntries(Object.entries(bloc.data).filter(([champ]) => !PROPRES_A_LA_FORME.has(champ)))
   if (forme === "texte") return { ...bloc, type: "paragraph", text: texte, data }
-  if (forme === "puces") return { ...bloc, type: "list", text: null, data: { ...data, items: texte.split("\n") } }
-  if (forme === "numerotee") return { ...bloc, type: "list", text: null, data: { ...data, items: texte.split("\n"), ordered: true } }
+  // D'une liste à l'autre, les sous-listes restent (E10-S04, AC-b2).
+  const items = elementsDepuis(elementsLus(texte), bloc.type === "list" ? elementsDe(bloc.data) : [])
+  if (forme === "puces") return { ...bloc, type: "list", text: null, data: { ...data, items } }
+  if (forme === "numerotee") return { ...bloc, type: "list", text: null, data: { ...data, items, ordered: true } }
   if (forme === "cases") return { ...bloc, type: "checklist", text: null, data: { ...data, items: texte.split("\n").map((ligne) => ({ text: ligne, checked: false })) } }
   if (forme === "citation") return { ...bloc, type: "callout", text: texte, data }
   if (forme === "code") return { ...bloc, type: "code", text: texte, data }
+  // Un Texte devenu repli : sa première ligne en résumé, coupée à 200 caractères ; les autres, le corps (E10-S06, AC-a3).
+  if (forme === "repli") return avecTexte({ ...bloc, type: "toggle", text: "", data }, texte)
+  if (forme === "tableau") return avecTexte({ ...bloc, type: "simple_table", text: null, data }, texte)
   return { ...bloc, type: "heading", text: texte, data: { ...data, level: 1 } }
 }
 
-/** Les premiers mots d'un bloc, balisage retiré, pour nommer ses gestes (AC8, AC10). */
+/** Les premiers mots d'un bloc, balisage retiré, pour nommer ses gestes (AC8, AC10) ; un séparateur, sans texte, par son nom. */
 export function premiersMots(bloc: Pick<BlocEdite, "type" | "text" | "data">): string {
   const donnee = (champ: string) => (typeof bloc.data[champ] === "string" ? String(bloc.data[champ]) : "")
-  const texte = bloc.type === "call" ? donnee("function") : bloc.type === "reference" ? donnee("path") : bloc.type === "image" ? donnee("alt") || (bloc.text ?? "") : texteDe(bloc)
+  // Un tableau simple se nomme par ses colonnes, un repli par son résumé (E10-S04), un séparateur par son nom (E10-S06) : ils n'ont pas de texte.
+  const propre = bloc.type === "divider" ? CHOIX_DE_BLOC.separateur : bloc.type === "call" ? donnee("function") : bloc.type === "reference" ? donnee("path") : bloc.type === "toggle" ? donnee("summary") : bloc.type === "simple_table" ? simpleTableOf(bloc.data).columns.join(" ") : null
+  const texte = propre ?? (bloc.type === "image" ? donnee("alt") || (bloc.text ?? "") : texteDe(bloc))
   const mots = texteLu(texte).trim().split(/\s+/).filter(Boolean).slice(0, 4)
   return mots.length > 0 ? mots.join(" ") : "bloc vide"
 }
@@ -171,6 +289,22 @@ function nouvelleRangee(forme: Forme, texte: string): Rangee {
   return { cle: nouvelleCle(), bloc: avecTexte(avecForme({ type: "paragraph", text: "", data: {}, key: null }, forme), texte) }
 }
 
+/** Le bloc neuf d'un choix (E10-S06, AC-a1) : une forme vide, un tableau de 3 × 3 cellules vides, ou un séparateur. */
+function blocDuChoix(choix: Choix): BlocEdite {
+  if (choix === "separateur") return { type: "divider", text: null, data: {}, key: null }
+  if (choix === "tableau") return { type: "simple_table", text: null, data: avecTableau({}, TABLEAU_NEUF), key: null }
+  return nouvelleRangee(choix, "").bloc
+}
+
+/** Le focus sur un bloc choisi : son premier champ, ou sa poignée pour un séparateur, qui n'en a pas (E05-S08, AC4). */
+const focusDuChoix = (cle: string, choix: Choix): Focus => (choix === "separateur" ? { cle, curseur: null, cible: "rangee" } : { cle, curseur: 0 })
+
+/** Un bloc qui prend la place d'un autre : l'`id`, la référence, la révision et la clé de celui-ci restent. */
+function aSaPlace(avant: BlocEdite, neuf: BlocEdite): BlocEdite {
+  const { id, ref, revision } = avant
+  return { ...neuf, ...(id === undefined ? {} : { id, ref, revision }), key: avant.key }
+}
+
 const rangDe = (modele: readonly Rangee[], cle: string) => modele.findIndex((rangee) => rangee.cle === cle)
 
 function remplacer(modele: readonly Rangee[], rang: number, ...rangees: Rangee[]): Rangee[] {
@@ -186,11 +320,20 @@ export function ecrireTexte(modele: readonly Rangee[], cle: string, texte: strin
   const rangee = modele[rang]
   if (!rangee) return { modele: [...modele] }
   const avant = texteDe(rangee.bloc)
-  const prefixe = rangee.bloc.type === "paragraph" ? PREFIXES.find(([marque]) => texte.startsWith(marque) && !avant.startsWith(marque)) : undefined
+  const unTexte = rangee.bloc.type === "paragraph"
+  // `---` tapé dans un Texte vide : un séparateur, puis un Texte neuf qui prend le focus (E10-S06, AC-a4). Le Texte d'avant
+  // est un début de la marque (vide, `-`, `--`) : un Texte servi tel quel, ou « ---x » raccourci, le reste.
+  if (unTexte && SEPARATEURS.has(texte) && avant !== texte && texte.startsWith(avant)) {
+    const suite = nouvelleRangee("texte", "")
+    return { modele: remplacer(modele, rang, { cle, bloc: aSaPlace(rangee.bloc, blocDuChoix("separateur")) }, suite), focus: { cle: suite.cle, curseur: 0 } }
+  }
+  const prefixe = unTexte ? PREFIXES.find(([marque]) => texte.startsWith(marque) && !avant.startsWith(marque)) : undefined
   if (!prefixe) return { modele: remplacer(modele, rang, { cle, bloc: avecTexte(rangee.bloc, texte) }) }
-  const [marque, forme] = prefixe
+  const [marque, forme, niveau] = prefixe
+  const change = avecTexte(avecForme(rangee.bloc, forme), texte.slice(marque.length))
+  const bloc = niveau === undefined ? change : { ...change, data: { ...change.data, level: niveau } }
   // Le bloc change d'élément (titre, liste) : son champ est remonté, le curseur se redemande.
-  return { modele: remplacer(modele, rang, { cle, bloc: avecTexte(avecForme(rangee.bloc, forme), texte.slice(marque.length)) }), focus: { cle, curseur: 0 } }
+  return { modele: remplacer(modele, rang, { cle, bloc }), focus: { cle, curseur: 0 } }
 }
 
 /**
@@ -235,19 +378,33 @@ export function fusionner(modele: readonly Rangee[], cle: string): Suite & { ave
   const precedente = modele[rang - 1]
   const courante = modele[rang]
   if (!courante || !precedente) return { modele: [...modele] }
-  if (formeDe(precedente.bloc) === null) return { modele: [...modele], focus: { cle: precedente.cle, curseur: null, cible: "rangee" } }
-  if (formeDe(courante.bloc) === null) return { modele: [...modele], focus: { cle: courante.cle, curseur: null, cible: "rangee" } }
+  if (!seFond(formeDe(precedente.bloc))) return { modele: [...modele], focus: { cle: precedente.cle, curseur: null, cible: "rangee" } }
+  if (!seFond(formeDe(courante.bloc))) return { modele: [...modele], focus: { cle: courante.cle, curseur: null, cible: "rangee" } }
   const jointure = texteDe(precedente.bloc)
   const fondue = { cle: precedente.cle, bloc: avecTexte(precedente.bloc, jointure + texteDe(courante.bloc)) }
   return { modele: [...modele.slice(0, rang - 1), fondue, ...modele.slice(rang + 1)], focus: { cle: precedente.cle, curseur: jointure.length }, avec: precedente.cle }
 }
 
-/** Un bloc neuf, sans `id`, juste après une rangée, le focus dedans (AC11). */
-export function insererApres(modele: readonly Rangee[], cle: string, forme: Forme = "texte"): Suite {
+/** Un bloc neuf, sans `id`, juste après une rangée, le focus dedans (AC11) : le bloc choisi au « + » (E10-S06, AC-a1). */
+export function insererApres(modele: readonly Rangee[], cle: string, choix: Choix = "texte"): Suite {
   const rang = rangDe(modele, cle)
   if (rang < 0) return { modele: [...modele] }
-  const neuve = nouvelleRangee(forme, "")
-  return { modele: [...modele.slice(0, rang + 1), neuve, ...modele.slice(rang + 1)], focus: { cle: neuve.cle, curseur: 0 } }
+  const neuve = { cle: nouvelleCle(), bloc: blocDuChoix(choix) }
+  return { modele: [...modele.slice(0, rang + 1), neuve, ...modele.slice(rang + 1)], focus: focusDuChoix(neuve.cle, choix) }
+}
+
+/** « / » (E10-S06, AC-a2) : le Texte devient le bloc choisi, vide, à sa place ; ou le tableau d'un tableur collé (AC-b3). */
+export function remplacerParChoix(modele: readonly Rangee[], cle: string, choix: Choix, colle?: Tableau): Suite {
+  const rang = rangDe(modele, cle)
+  const rangee = modele[rang]
+  if (!rangee) return { modele: [...modele] }
+  const neuf: BlocEdite = colle ? { type: "simple_table", text: null, data: avecTableau({}, colle), key: null } : blocDuChoix(choix)
+  return { modele: remplacer(modele, rang, { cle, bloc: aSaPlace(rangee.bloc, neuf) }), focus: focusDuChoix(cle, choix) }
+}
+
+/** Un bloc écrit par ses propres champs (tableau, repli) : le bloc de la rangée, remplacé tel quel (E10-S06). */
+export function remplacerLeBloc(modele: readonly Rangee[], cle: string, bloc: BlocEdite): Rangee[] {
+  return modele.map((rangee) => (rangee.cle === cle ? { cle, bloc } : rangee))
 }
 
 /** Un bloc neuf en tête : le seul chemin d'une page sans bloc (AC11). */

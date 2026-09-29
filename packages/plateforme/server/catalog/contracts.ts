@@ -65,6 +65,7 @@ const writeProcedure: Contract = {
       "On write: a call fence that is not <function> followed by a JSON object, or that is never closed; nothing is written.",
       `On publish: steps longer than ${formatCount(PROCEDURE_MAX_CHARS)} characters once rendered; move reference material to a page and link to it.`,
       "On publish: a code block marked call, or a text line starting with a call fence; write a call block.",
+      "On publish: a call fence never stands in a table, a toggle or a sub-item; write a call block after it.",
       "On publish: a call block that does not start with a function name such as table.rows.",
       `On publish: an unknown function; ${p}_find with type function lists the functions.`,
       "On publish: a function whose connector is not enabled for the organisation; an administrator enables it on the dashboard.",
@@ -90,17 +91,20 @@ const writeTable: Contract = {
   content: (p) => ({
     summary: `the header of ${p}_write for a table (not a function; nothing to call).`,
     description: [
-      `A table is a node of kind table: its header declares the typed columns, the key column whose value addresses each row, the work queue of the rows (lifecycle) and whether new rows can be created (closed). Create it with ${p}_write, kind "table", a title, a summary and header; change it with ${p}_write, base_revision and header. Its rows are written with ${p}_call table.write, never with ${p}_write.`,
+      `A table is a node of kind table: its header declares the typed columns, the key column whose value addresses each row, the work queue of the rows (lifecycle), whether new rows can be created (closed) and whether each new value needs its proof (proof). Create it with ${p}_write, kind "table", a title, a summary and header; change it with ${p}_write, base_revision and header. Its rows are written with ${p}_call table.write, never with ${p}_write.`,
       "header holds changes, never the whole header: what it does not name stays as it is. The draft keeps the complete target header, checked at every write; publish: true (manage level) applies it after checking the rows already there.",
+      // E10-S01 (AC-c2) : un fichier donné par la personne, ce qu'il devient.
+      "A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line.",
+      "A markdown file the user gives you becomes a page with write: its first # heading is the title, the rest goes in the text.",
     ],
     parts: [
       { title: "Header (JSON Schema):", lines: [headerSchema()] },
       {
         title: "Rules:",
         lines: [
-          "1. columns are merged by name: an existing column receives the attributes given (type, options, required, max_length) and keeps the others; a new column needs its type and is added at the end; the order of the existing columns never changes.",
+          "1. columns are merged by name: an existing column receives the attributes given (type, options, required, allow_verified_empty, max_length) and keeps the others; a new column needs its type and is added at the end; the order of the existing columns never changes.",
           "2. remove_columns names the columns to remove; the key column cannot be removed, and a name cannot be both in columns and remove_columns.",
-          "3. key, lifecycle and closed replace their value; lifecycle is replaced whole, and the options of its state column change in the same header as its states.",
+          "3. key, lifecycle, closed and proof replace their value; lifecycle is replaced whole, and the options of its state column change in the same header as its states.",
           `4. Columns cannot be renamed: add the new column, copy the values with ${p}_call table.write, then remove the old one.`,
           "5. The type of a column changes only while it holds no value; otherwise add a new column of the new type, copy the values, then remove the old one. A new type drops the attributes it does not take (options, max_length) unless they are given again.",
           "6. The key changes only while the table has no row; otherwise create a new table keyed by the new column and copy the rows.",

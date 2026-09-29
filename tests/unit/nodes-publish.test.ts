@@ -183,16 +183,24 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
   })
 
   describe("Contexte and long documents (AC32, AC33, AC39)", () => {
-    it("should say that the rules changed when a Contexte is published (AC32)", async () => {
+    // E11-S03 (AC-a7) : seules les conversations qui ont reçu ce Contexte périment ; une republication à
+    // l'identique n'en périme aucune (H28).
+    it("should say that the Contexte changed when it is published with another content, and nothing on an identical republication (AC32)", async () => {
       const tables = base()
       openDraftRow(tables, "contexte")
       addBlocks(tables, "contexte", "draft", [paragraph("Tutoyer.")])
       await content(tables)
       const ada = await write("ada", { path: "contexte", base_revision: 1, publish: true })
       expect(ada.result?.text).toBe(
-        "Published contexte revision 2 (0 sections, 1 block).\nThe organisation's rules changed: every open ctx is now invalid; call acme_context again before any other acme_ tool.",
+        "Published contexte revision 2 (0 sections, 1 block).\nContext contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
       )
       expect(ada.result?.data).toMatchObject({ rules_changed: true })
+
+      await ref.openDraft("contexte")
+      await ref.addBlocks("contexte", "draft", [paragraph("Tutoyer.")])
+      const same = await write("ada", { path: "contexte", base_revision: 2, publish: true })
+      expect(same.result?.text).toBe("Published contexte revision 3 (0 sections, 1 block).")
+      expect(same.result?.data).toMatchObject({ rules_changed: false })
     })
 
     it("should write a long text in three parts, then publish it whole (AC33)", async () => {
@@ -220,7 +228,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       expect(drafted.result?.text.split("\n")[0]).toBe("Draft of ventes/contexte saved on revision 1: appended to « Ton » (+11 → 29 characters).")
       const published = await write("claire", { path: "ventes/contexte", base_revision: 1, publish: true })
       expect(published.result?.text.split("\n")[1]).toBe(
-        "The organisation's rules changed: every open ctx is now invalid; call acme_context again before any other acme_ tool.",
+        "Context ventes/contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
       )
     })
   })

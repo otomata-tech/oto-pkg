@@ -58,6 +58,11 @@
   /* `--title` et non `--ink` : l'encre teintée des intitulés ; en `--ink`, un intertitre pèse autant que le corps qu'il coiffe, et se lit à un autre niveau que les en-têtes d'îlot voisins. */
   color: var(--title);
 }
+/* Un titre par niveau (E10-S04, AC-b3) : `h2` à `h6`, un cran de corps de moins par niveau, la graisse gardée ; `h6`, au corps du texte, se distingue par la mono capitales des intitulés. */
+.oto-island-body[data-reading] h3.oto-reader-heading { font-size: var(--fs-md); }
+.oto-island-body[data-reading] h4.oto-reader-heading { font-size: var(--fs-base); }
+.oto-island-body[data-reading] h5.oto-reader-heading { font-size: var(--fs-sm); }
+.oto-island-body[data-reading] h6.oto-reader-heading { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--tr-mono); }
 /* Le premier bloc ne décolle pas du haut de l'îlot : la marge de tête d'un intertitre sépare deux blocs, elle n'ouvre pas le corps. */
 .oto-island-body[data-reading] > :first-child { margin-block-start: 0; }
 
@@ -87,6 +92,10 @@
 /* Le pendant décimal (`ordered`) : seul le marqueur change, `tabular-nums` garde 9 et 10 à l'aplomb ; le sélecteur porte `ol`, (0,0,1) de plus, pour battre le `disc` de la règle sœur au même scope. */
 .oto-island-body[data-reading] ol.oto-reader-list { list-style: decimal; }
 .oto-island-body[data-reading] ol.oto-reader-list > li::marker { font-variant-numeric: tabular-nums; }
+/* Une sous-liste (E10-S04, AC-b1) colle à son élément, sans la marge qui sépare deux blocs ; ses puces changent de forme à chaque niveau. */
+.oto-island-body[data-reading] .oto-reader-list .oto-reader-list { margin: var(--space-1-5) 0 0; }
+.oto-island-body[data-reading] ul.oto-reader-list ul.oto-reader-list { list-style: circle; }
+.oto-island-body[data-reading] ul.oto-reader-list ul.oto-reader-list ul.oto-reader-list { list-style: square; }
 
 /* L'encart de contenu, un objet posé au fil du texte et pas une ligne : sa vignette (la trame du thème, le glyphe de son type) dit ce que c'est avant qu'on lise le nom. */
 

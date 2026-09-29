@@ -6,11 +6,13 @@
 // rendait 0 ligne.
 import { describe, expect, it } from "vitest"
 import type { TableHeader } from "../../packages/plateforme/schemas"
-import { tableFilterSchema } from "../../packages/plateforme/schemas/tables"
-import { matchesRow, parseFilter } from "../../packages/plateforme/server/tables/filters"
+import { queryWords, tableFilterSchema, tableRowsArgsSchema } from "../../packages/plateforme/schemas/tables"
+import { issuesText } from "../../packages/plateforme/server/errors"
+import { matchesQuery, matchesRow, parseFilter } from "../../packages/plateforme/server/tables/filters"
 import { parseTableHeader } from "../../packages/plateforme/server/tables/header"
 import { rowCells } from "../../packages/plateforme/server/tables/meta"
-import { PROSPECT_ROWS, PROSPECTS_HEADER } from "../factories/table-fixture"
+import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
+import { PROSPECT_ROWS, PROSPECTS, PROSPECTS_HEADER } from "../factories/table-fixture"
 
 function referenceHeader(): TableHeader {
   const parsed = parseTableHeader(PROSPECTS_HEADER)
@@ -92,5 +94,46 @@ describe("filters (AC8)", () => {
       `Unknown operators ${twenty} on montant_estime. Operators: eq, ne, contains, in, gt, gte, lt, lte, empty, not_empty.`,
       "in takes 100 values at most (101 given): ville.",
     ])
+  })
+})
+
+describe("q by words (E11-S01, AC-c1, AC-c2)", () => {
+  /** Les clés des prospects qui répondent à `q`, dans l'ordre de la fixture. */
+  const found = (q: string) => ENTRIES.filter((entry) => matchesQuery(entry.cells, HEADER, queryWords(q))).map((entry) => entry.key)
+
+  it("should split q into distinct words without case or accents, on anything that is neither a letter nor a digit", () => {
+    expect(queryWords("  Mairie-de  COUDRAY, mairie ")).toEqual(["mairie", "de", "coudray"])
+    expect(queryWords("École n°2")).toEqual(["ecole", "n", "2"])
+    expect(queryWords("-- , ;")).toEqual([])
+  })
+
+  it("should keep a row when every word appears in one of its searched cells, in any order and in different cells", () => {
+    expect(found("coudray mairie")).toEqual(["Mairie de Coudray"])
+    expect(found("valbrune nina")).toEqual(["Atelier 2"])
+    expect(found("ECOLE sophie")).toEqual(["École de Valbrune"])
+    expect(found("valbrune valbrune")).toEqual(found("valbrune"))
+    expect(found("valbrune")).toEqual(["Atelier 2", "Boulangerie Fournier", "École de Valbrune"])
+    // Un mot absent écarte la ligne ; un nombre ou une date ne se cherchent pas (colonnes text, email, url, enum et la clé).
+    expect(found("valbrune inconnu")).toEqual([])
+    expect(found("2026")).toEqual([])
+  })
+
+  it("should refuse a q without letters or digits in table.rows (AC-c2)", () => {
+    const parsed = tableRowsArgsSchema.safeParse({ table: PROSPECTS.path, q: "--" })
+    expect(parsed.success ? null : issuesText(parsed.error.issues)).toBe("q: write at least one word (letters or digits)")
+  })
+
+  it("should search 100 words over 5,000 rows of 20 columns in less than a second (security-patterns.md § Validation des inputs)", () => {
+    const columns = Array.from({ length: 20 }, (_, index) => ({ name: `c${index}`, type: "text" as const }))
+    const wide = parseTableHeader({ columns, key: "c0" })
+    if (!("header" in wide)) throw new Error(wide.problems.join(" "))
+    const words = Array.from({ length: 100 }, (_, index) => `mot${index}`)
+    // Chaque ligne porte tous les mots sauf le dernier, répartis sur ses 19 autres colonnes : chaque mot est cherché sur chaque ligne.
+    const texts = columns.map((_, index) => words.filter((_, rank) => rank < 99 && rank % 19 === index - 1).join(" "))
+    const rows = Array.from({ length: 5_000 }, (_, row) => new Map(columns.map((column, index) => [column.name, index === 0 ? `L${row}` : texts[index]])))
+    const started = performance.now()
+    const matching = rows.filter((cells) => matchesQuery(cells, wide.header, words))
+    expect(matching).toEqual([])
+    expect(performance.now() - started).toBeLessThan(TEMPS_LINEAIRE_MS)
   })
 })

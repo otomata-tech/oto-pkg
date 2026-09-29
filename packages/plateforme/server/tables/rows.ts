@@ -11,7 +11,7 @@
 // `row`, ADR-011), la comparaison `values->>col` en texte, le curseur `gt key` seul, les valeurs brutes
 // servies (dont `null`).
 import {
-  normalizeTitle,
+  queryWords,
   tableRowsArgsSchema,
   type CellValue,
   type TableHeader,
@@ -128,7 +128,8 @@ function importedOf(raw: unknown): ServedProvenance["imported"] | null {
  * membre (`names` : `memberNames`), dates en UTC `…Z`.
  */
 function servedProvenance(raw: Record<string, unknown>, names: ReadonlyMap<string, string>): ServedProvenance | null {
-  const { origin, by, at, comment, link } = raw
+  // Le code `ctx` rangé n'est jamais servi (E11-S01, AC-d4) : c'est le code de conversation d'une autre personne.
+  const { origin, by, at, comment, link, host, worker } = raw
   if (origin !== "agent" && origin !== "human" && origin !== "import" && origin !== "verified_empty") return null
   const imported = importedOf(raw.imported)
   return {
@@ -137,6 +138,8 @@ function servedProvenance(raw: Record<string, unknown>, names: ReadonlyMap<strin
     ...(typeof at === "string" ? { at: utcText(at) } : {}),
     ...(typeof comment === "string" ? { comment } : {}),
     ...(typeof link === "string" ? { link } : {}),
+    ...(typeof host === "string" ? { host } : {}),
+    ...(typeof worker === "string" ? { worker } : {}),
     ...(imported ? { imported } : {}),
   }
 }
@@ -200,7 +203,8 @@ export function toReadRow(block: RowBlock, header: TableHeader, names: ReadonlyM
 
 type Query = {
   clauses: FilterClause[]
-  q: string | null
+  /** Les mots de `q` (E11-S01, AC-c1) ; `null` sans `q`. */
+  q: string[] | null
   sort: TableRowsArgs["sort"]
   columns: string[] | null
   limit: number
@@ -215,7 +219,7 @@ function parseQuery(header: TableHeader, args: TableRowsArgs): Query {
   if (unknown.length > 0) throw new PlatformError("invalid_arguments", unknownColumnsMessage(header, unknown))
   const filter = parseFilter(args.filter, header)
   if ("problems" in filter) throw new PlatformError("invalid_arguments", boundedList(filter.problems, " "))
-  const q = args.q === undefined ? null : normalizeTitle(args.q)
+  const q = args.q === undefined ? null : queryWords(args.q)
   const narrowed = filter.clauses.length > 0 || q !== null || args.sort !== undefined
   const { sort, columns, limit, provenance } = args
   return { clauses: filter.clauses, q, sort, columns: columns ?? null, limit: limit ?? DEFAULT_LIMIT, provenance: provenance === true, narrowed }

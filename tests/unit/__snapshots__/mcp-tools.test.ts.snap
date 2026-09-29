@@ -192,7 +192,7 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
                 "type": "string",
               },
               "after_block": {
-                "description": "move_block only: reference of the block to put it after (default: the start of the page).",
+                "description": "move_block only: reference of the block to put it after (default: the start of the page, outside any section).",
                 "maxLength": 500,
                 "minLength": 1,
                 "type": "string",
@@ -224,7 +224,7 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
                 "type": "string",
               },
               "section": {
-                "description": "Title of the section it applies to, e.g. "Étapes". Section operations only.",
+                "description": "Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section).",
                 "maxLength": 200,
                 "minLength": 1,
                 "type": "string",

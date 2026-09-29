@@ -34,6 +34,8 @@ const HEADER = {
   key: "ref",
   lifecycle: { column: "statut", states: STATES, working: "en cours", review: { state: "à revoir", approve: "qualifié", reject: "écarté" } },
   closed: true,
+  // La preuve exigée (fiche D133, E11-S01 AC-f8) : la procédure pilote garde ses refus de preuve.
+  proof: true,
 }
 
 /** Les dix lignes de la story : ref, entreprise, ville, contact, email, montant estimé, statut ; `null` = cellule vide. */

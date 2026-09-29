@@ -17,41 +17,16 @@ import type { Identity } from "../identity"
 import { cut } from "../journal"
 import { charCount, formatCount } from "../nodes/document"
 import { findNode, type NodeRow } from "../nodes/lookup"
-import { isRecord, isValidDate } from "../../schemas/tables"
+import { COLUMN_TEXT_MAX, instantOf, isEmail, isRecord, isValidDate, maxLengthOf } from "../../schemas/tables"
 import { keyColumn, parseTableHeader } from "./header"
 
-// La règle d'une date vit dans `schemas/tables.ts`, que l'adresse de l'écran lit aussi (E07-S03) ; les
-// filtres la lisent toujours ici.
-export { isValidDate }
-
-/** Texte sans `max_length` (N2) ; adresse email (AC3) ; URL (AC3). */
-const TEXT_MAX = 2_000
-const EMAIL_MAX = 254
-const URL_MAX = 2_000
+// La règle d'une date, d'une date et heure et de la longueur d'une colonne vivent dans `schemas/tables.ts`, que
+// l'adresse de l'écran (E07-S03) et la lecture d'un CSV (E10-S01) lisent aussi ; les services la lisent toujours ici.
+export { instantOf, isValidDate, maxLengthOf }
 
 /** Une valeur citée dans un refus : son JSON, coupé à 50 caractères (`cut`, N30). */
 export function shown(value: unknown): string {
   return cut(JSON.stringify(value) ?? String(value), 50)
-}
-
-/** Longueur maximale d'une colonne de texte, d'email ou d'URL ; `null` pour les autres types. */
-export function maxLengthOf(column: TableColumn): number | null {
-  if (column.type === "text") return column.max_length ?? TEXT_MAX
-  if (column.type === "email") return Math.min(column.max_length ?? EMAIL_MAX, EMAIL_MAX)
-  if (column.type === "url") return Math.min(column.max_length ?? URL_MAX, URL_MAX)
-  return null
-}
-
-const DATETIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):(\d{2}))$/
-
-/** L'instant (ms) d'une date et heure ISO 8601 avec fuseau (`Z` ou décalage) ; `null` sinon. */
-export function instantOf(value: string): number | null {
-  const match = DATETIME.exec(value)
-  if (!match || !isValidDate(match[1])) return null
-  const [hour, minute, second, offsetHour, offsetMinute] = match.slice(2).map((part) => Number(part ?? 0))
-  if (hour > 23 || minute > 59 || second > 59 || offsetHour > 23 || offsetMinute > 59) return null
-  const instant = Date.parse(value)
-  return Number.isNaN(instant) ? null : instant
 }
 
 function textProblem(value: unknown, max: number, expected: string): string | null {
@@ -60,16 +35,10 @@ function textProblem(value: unknown, max: number, expected: string): string | nu
   return length > max ? `expected ${expected} of ${formatCount(max)} characters at most (not ${formatCount(length)} characters)` : null
 }
 
-/** Une adresse email (AC3) : un seul `@`, une partie de chaque côté, sans espace. */
-function isEmail(value: string): boolean {
-  const parts = value.split("@")
-  return parts.length === 2 && parts[0] !== "" && parts[1] !== "" && !/\s/.test(value)
-}
-
 /** Une colonne email ou url : un texte sous sa longueur, puis sa forme. */
 function addressProblem(column: TableColumn, value: unknown): string | null {
   const email = column.type === "email"
-  const tooLong = textProblem(value, maxLengthOf(column) ?? TEXT_MAX, email ? "an email address" : "a URL")
+  const tooLong = textProblem(value, maxLengthOf(column) ?? COLUMN_TEXT_MAX, email ? "an email address" : "a URL")
   if (tooLong !== null || typeof value !== "string") return tooLong
   if (email) return isEmail(value) ? null : `expected an email address, e.g. contact@example.test (not ${shown(value)})`
   return /^https?:\/\/\S+$/i.test(value) ? null : `expected a URL starting with http:// or https:// (not ${shown(value)})`
@@ -98,7 +67,7 @@ export function valueProblem(column: TableColumn, value: unknown): string | null
     case "url":
       return addressProblem(column, value)
     case "text":
-      return textProblem(value, maxLengthOf(column) ?? TEXT_MAX, "a text")
+      return textProblem(value, maxLengthOf(column) ?? COLUMN_TEXT_MAX, "a text")
   }
 }
 

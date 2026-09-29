@@ -47,6 +47,8 @@ export type CallDeps = {
   identity: Identity
   /** Code `ctx` validé par la garde de la porte (H27) : dernière procédure (H84) et provenance (N9). */
   ctxCode: string | null
+  /** Client MCP du même `ctx` (`ctx.host`), pour la provenance d'une écriture (E11-S01, AC-d2) ; facultatif. */
+  ctxHost?: string | null
   /** Origine de l'adresse appelée (`https://acme.oto.cx`) : lien du tableau de bord d'un refus (AC8). */
   origin: string
   /** Jeton vérifié de la requête, passé au contexte des seules fonctions de l'ERP, qui s'exécutent sous lui (E08-S05, NH4, NH19). */
@@ -157,7 +159,15 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
   trace.accountId = account?.id ?? null
   // En V1, un connecteur ne court que sur un compte simulé (H85) : refusé avant la fonction (N5).
   if (account) requireSimulated(account)
-  const context: FunctionContext = { db, identity, account, ctx: deps.ctxCode, origin: deps.origin, accessToken: fn.origin === "erp" ? deps.accessToken : undefined }
+  const context: FunctionContext = {
+    db,
+    identity,
+    account,
+    ctx: deps.ctxCode,
+    host: deps.ctxHost ?? null,
+    origin: deps.origin,
+    accessToken: fn.origin === "erp" ? deps.accessToken : undefined,
+  }
   const data = callData(fn, team, account)
   const journal = { target: fn.name, teamId: trace.teamId, accountId: trace.accountId }
   if (fn.class === "sensitive" && input.confirm !== true) {

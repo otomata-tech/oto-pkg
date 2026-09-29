@@ -90,7 +90,7 @@ const SERVICES: { [K in ToolKey]: Service<K> } = {
   find: async ({ db, identity, activeConnectors }, input) => find(db, identity, input, { functions: catalogFunctions(), activeConnectors: await activeConnectors() }),
   read: ({ db, identity }, input) => readNode(db, identity, input),
   call: ({ db, identity, origin, activeConnectors, trace, accessToken }, input, ctx) =>
-    runCall({ db, identity, ctxCode: ctx?.code ?? null, origin, activeConnectors, trace, accessToken }, input),
+    runCall({ db, identity, ctxCode: ctx?.code ?? null, ctxHost: ctx?.host ?? null, origin, activeConnectors, trace, accessToken }, input),
   // La provenance d'un bloc écrit par un assistant porte le code `ctx` de la conversation (AC28).
   write: ({ db, identity }, input, ctx) => writeNode(db, identity, input, { kind: "agent", ctx: ctx?.code ?? null }),
   // `ctx` est toujours validé ici : la garde précède tout outil autre que `context`.
@@ -144,7 +144,8 @@ async function serve(deps: MemberDeps, call: ToolCall, validated: { ctx: ValidCt
   if (size > MAX_ARGS_CHARS) {
     throw new PlatformError("too_large", `Arguments too large (${size} characters, max ${MAX_ARGS_CHARS}). Split the content into several calls.`)
   }
-  if (key !== "context") validated.ctx = await requireCtx(deps.db, deps.identity, args.ctx)
+  // `feedback` accepte un code connu mais périmé (E11-S03, AC-a6) : un retour sur la panne n'exige pas de relire le contexte.
+  if (key !== "context") validated.ctx = await requireCtx(deps.db, deps.identity, args.ctx, { staleAllowed: key === "feedback" })
   const parsed = parseInput(inputSchemas(prefix)[key], args)
   if ("issues" in parsed) throw new PlatformError("invalid_arguments", `Invalid arguments for ${name}: ${parsed.issues}`)
   // `parsed.data` suit le schéma de `key` : TypeScript ne relie pas `SERVICES[key]` à ce schéma.

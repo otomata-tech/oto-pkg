@@ -175,7 +175,7 @@ erDiagram
 | `teams`, `team_members` | Équipes et appartenance | `slug` (ni `guide`, ni `perso`, ni `private`, ni `contexte`, ni `journal`), `name`, `lead_user_id` ; `team_members.role` (`lead` · `member`), dérivé du responsable |
 | `nodes` | Page, procédure, Contexte ou tableau (métadonnées ; le contenu est dans `blocks`) | `parent_id` (racine : null), `path` (unique par organisation ; suit le titre, l'ancien reste un alias ; un chemin pris donne le premier libre, `<segment>_2`, `_3`…, jamais un refus ; les espaces personnels sous `private`, anciens chemins `perso/…` gardés en alias), `lpath` (ltree généré), `kind` (`page` · `procedure` · `context` · `table` ; `context` ⇔ chemin de Contexte), `title` (≤ 200), `summary` (1 à 200), `status`, `revision` (0 = jamais publié), `position` (ordre parmi les frères ; nul = rangé par chemin), `deleted_at` (corbeille), `meta` (schéma d'un tableau seulement), `owner_kind` / `owner_team_id` / `owner_user_id` (null = hérité), `created_by`, `updated_by`, dates, `search_tsv` (générée : titre poids A, résumé poids B) |
 | `node_drafts` | Brouillon ouvert d'un nœud | `node_id` (clé), `base_revision`, en-tête en attente (`title`, `summary`, `kind`, `meta`), `created_by`, `updated_by`, dates |
-| `blocks` | Tout le contenu : blocs des documents et lignes des tableaux | `id` (fabriqué par la base), `state` (`draft` · `published`), `org_id` (posé par la base), `node_id`, `position`, `type` (`heading` · `paragraph` · `list` · `checklist` · `code` · `call` · `mermaid` · `image` · `callout` · `reference` · `row`), `text` (nul pour un `row`), `data`, `key` (obligatoire et immuable pour un `row`), `provenance`, `revision`, `claimed_by`, `claimed_by_user`, `lease_until`, auteurs, dates, `search_tsv` ; clé (`id`, `state`) ; unique (`node_id`, `state`, `key`) |
+| `blocks` | Tout le contenu : blocs des documents et lignes des tableaux | `id` (fabriqué par la base), `state` (`draft` · `published`), `org_id` (posé par la base), `node_id`, `position`, `type` (`heading` · `paragraph` · `list` · `checklist` · `code` · `call` · `mermaid` · `image` · `callout` · `reference` · `simple_table` · `divider` · `toggle` · `row` ; titres de niveau 1 à 5, listes imbriquées sur trois niveaux), `text` (nul pour un `row`), `data`, `key` (obligatoire et immuable pour un `row`), `provenance`, `revision`, `claimed_by`, `claimed_by_user`, `lease_until`, auteurs, dates, `search_tsv` ; clé (`id`, `state`) ; unique (`node_id`, `state`, `key`) |
 | `node_versions` | Historique publié | `node_id`, `revision`, `title`, `summary`, `kind`, `meta`, `blocks` (instantané des blocs publiés ; sans lignes pour un tableau), `author`, `created_at` |
 | `node_aliases` | Anciens chemins | `old_path`, `node_id` ; clé (`org_id`, `old_path`) |
 | `links` | Liens `[[…]]` et blocs `reference` | `source_node_id`, `source_block_id`, `target_path`, `target_key` (`[[chemin#clé]]`), `target_node_id` (null si sans cible) |
@@ -187,7 +187,7 @@ erDiagram
 | `accounts` | Compte de connecteur | `connector`, `owner_kind` (`org` · `team` · `user`), `owner_team_id` (clé différée : une équipe qui possède un compte ne se supprime pas), `label` (unique sans casse dans l'organisation), `status`, `health`, `mode` (`simule` seulement en V1), `secret_ciphertext` (V2, jamais accordée en lecture) |
 | `connector_activations` | Connecteur ouvert chez ce client | `connector`, `state` (`active` · `inactive`), `activated_by` ; clé (`org_id`, `connector`) |
 | `sim_outbox` | Ce que le connecteur simulé « enverrait » | `id` (`sim_` + 8 hex), `account_id`, `connector`, `function`, `payload`, `status` (`draft` · `sent`), `created_by`, `sent_by`, `sent_at` |
-| `ctx` | Code de contexte | `code`, `user_id`, `rules_version`, `host`, `user_agent` |
+| `ctx` | Code de contexte | `code`, `user_id`, `rules_version` (compté, plus lu par la garde), `contexts` (`{chemin: révision}` des Contextes servis ; nul : émis avant 1.1.0, périmé ; ADR-002 § 2), `host`, `user_agent` |
 | `journal` | Chaque appel | `ctx`, `user_id`, `team_id`, `account_id`, `method`, `tool`, `target`, `args` (2 ko, secrets masqués), `args_chars`, `result_chars`, `is_error`, `error`, `duration_ms`, `host`, `user_agent` |
 | `admin_journal` | Journal du MCP admin, à part | comme `journal` sans `team_id`, `org_id` facultatif, plus `op` |
 | `feedback` | Signalement | `number` (par organisation, affiché `FB-0001`), `user_id`, `ctx`, `type` (`friction` · `gap` · `error`), `target`, `text` (≤ 4 000), `state` (`open` · `acknowledged` · `declined` · `resolved`), `resolution` (exigée pour `declined`), `handled_by`, `handled_at` |
@@ -245,7 +245,7 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `teams_tree_sync`, `members_tree_sync`, `teams_tree_cleanup` | Équipe créée : son dossier et son Contexte ; membre créé : `private/<handle>` (« Privé ») et son Contexte ; équipe supprimée dont le dossier ne contient que son Contexte : les deux nœuds partent avec elle |
 | `members_cleanup` | Membre retiré : ses `team_members`, ses règles nominatives, sa place de responsable |
 | `blocks_guard`, `blocks_lock_draft` | `org_id` pris du nœud ; un `row` seulement dans un tableau, publié, clé immuable ; une écriture de brouillon passe la porte du brouillon (verrou partagé, `PT409` pendant une publication) et avance son tampon |
-| `bump_rules_version` | `rules_version + 1` à la publication d'un nœud Contexte |
+| `bump_rules_version` | `rules_version + 1` à la publication d'un nœud Contexte ; compteur seul, la garde du `ctx` lit `ctx.contexts` (E11-S03) |
 | `feedback_number` | Numéro de ticket par organisation, sous verrou |
 | `nodes_lexicon_sync`, `blocks_lexicon_sync` | Mots du contenu ajoutés au lexique |
 
@@ -281,23 +281,27 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `teams.ts`, `rules.ts`, `directory.ts` | Équipes, responsables, règles d'accès d'un nœud ou d'un compte (personne, équipe, organisation), annuaire | API, écrans, MCP admin |
 | `oauth.ts`, `connect.ts` | Mode Supabase : consentement OAuth (client, compte, organisation par `resource`, MCP admin nommé) ; page « Brancher mon Claude, ChatGPT ou Mistral » : adresse du serveur, noms recommandés, dernières connexions, prompts d'exemple | hôte, écrans |
 | `ctx.ts`, `journal.ts` | Émission et garde du `ctx` ; écriture du journal, pour le MCP et les mutations de l'API | MCP, API |
-| `context/` | Moteur de blocs de `context` : `code` (règles « How this workspace works » et langue de réponse), procédure servie, une partie par Contexte (Tout le monde, Privé, chaque équipe) ouverte par sa ligne de faits (organisation, personne, équipe, connecteurs de l'équipe par défaut) puis le Contexte, les contenus rangés dessous et ses pages liées, nouveautés, procédures utiles, « Recent content » ; budget de 20 000 caractères ; `BlockReport.head` | MCP, écrans (aperçu) |
+| `context/` | Moteur de blocs de `context` : `code` (règles « How this workspace works » et langue de réponse), procédure servie, une partie par Contexte (Tout le monde, Privé, chaque équipe) ouverte par sa ligne de faits (organisation, personne, équipe, connecteurs de l'équipe par défaut) puis le Contexte, les contenus rangés dessous et ses pages liées, nouveautés, procédures utiles, « Recent content » ; blocs servis entiers sous un plafond de 35 000 caractères, coupe dite (ADR-002 § 7) ; `BlockReport.head` | MCP, écrans (aperçu) |
 | `routing.ts`, `find.ts` | Score, décision au seuil de l'organisation, consigne des candidats ; recherche de `find` | MCP, écrans |
-| `nodes/` | `read` (blocs rendus en markdown : en-tête, plan, section, référence au bloc ; un bloc de type ou de forme inconnus rendu en ligne de commentaire, que `write` refuse de perdre), `write` (markdown analysé en blocs, opérations par section et par bloc, brouillon), publication, liens, alias, blocs `reference`, déplacement, ordre des frères, duplication, corbeille (purge après 30 jours par le service, sans tâche planifiée), liens de partage public | MCP, API, écrans |
+| `nodes/` | `read` (blocs rendus en markdown : en-tête, plan, section, référence au bloc ; un bloc de type ou de forme inconnus rendu en ligne de commentaire, que `write` refuse de perdre), `write` (markdown analysé en blocs, opérations par section et par bloc, brouillon ; mode tolérant réservé à l'écran : collage, `.md` importé), export `.md` d'un nœud publié (`export.ts`), publication, liens, alias, blocs `reference`, déplacement, ordre des frères, duplication, corbeille (purge après 30 jours par le service, sans tâche planifiée), liens de partage public | MCP, API, écrans |
 | `procedures.ts`, `procedures-check.ts`, `prompts.ts` | Contrôle à la publication des blocs `call` d'une procédure ; prompts (procédures publiées lisibles, message = titre) | MCP, API |
 | `catalog/` | Registre des fonctions, recherche et contrats servis par `read` ; fonctions `table.*` ; contrats non appelables `write.*` ; source des fonctions métier de l'ERP | MCP, MCP admin |
 | `connectors/` | Activation, comptes simulés, résolution du compte dans un ordre fixe, équipe porteuse, connecteur simulé `mail` | MCP, API, MCP admin |
 | `calls.ts` | `call` : fonction, activation, droits, équipe, compte, confirmation en deux temps, exécution, compte-rendu | MCP |
-| `tables/` | `table.schema`, `rows`, `aggregate`, `write`, `claim`, `release` sur les blocs `row` ; preuve exigée pour toute valeur nouvelle ; revue humaine ; lectures de l'écran (grille, résumé, file, vues) ; évolution de l'en-tête par `write` | MCP (`call`), API, écrans |
+| `tables/` | `table.schema`, `rows`, `aggregate`, `write`, `claim`, `release` sur les blocs `row` ; preuve exigée pour toute valeur nouvelle si le tableau l'exige (`proof`) ; `create_only` ; recherche `q` par mots ; revue humaine, ou par l'assistant si le tableau l'autorise ; lectures de l'écran (grille, résumé, file, vues) ; évolution de l'en-tête par `write` ; import d'un CSV (`import.ts` : `table.import` et `POST tables/import` appellent `importRows`, provenance `import`) et export CSV (`export.ts`) | MCP (`call`), API, écrans |
 | `feedback.ts` | Tickets | MCP, MCP admin, écrans |
 | `journal-read.ts`, `journal-rows.ts`, `journal-model.ts`, `usage.ts`, `activities.ts` | Lecture du journal par conversation, dans la portée décidée par le service (ses lignes, celles des équipes qu'on mène, toutes pour l'admin) ; arguments masqués et coupés ; un appel sur l'espace personnel d'autrui ne livre à un autre lecteur que son outil, son heure, son issue, son code et sa cible coupée à `private/<handle>` (`perso/<handle>` sur une ligne d'avant ce nom, le journal n'étant pas réécrit) ; usage agrégé ; activités de l'accueil (le journal classé en gestes sur un contenu, dans la même portée, titre et lien seulement pour un contenu que la personne lit) | écrans, MCP, MCP admin |
 | `admin/` | Opérations des huit outils admin, partagées avec le tableau de bord ; journal admin ; point d'extension de la création d'une organisation, que l'hôte branche | MCP admin, API |
 | `flags.ts`, `cell.ts`, `brand.ts` | Drapeaux par organisation ; état de la cellule (version, migrations, variables exigées selon le mode) ; marque | MCP admin, écrans |
 
 **Hors de `server/`, dans `schemas/`**, des fonctions pures qu'importent `server/` et `ui/` :
-le rendu des blocs (`blocks-render.ts`) et la syntaxe des liens `[[…]]` (`link-syntax.ts`, seul
-lecteur des liens et du code en ligne qui les cache) : un `[[…]]` est un lien à l'écran si et
-seulement si la publication l'extrait.
+le rendu des blocs (`blocks-render.ts`, dont le `.md` d'une page et son inverse, `pageMarkdown` et
+`readPageMarkdown`) et la syntaxe des liens `[[…]]` (`link-syntax.ts`, seul lecteur des liens, du
+code en ligne qui les cache et des clôtures, `openingFence` et `closesFence`) : un `[[…]]` est un
+lien à l'écran si et seulement si la publication l'extrait. S'y ajoutent la lecture, la déduction
+et le contrôle d'un CSV (`csv.ts`, `csv-cells.ts`), que l'écran joue avant l'envoi et que le service
+rejoue sur chaque lot, et les règles d'une valeur de tableau (`tables.ts` : `isEmail`, `instantOf`,
+`maxLengthOf`).
 
 **Portes.**
 - `mcp/` : handlers bas niveau, outils calculés par organisation, un seul formateur de résultat,
@@ -306,7 +310,9 @@ seulement si la publication l'extrait.
   vérifie le jeton, résout l'organisation de l'adresse puis dispatche `/api/plateforme/<ressource>`
   vers le service. Réponses `{ data }` ou `{ error: { code, message } }` avec le statut HTTP. Une
   ressource sans organisation (`cell`, équipe plateforme) se reconnaît avant l'identité par
-  l'adresse. Routes du tableau de bord sous `admin/*`.
+  l'adresse. Routes du tableau de bord sous `admin/*`. `GET nodes/export` et `GET tables/export`
+  rendent `{filename, content}`, des lectures sans ligne de journal (D138) ; `POST tables/import`
+  écrit un lot de 500 lignes d'un CSV.
 - `ui/` : écrans en Server Components, qui reçoivent leurs données et leurs rappels par props
   (`.method/conventions/portage-ecrans.md`) ; mutations par `api/`. Une procédure s'y édite et s'y
   lit comme une page (texte seul, un bloc `call` déjà écrit rendu en texte) ; ses blocs `call`, la
@@ -446,8 +452,8 @@ et décision d'accès dans le service), écrits là seuls parce que chaque sessi
 est en § 2.
 
 **Flexible sans ADR** : l'ordre et le choix des écrans portés ; les seuils de routage (réglage par
-organisation, 0,65 et 0,1 par défaut) et les tailles nominales des blocs de `context` ; le
-fournisseur d'emails ; la stratégie de cache ; le déploiement de notre application de base.
+organisation, 0,65 et 0,1 par défaut) ; le fournisseur d'emails ; la stratégie de cache ; le
+déploiement de notre application de base.
 
 ## 9. Portée technique V1 et V2
 

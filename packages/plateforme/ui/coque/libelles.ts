@@ -117,3 +117,83 @@ export const PALETTE = {
   plusDeResultats: (nombre: number) =>
     nombre > 1 ? `${nombre} autres pages contiennent ces mots : précisez la recherche.` : "Une autre page contient ces mots : précisez la recherche.",
 } as const
+
+/** Les exports du « ⋯ » d'une ligne (E10-S01, AC-a5, AC-b6) : un fichier téléchargé, ou le refus. */
+export const EXPORTS = {
+  markdown: "Télécharger en .md",
+  csv: "Télécharger en .csv",
+  enCours: "Préparation du fichier…",
+  pret: (nom: string) => `« ${nom} » est téléchargé.`,
+  /** Les refus qui ont leur phrase ; les autres passent par `messageDErreur`. */
+  refus: {
+    invalid_arguments: "Ce contenu n'a pas encore de version publiée à télécharger.",
+    too_large: "Ce tableau a trop de lignes pour un export : filtrez-le, ou demandez à un assistant de le lire par pages.",
+    not_found: "Ce contenu n'est plus visible.",
+  },
+} as const
+
+/**
+ * « Importer un fichier… » (E10-S01, AC-a3, AC-b1 à AC-b5) : le dialogue, sa zone de dépôt, ses réglages, ses refus
+ * et sa progression. Les bornes s'écrivent depuis `schemas/` (`portage-ecrans.md § 6`), formatées par l'écran.
+ */
+export const IMPORT = {
+  entree: "Importer un fichier…",
+  titre: "Importer un fichier",
+  titreDans: (nom: string) => `Importer dans « ${nom} »`,
+  zone: "Déposez un fichier ici, ou choisissez-le",
+  choisir: "Choisir un fichier",
+  limites: (lignes: string, colonnes: string, mo: string) => `.csv ou .md ; ${lignes} lignes, ${colonnes} colonnes, ${mo} Mo`,
+  limitesDuTableau: (lignes: string, mo: string) => `.csv ; ${lignes} lignes, ${mo} Mo`,
+  formatRefuse: "Ce fichier n'est ni un .md ni un .csv.",
+  tableauSeulement: "Seul un .csv s'importe dans un tableau.",
+  tropLourd: (mo: string) => `Ce fichier dépasse ${mo} Mo.`,
+  vide: "Ce fichier est vide",
+  illisible: "Ce fichier n'a pas pu être lu.",
+  pageTropLongue: (max: string) => `Ce fichier dépasse ${max} caractères, la taille d'une page : coupez-le en plusieurs fichiers.`,
+  lecture: "Lecture du fichier…",
+  pageTitre: "Titre de la page",
+  pageResume: "Résumé",
+  importer: "Importer",
+  annuler: "Annuler",
+  envoi: "Import…",
+  encodage: "Encodage",
+  separateur: "Séparateur",
+  separateurs: { ";": "Point-virgule", "\t": "Tabulation", ",": "Virgule" },
+  cle: "Colonne clé",
+  cleGeneree: (nom: string) => `« ${nom} » générée (0001, 0002…)`,
+  type: (colonne: string) => `Type de ${colonne}`,
+  types: { text: "Texte", number: "Nombre", date: "Date", datetime: "Date et heure", bool: "Oui ou non", enum: "Liste de valeurs", email: "Email", url: "Lien" },
+  apercu: (lignes: number, total: string) => `Aperçu : ${lignes} premières lignes sur ${total}`,
+  ignorees: (noms: string) => `Colonnes ignorées (absentes du tableau, ou son état) : ${noms}.`,
+  colonneIgnoree: "(ignorée)",
+  problemes: "Rien n'est envoyé tant que ces problèmes restent :",
+  etAutres: (nombre: number) => `et ${nombre} ${nombre > 1 ? "autres" : "autre"}`,
+  cellule: (ligne: number, colonne: string, valeur: string, attendu: string) => `Ligne ${ligne}, colonne ${colonne} : « ${valeur} » n'est pas ${attendu}.`,
+  cellules: (ligne: number, compte: string, attendu: string) => `Ligne ${ligne} : ${compte} cellules, l'en-tête en a ${attendu}.`,
+  cleVide: (ligne: number, colonne: string) => `Ligne ${ligne}, colonne ${colonne} : la clé est vide.`,
+  cleEnDouble: (ligne: number, colonne: string, valeur: string, premiere: number) => `Ligne ${ligne}, colonne ${colonne} : « ${valeur} » est déjà la clé de la ligne ${premiere}.`,
+  cleInvalide: (ligne: number, colonne: string, valeur: string) => `Ligne ${ligne}, colonne ${colonne} : « ${valeur} » ne peut pas servir de clé (trop longue, ou un caractère de contrôle).`,
+  cleAbsente: (colonne: string) => `La colonne clé du tableau, ${colonne}, manque à l'en-tête du fichier.`,
+  guillemet: (ligne: number) => `Ligne ${ligne} : un guillemet n'est jamais fermé.`,
+  tropGrand: "Ce fichier dépasse les limites d'un import (lignes, colonnes ou taille d'une cellule).",
+  attendus: {
+    text: "un texte assez court",
+    number: "un nombre",
+    date: "une date (AAAA-MM-JJ ou JJ/MM/AAAA)",
+    datetime: "une date et heure avec son fuseau",
+    bool: "oui ou non",
+    enum: "une des valeurs de la liste",
+    email: "une adresse email",
+    url: "un lien http:// ou https://",
+  },
+  progression: "Lignes envoyées",
+  ecrites: (faites: string, total: string) => `${faites} lignes écrites sur ${total}.`,
+  reprendre: "Reprendre",
+  conserves: (nombre: number) => `${nombre} ${nombre > 1 ? "éléments conservés" : "élément conservé"} en texte`,
+  resumeDuTableau: (nom: string, lignes: string) => `Importé de ${nom} (${lignes} lignes)`,
+  aucuneAdresse: "Les adresses tirées de ce nom de fichier sont toutes prises à cet endroit : renommez le fichier.",
+  refus: {
+    forbidden: "Créer un tableau ici demande la gestion de cet endroit : demandez-la à ses responsables, ou importez ailleurs.",
+    too_large: "Ce fichier dépasse une limite de la page ou du tableau (taille, nombre de blocs ou de lignes).",
+  },
+} as const

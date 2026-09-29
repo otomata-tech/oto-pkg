@@ -80,6 +80,12 @@ function menuDu(mots: string) {
   return within(screen.getByRole("menu"))
 }
 
+/** Un Texte ajouté après un bloc : le « + » ouvre le choix du bloc, « Texte » l'insère (E10-S06, AC-a1). */
+function ajouterUnTexteApres(mots: string) {
+  fireEvent.click(bouton(`Ajouter un bloc après — ${mots}`))
+  fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Texte" }))
+}
+
 /** Un geste du menu d'un bloc, par son nom (« Monter » porte son raccourci). */
 function choisir(mots: string, geste: string | RegExp) {
   fireEvent.click(menuDu(mots).getByRole("menuitem", { name: geste }))
@@ -109,11 +115,10 @@ describe("EditeurDeBlocs, champs montés (AC1, AC9)", () => {
     ])
     expect(document.activeElement).toBe(document.body)
     expect(champ("Modifier ce titre — Objet").closest("h2")).toHaveAttribute("id", "objet")
-    // Une liste à puces écrite porte ses puces en fond, dessinées par le design system, pour l'œil seul ; sa
+    // Une liste à puces écrite est dessinée par le design system (ses puces : `e11s06-editeur.test.tsx`) ; sa
     // hauteur est celle de ses lignes dès le rendu du serveur, avant toute mesure (M30).
     const liste = champ("Modifier cette liste — Lire le devis Écrire")
     expect(liste).toHaveAttribute("data-kind", "list")
-    expect(liste).not.toHaveAttribute("data-ordered")
     expect(liste).toHaveAttribute("rows", "2")
     // Un bloc qu'on n'écrit pas se lit dans sa rangée, avec sa gouttière (HN-E05S08-5).
     expect(screen.getByText("Diagramme (texte)")).toBeInTheDocument()
@@ -201,7 +206,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
     expect(document.activeElement).toBe(bouton("Ailleurs"))
 
     // Un bloc neuf vide reste quand le focus le quitte (E05-S10, AC-a4), sans rien envoyer.
-    fireEvent.click(bouton("Ajouter un bloc après — Objet"))
+    ajouterUnTexteApres("Objet")
     await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
     ailleurs()
     await unTour()
@@ -212,7 +217,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
   // Sous Safari et Firefox macOS, un bouton cliqué ne prend pas le focus : le champ quitté le laisse à `<body>`.
   it("should keep an empty new block and open its menu when the click in its row leaves the focus to the page, as in Safari (M30)", async () => {
     monter()
-    fireEvent.click(bouton("Ajouter un bloc après — Objet"))
+    ajouterUnTexteApres("Objet")
     await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
     const poignee = bouton("Actions sur ce bloc — bloc vide")
     fireEvent.pointerDown(poignee)
@@ -307,7 +312,7 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
   it("should open under the handle a menu to move, restyle among one « Titre » and seven styles, duplicate and delete, with no such button outside it", async () => {
     monter()
     expect(screen.queryByRole("button", { name: /^(Monter|Descendre|Supprimer|Dupliquer)$/ })).toBeNull()
-    fireEvent.click(bouton("Ajouter un bloc après — Objet de la relance"))
+    ajouterUnTexteApres("Objet de la relance")
     const neuf = champ("Modifier ce texte — bloc vide")
     await waitFor(() => expect(document.activeElement).toBe(neuf))
     const poignee = bouton("Actions sur ce bloc — bloc vide")
@@ -323,6 +328,8 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
       ["Liste à cocher", "false"],
       ["Citation", "false"],
       ["Code", "false"],
+      // E10-S06 (AC-a3) : « Repli » s'ajoute ; les blocs « Insérer » n'y figurent pas.
+      ["Repli", "false"],
     ])
     expect(menu.getAllByRole("menuitem").map((geste) => geste.querySelector(".oto-menu-label")?.textContent)).toEqual(["Monter", "Descendre", "Dupliquer", "Supprimer"])
     // Un bloc neuf vide qui change de style ne part pas : il part avec son texte.
@@ -384,15 +391,30 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
     expect(api.envoyes[2].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "mermaid", text: "graph TD", data: {} } }])
   })
 
-  it("should read a heading of level 2 or 3 as « Titre », in an h2, without rewriting its level", async () => {
+  it("should read a heading of level 2 or 3 as « Titre », in the element of its level, without rewriting its level", async () => {
     const ancien = { ...bloc("a7000000-0000-4000-8000-000000000007", "heading", "Suite", { level: 3 }), revision: 2 }
     monter({ blocs: [ancien] })
-    expect(champ("Modifier ce titre — Suite").closest("h2")).not.toBeNull()
+    expect(champ("Modifier ce titre — Suite").closest("h4")).not.toBeNull()
     expect(menuDu("Suite").getByRole("menuitemradio", { name: "Titre" })).toHaveAttribute("aria-checked", "true")
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     ecrireEtEchapper(champ("Modifier ce titre — Suite"), "Suite revue")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops?.[0]).toMatchObject({ input: { type: "heading", text: "Suite revue", data: { level: 3 } } })
+  })
+
+  it("should show a nested list one item per line, two spaces per level, and send the typing with its children, ordered and start kept (E10-S04, AC-b2)", () => {
+    const items = ["a", { text: "b", children: { items: ["c", { text: "d", children: { items: ["e"], ordered: true, start: 3 } }] } }]
+    monter({ blocs: [{ ...bloc("a8000000-0000-4000-8000-000000000008", "list", null, { items, ordered: true, start: 2 }), revision: 2 }] })
+    const liste = screen.getByRole("textbox", { name: /^Modifier .* — a b/ })
+    if (!(liste instanceof HTMLTextAreaElement)) throw new Error("champ attendu")
+    expect(liste).toHaveValue("a\nb\n  - c\n  - d\n    3. e")
+    vi.useFakeTimers()
+    ecrire(liste, "a\nb\n  - c\n  - d\n    3. e\n    4. f")
+    act(() => vi.advanceTimersByTime(1_200))
+    const suite = [...items.slice(0, 1), { text: "b", children: { items: ["c", { text: "d", children: { items: ["e", "f"], ordered: true, start: 3 } }] } }]
+    expect(api.envoyes.map((corps) => corps.ops)).toEqual([
+      [{ op: "replace_block", block: "a8000000-0000-4000-8000-000000000008", revision: 2, input: { type: "list", data: { items: suite, ordered: true, start: 2 } } }],
+    ])
   })
 
   it("should settle the status line when a queued gesture has nothing left to send, its block deleted meanwhile", async () => {
@@ -435,9 +457,9 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
 describe("EditeurDeBlocs, blocs vides de suite (E05-S10, AC-a4)", () => {
   it("should add empty blocks one after the other, by a second « + » or by Enter on an empty block", async () => {
     monter()
-    fireEvent.click(bouton("Ajouter un bloc après — Objet de la relance"))
+    ajouterUnTexteApres("Objet de la relance")
     await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
-    fireEvent.click(bouton("Ajouter un bloc après — bloc vide"))
+    ajouterUnTexteApres("bloc vide")
     await waitFor(() => expect(screen.getAllByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toHaveLength(2))
     const second = screen.getAllByRole("textbox", { name: "Modifier ce texte — bloc vide" })[1]
     await waitFor(() => expect(document.activeElement).toBe(second))
@@ -696,6 +718,26 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     fireEvent.keyDown(lie, { key: "Escape" })
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops?.[0]).toMatchObject({ op: "replace_block", input: { type: "paragraph", text: "Voir [[ventes/grille_tarifaire|Grille tarifaire]]" } })
+  })
+
+  // E10-S06 (AC-a6) : dans une liste, `Tab` change le niveau d'une ligne, sauf quand la liste de « @ » est ouverte.
+  it("should still choose with Tab in the list of « @ » opened in a bulleted list, the line keeping its level", async () => {
+    const ecriture = api.fetchMock.getMockImplementation()
+    const matches = [{ path: "ventes/grille_tarifaire", kind: "page", title: "Grille tarifaire", snippet: null }]
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (adresse, init) => {
+        if (!String(adresse).includes("/api/plateforme/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
+        return new Response(JSON.stringify({ data: { matches, more: 0 } }), { status: 200, headers: { "content-type": "application/json" } })
+      }),
+    )
+    monter()
+    const liste = champ("Modifier cette liste — Lire le devis Écrire")
+    ecrire(liste, "Lire le devis\nÉcrire @gri")
+    await screen.findByRole("option")
+    expect(fireEvent.keyDown(liste, { key: "Tab" })).toBe(false)
+    await waitFor(() => expect(champ("Modifier cette liste — Lire le devis Écrire")).toHaveValue("Lire le devis\nÉcrire [[ventes/grille_tarifaire|Grille tarifaire]]"))
+    expect(screen.queryByRole("listbox")).toBeNull()
   })
 
   it("should mount the status region of « @ » empty, its sentence coming after the mount", () => {

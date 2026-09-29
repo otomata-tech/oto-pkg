@@ -6,12 +6,10 @@
 // Repris d'Oto (`datastore/cle_metier.py` l. 29-90) : une clé vide ne désigne aucune ligne. Retiré :
 // la clé fournie à l'appel (`key=`), la clé devinée d'une autre colonne.
 import { blockKeySchema, type TableHeader } from "../../schemas"
+import { ROW_KEY_MAX } from "../../schemas/tables"
 import { charCount, formatCount } from "../nodes/document"
 import { keyColumn } from "./header"
 import { shown, valueProblem } from "./meta"
-
-/** Une clé de ligne : 200 caractères au plus (N19), sous la borne de `blocks.key` (500). */
-const KEY_MAX = 200
 
 export const EMPTY_KEY = "key: an empty key designates no row; nothing written."
 const CONTROL_KEY = "key: control characters are not allowed in a key."
@@ -54,7 +52,7 @@ export function rowKey(header: TableHeader, raw: string | number): { key: string
   if ("problem" in typed) return typed
   if (typeof typed.key !== "string") return { problem: `key: ${valueProblem(column, typed.key) ?? "expected a text"}.` }
   const length = charCount(typed.key)
-  if (length > KEY_MAX) return { problem: `key: a key holds ${KEY_MAX} characters at most (not ${formatCount(length)} characters).` }
+  if (length > ROW_KEY_MAX) return { problem: `key: a key holds ${ROW_KEY_MAX} characters at most (not ${formatCount(length)} characters).` }
   const problem = column.type === "number" ? null : valueProblem(column, typed.key)
   if (problem !== null) return { problem: `key: ${problem}.` }
   const checked = blockKeySchema.safeParse(typed.key)
@@ -67,7 +65,8 @@ export type StateRefusal = "unknown" | "working" | "decision"
 /**
  * Ce qu'un état permet (H98, P10, N9) : `null` quand une écriture ou une libération peut le poser ;
  * `unknown` hors des états du cycle ; `working`, l'état de travail, que seule une réservation pose ;
- * `decision`, un état de décision d'une revue, que seule une personne pose (E07-S03). Sans cycle, aucun
+ * `decision`, un état de décision d'une revue, que seule une personne pose (E07-S03), sauf dans un
+ * tableau dont la revue laisse l'assistant décider (`agents_may_decide`, E11-S01, AC-e2). Sans cycle, aucun
  * état n'est réservé.
  */
 export function stateRule(header: TableHeader, state: string): StateRefusal | null {
@@ -76,7 +75,7 @@ export function stateRule(header: TableHeader, state: string): StateRefusal | nu
   if (!lifecycle.states.includes(state)) return "unknown"
   if (state === lifecycle.working) return "working"
   const { review } = lifecycle
-  return review && (state === review.approve || state === review.reject) ? "decision" : null
+  return review && !review.agents_may_decide && (state === review.approve || state === review.reject) ? "decision" : null
 }
 
 /** Les états qu'une libération pose (AC24) : ceux du cycle, hors état de travail et décisions de la revue. */

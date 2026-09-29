@@ -14,7 +14,9 @@ const invalid = (name: string, block: Record<string, unknown>): BlockCase => ({ 
 export const DOCUMENT_CASES: BlockCase[] = [
   valid("a heading of level 2", { type: "heading", text: "Étapes", data: { level: 2 } }),
   valid("a heading with a key", { type: "heading", text: "Règles", data: { level: 1 }, key: "regles" }),
-  invalid("a heading of level 4", { type: "heading", text: "Titre", data: { level: 4 } }),
+  // E10-S04 (AC-b3) : cinq niveaux.
+  valid("a heading of level 5", { type: "heading", text: "Détail", data: { level: 5 } }),
+  invalid("a heading of level 6", { type: "heading", text: "Titre", data: { level: 6 } }),
   invalid("a heading without text", { type: "heading", data: { level: 1 } }),
   invalid("a heading on two lines", { type: "heading", text: "Titre\nsuite", data: { level: 1 } }),
   invalid("a blank heading", { type: "heading", text: "   ", data: { level: 1 } }),
@@ -40,6 +42,22 @@ export const DOCUMENT_CASES: BlockCase[] = [
   invalid("a list starting at 0", { type: "list", data: { items: ["a"], start: 0 } }),
   invalid("a list whose ordered is a string", { type: "list", data: { items: ["a"], ordered: "yes" } }),
   invalid("a list whose ordered is null", { type: "list", data: { items: ["a"], ordered: null } }),
+  // E10-S04 (AC-b1) : un élément est une chaîne ou `{text, children}`, trois niveaux, 500 éléments en tout.
+  valid("a list nested on three levels", {
+    type: "list",
+    data: { items: ["a", { text: "b", children: { items: ["c", { text: "d", children: { items: ["e"], ordered: true, start: 3 } }] } }] },
+  }),
+  invalid("a list nested on four levels", {
+    type: "list",
+    data: { items: [{ text: "a", children: { items: [{ text: "b", children: { items: [{ text: "c", children: { items: ["d"] } }] } }] } }] },
+  }),
+  invalid("a list item with an unknown key", { type: "list", data: { items: [{ text: "a", children: { items: ["b"] }, note: 1 }] } }),
+  invalid("a sub-list with an unknown key", { type: "list", data: { items: [{ text: "a", children: { items: ["b"], note: 1 } }] } }),
+  invalid("a list item without children", { type: "list", data: { items: [{ text: "a" }] } }),
+  invalid("a sub-list without item", { type: "list", data: { items: [{ text: "a", children: { items: [] } }] } }),
+  invalid("a sub-list starting at 0", { type: "list", data: { items: [{ text: "a", children: { items: ["b"], start: 0 } }] } }),
+  invalid("a list item that is an array", { type: "list", data: { items: [["a"]] } }),
+  invalid("a list of 501 items, sub-items included", { type: "list", data: { items: [{ text: "a", children: { items: Array.from({ length: 500 }, () => "b") } }] } }),
 
   valid("a checklist", { type: "checklist", data: { items: [{ text: "Vérifier", checked: false }] } }),
   invalid("a checklist item without checked", { type: "checklist", data: { items: [{ text: "Vérifier" }] } }),
@@ -80,6 +98,38 @@ export const DOCUMENT_CASES: BlockCase[] = [
   invalid("a reference with a text", { type: "reference", text: "x", data: { path: "ventes/devis" } }),
   invalid("a reference without path", { type: "reference", data: { view: {} } }),
   invalid("a reference whose view is an array", { type: "reference", data: { path: "ventes/devis", view: [] } }),
+
+  // E10-S04 (AC-a1 à AC-a3) : tableau simple, séparateur, repli.
+  valid("a simple table", { type: "simple_table", data: { columns: ["Nom", "a \\| b"], rows: [["x", ""], ["a<br>b", "y\\\\\\|"]], align: [null, "right"] } }),
+  valid("a simple table without rows", { type: "simple_table", data: { columns: ["Nom"], rows: [] } }),
+  invalid("a simple table with a text", { type: "simple_table", text: "x", data: { columns: ["a"], rows: [] } }),
+  invalid("a simple table without column", { type: "simple_table", data: { columns: [], rows: [] } }),
+  invalid("a simple table of 21 columns", { type: "simple_table", data: { columns: Array.from({ length: 21 }, () => "c"), rows: [] } }),
+  invalid("a simple table of 201 rows", { type: "simple_table", data: { columns: ["c"], rows: Array.from({ length: 201 }, () => ["x"]) } }),
+  invalid("a simple table row one cell short", { type: "simple_table", data: { columns: ["a", "b"], rows: [["x"]] } }),
+  invalid("a simple table row that is not an array", { type: "simple_table", data: { columns: ["a"], rows: ["x"] } }),
+  invalid("a simple table cell with an unescaped bar", { type: "simple_table", data: { columns: ["a\\\\|b"], rows: [] } }),
+  invalid("a simple table cell on two lines", { type: "simple_table", data: { columns: ["a"], rows: [["x\ny"]] } }),
+  invalid("a simple table cell with a trailing space", { type: "simple_table", data: { columns: ["a "], rows: [] } }),
+  invalid("a simple table cell that is a number", { type: "simple_table", data: { columns: ["a"], rows: [[1]] } }),
+  invalid("a simple table with an unknown alignment", { type: "simple_table", data: { columns: ["a"], rows: [], align: ["middle"] } }),
+  invalid("a simple table with one alignment too many", { type: "simple_table", data: { columns: ["a"], rows: [], align: [null, null] } }),
+
+  valid("a divider", { type: "divider", data: {} }),
+  invalid("a divider with a text", { type: "divider", text: "---", data: {} }),
+  invalid("a divider whose data is an array", { type: "divider", data: [] }),
+
+  valid("a toggle", { type: "toggle", text: "Corps [[ventes/devis]].\n\n```\n<b>\n```", data: { summary: "Détails" } }),
+  valid("an empty toggle", { type: "toggle", text: "", data: { summary: "Rien" } }),
+  invalid("a toggle without text", { type: "toggle", data: { summary: "a" } }),
+  invalid("a toggle without summary", { type: "toggle", text: "x", data: {} }),
+  invalid("a toggle with a blank summary", { type: "toggle", text: "x", data: { summary: "  " } }),
+  invalid("a toggle summary of 201 characters", { type: "toggle", text: "x", data: { summary: long(201) } }),
+  invalid("a toggle summary on two lines", { type: "toggle", text: "x", data: { summary: "a\nb" } }),
+  invalid("a toggle body starting with a blank line", { type: "toggle", text: "  \nx", data: { summary: "a" } }),
+  invalid("a toggle body ending with a blank line", { type: "toggle", text: "x\n", data: { summary: "a" } }),
+  invalid("a toggle holding a toggle", { type: "toggle", text: "x\n  <details>\ny", data: { summary: "a" } }),
+  invalid("a toggle holding its closing line", { type: "toggle", text: "x\n</details> \ny", data: { summary: "a" } }),
 
   valid("a block with a key", { type: "paragraph", text: "Clé.", key: "etapes" }),
   invalid("a key with a leading space", { type: "paragraph", text: "x", key: " x" }),

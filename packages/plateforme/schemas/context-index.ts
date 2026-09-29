@@ -1,5 +1,5 @@
 // Les listes d'index d'une partie de Contexte servie par `context` (E03-S08, AC12 ; E05-S12, D110 b ; M71) : leurs
-// titres, la forme d'une ligne et le pointeur qui dit la coupe. Écrits par `server/context/blocks/contexts.ts`,
+// titres, la forme d'une ligne et les pointeurs qui disent la coupe. Écrits par `server/context/blocks/contexts.ts`,
 // relus par la vue « Contexte » de l'accueil (`ui/contexte/parties-du-contexte.ts`), qui les montre sous l'éditeur
 // d'un Contexte écrivable. Sans ce module, un texte changé côté service ferait disparaître ces listes de l'écran
 // sans erreur (`portage-ecrans.md § 6`).
@@ -17,8 +17,16 @@ export const CONTEXT_INDEX = {
   /** Une ligne : `- <chemin> — <titre> — <résumé>`. */
   item: "- ",
   separator: " — ",
-  /** Le début du pointeur vers `read` d'un Contexte coupé, dernière ligne de sa partie. */
-  rest: "Rest of this context:",
+  /**
+   * Les débuts des deux pointeurs vers `read` d'un Contexte servi en partie, dernière ligne de sa partie
+   * (E11-S03) : `Only the first <20> entries are listed. Read the rest: <p>_read {"path": "<chemin>"}.` quand ses
+   * listes sont arrêtées (`blocks/contexts.ts`, AC-b2) ; `This context is cut: everything served together exceeds
+   * <35,000> characters. Read the rest: …` quand le plafond le coupe (`engine.ts`, AC-b4).
+   */
+  listsStopped: "Only the first ",
+  bodyCut: "This context is cut: everything served together exceeds ",
+  /** La fin commune des deux pointeurs, avant l'appel à `read`. */
+  readRest: "Read the rest:",
   /** Le début de la ligne d'une partie dont les Contextes n'ont pas pu être lus (`blocks/contexts.ts`, AC13). */
   notLoaded: "Not loaded: read it with ",
 } as const

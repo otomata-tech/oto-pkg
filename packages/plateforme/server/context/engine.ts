@@ -8,10 +8,14 @@
 // de chaque bloc, pour l'aperçu (« on mesure, on n'ampute pas », l. 44-52). Retiré d'Oto : notice,
 // toolbox, projets et `run_*` (architecture § 10).
 
-import { SERVED_BUDGET } from "../../schemas"
+import { CONTEXT_INDEX, SERVED_BUDGET } from "../../schemas"
+import { formatCount } from "../nodes/document"
 
-/** 5 000 tokens ≈ 20 000 caractères, arbitrage du doc fonctionnel (coût sur l'abonnement). */
-export const CONTEXT_BUDGET = 20_000
+/**
+ * Le plafond de `context` (ADR-002 § 7, fiche D134) : 35 000 caractères ≈ 10 000 tokens, où Claude Code commence à
+ * avertir d'un résultat d'outil MCP ; les blocs y sont servis entiers, sans taille par bloc (E11-S03, AC-b1).
+ */
+export const CONTEXT_BUDGET = 35_000
 
 /** Place gardée pour la ligne finale qui nomme les blocs omis. */
 const NOTICE_RESERVE = 240
@@ -27,8 +31,9 @@ export type ContextBlock = {
    */
   fallback?: string
   /**
-   * Déjà coupé à sa taille nominale (H30, E03-S08 N6) : rapporté `cut` même quand le budget le garde
-   * entier. Sans lui, l'aperçu d'E05-S04 dirait « complet » d'un Contexte tronqué.
+   * Déjà arrêté à sa borne en lignes (listes d'un Contexte 20, procédures utiles 60 ; E11-S03, HN-E11S03-15),
+   * l'arrêt dit dans son texte : rapporté `cut` même quand le plafond le garde entier. Sans lui, l'aperçu
+   * d'E05-S04 dirait « complet » d'un bloc dont une partie n'est pas listée.
    */
   cut?: boolean
   /** Chemin du nœud Contexte d'où vient le bloc (E03-S08), recopié dans le rapport pour l'écran d'E05-S04. */
@@ -51,20 +56,40 @@ export type BlockStatus = "full" | "cut" | "replaced" | "omitted"
 export type BlockReport = { name: string; chars: number; status: BlockStatus; path: string | null; head?: number }
 
 /** Le début de `text` qui tient en `max` caractères, coupé à une fin de ligne ; `""` si rien ne tient. */
-export function linesThatFit(text: string, max: number): string {
+function linesThatFit(text: string, max: number): string {
   if (text.length <= max) return text
   if (max <= 0) return ""
   const end = text.lastIndexOf("\n", max)
   return end === -1 ? "" : text.slice(0, end)
 }
 
+/** Le texte sans un bloc clôturé resté ouvert à sa fin : la coupe recule avant son ouverture (E03-S08, AC1). */
+function beforeOpenFence(text: string): string {
+  let open: { fence: string; at: number } | null = null
+  let at = 0
+  for (const line of text.split("\n")) {
+    const run = /^`{3,}/.exec(line)?.[0]
+    if (open === null && run !== undefined) open = { fence: run, at }
+    else if (open !== null && line.trimEnd() === open.fence) open = null
+    at += line.length + 1
+  }
+  return open === null ? text : text.slice(0, open.at)
+}
+
+/** La fin commune des deux pointeurs d'un Contexte servi en partie (E11-S03, AC-b2, AC-b4) : `Read the rest: <p>_read {"path": …}.` */
+export function readRest(prefix: string, path: string): string {
+  return `${CONTEXT_INDEX.readRest} ${prefix}_read {"path": "${path}"}.`
+}
+
 /**
- * Un bloc borné à sa taille nominale (H30, E03-S08 N6) : coupé à la dernière ligne entière qui tient,
- * sa première ligne (son titre) gardée, et marqué `cut`. Le moteur coupe ensuite par le budget total.
+ * Une partie de Contexte au corps servi, coupée par le plafond (E11-S03, AC-b4, HN-E11S03-14) : à la dernière
+ * ligne entière qui tient avec son pointeur (`max` le compte), jamais dans un bloc clôturé resté ouvert, puis
+ * le pointeur, qui remplace celui de ses listes. `""` quand même sa tête ne tient pas : la partie est omise.
  */
-export function withinSize(block: ContextBlock, size: number): ContextBlock {
-  if (block.text.length <= size) return block
-  return { ...block, text: linesThatFit(block.text, size), cut: true }
+function cutContextPart(block: ContextBlock & { path: string }, max: number, budget: number, prefix: string): string {
+  const pointer = `${CONTEXT_INDEX.bodyCut}${formatCount(budget)} characters. ${readRest(prefix, block.path)}`
+  const kept = beforeOpenFence(linesThatFit(block.text, max - pointer.length - 1)).trimEnd()
+  return kept.length < (block.head ?? 0) || kept === "" ? "" : `${kept}\n${pointer}`
 }
 
 /**
@@ -104,7 +129,8 @@ function recededReport(report: BlockReport[], kept: number): BlockReport[] {
 /**
  * Assemble les blocs dans l'ordre tant qu'ils tiennent, séparés par une ligne vide. Le premier
  * qui dépasse est coupé à la dernière ligne qui tient, les suivants sont omis, et une dernière
- * ligne les nomme (« <nom> (cut) » pour le bloc coupé). Un bloc à `fallback` n'est jamais coupé :
+ * ligne les nomme (« <nom> (cut) » pour le bloc coupé) ; une partie de Contexte au corps servi finit
+ * par son pointeur (`cutContextPart`, E11-S03 AC-b4). Un bloc à `fallback` n'est jamais coupé :
  * s'il dépasse, son `fallback` le remplace s'il tient, et l'assemblage continue ; sinon il est omis
  * avec les suivants. Le texte fait au plus `budget`. Le rapport dit, pour chaque bloc non vide, sa
  * taille incluse et ce qu'il est devenu (E03-S08, AC8) : l'aperçu d'E05-S04 le montre.
@@ -136,7 +162,8 @@ export function renderContext(blocks: ContextBlock[], budget: number, prefix: st
       record(block, fits ? block.fallback.length : 0, fits ? "replaced" : "omitted")
       continue
     }
-    const partial = linesThatFit(block.text, room - text.length - separator.length)
+    const max = room - text.length - separator.length
+    const partial = block.path === undefined ? linesThatFit(block.text, max) : cutContextPart({ ...block, path: block.path }, max, budget, prefix)
     if (partial.trim()) text += separator + partial
     omitted.push(partial.trim() ? `${block.name}${SERVED_BUDGET.cut}` : block.name)
     record(block, partial.trim() ? partial.length : 0, partial.trim() ? "cut" : "omitted")

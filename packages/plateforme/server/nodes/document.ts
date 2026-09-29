@@ -69,8 +69,8 @@ export function sectionSizes(blocks: readonly DocBlock[], sections: BlockSection
   return sections.map((section) => blocksSize(section.blocks))
 }
 
-/** Niveau (1 à 3) d'un titre que le schéma partagé accepte ; `null` pour tout autre bloc. */
-export function headingLevel(block: DocBlock): 1 | 2 | 3 | null {
+/** Niveau (1 à 5, E10-S04) d'un titre que le schéma partagé accepte ; `null` pour tout autre bloc. */
+export function headingLevel(block: DocBlock): 1 | 2 | 3 | 4 | 5 | null {
   if (block.type !== "heading") return null
   const valid = blockInputSchema.safeParse(block)
   return valid.success && valid.data.type === "heading" ? valid.data.data.level : null

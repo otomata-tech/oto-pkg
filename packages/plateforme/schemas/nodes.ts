@@ -18,6 +18,38 @@ export const nodePathSchema = z
   .max(200)
   .regex(NODE_PATH_PATTERN, "Path: lowercase letters, digits and _ separated by /, e.g. ventes/relance_devis")
 
+/**
+ * Un texte en segment de chemin (le slug d'une équipe, HN-E05S03-8) : sans accents, en minuscules, tout ce qui
+ * n'est pas `[a-z0-9]` devient `_`, `max` caractères au plus, sans `_` en tête ni en fin ; `""` pour un
+ * texte sans lettre ni chiffre. Parcours linéaire (`security-patterns.md § Validation des inputs`). Ici depuis
+ * E10-S01 : l'adresse d'un fichier importé et le nom d'une colonne d'un CSV se tirent à l'écran comme au service.
+ */
+export function slugOf(text: string, max: number): string {
+  return text
+    .replace(/œ/gi, "oe")
+    .replace(/æ/gi, "ae")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+/, "")
+    .slice(0, max)
+    .replace(/_+$/, "")
+}
+
+/**
+ * Texte d'une opération de `write` (banc E04, mesure 4 : un appel porte ~47 000 caractères) et caractères rendus
+ * d'une page : bornes du service (`server/nodes/limits.ts`), que l'écran dit avant d'envoyer un collage ou un
+ * fichier importé (E10-S01, AC-a1, AC-a3).
+ */
+export const OP_TEXT_MAX = 40_000
+export const PAGE_MAX = 300_000
+/** Titre et résumé d'un nœud : 200 caractères au plus (`writeNodeSchema`), que l'écran coupe avant d'envoyer (E10-S01). */
+export const NODE_HEAD_MAX = 200
+
+/** `GET nodes/export?path=` et `GET tables/export?path=` (E10-S01, AC-a5, AC-b6) : le chemin exporté. */
+export const nodeExportQuerySchema = z.object({ path: nodePathSchema })
+
 /** Les cinq opérations par section d'E03-S01, dans leur ordre. */
 export const SECTION_OPS = ["replace_section", "append", "add_section", "delete_section", "replace_text"] as const
 
@@ -39,7 +71,7 @@ export const writeOpSchema = z.object({
     .min(1)
     .max(200)
     .optional()
-    .describe('Title of the section it applies to, e.g. "Étapes". Section operations only.'),
+    .describe('Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section).'),
   text: z
     .string()
     .optional()
@@ -65,7 +97,7 @@ export const writeOpSchema = z.object({
     .min(1)
     .max(500)
     .optional()
-    .describe("move_block only: reference of the block to put it after (default: the start of the page)."),
+    .describe("move_block only: reference of the block to put it after (default: the start of the page, outside any section)."),
 })
 
 export type WriteOp = z.infer<typeof writeOpSchema>
@@ -131,14 +163,14 @@ export const writeNodeSchema = z.object({
     .string()
     .trim()
     .min(1)
-    .max(200)
+    .max(NODE_HEAD_MAX)
     .optional()
     .describe(`Title, 200 characters max, e.g. "Compte rendu Mairie de Valbrune"; required to create (default: unchanged). A new title, once published, moves the path to follow it; the old path still leads here.`),
   summary: z
     .string()
     .trim()
     .min(1)
-    .max(200)
+    .max(NODE_HEAD_MAX)
     .optional()
     .describe("One-line summary, 200 characters max; required to create (default: unchanged)."),
   kind: nodeKindSchema.optional().describe("Kind of a new node: page, procedure or table (default page)."),

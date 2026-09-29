@@ -34,6 +34,7 @@ const ENTETE: TableHeader = {
   key: "ref",
   lifecycle: { column: "statut", states: STATES, working: "en cours", review: { state: "à revoir", approve: "qualifié", reject: "écarté" } },
   closed: false,
+  proof: false,
 }
 
 const P001: TableRowRead = {

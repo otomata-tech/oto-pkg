@@ -12,12 +12,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { candidate } from "../integration/fixtures/acme"
 import { buildContext, previewContext } from "../../packages/plateforme/server/context"
 import { codeBlock, workspaceRules } from "../../packages/plateforme/server/context/blocks/code"
-import { CONTEXT_SIZES, contextBodies } from "../../packages/plateforme/server/context/blocks/contexts"
-import { NEWS_SIZE, newsBlock, newsItems } from "../../packages/plateforme/server/context/blocks/news"
+import { contextBodies } from "../../packages/plateforme/server/context/blocks/contexts"
+import { newsBlock, newsItems } from "../../packages/plateforme/server/context/blocks/news"
 import { orgFacts } from "../../packages/plateforme/server/context/blocks/org"
 import { personFacts } from "../../packages/plateforme/server/context/blocks/person"
-import { PROCEDURES_SIZE, proceduresBlock } from "../../packages/plateforme/server/context/blocks/procedures"
-import { RECENT_SIZE, recentBlock } from "../../packages/plateforme/server/context/blocks/recent"
+import { proceduresBlock } from "../../packages/plateforme/server/context/blocks/procedures"
+import { recentBlock } from "../../packages/plateforme/server/context/blocks/recent"
 import { teamFacts } from "../../packages/plateforme/server/context/blocks/team"
 import { CONTEXT_BUDGET } from "../../packages/plateforme/server/context/engine"
 import { lastCtxAt } from "../../packages/plateforme/server/ctx"
@@ -392,7 +392,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("C
   const RULE = `Règle : ${"chaque devis est relu avant envoi. ".repeat(28)}`.trim()
   const TEMPLATE = Array.from({ length: 10 }, (_, index) => `ligne ${index} du modèle de relance`).join("\n")
   const VENTES_HEAD = "## Context: team Ventes (ventes/contexte)\nTeam Ventes. Lead: Claire Morel."
-  const ventesCut = (prefix: string) => `${VENTES_HEAD}\n### Règles\n\n${RULE}\nRest of this context: ${prefix}_read {"path": "ventes/contexte"}.`
+  // E11-S03 (AC-b1) : plus de taille par partie, le Contexte de Ventes est servi entier, son bloc clôturé compris.
+  const VENTES_WHOLE = `${VENTES_HEAD}\n### Règles\n\n${RULE}\n\n\`\`\`text\n${TEMPLATE}\n\`\`\``
 
   /** Les Contextes de O : publiés, un brouillon ouvert sur celui de Tout le monde, la racine publiée, un Contexte d'une équipe d'ailleurs. */
   function contextTables(rules: RuleSpec[] = [], space: Partial<ContentNode> = {}): Tables {
@@ -420,6 +421,9 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("C
     addBlocks(tables, "private/lea/contexte", "published", [
       { type: "heading", text: "Ton", data: { level: 1 } },
       { type: "paragraph", text: "Tutoiement, phrases courtes." },
+      // E10-S04 (AC-b3) : sous `headingBase` 3, les niveaux 4 et 5 rendent six # au plus.
+      { type: "heading", text: "Détail", data: { level: 4 } },
+      { type: "heading", text: "Précision", data: { level: 5 } },
     ])
     addBlocks(tables, "ventes/contexte", "published", [
       { type: "heading", text: "Règles", data: { level: 1 } },
@@ -431,7 +435,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("C
     return tables
   }
 
-  it("should serve everyone's, the personal, the default team's then the other team's published blocks, cut at their size outside a fenced block (AC1)", async () => {
+  it("should serve everyone's, the personal, the default team's then the other team's published blocks, whole (AC1 ; E11-S03, AC-b1)", async () => {
     const ref = await seedO(contextTables())
     const lea = leaOf(ref)
     const { text } = await buildContext(await ref.db("lea"), lea, {}, { userAgent: null })
@@ -441,14 +445,12 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("C
     expect(text.slice(start, text.indexOf("\n\n## What's new"))).toBe(
       [
         `## Context: everyone (contexte)\n${orgFacts(lea.org)}\n### Mission\n\nAcme Test conçoit des opérations d'autoconsommation collective.\n\n→ page: FAQ support — Réponses types. (support/faq)\n\n### Règles\n\nAucun email n'est envoyé sans accord.`,
-        `## Context: you only (private/lea/contexte)\n${personFacts(lea)}\n### Ton\n\nTutoiement, phrases courtes.`,
-        ventesCut(ref.org.prefix),
+        `## Context: you only (private/lea/contexte)\n${personFacts(lea)}\n### Ton\n\nTutoiement, phrases courtes.\n\n###### Détail\n\n###### Précision`,
+        VENTES_WHOLE,
         "## Context: team Support (support/contexte)\nTeam Support. Lead: Paul Girard.\nRépondre sous 24 h ouvrées.",
       ].join("\n\n"),
     )
-    // La taille nominale borne le corps seul (AC-5).
-    expect(ventesCut(ref.org.prefix).length - VENTES_HEAD.length - 1).toBeLessThanOrEqual(CONTEXT_SIZES.team)
-    for (const hidden of ["BROUILLON", "Titre en attente", "Guide de l'organisation", "conseil/contexte", "Réservé au Conseil", "```"]) {
+    for (const hidden of ["BROUILLON", "Titre en attente", "Guide de l'organisation", "conseil/contexte", "Réservé au Conseil", "Read the rest"]) {
       expect(text).not.toContain(hidden)
     }
 
@@ -661,33 +663,30 @@ describe.skipIf(!sqlConfigured)(portable("recent content (E03-S08, AC5 ; E05-S12
   })
 })
 
-describe.skipIf(!sqlConfigured)(portable("sizes of the dynamic blocks (E03-S08, AC6)"), { timeout: REAL_BASE_TIMEOUT }, () => {
-  it("should cut what's new at 600, the procedures at 60 lines and 8,000 with a last line counting the others, recent documents at 1,400, their title kept", async () => {
+// E11-S03 (AC-b1, HN-E11S03-15, fiche D134) : plus de taille par bloc ; les bornes en lignes restent, et un arrêt se dit.
+describe.skipIf(!sqlConfigured)(portable("the dynamic blocks served whole (E03-S08, AC6 ; E11-S03, AC-b1)"), { timeout: REAL_BASE_TIMEOUT }, () => {
+  it("should serve what's new and recent documents whole, and the procedures up to 60 lines with a last line counting the others", async () => {
     const items = Array.from({ length: 10 }, (_, index) => ({
       at: `2026-09-23T0${9 - index}:00:00.000Z`,
       line: `- annonces v${10 - index} (2026-09-23): ${"Une annonce au titre long ".repeat(3)}${10 - index}`,
     }))
     const news = newsBlock(items, "2026-09-20T10:00:00.000Z")
     const newsLines = ["## What's new since 2026-09-20", ...items.map((item) => item.line)]
-    const kept = newsLines.filter((_, index) => newsLines.slice(0, index + 1).join("\n").length <= NEWS_SIZE)
-    expect(news).toEqual({ name: "news", text: kept.join("\n"), cut: true })
-    expect(kept.length).toBeLessThan(newsLines.length)
+    // Plus longues que l'ancienne taille de 600 : entières.
+    expect(news).toEqual({ name: "news", text: newsLines.join("\n") })
+    expect(news?.text.length).toBeGreaterThan(600)
 
     const procedure = (index: number, summary: string): ContentNode => ({ path: `annonces/p${String(index).padStart(2, "0")}`, kind: "procedure", summary })
     const long = Array.from({ length: 70 }, (_, index) => procedure(index, `Procédure ${index} : ${"étape détaillée ".repeat(9)}`.trim()))
     const longRef = await seedO(oTables(long))
-    const more = (count: number) => `… and ${count} more: find them with ${longRef.org.prefix}_find, type procedure.`
     const procedures = await proceduresBlock(await longRef.db("marc"), longRef.identityOf("marc"))
-    const cut = procedures.text.split("\n")
-    const shown = cut.length - 2
+    const lines = procedures.text.split("\n")
     expect(procedures.cut).toBe(true)
-    expect(cut.join("\n").length).toBeLessThanOrEqual(PROCEDURES_SIZE)
-    expect(cut[0]).toBe("## Procedures you can run (70)")
-    expect(cut.slice(1, -1)).toEqual(long.slice(0, shown).map((node) => `- ${node.path}: ${node.summary}`))
-    expect(cut.at(-1)).toBe(more(70 - shown))
-    // La dernière ligne entière qui tient : une procédure de plus dépasserait les 8 000 caractères.
-    const next = [...cut.slice(0, -1), `- ${long[shown].path}: ${long[shown].summary}`, more(70 - shown - 1)]
-    expect(next.join("\n").length).toBeGreaterThan(PROCEDURES_SIZE)
+    // Plus longues que l'ancienne taille de 8 000 : 60 lignes, puis celle qui compte les autres.
+    expect(procedures.text.length).toBeGreaterThan(8_000)
+    expect(lines[0]).toBe("## Procedures you can run (70)")
+    expect(lines.slice(1, -1)).toEqual(long.slice(0, 60).map((node) => `- ${node.path}: ${node.summary}`))
+    expect(lines.at(-1)).toBe(`… and 10 more: find them with ${longRef.org.prefix}_find, type procedure.`)
     // Plus de procédures qu'une lecture n'en rend (`supabase-patterns.md § Error Handling`) : toutes comptées.
     const short = Array.from({ length: 1005 }, (_, index) => procedure(index, `Procédure ${index}.`))
     const shortRef = await seedO(oTables(short))
@@ -704,8 +703,9 @@ describe.skipIf(!sqlConfigured)(portable("sizes of the dynamic blocks (E03-S08, 
     const documentsRef = await seedO(tables)
     const recent = await recentBlock(await documentsRef.db("marc"), documentsRef.identityOf("marc"))
     const recentLines = ["## Recent content", ...documents.map((document, index) => `- ${document.path} (page, ${day(updated[index])}): ${document.title}`)]
-    const fitting = recentLines.filter((_, index) => recentLines.slice(0, index + 1).join("\n").length <= RECENT_SIZE)
-    expect(recent).toEqual({ name: "recent content", text: fitting.join("\n"), cut: true })
+    // Plus longs que l'ancienne taille de 1 400 : entiers.
+    expect(recent).toEqual({ name: "recent content", text: recentLines.join("\n") })
+    expect(recent?.text.length).toBeGreaterThan(1_400)
   })
 })
 
@@ -717,8 +717,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("p
     ])
     addBlocks(tables, "contexte", "published", [{ type: "paragraph", text: "Acme Test conçoit des opérations." }])
     addBlocks(tables, "ventes/contexte", "published", [{ type: "paragraph", text: `${"Une règle de Ventes. ".repeat(40)}\n${"Une autre règle. ".repeat(40)}` }])
-    // Des étapes plus longues que le budget : la procédure servie cède la place à son pointeur.
-    addBlocks(tables, "ventes/relance", "published", [{ type: "paragraph", text: "Étape. ".repeat(3000) }])
+    // Des étapes plus longues que le plafond (35 000, E11-S03) : la procédure servie cède la place à son pointeur.
+    addBlocks(tables, "ventes/relance", "published", [{ type: "paragraph", text: "Étape. ".repeat(6000) }])
     tables.ctx.push({ code: "AAAA-0001", org_id: O.id, user_id: PEOPLE.lea.id, created_at: "2026-09-20T10:00:00.000Z" })
     // Le vrai routage (`route_candidates`) sert la procédure : son résumé porte la demande mot pour mot.
     const ref = await seedO(tables)
@@ -747,7 +747,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("p
       ["procedure", "replaced", null],
       ["contexte", "full", "contexte"],
       ["private/lea/contexte", "full", null],
-      ["ventes/contexte", "cut", "ventes/contexte"],
+      // Plus de taille par partie (E11-S03, AC-b1) : le Contexte de Ventes, plus long que l'ancienne, entier.
+      ["ventes/contexte", "full", "ventes/contexte"],
       ["support/contexte", "full", null],
       ["news", "full", null],
       ["procedures", "full", null],
@@ -757,8 +758,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("p
     const ventes = preview.blocks.find((block) => block.name === "ventes/contexte")
     const ventesText = section(preview.text, "## Context: team Ventes") ?? ""
     const ventesHead = "## Context: team Ventes (ventes/contexte)\nTeam Ventes. Lead: Claire Morel."
-    expect([ventes?.chars, ventes?.head, ventesText.startsWith(`${ventesHead}\n`)]).toEqual([ventesText.length, ventesHead.length, true])
-    expect(ventesText.length - ventesHead.length - 1).toBeLessThanOrEqual(CONTEXT_SIZES.team)
+    expect([ventes?.chars, ventes?.head, ventesText]).toEqual([ventesText.length, ventesHead.length, `${ventesHead}\n${"Une règle de Ventes. ".repeat(40)}\n${"Une autre règle. ".repeat(40)}`])
   })
 })
 
@@ -896,7 +896,8 @@ describe.skipIf(!sqlConfigured)(portable("pages, tables and linked pages of a Co
     expect(listed.slice(4)).toEqual([
       "Pages, tables and procedures here:",
       ...Array.from({ length: 20 }, (_, index) => `- contexte/c${String(index).padStart(2, "0")} — contexte/c${String(index).padStart(2, "0")} — Summary of contexte/c${String(index).padStart(2, "0")}.`),
-      `Rest of this context: ${crowdedRef.org.prefix}_read {"path": "contexte"}.`,
+      // E11-S03 (AC-b2) : le pointeur dit l'arrêt des listes.
+      `Only the first 20 entries are listed. Read the rest: ${crowdedRef.org.prefix}_read {"path": "contexte"}.`,
     ])
   })
 })

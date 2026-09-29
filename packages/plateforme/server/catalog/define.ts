@@ -24,6 +24,8 @@ export type FunctionContext = {
   account?: ResolvedAccount
   /** Code `ctx` de l'appel (E03-S04, N9) : la provenance d'une écriture faite par un assistant (ADR-011 § 2). */
   ctx?: string | null
+  /** Client MCP de la conversation (`ctx.host`, `nom@version`), rangé dans la provenance d'une écriture (E11-S01, AC-d2) ; absent sans lui. */
+  host?: string | null
   /** Origine de l'adresse appelée (`https://acme.oto.cx`) : lien d'un écran cité par un refus (E07-S02, AC17). */
   origin?: string
 }

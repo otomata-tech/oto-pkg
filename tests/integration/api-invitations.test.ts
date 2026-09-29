@@ -4,16 +4,18 @@
 // magique est espionné sur le client d'auth : aucun email réel ne part des tests. Les refus de la
 // porte sans base sont dans `tests/unit/api-handler.test.ts` ; la révocation (route, ligne de journal)
 // et le rôle réservé à l'administrateur y sont aussi, et dans le service sur une vraie base, en suite portable
-// (`tests/integration/invitations.test.ts`) : leurs cas sur le projet sont retirés (M11b). Marqué Supabase :
-// la porte vérifie des jetons de Supabase Auth, et le lien magique est celui de Supabase Auth ; depuis
-// E01-S10 f2, le journal se relit sous la session de l'administratrice par la face SQL, la marque par la
-// connexion d'administration, plus par PostgREST.
+// (`tests/integration/invitations.test.ts`) : leurs cas sur le projet sont retirés (M11b). Suite portable
+// (E11-S14) : personnes sans compte, jetons signés localement que la porte vérifie par `verifyToken`
+// (`tests/helpers/session-locale.ts`) ; le client du lien magique se construit sur une adresse `.invalid`
+// (HN-E11S14-3) et son envoi reste espionné, rien n'est joint. Le journal se relit sous la session de
+// l'administratrice par la face SQL, la marque par la connexion d'administration.
 import { AuthClient } from "@supabase/supabase-js"
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestOrg } from "../helpers/plateforme"
-import { asCaller, SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { asCaller, portable, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 
 const NETWORK_TIMEOUT = 60_000
 const USER_AGENT = "api-invitations-test"
@@ -21,13 +23,11 @@ const USER_AGENT = "api-invitations-test"
 type Task = () => Promise<void>
 type Caller = "admin"
 
-const configured = supabaseConfigured && sqlConfigured
-
-describe.skipIf(!configured)(
-  configured ? "platform API invitations" : `platform API invitations (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable("platform API invitations"),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let org: TestOrg
     let host: string
@@ -63,6 +63,7 @@ describe.skipIf(!configured)(
       const response = await handlePlateforme(req, {
         accessToken,
         host,
+        verifyToken: fx.verifyToken,
         defer: (task) => tasks.push(task),
       })
       return { response, body: await response.json(), tasks }
@@ -76,7 +77,10 @@ describe.skipIf(!configured)(
       )
 
     beforeAll(async () => {
-      fx = createFixtures()
+      // Le client du lien magique exige l'adresse et la clé publique de l'hôte : aucune n'est jointe.
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example.invalid")
+      vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", `anon-${hex(8)}`)
+      fx = createLocalFixtures()
       admin = testAdminSql()
       host = `t${hex(4)}.example.invalid`
       org = await fx.createOrg({ hosts: [host] })
@@ -84,7 +88,7 @@ describe.skipIf(!configured)(
       adminId = person.id
       ventes = (await fx.createTeam(org.id, { name: "Ventes" })).id
       await fx.addMember(org.id, person.id, { role: "admin" })
-      const signed = await fx.signIn(person.email, person.password)
+      const signed = await fx.sessionFor(person)
       tokens.set("admin", signed.accessToken)
       adminDb = asCaller(person.id, person.email)
     }, 120_000)
@@ -96,6 +100,7 @@ describe.skipIf(!configured)(
 
     afterAll(async () => {
       otp.mockRestore()
+      vi.unstubAllEnvs()
       try {
         await fx?.cleanup()
       } finally {

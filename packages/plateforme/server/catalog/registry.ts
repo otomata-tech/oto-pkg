@@ -10,6 +10,7 @@ import { normalizeTitle } from "../../schemas"
 import { mailCreateDraft, mailSendDraft } from "../connectors/simulated/mail"
 import { tableAggregate } from "../tables/aggregate"
 import { tableClaim } from "../tables/claim"
+import { tableImport } from "../tables/import"
 import { tableRelease } from "../tables/release"
 import { tableRows } from "../tables/rows"
 import { tableSchema } from "../tables/schema"
@@ -22,10 +23,10 @@ export const NATIVE_CONNECTOR = "table"
 
 /**
  * Catalogue de la V1 (H80) : `mail` simulé (E04-S01), lecture des tableaux (E07-S01), écriture et file
- * de travail (E07-S02) ; ERP (E08-S05) s'y ajoute.
+ * de travail (E07-S02), import d'un CSV (E10-S01) ; ERP (E08-S05) s'y ajoute.
  */
 export function catalogFunctions(): CatalogFunction[] {
-  return [mailCreateDraft, mailSendDraft, tableSchema, tableRows, tableAggregate, tableWrite, tableClaim, tableRelease, ...erpFunctions()]
+  return [mailCreateDraft, mailSendDraft, tableSchema, tableRows, tableAggregate, tableWrite, tableClaim, tableRelease, tableImport, ...erpFunctions()]
 }
 
 /**

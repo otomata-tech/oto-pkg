@@ -75,6 +75,10 @@ describe.skipIf(!sqlConfigured)(portable("the screen of a table"), { timeout: NE
       // Le texte libre, sans casse ni accent : clé, texte, email (AC5).
       const cherche = await tableGridRows(db, lea(), { table: PROSPECTS.path, q: "ÉCOLE", limit: 20 })
       expect([keys(cherche.rows), cherche.total]).toEqual([["École de Valbrune"], 1])
+      // Par mots, comme `table.rows` : dans n'importe quel ordre et des cellules différentes ; un `q` sans mot est ignoré (E11-S01, AC-c2, AC-c3).
+      const mots = await tableGridRows(db, lea(), { table: PROSPECTS.path, q: "valbrune NINA", limit: 20 })
+      expect([keys(mots.rows), mots.total]).toEqual([["Atelier 2"], 1])
+      expect((await tableGridRows(db, lea(), { table: PROSPECTS.path, q: "--", limit: 20 })).total).toBe(12)
       // Sans tri, l'ordre naturel des clés (« Atelier 2 » avant « Atelier 10 ») ; un bail actif est servi (AC2).
       const tout = await tableGridRows(db, lea(), { table: PROSPECTS.path, limit: 20 })
       expect(keys(tout.rows).slice(0, 2)).toEqual(["Atelier 2", "Atelier 10"])

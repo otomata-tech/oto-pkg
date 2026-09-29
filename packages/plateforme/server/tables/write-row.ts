@@ -20,11 +20,19 @@ import { keyValue, rowCells, shown, valueProblem, normalizeValue, type RowBlock 
 import { decisionNames, rowKey, stateRule } from "./row-rules"
 import { describeValue, expectedOf, sameValue } from "./write-values"
 
-/** Qui écrit (H94, N21) : la personne, le code `ctx` de la conversation, l'instant de l'écriture. */
-export type RowActor = { userId: string; ctx: string | null; at: string }
+/**
+ * Qui écrit (H94, N21) : la personne, le code `ctx` de la conversation, l'instant de l'écriture ; `origin`, un
+ * import (E10-S01, AC-b3 : l'origine de chaque cellule qu'il écrit, sa preuve avec le commentaire, D100) ;
+ * `host`, le client MCP de la conversation (`ctx.host`, `nom@version`), et `worker`, le libellé du bail sous
+ * lequel l'assistant écrit (E11-S01, AC-d2, AC-d3) : sans eux, la provenance ne dit pas quel assistant a écrit.
+ */
+export type RowActor = { userId: string; ctx: string | null; at: string; origin?: "import"; host?: string | null; worker?: string | null }
 
 /** Refus d'un `null` (AC4) : vider se dit `clear`, « cherché, rien trouvé » se dit `verified_empty` ; repris par `checkWriteArgs`. */
 export const NULL_REFUSED = "null is refused: use clear to empty a field, or verified_empty with a reason for 'searched, nothing found'"
+
+/** Refus d'un `verified_empty` sur une colonne qui exige une vraie valeur (E11-S01, AC-b2) ; repris par `checkWriteArgs` (AC-b6). */
+export const REAL_VALUE_NEEDED = "needs a real value; verified_empty is not allowed for this column"
 
 /**
  * Une ligne d'entrée : clé normalisée par `rowKey`, opérations validées par `tableRowWriteSchema`
@@ -128,7 +136,7 @@ function own(record: Readonly<Record<string, unknown>>, name: string): unknown {
 }
 
 /** Ce qu'une écriture ajoute à la provenance d'une cellule : son origine, un commentaire, un lien, une raison, la révision posée par une réservation (N24). */
-type ProvenanceExtra = { origin?: "agent" | "human" | "verified_empty"; comment?: string; link?: string; reason?: string; claim_revision?: number }
+type ProvenanceExtra = { origin?: "agent" | "human" | "import" | "verified_empty"; comment?: string; link?: string; reason?: string; claim_revision?: number }
 
 /**
  * La provenance d'une cellule écrite par un assistant (H94, N21), seule construction pour l'écriture,
@@ -138,7 +146,9 @@ type ProvenanceExtra = { origin?: "agent" | "human" | "verified_empty"; comment?
  */
 export function cellProvenance(actor: RowActor, previous: unknown, extra: ProvenanceExtra = {}): Record<string, unknown> {
   const imported = isRecord(previous) && previous.imported !== undefined ? { imported: previous.imported } : {}
-  return { origin: "agent", by: actor.userId, ctx: actor.ctx, at: actor.at, ...extra, ...imported }
+  // `host` et `worker` rangés seulement connus (AC-d2, AC-d3) : une décision d'une personne n'en a pas (AC-d5).
+  const assistant = { ...(actor.host ? { host: actor.host } : {}), ...(actor.worker ? { worker: actor.worker } : {}) }
+  return { origin: actor.origin ?? "agent", by: actor.userId, ctx: actor.ctx, at: actor.at, ...assistant, ...extra, ...imported }
 }
 
 /** AC16, AC17 : la colonne clé suit `key` ; l'état se change hors du travail, de la revue et d'un bail. */
@@ -196,12 +206,21 @@ function annotate(work: Work, name: string, comment: string | undefined, link: s
   work.changes.annotated.push(name)
 }
 
-/** Une colonne que `clear` et `verified_empty` ne touchent pas : la clé ; l'état d'une file ; une colonne requise pour `clear` (AC11, AC14). */
+/** Une colonne qui admet `verified_empty` (E11-S01, AC-b4) : toutes, sauf `allow_verified_empty: false`. */
+function allowsVerifiedEmpty(column: TableColumn): boolean {
+  return column.allow_verified_empty !== false
+}
+
+/**
+ * Une colonne que `clear` et `verified_empty` ne touchent pas : la clé ; l'état d'une file ; une colonne requise
+ * pour `clear` (AC11, AC14) ; une colonne qui exige une vraie valeur pour `verified_empty` (E11-S01, AC-b2).
+ */
 function reservedProblem(header: TableHeader, column: TableColumn, op: "clear" | "verified_empty"): string | null {
   const verb = op === "clear" ? "cleared" : "verified_empty"
   if (column.name === header.key) return `${column.name}: this is the key column; it cannot be ${verb}.`
   if (op === "clear" && column.required) return `${column.name}: required: it cannot be cleared.`
   if (column.name === header.lifecycle?.column) return `${column.name}: this is the state column of the work queue; it cannot be ${verb}.`
+  if (op === "verified_empty" && !allowsVerifiedEmpty(column)) return `${column.name}: ${REAL_VALUE_NEEDED}.`
   return null
 }
 
@@ -240,11 +259,18 @@ function applyVerifiedEmpty(work: Work, column: TableColumn, reason: string): vo
   work.changes.verified_empty.push(name)
 }
 
-/** Une colonne sans valeur ni `verified_empty` (AC14). */
-function missing(work: Work, name: string): boolean {
-  const provenance = own(work.provenance, name)
-  const value = own(work.data, name)
-  return (value === undefined || value === null) && !(isRecord(provenance) && provenance.origin === "verified_empty")
+/** Une colonne sans valeur ni `verified_empty` (AC14) ; sans valeur, pour une colonne qui refuse `verified_empty` (E11-S01, AC-b3). */
+function missing(work: Work, column: TableColumn): boolean {
+  const provenance = own(work.provenance, column.name)
+  const value = own(work.data, column.name)
+  const verifiedEmpty = allowsVerifiedEmpty(column) && isRecord(provenance) && provenance.origin === "verified_empty"
+  return (value === undefined || value === null) && !verifiedEmpty
+}
+
+/** Refus d'une ligne créée sans une colonne requise (AC14 ; E11-S01, AC-b3) : « with its proof » dans un tableau qui l'exige seulement. */
+function requiredAtCreation(column: TableColumn, proof: boolean): string {
+  const how = allowsVerifiedEmpty(column) ? "set it, or verified_empty with a reason." : `set it${proof ? " with its proof" : ""}; verified_empty is not allowed for this column.`
+  return `${column.name}: required when creating a row: ${how}`
 }
 
 /** Création (AC1, AC14) : la clé et l'état d'entrée posés d'office ; les colonnes requises exigées. */
@@ -260,7 +286,7 @@ function create(work: Work): void {
     work.changes.entry = { column: lifecycle.column, state: entry }
   }
   for (const column of header.columns) {
-    if (column.required && missing(work, column.name)) work.problems.push(`${column.name}: required when creating a row: set it, or verified_empty with a reason.`)
+    if (column.required && missing(work, column)) work.problems.push(requiredAtCreation(column, header.proof))
   }
 }
 
@@ -270,7 +296,7 @@ function notesOf(work: Work, touched: ReadonlySet<string>): string[] {
   const cells = rowCells({ key: work.request.input.key, data: work.data }, header)
   return header.columns.flatMap((column) => {
     if (column.name === header.key) return []
-    if (column.required && missing(work, column.name)) return [`note: ${column.name} is required and has no value on this row.`]
+    if (column.required && missing(work, column)) return [`note: ${column.name} is required and has no value on this row.`]
     const value = cells.get(column.name)
     if (touched.has(column.name) || value === undefined || valueProblem(column, value) === null) return []
     return [`note: ${column.name} holds a value that is not ${expectedOf(column, value)} (${shown(value)}); fix it with set.`]

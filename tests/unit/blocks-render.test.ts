@@ -20,7 +20,7 @@ import { DOCUMENT_CASES } from "../helpers/block-cases"
 
 type Extra = Partial<BlockLike>
 
-const heading = (text: string, level: 1 | 2 | 3, extra: Extra = {}): BlockLike => ({ type: "heading", text, data: { level }, ...extra })
+const heading = (text: string, level: number, extra: Extra = {}): BlockLike => ({ type: "heading", text, data: { level }, ...extra })
 const paragraph = (text: string, extra: Extra = {}): BlockLike => ({ type: "paragraph", text, data: {}, ...extra })
 const list = (items: string[], data: { ordered?: boolean; start?: number } = {}, extra: Extra = {}): BlockLike => ({
   type: "list",
@@ -55,6 +55,11 @@ describe("renderBlock — canonical forms of E03-S03", () => {
     expect(renderBlock(heading("Étapes", 1), { headingBase: 3 })).toBe("### Étapes")
     expect(renderBlock(heading("Cas particulier", 2), { headingBase: 3 })).toBe("#### Cas particulier")
     expect(renderBlock(heading("Détail", 3), { headingBase: 3 })).toBe("##### Détail")
+  })
+
+  it("should render levels 4 and 5 as ##### and ######, and bound context (headingBase 3) to six # (E10-S04, AC-b3)", () => {
+    expect([4, 5].map((level) => renderBlock(heading("Détail", level)))).toEqual(["##### Détail", "###### Détail"])
+    expect([4, 5].map((level) => renderBlock(heading("Détail", level), { headingBase: 3 }))).toEqual(["###### Détail", "###### Détail"])
   })
 
   it("should render a paragraph as is, links and lines included", () => {

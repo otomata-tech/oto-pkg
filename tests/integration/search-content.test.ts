@@ -260,6 +260,17 @@ describe.skipIf(!sqlConfigured || privatePending)(
           { type: "callout", text: "Attention au zorglub." },
         ],
       })
+      // E10-S04 (AC-a4) : un mot d'une cellule, d'un résumé de repli, de son corps, d'un sous-élément.
+      await published(v, "ventes/e_riche", {
+        title: "Formes riches",
+        summary: "Rien ici.",
+        blocks: [
+          { type: "simple_table", data: { columns: ["Nom"], rows: [["ornithorynque"]] } },
+          { type: "toggle", text: "Le pangolin du corps.", data: { summary: "Le tamanoir" } },
+          { type: "list", data: { items: [{ text: "a", children: { items: [{ text: "b", children: { items: ["okapi"] } }] } }] } },
+          { type: "divider", data: {} },
+        ],
+      })
       await published(v, "ventes/d_quatre", {
         title: "Quatre blocs",
         summary: "Rien ici.",
@@ -394,15 +405,15 @@ describe.skipIf(!sqlConfigured || privatePending)(
       // M58 (E11-S04, AC-a8) : un nœud à la corbeille ne prend plus de place sous la coupe ; la fonction
       // d'avant le rendait en tête, par son titre, et le service le retirait après.
       it("should leave a node in the trash out before the cut, by its title, its summary and its blocks, a living node taking its place", async () => {
-        const trashed = await published(o.nodes.ventes, "ventes/ornithorynque_corbeille", {
-          title: "Ornithorynque",
-          summary: "L'ornithorynque de la corbeille.",
-          blocks: [{ type: "paragraph", text: "Un ornithorynque dans un bloc." }],
+        const trashed = await published(o.nodes.ventes, "ventes/axolotl_corbeille", {
+          title: "Axolotl",
+          summary: "L'axolotl de la corbeille.",
+          blocks: [{ type: "paragraph", text: "Un axolotl dans un bloc." }],
         })
-        await published(o.nodes.ventes, "ventes/ornithorynque_vivant", { title: "Page vivante", summary: "Un ornithorynque dans le résumé." })
+        await published(o.nodes.ventes, "ventes/axolotl_vivant", { title: "Page vivante", summary: "Un axolotl dans le résumé." })
         await fx.admin`update platform.nodes set deleted_at = now() where id = ${trashed}`
-        expect((await search("lea", "ornithorynque", { limit: 1 })).map(at)).toEqual([["ventes/ornithorynque_vivant", "summary", null, null]])
-        expect((await search("lea", "ornithorynque")).map(at)).toEqual([["ventes/ornithorynque_vivant", "summary", null, null]])
+        expect((await search("lea", "axolotl", { limit: 1 })).map(at)).toEqual([["ventes/axolotl_vivant", "summary", null, null]])
+        expect((await search("lea", "axolotl")).map(at)).toEqual([["ventes/axolotl_vivant", "summary", null, null]])
       })
 
       it("should keep Support from Léa and give it to Paul, summary then block", async () => {
@@ -465,6 +476,16 @@ describe.skipIf(!sqlConfigured || privatePending)(
 
       it("should find a call block by its function", async () => {
         expect((await search("lea", "table.claim")).map(at)).toEqual([["ventes/qualifier_prospects", "block", "call", null]])
+      })
+
+      it("should find a word of a table cell, a toggle summary, a toggle body and a sub-item (E10-S04, AC-a4)", async () => {
+        const found = await Promise.all(["ornithorynque", "tamanoir", "pangolin", "okapi"].map(async (word) => (await search("lea", word)).map(at)))
+        expect(found).toEqual([
+          [["ventes/e_riche", "block", "simple_table", null]],
+          [["ventes/e_riche", "block", "toggle", null]],
+          [["ventes/e_riche", "block", "toggle", null]],
+          [["ventes/e_riche", "block", "list", null]],
+        ])
       })
     })
 

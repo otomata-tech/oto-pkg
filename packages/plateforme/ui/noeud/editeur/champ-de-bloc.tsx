@@ -2,14 +2,14 @@
 
 // Le champ d'un bloc (E05-S02 ; E05-S08, AC1, AC7, AC9 ; E05-S09, partie c1) : un `<textarea>` natif
 // toujours monté, dont la hauteur suit le texte, au nom accessible obligatoire, sans fond ni bordure au repos
-// ni au focus : seul le curseur se voit, et la gouttière de sa rangée paraît (HN-E05S08-4). Une liste à
-// puces porte ses puces en fond, une liste numérotée ses numéros en colonne `aria-hidden`, à partir de
-// `start`. Sa frappe, sa sortie et son clavier vont aux gestes de l'éditeur. Sans lui, un bloc ne s'écrit pas.
+// ni au focus : seul le curseur se voit, et la gouttière de sa rangée paraît (HN-E05S08-4). Une liste porte ses
+// repères (puces, numéros à partir de `start`, cases) sur la copie de ses éléments (`elements-de-liste.tsx`).
+// Sa frappe, sa sortie et son clavier vont aux gestes de l'éditeur. Sans lui, un bloc ne s'écrit pas.
 //
 // Porté du DS d'oto-frontend (`blocks.jsx`, `BlockField`) sur ses classes (`oto-block-field`, `data-kind`,
-// `data-ordered`, `oto-block-numbers`, `blocks.css`) : le contrôle natif (sélection, annulation, clavier
+// `blocks.css`) : le contrôle natif (sélection, annulation, clavier
 // mobile), aucun chrome au repos ni au focus, la hauteur remise à `auto` avant sa mesure, recalculée quand la
-// forme change, les numéros par ligne. Changé : les numéros partent de `start` (une liste écrite en
+// forme change. Changé : les numéros partent de `start` (une liste écrite en
 // plusieurs blocs continue la numérotation, E05-S04) ; la hauteur est estimée avant l'hydratation (`rows`,
 // `field-sizing: content`), sans quoi un bloc long paraissait coupé à sa première ligne (M30) ; le contour en
 // contrastes forcés est gardé (`outline-hidden`, qui l'emporte sur le `outline: none` du DS). Retiré : le
@@ -21,17 +21,33 @@
 // E05-S11 : au repos, un texte qui porte des liens se lit comme en lecture, liens dans la phrase (retour 11, fiche
 // D107) : son rendu est posé sur le champ, dans la même case, le champ transparent dessous ; au focus, le rendu
 // s'efface et le texte brut paraît (`editeur.css`). Un clic hors d'un lien traverse le rendu jusqu'au champ ; un
-// clic sur un lien le suit. Le champ reste le même élément, monté : aucun focus perdu quand un lien paraît. Tout
+// clic sur un lien ouvre son panneau (E11-S06). Le champ reste le même élément, monté : aucun focus perdu quand un lien paraît. Tout
 // le texte sélectionné ouvre le menu de la poignée (AC-28) ; Échap ou la frappe suivante le referme.
-import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type SyntheticEvent } from "react"
+//
+// E10-S01 : un collage de plusieurs lignes (`text/plain` seul, jamais `text/html`) s'insère après le bloc entier,
+// en mode tolérant (AC-a1) ; une ligne, ou Ctrl+Maj+V, reste du texte au curseur. Un `.md` lâché sur le champ
+// s'insère de même (AC-a4).
+//
+// E10-S06 : « / » tapé dans un Texte vide ouvre sous le champ le choix des blocs (AC-a2, `choix-de-bloc.tsx`) ; un
+// tableur collé dans un Texte vide devient un tableau simple (AC-b3) ; la numérotation d'une liste ne compte
+// que les éléments du premier niveau, les sous-éléments portant leur marque dans le texte (HN-E10S04-14).
+//
+// E11-S06 : les repères d'une liste suivent ses éléments, une seule puce, un numéro ou une case par élément, sur sa
+// première ligne (`ElementsDeListe`, lot a) ; le curseur dans un lien, ou un clic sur un lien au repos, ouvre sous le
+// champ le panneau « Lien » (`lien-du-bloc.tsx`, lot b).
+import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type SyntheticEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { Resultat } from "../../api/resultat"
 import { useRechercheDeContenus } from "../../api/use-recherche-de-contenus"
 import { aDesLiens, type CiblesDesLiens } from "../en-ligne"
-import { MENU_DU_BLOC } from "../libelles"
+import { LIEN_DU_BLOC } from "../libelles"
 import { EnLigne } from "../rendu-des-blocs"
-import { citationAuCurseur, idDOption, lienVers, ListeACiter, type Citation } from "./citer"
+import { tableauColle } from "./blocs-de-page"
+import { ListeDesChoix, useChoixParBarre } from "./choix-de-bloc"
+import { citationAuCurseur, idDOption, lienVers, ListeACiter, useOptionActive, type Citation } from "./citer"
+import { ElementsDeListe } from "./elements-de-liste"
 import { useGestes } from "./gestes"
+import { PanneauDuLien, useLienAuCurseur } from "./lien-du-bloc"
 
 /**
  * Ce que lit le rendu au repos des liens d'un bloc (AC-26, AC-27) : le préfixe des adresses de pages, les
@@ -71,47 +87,15 @@ type ChampDeBlocProps = {
   menuOuvert: boolean
 }
 
-function Numeros({ lignes, debut }: { lignes: number; debut: number }) {
-  return (
-    <div className="oto-block-numbers" aria-hidden="true">
-      {Array.from({ length: lignes }, (_, rang) => (
-        // Ces `<span>` sont des rangs : le rang 3 reste le rang 3 quoi qu'on tape dedans.
-        <span key={rang}>{`${debut + rang}.`}</span>
-      ))}
-    </div>
-  )
-}
-
-/** Une case par ligne d'une liste à cocher, nommée par son texte ; elle se coche sans quitter le bloc (E05-S10). */
-function Cases({ cle, lignes, cases, lectureSeule }: { cle: string; lignes: readonly string[]; cases: readonly boolean[]; lectureSeule: boolean }) {
-  const gestes = useGestes()
-  return (
-    <div className="oto-block-checks">
-      {lignes.map((ligne, rang) => (
-        // Une case est un rang de la liste : la case 3 reste la case 3 quoi qu'on tape dans sa ligne.
-        <input
-          key={rang}
-          type="checkbox"
-          checked={cases[rang] === true}
-          disabled={lectureSeule}
-          aria-label={MENU_DU_BLOC.case(ligne)}
-          onChange={() => gestes.basculerLaCase(cle, rang)}
-          className="oto-block-check"
-        />
-      ))}
-    </div>
-  )
-}
-
 /**
  * Le texte au repos, rendu sur le champ (AC-26) : les titres de l'arbre d'abord, ceux des liens sortants à leur
  * arrivée, seul le titre d'un lien les attendant (M64). Les classes du champ lui donnent sa géométrie et son corps :
- * le rendu tombe sur le texte brut.
+ * le rendu tombe sur le texte brut. Une liste a le sien, la copie de ses éléments (`ElementsDeListe`).
  */
 function TexteAuRepos({ texte, genre, liens }: { texte: string; genre: string; liens: LiensDesBlocs }) {
   return (
     <span className="oto-block-field oto-block-rendu" data-kind={genre}>
-      <EnLigne texte={texte} Lien="a" hrefDuChemin={(chemin) => `${liens.prefixe}${chemin}`} cibles={liens.cibles} lecture={liens.lecture} />
+      <EnLigne texte={texte} numeroter Lien="a" hrefDuChemin={(chemin) => `${liens.prefixe}${chemin}`} cibles={liens.cibles} lecture={liens.lecture} />
     </span>
   )
 }
@@ -125,12 +109,13 @@ function toutSelectionne(champ: HTMLTextAreaElement): boolean {
 function useCitation(cle: string, texte: string) {
   const gestes = useGestes()
   const [citation, setCitation] = useState<Citation | null>(null)
-  const [actif, setActif] = useState(0)
   const recherche = useRechercheDeContenus()
+  const trouves = recherche.resultat.etat === "lue" ? recherche.resultat.trouves : []
+  const option = useOptionActive(trouves)
   const suivre = (valeur: string, curseur: number) => {
     const lue = citationAuCurseur(valeur, curseur)
     setCitation(lue)
-    setActif(0)
+    option.remettre()
     recherche.chercher(lue?.requete ?? "")
   }
   const fermer = () => {
@@ -144,7 +129,6 @@ function useCitation(cle: string, texte: string) {
     fermer()
     gestes.citer(cle, `${texte.slice(0, citation.debut)}${lien}${texte.slice(fin)}`, citation.debut + lien.length)
   }
-  const trouves = recherche.resultat.etat === "lue" ? recherche.resultat.trouves : []
   /** Le clavier de la liste ouverte : `true` si la touche est prise. */
   const toucher = (evenement: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (!citation) return false
@@ -153,25 +137,71 @@ function useCitation(cle: string, texte: string) {
       fermer()
       return true
     }
-    if (trouves.length === 0) return false
-    if (evenement.key === "ArrowDown" || evenement.key === "ArrowUp") {
-      evenement.preventDefault()
-      setActif((rang) => (rang + (evenement.key === "ArrowDown" ? 1 : trouves.length - 1)) % trouves.length)
-      return true
-    }
-    if (evenement.key !== "Enter" && evenement.key !== "Tab") return false
-    evenement.preventDefault()
-    choisir(trouves[Math.min(actif, trouves.length - 1)])
-    return true
+    return option.toucher(evenement, ["Enter", "Tab"], choisir)
   }
-  return { ouverte: citation !== null, resultat: recherche.resultat, actif: Math.min(actif, Math.max(trouves.length - 1, 0)), aDesOptions: trouves.length > 0, suivre, fermer, choisir, toucher }
+  return { ouverte: citation !== null, resultat: recherche.resultat, actif: option.actif, aDesOptions: trouves.length > 0, suivre, fermer, choisir, toucher }
+}
+
+/** Ctrl+Maj+V (⌘⇧V) : le collage qui suit reste du texte brut, quelle que soit sa longueur (AC-a1). */
+const collageBrut = (evenement: KeyboardEvent<HTMLTextAreaElement>) => (evenement.ctrlKey || evenement.metaKey) && evenement.shiftKey && evenement.key.toLowerCase() === "v"
+
+/**
+ * Le collage et le dépôt d'un fichier (E10-S01, AC-a1, AC-a4) : plusieurs lignes, ou un `.md`, partent au geste ; un
+ * tableur collé dans un Texte vide devient un tableau simple (E10-S06, AC-b3). Seul `text/plain` est lu.
+ */
+function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
+  const gestes = useGestes()
+  const brut = useRef(false)
+  return {
+    noterLaTouche: (evenement: KeyboardEvent<HTMLTextAreaElement>) => {
+      brut.current = collageBrut(evenement)
+    },
+    coller: (evenement: ClipboardEvent<HTMLTextAreaElement>) => {
+      const texteBrut = brut.current
+      brut.current = false
+      const colle = evenement.clipboardData.getData("text/plain")
+      if (texteBrut || lectureSeule || !colle.trim().includes("\n")) return
+      evenement.preventDefault()
+      const tableau = texteVide ? tableauColle(colle) : null
+      if (tableau) return gestes.remplacerParChoix(cle, "tableau", tableau)
+      gestes.insererDuMarkdown(cle, colle)
+    },
+    survoler: (evenement: DragEvent<HTMLTextAreaElement>) => {
+      if (!lectureSeule && Array.from(evenement.dataTransfer.types).includes("Files")) evenement.preventDefault()
+    },
+    deposer: (evenement: DragEvent<HTMLTextAreaElement>) => {
+      const fichier = evenement.dataTransfer.files[0]
+      if (!fichier || lectureSeule) return
+      evenement.preventDefault()
+      gestes.deposerUnFichier(cle, fichier)
+    },
+  }
 }
 
 export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert }: ChampDeBlocProps) {
   const gestes = useGestes()
   const champ = useRef<HTMLTextAreaElement>(null)
+  const unTexte = genre === "paragraph"
+  const collage = useCollage(cle, lectureSeule, unTexte && texte === "")
   const idDeLaListe = useId()
+  const idDesChoix = useId()
   const citation = useCitation(cle, texte)
+  const choix = useChoixParBarre(texte, (un) => gestes.remplacerParChoix(cle, un))
+  // Le focus du champ choisit ce que montre la copie d'une liste : son texte brut au focus, son rendu au repos (E11-S06).
+  const [auFocus, setAuFocus] = useState(false)
+  const enListe = genre === "list" || genre === "checklist"
+  const lien = useLienAuCurseur(texte, champ, liens !== null && !lectureSeule, enListe)
+  const idDuLien = useId()
+  const idDuRefus = useId()
+  // Le panneau « Lien » cède la place sous le champ aux listes de « / » et de « @ » (AC-b1).
+  const panneau = liens && !lectureSeule && lien.ouvert && !choix.ouverte && !citation.ouverte ? { liens, ouvert: lien.ouvert } : null
+  const decrit = [decritPar, panneau ? idDuLien : undefined, lien.perdu ? idDuRefus : undefined].filter(Boolean).join(" ") || undefined
+  // La liste ouverte sous le champ, « / » ou « @ », que le champ désigne (`aria-activedescendant`).
+  const liste = choix.ouverte
+    ? { id: idDesChoix, active: choix.retenus.length > 0 ? idDOption(idDesChoix, choix.actif) : undefined }
+    : citation.ouverte
+      ? { id: idDeLaListe, active: citation.aDesOptions ? idDOption(idDeLaListe, citation.actif) : undefined }
+      : null
 
   // La hauteur suit le texte, à chaque valeur reçue (frappe, annulation) et à chaque forme (un titre change
   // de corps) : `auto` d'abord, sinon `scrollHeight` ne redescend jamais sous la hauteur déjà posée.
@@ -184,16 +214,18 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
 
   const auRepos = liens !== null && aDesLiens(texte)
   const toucher = (evenement: KeyboardEvent<HTMLTextAreaElement>) => {
+    collage.noterLaTouche(evenement)
     if (menuOuvert && !MODIFICATEURS.has(evenement.key)) {
       gestes.fermerLeMenu()
       // Échap ferme le menu, rien d'autre : le focus reste dans le texte (AC-28).
       if (evenement.key === "Escape") return evenement.preventDefault()
     }
-    if (!citation.toucher(evenement)) gestes.toucher(cle, evenement)
+    if (!choix.toucher(evenement) && !lien.toucher(evenement, panneau !== null) && !citation.toucher(evenement)) gestes.toucher(cle, evenement)
   }
   const selectionner = (evenement: SyntheticEvent<HTMLTextAreaElement>) => {
     const totale = toutSelectionne(evenement.currentTarget)
     if (totale || menuOuvert) gestes.selectionner(cle, totale)
+    lien.suivre(evenement.currentTarget.value, evenement.currentTarget.selectionStart, evenement.currentTarget.selectionEnd)
   }
   // ⌘A sur un texte déjà tout sélectionné (après Échap) ne change pas la sélection : `onSelect` se tait, la touche rouvre.
   const toutSelectionner = (evenement: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -202,42 +234,57 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
 
   return (
     <>
-      {genre === "checklist" && <Cases cle={cle} lignes={texte.split("\n")} cases={cases} lectureSeule={lectureSeule} />}
-      {/* Le champ et son rendu au repos dans la même case (`oto-block-pile`), toujours : le champ n'est jamais remonté. Un `span` : la pile vit aussi dans le `h2` d'un titre. */}
-      <span className="oto-block-pile">
+      {/* Le champ et son rendu au repos dans la même case (`oto-block-pile`), toujours : le champ n'est jamais remonté. Un `span` : la pile vit aussi dans le `h2` d'un titre. Un clic sur un lien rendu y est lu par délégation (AC-b2). */}
+      <span className="oto-block-pile" onClickCapture={lien.cliquer}>
+        {/* La copie d'une liste précède le champ : ses cases, à gauche du texte, viennent avant lui au clavier. */}
+        {enListe && <ElementsDeListe cle={cle} texte={texte} genre={genre} debut={debut} cases={cases} lectureSeule={lectureSeule} rendu={auRepos && !auFocus ? liens : null} />}
         <textarea
           ref={champ}
           rows={lignesEstimees(texte)}
           data-champ=""
           data-kind={genre}
-          // Présent ou absent, jamais « false » : le design system lit `[data-ordered]`, qui matche toute valeur.
-          data-ordered={debut !== null ? "true" : undefined}
           // Son rendu est posé dessus : hors du focus, le texte brut se tait (`editeur.css`).
           data-rendu={auRepos ? "" : undefined}
           aria-label={nom}
-          aria-describedby={decritPar}
-          aria-autocomplete={citation.ouverte ? "list" : undefined}
-          aria-controls={citation.ouverte ? idDeLaListe : undefined}
-          aria-activedescendant={citation.ouverte && citation.aDesOptions ? idDOption(idDeLaListe, citation.actif) : undefined}
+          aria-describedby={decrit}
+          aria-autocomplete={liste ? "list" : undefined}
+          aria-controls={liste?.id}
+          aria-activedescendant={liste?.active}
           readOnly={lectureSeule}
           value={texte}
           onChange={(evenement) => {
-            gestes.saisir(cle, evenement.target.value)
+            gestes.saisir(cle, evenement.target.value, choix.suivre(texte, evenement.target.value, unTexte))
             citation.suivre(evenement.target.value, evenement.target.selectionStart)
+            lien.suivre(evenement.target.value, evenement.target.selectionStart, evenement.target.selectionEnd)
           }}
           onKeyDown={toucher}
+          onPaste={collage.coller}
+          onDragOver={collage.survoler}
+          onDrop={collage.deposer}
           onSelect={selectionner}
           onKeyUp={toutSelectionner}
           onBlur={(evenement) => {
+            setAuFocus(false)
+            choix.fermer()
             citation.fermer()
+            lien.quitter(evenement)
             gestes.quitterLeChamp(cle, evenement)
           }}
-          onFocus={lectureSeule ? gestes.annoncerLeConflit : undefined}
+          onFocus={() => {
+            setAuFocus(true)
+            if (lectureSeule) gestes.annoncerLeConflit()
+          }}
           className="oto-block-field field-sizing-content focus-visible:outline-hidden!"
         />
-        {auRepos && <TexteAuRepos texte={texte} genre={genre} liens={liens} />}
+        {auRepos && !enListe && <TexteAuRepos texte={texte} genre={genre} liens={liens} />}
       </span>
-      {debut !== null && <Numeros lignes={texte.split("\n").length} debut={debut} />}
+      {panneau && <PanneauDuLien key={`${panneau.ouvert.lu.debut}:${panneau.ouvert.source}`} cle={cle} texte={texte} {...panneau} idDescription={idDuLien} lien={lien} />}
+      {lien.perdu && (
+        <p id={idDuRefus} role="alert" className="oto-field-error">
+          {LIEN_DU_BLOC.change}
+        </p>
+      )}
+      {choix.ouverte && <ListeDesChoix id={idDesChoix} retenus={choix.retenus} actif={choix.actif} prendre={choix.prendre} />}
       {citation.ouverte && <ListeACiter id={idDeLaListe} resultat={citation.resultat} actif={citation.actif} choisir={citation.choisir} />}
     </>
   )

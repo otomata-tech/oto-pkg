@@ -212,6 +212,26 @@ describe.skipIf(!sqlConfigured)(
           ...Array.from({ length: 3 }, () => where("code")),
         ])
       })
+
+      it("should refuse a call fence in a cell, a toggle summary or body, or a sub-item, and count a step at the first level (E10-S04, AC-a5)", async () => {
+        const call = '```call\nmail.send_draft {"id": "<id>"}\n```'
+        const { refusals } = await check(
+          stored([
+            heading("Étapes"),
+            { type: "simple_table", text: null, data: { columns: ["a"], rows: [['```call mail.send_draft {"id": "<id>"}']] } },
+            { type: "toggle", text: `Voir :\n${call}`, data: { summary: "Détail" } },
+            { type: "toggle", text: "Rien.", data: { summary: "```call x" } },
+            { type: "list", text: null, data: { items: [{ text: "Prépare.", children: { items: [call] } }] } },
+            // Une étape reste un élément de premier niveau : sous-éléments non comptés.
+            { type: "list", text: null, data: { items: ["a", { text: "b", children: { items: ["b1", "b2"] } }], ordered: true } },
+            callBlock("x.after"),
+          ]),
+        )
+        expect(refusals.map((refusal) => refusal.message.split(":")[0])).toEqual([
+          ...Array.from({ length: 4 }, () => "section « Étapes », text block"),
+          "section « Étapes », call block 1 (step 2)",
+        ])
+      })
     })
 
     describe("checkProcedureBlocks — hostile blocks (security-patterns.md § Validation des inputs)", () => {

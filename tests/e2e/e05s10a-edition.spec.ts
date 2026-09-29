@@ -99,8 +99,11 @@ test.describe("édition sans friction (E05-S10, partie a)", () => {
         // Deux blocs vides de suite (AC-a4), puis « @ » dans le second (AC-a9).
         const horodatage = new Date().toISOString().slice(11, 19)
         await page.locator(".oto-block-row").filter({ has: poignee }).hover()
+        // Le « + » ouvre le choix du bloc (E10-S06, AC-a1) : un Texte.
         await page.getByRole("button", { name: `Ajouter un bloc après — ${mots}` }).click()
+        await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
         await page.getByRole("button", { name: "Ajouter un bloc après — bloc vide" }).click()
+        await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
         await expect(page.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toHaveCount(2)
         await page.keyboard.type(`Voir @qualif`)
         const option = page.getByRole("option", { name: new RegExp(PROCEDURE) })

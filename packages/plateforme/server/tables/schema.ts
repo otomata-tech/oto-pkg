@@ -36,12 +36,25 @@ const FORMATS: Partial<Record<TableColumn["type"], string>> = {
   bool: "true or false",
 }
 
+/**
+ * Ce qu'exige une colonne (E11-S01, AC-b6) : la clé et la colonne d'état, requises (ni `clear` ni
+ * `verified_empty`, `reservedProblem`) ; une colonne requise, une valeur ou `verified_empty`, sauf
+ * `allow_verified_empty: false` ; une colonne facultative qui refuse `verified_empty`.
+ */
+function requirement(column: TableColumn, reserved: boolean): string | null {
+  const strict = column.allow_verified_empty === false
+  if (reserved) return "required"
+  if (column.required) return strict ? "required (a value; verified_empty not allowed)" : "required (a value or verified_empty)"
+  return strict ? "verified_empty not allowed" : null
+}
+
 function columnLine(column: TableColumn, header: TableHeader): string {
   const key = column.name === header.key
   const type = column.type === "enum" ? `enum (${(column.options ?? []).join(" | ")})` : column.type
   const format = FORMATS[column.type]
   const parts = [format ? `${type} (${format})` : type]
-  if (column.required || key) parts.push("required")
+  const required = requirement(column, key || column.name === header.lifecycle?.column)
+  if (required !== null) parts.push(required)
   // La longueur que `valueProblem` accepte : une adresse email ou une URL garde son plafond (N30).
   if (column.max_length !== undefined) parts.push(`${formatCount(maxLengthOf(column) ?? column.max_length)} characters at most`)
   return `- ${column.name}: ${parts.join(", ")}${key ? " (key)" : ""}`
@@ -60,13 +73,34 @@ function queueLines(header: TableHeader, functions: ReadonlySet<string>): string
   const { review } = lifecycle
   if (review) {
     lines.push(`Review: rows « ${review.state} » wait for a person, who approves them (« ${review.approve} ») or rejects them (« ${review.reject} »).`)
+    // E11-S01, AC-e4 : la revue confiée aussi à l'assistant, qui pose la décision par l'une des deux fonctions.
+    if (review.agents_may_decide) lines.push(`An assistant may also decide: set « ${review.approve} » or « ${review.reject} » with table.release or table.write.`)
   }
   return lines
 }
 
 /**
+ * La ligne d'écriture (E07-S02 ; E11-S01, AC-f4) : la forme de la preuve, exigée seulement dans un tableau
+ * qui la déclare (`proof`, fiche D133).
+ */
+function writeLine(header: TableHeader): string {
+  if (!header.proof) {
+    return "Write with table.write: rows [{key, revision?, set: {column: value | {value, comment | link}}, clear: [column], verified_empty: [{column, reason}]}]; a bare value equal to the stored one is ignored; null is refused; unnamed columns stay unchanged."
+  }
+  const state = header.lifecycle ? `, except the state column ${header.lifecycle.column}, set bare within its allowed changes` : ""
+  return `Write with table.write: rows [{key, revision?, set: {column: {value, comment | link}}, clear: [column], verified_empty: [{column, reason}]}]; a bare value equal to the stored one is ignored; any new value needs its proof (comment or link)${state}; null is refused; unnamed columns stay unchanged.`
+}
+
+/** La ligne de la preuve (E11-S01, AC-f4), après la fermeture. */
+function proofLine(header: TableHeader): string {
+  return header.proof
+    ? "Proof: required — every new value needs {value, comment | link}; a new value without it refuses the whole call."
+    : "Proof: optional — a bare value is written as it is; {value, comment | link} keeps where it comes from."
+}
+
+/**
  * La description d'un tableau (AC5, AC18) : clé, colonnes, file de travail et revue, écriture si
- * `table.write` est au catalogue, fermeture ; et ses données en champs. `table.schema` y ajoute son
+ * `table.write` est au catalogue, fermeture, preuve ; et ses données en champs. `table.schema` y ajoute son
  * en-tête et un exemple, `read` le nombre de lignes et le renvoi vers `table.rows`.
  */
 function describeTable(table: Pick<LoadedTable, "node" | "header">, facts: TableFacts): { lines: string[]; data: Record<string, unknown> } {
@@ -76,12 +110,9 @@ function describeTable(table: Pick<LoadedTable, "node" | "header">, facts: Table
     "Columns:",
     ...header.columns.map((column) => columnLine(column, header)),
     ...queueLines(header, facts.functions),
-    ...(facts.functions.has("table.write")
-      ? [
-          `Write with table.write: rows [{key, revision?, set: {column: {value, comment | link}}, clear: [column], verified_empty: [{column, reason}]}]; a bare value equal to the stored one is ignored; any new value needs its proof (comment or link)${header.lifecycle ? `, except the state column ${header.lifecycle.column}, set bare within its allowed changes` : ""}; null is refused; unnamed columns stay unchanged.`,
-        ]
-      : []),
+    ...(facts.functions.has("table.write") ? [writeLine(header)] : []),
     header.closed ? "Closed: yes — only existing rows can be written." : "Closed: no — a new key creates a row.",
+    proofLine(header),
   ]
   const data = {
     table: node.path,
@@ -90,6 +121,7 @@ function describeTable(table: Pick<LoadedTable, "node" | "header">, facts: Table
     columns: header.columns,
     ...(header.lifecycle ? { lifecycle: header.lifecycle } : {}),
     closed: header.closed,
+    proof: header.proof,
     rows_count: facts.rows,
   }
   return { lines, data }
@@ -128,11 +160,12 @@ async function readSchema(context: FunctionContext, args: { table: string }): Pr
   const level = ACCESS_LEVEL_NAMES[table.level]
   const text = [
     `Table ${node.path}: ${node.title}. ${node.summary}`,
-    `Owner: ${owner}. Your access: ${level}. Rows: ${formatCount(rows)}.`,
+    // E11-S01, AC-d1 : la révision publiée, celle que `write` attend pour changer l'en-tête (HN-E11S01-9).
+    `Owner: ${owner}. Your access: ${level}. Rows: ${formatCount(rows)}. Revision: ${node.revision} (the base_revision of ${context.identity.org.prefix}_write to change the header).`,
     ...described.lines,
     `Example: ${context.identity.org.prefix}_call {"function": "table.rows", "arguments": ${JSON.stringify(exampleArguments(table))}}`,
   ].join("\n")
-  return tableOutput(context, table, { text, data: { ...described.data, your_level: level } })
+  return tableOutput(context, table, { text, data: { ...described.data, revision: node.revision, your_level: level } })
 }
 
 /** Ce que `read {draft: true}` lit du brouillon d'un tableau (E07-S04, AC12), décidé au niveau 2 par `read`. */

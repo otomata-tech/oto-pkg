@@ -1,20 +1,14 @@
 // @vitest-environment node
 // Connecteurs vus par les hosts (E04-S01, AC21, AC22) : `tools/list` et le bloc `team` de `context`
 // par InMemoryTransport, sessions câblées comme la route (`tests/helpers/mcp.ts`), organisations et
-// personnes jetables. Les textes servis au modèle se comparent mot pour mot (H04, P14). Marqué Supabase :
-// la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, l'écriture de mise en place
-// passe par la connexion d'administration, plus par PostgREST.
+// personnes jetables. Les textes servis au modèle se comparent mot pour mot (H04, P14). Suite portable
+// (E11-S14) : personnes sans compte, jetons signés localement (`tests/helpers/session-locale.ts`) ;
+// l'écriture de mise en place passe par la connexion d'administration.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { connectMcp } from "../helpers/mcp"
-import {
-  createFixtures,
-  SKIP_REASON,
-  supabaseConfigured,
-  type Fixtures,
-  type ReferenceOrg,
-  type ReferencePerson,
-} from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import type { ReferencePerson } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type SqlReferenceOrg, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -30,15 +24,13 @@ const ORG_HEADER = "Connectors (when no team of yours runs the call):"
 
 type Person = { id: string; email: string; accessToken: string }
 
-const configured = supabaseConfigured && sqlConfigured
-
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? "connectors through the MCP" : `connectors through the MCP (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable("connectors through the MCP"), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
-    let o: ReferenceOrg
+    let o: SqlReferenceOrg
     const people = new Map<ReferencePerson, Person>()
 
     function person(who: ReferencePerson): Person {
@@ -66,7 +58,7 @@ describe.skipIf(!configured || privatePending)(
     }
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       o = await fx.buildReferenceOrg()
       await fx.addActivation(o.org.id, "mail")

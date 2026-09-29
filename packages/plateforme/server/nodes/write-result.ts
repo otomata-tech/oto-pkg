@@ -26,6 +26,8 @@ export type Saved = {
   touched: Touched[]
   header: { title?: string; summary?: string; kind?: string } | null
   headerChange?: string
+  /** Les constructions gardées en texte par le mode tolérant (E10-S01, AC-a2) ; 0 en mode strict. */
+  keptAsText?: number
 }
 
 /**
@@ -105,8 +107,9 @@ function publishedLines(input: ResultInput, published: PublishResult): string[] 
   const table = published.table?.summary ? `: ${published.table.summary}` : ""
   return [
     node.kind === "table" ? `Published ${node.path} revision ${published.revision}${table}.` : `Published ${node.path} revision ${published.revision} (${counts}).`,
+    // Seules les conversations qui ont reçu ce Contexte périment (E11-S03, AC-a7), celle-ci comprise si c'est le cas.
     ...(published.rulesChanged
-      ? [`The organisation's rules changed: every open ctx is now invalid; call ${prefix}_context again before any other ${prefix}_ tool.`]
+      ? [`Context ${node.path} changed: every conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool, this one included if it was.`]
       : []),
     // Ce que la publication signale (E03-S07 AC2, AC12) : 20 lignes au plus, puis leur nombre restant.
     ...(published.warnings.length > 0 ? ["Warnings:", boundedList(published.warnings.map((warning) => `- ${warning}`), "\n")] : []),
@@ -167,5 +170,7 @@ export function savedResult(input: ResultInput): ToolOutput {
         ...(published.table ? { warnings: published.table.warnings } : {}),
       }
     : { path: node.path, revision: node.revision, status: node.status, has_draft: true, touched, blocks_total: saved?.blocks.length ?? 0, draft_stamp: saved?.stamp ?? null }
-  return { text: lines.join("\n"), data, nextActions: [`${prefix}_read`], target: node.path, teamId: input.teamId }
+  // Le compte du mode tolérant (E10-S01, AC-a2), pour l'écran seul : en mode strict, les champs de `write` ne changent pas.
+  const kept = saved?.keptAsText ? { kept_as_text: saved.keptAsText } : {}
+  return { text: lines.join("\n"), data: { ...data, ...kept }, nextActions: [`${prefix}_read`], target: node.path, teamId: input.teamId }
 }

@@ -30,7 +30,7 @@ const USES: Record<Op, readonly Field[]> = {
   replace_block: ["block", "text", "revision", "input"],
   insert_after: ["block", "text", "input"],
   delete_block: ["block", "revision"],
-  move_block: ["block", "after_block", "revision"],
+  move_block: ["block", "after_block", "section", "revision"],
 }
 
 const SECTION_OP_NAMES: ReadonlySet<string> = new Set(SECTION_OPS)
@@ -60,6 +60,8 @@ function checkFields(op: WriteOpBody): void {
   const unused = FIELDS.find((field) => op[field] !== undefined && !USES[op.op].includes(field))
   if (unused) throw new OpProblem("invalid_arguments", `${unused} is not used by ${op.op}; remove it.`)
   if (op.text !== undefined && op.input !== undefined) throw new OpProblem("invalid_arguments", "give text or input, not both.")
+  // `move_block` (E11-S03, AC-c1) : après un bloc, ou à la fin d'une section ; les deux destinations ensemble se contredisent.
+  if (op.after_block !== undefined && op.section !== undefined) throw new OpProblem("invalid_arguments", "give after_block or section, not both.")
   if (USES[op.op].includes("text") && op.text === undefined && op.input === undefined) throw new OpProblem("invalid_arguments", "text is required.")
   if (op.op === "replace_text" && op.find === undefined) throw new OpProblem("invalid_arguments", "find is required (the exact words to replace).")
   if (op.text !== undefined && charCount(op.text) > OP_TEXT_MAX) {
@@ -105,17 +107,25 @@ function checkBounds(before: readonly WorkBlock[], after: readonly WorkBlock[], 
  * blocs gardés gardent leur id ; un bloc neuf n'a ni id ni position ; un bloc déplacé perd sa position
  * (`placeBlocks` les pose). Lève les refus des AC, préfixés de « Op <rang> (…): » et finis par
  * « Nothing was written. » : rien n'est écrit. `revision`, celle du nœud, que porte un refus de révision
- * de bloc (`details.revision`, AC37).
+ * de bloc (`details.revision`, AC37). `tolerant` (E10-S01, AC-a2) : les textes se lisent en mode tolérant, et
+ * `keptAsText` compte ce qu'ils ont gardé en texte (0 sans lui).
  */
 export function applyOps(
   blocks: readonly DocBlock[],
   ops: readonly WriteOpBody[],
-  options: { path: string; revision?: number },
-): { blocks: WorkBlock[]; touched: Touched[] } {
+  options: { path: string; revision?: number; tolerant?: boolean },
+): { blocks: WorkBlock[]; touched: Touched[]; keptAsText: number } {
   if (ops.length > OPS_MAX) {
     throw new PlatformError("invalid_arguments", `${formatCount(ops.length)} operations; ${OPS_MAX} at most per call: split them over several calls.`)
   }
-  const state: OpState = { blocks: blocks.map((block, uid) => ({ ...block, uid })), path: options.path, nextUid: blocks.length, revision: options.revision }
+  const state: OpState = {
+    blocks: blocks.map((block, uid) => ({ ...block, uid })),
+    path: options.path,
+    nextUid: blocks.length,
+    revision: options.revision,
+    tolerant: options.tolerant,
+    keptAsText: 0,
+  }
   const touched: Touched[] = []
   ops.forEach((op, index) => {
     try {
@@ -129,5 +139,5 @@ export function applyOps(
       throw new PlatformError(error.code, error.bare ? error.message : `${prefixOf(index + 1, op)}${error.message} Nothing was written.`, error.details)
     }
   })
-  return { blocks: state.blocks, touched }
+  return { blocks: state.blocks, touched, keptAsText: state.keptAsText ?? 0 }
 }

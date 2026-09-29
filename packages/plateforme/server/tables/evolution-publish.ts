@@ -254,6 +254,7 @@ function publishedChanges(step: TableStep, erased: ReadonlyMap<string, number>):
     ...(diff.key ? [`key set to ${diff.key.after}`] : []),
     ...(diff.lifecycle ? [diff.lifecycle.before ? "lifecycle replaced" : "lifecycle set"] : []),
     ...(diff.closed === null ? [] : [diff.closed ? "closed" : "reopened"]),
+    ...(diff.proof === null ? [] : [diff.proof ? "proof required" : "proof optional"]),
   ]
 }
 

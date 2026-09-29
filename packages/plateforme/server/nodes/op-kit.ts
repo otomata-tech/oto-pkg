@@ -16,9 +16,10 @@ export type WorkBlock = DocBlock & { uid: number }
 
 /**
  * Le document pendant les opérations d'un appel ; `nextUid` numérote les blocs neufs ; `revision`, celle
- * du nœud, que porte un refus de révision (`details.revision`, AC37).
+ * du nœud, que porte un refus de révision (`details.revision`, AC37). `tolerant` : le texte des opérations se
+ * lit en mode tolérant, et `keptAsText` compte ce qu'il a gardé en texte (E10-S01, AC-a2 ; corps de l'API seul).
  */
-export type OpState = { blocks: WorkBlock[]; path: string; nextUid: number; revision?: number }
+export type OpState = { blocks: WorkBlock[]; path: string; nextUid: number; revision?: number; tolerant?: boolean; keptAsText?: number }
 
 /**
  * Ce qu'une opération a touché : les blocs qu'elle a écrits (`uid`), et son fragment de réponse,
@@ -59,10 +60,14 @@ export function newBlock(state: OpState, input: BlockInput): WorkBlock {
   }
 }
 
-/** Les blocs d'un texte d'opération (`parseMarkdown`), ou le refus de l'analyse (AC3). */
-export function parseOpText(text: string): { blocks: BlockInput[]; lines: number[] } {
-  const parsed = parseMarkdown(text)
+/**
+ * Les blocs d'un texte d'opération (`parseMarkdown`), ou le refus de l'analyse (AC3) ; au mode de l'état
+ * (E10-S01, AC-a2), dont le compte des constructions gardées en texte avance.
+ */
+export function parseOpText(text: string, state: Pick<OpState, "tolerant" | "keptAsText">): { blocks: BlockInput[]; lines: number[] } {
+  const parsed = parseMarkdown(text, { tolerant: state.tolerant === true })
   if ("problem" in parsed) throw new OpProblem("invalid_arguments", parsed.problem)
+  if (parsed.keptAsText) state.keptAsText = (state.keptAsText ?? 0) + parsed.keptAsText
   return parsed
 }
 

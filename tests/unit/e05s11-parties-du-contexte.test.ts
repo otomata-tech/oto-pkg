@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest"
 import { contextParts, type PartFacts } from "../../packages/plateforme/server/context/blocks/contexts"
 import { renderContext, type ContextBlock } from "../../packages/plateforme/server/context/engine"
 import type { Identity } from "../../packages/plateforme/server/identity"
-import { ancreDeLaPartie, cheminDuContexte, partiesDuContexte } from "../../packages/plateforme/ui/contexte/parties-du-contexte"
+import { ancreDeLaPartie, cheminDuContexte, morceauxDuContexte, partiesDuContexte } from "../../packages/plateforme/ui/contexte/parties-du-contexte"
 
 const lignes = (prefixe: string, nombre: number) => Array.from({ length: nombre }, (_, rang) => `${prefixe} ligne ${rang}`).join("\n")
 
@@ -66,7 +66,10 @@ describe("partiesDuContexte (AC-13, parity with renderContext)", () => {
       ["procedures", "omitted"],
     ])
     expect(parties[1].texte).toBe("Read it with demo_read.")
-    expect(blocs[2].text.startsWith(parties[2].texte)).toBe(true)
+    // Une partie de Contexte coupée par le plafond finit par son pointeur (E11-S03, AC-b4).
+    const pointeur = '\nThis context is cut: everything served together exceeds 4,000 characters. Read the rest: demo_read {"path": "contexte"}.'
+    expect(parties[2].texte.endsWith(pointeur)).toBe(true)
+    expect(blocs[2].text.startsWith(parties[2].texte.slice(0, -pointeur.length))).toBe(true)
     expect(parties[3].texte).toBe("")
     expect(parties[4].texte).toBe("")
     expect(reste).toBe("[Context budget reached. Omitted: contexte (cut), news, procedures. Use demo_find or demo_read for more.]")
@@ -119,6 +122,21 @@ describe("partiesDuContexte, the head of a part (E05-S12, AC-4, AC-7)", () => {
     expect(report[1].head).toBe(report[1].chars)
     expect(parties[1].tete).toBe(parties[1].texte)
     expect(parties[1].suite).toBe("")
+  })
+
+  // E11-S03 (AC-b2, AC-b4, AC-b5) : les deux pointeurs du service, reconnus par leurs constantes, jamais montrés bruts.
+  it("should read the pointer of stopped lists and the pointer of the cap as the end of the part", () => {
+    const listes = contextParts(LEA, FAITS, new Map([["ventes/contexte", { text: "Tutoie les clients.", listsCut: true }]]))
+    const arretees = confronter([{ name: "code", text: "ctx: XXXX-XXXX" }, ...listes], 35_000).parties.find((partie) => partie.name === "ventes/contexte")
+    const longues = contextParts(LEA, FAITS, new Map([["contexte", { text: lignes("Règle", 400), listsCut: false }]]))
+    const coupee = confronter([{ name: "code", text: "ctx: XXXX-XXXX" }, ...longues], 3_000).parties.find((partie) => partie.name === "contexte")
+    expect(coupee?.status).toBe("cut")
+    expect(coupee?.suite.split("\n").at(-1)).toBe('This context is cut: everything served together exceeds 3,000 characters. Read the rest: demo_read {"path": "contexte"}.')
+    for (const partie of [arretees, coupee]) {
+      const morceaux = morceauxDuContexte(partie?.suite ?? "")
+      expect(morceaux.at(-1)).toEqual({ genre: "phrase", phrase: "suite" })
+      expect(JSON.stringify(morceaux)).not.toContain("Read the rest")
+    }
   })
 
   it("should read a report without head (before E05-S12) as a part without head", () => {

@@ -210,14 +210,20 @@ export function matchesRow(cells: ReadonlyMap<string, CellValue>, clauses: reado
   return clauses.every((clause) => matchesClause(cells, clause))
 }
 
+/** Séparateur des cellules cherchées : ni lettre ni chiffre, aucun mot de `queryWords` ne l'enjambe. */
+const CELL_SEPARATOR = "\n"
+
 /**
- * `q` (AC10) : sous-chaîne sans casse ni accent dans une colonne `text`, `email`, `url` ou `enum`, ou
- * dans la clé ; `normalized` est déjà passé par `normalizeTitle`.
+ * `q` (AC10 ; E11-S01, AC-c1) : chaque mot (`queryWords`) se trouve, sans casse ni accent, dans l'une des
+ * colonnes `text`, `email`, `url` ou `enum` ou dans la clé, dans n'importe quel ordre, au besoin dans des
+ * cellules différentes. Chaque cellule est normalisée une fois par ligne (coût borné, § Sécurité de la story).
  */
-export function matchesQuery(cells: ReadonlyMap<string, CellValue>, header: TableHeader, normalized: string): boolean {
-  return header.columns.some((column) => {
-    if (!TEXT_TYPES.includes(column.type) && column.name !== header.key) return false
+export function matchesQuery(cells: ReadonlyMap<string, CellValue>, header: TableHeader, words: readonly string[]): boolean {
+  const searched = header.columns.flatMap((column) => {
+    if (!TEXT_TYPES.includes(column.type) && column.name !== header.key) return []
     const cell = cells.get(column.name)
-    return cell !== undefined && typeof cell !== "boolean" && normalizeTitle(String(cell)).includes(normalized)
+    return cell !== undefined && typeof cell !== "boolean" ? [normalizeTitle(String(cell))] : []
   })
+  const text = searched.join(CELL_SEPARATOR)
+  return words.every((word) => text.includes(word))
 }

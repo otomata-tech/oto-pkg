@@ -34,7 +34,7 @@ const RENAMED_TO = ["rename", "new_name", "renamed_to"]
 const RENAMED_FROM = "old_name"
 
 /** Les attributs d'une colonne, dans l'ordre où l'écart les nomme (AC12). */
-const ATTRIBUTES = ["type", "options", "required", "max_length"] as const
+const ATTRIBUTES = ["type", "options", "required", "allow_verified_empty", "max_length"] as const
 
 /** Le renvoi au contrat, en fin des refus d'un en-tête (AC2, AC5). */
 function contractHint(prefix: string): string {
@@ -185,6 +185,7 @@ function merge(request: Merge): { candidate: Record<string, unknown>; problems: 
     ...(key === undefined ? {} : { key }),
     ...(lifecycle === undefined ? {} : { lifecycle }),
     closed: patch.closed ?? base?.closed ?? false,
+    proof: patch.proof ?? base?.proof ?? false,
   }
   return { candidate, problems }
 }
@@ -228,7 +229,7 @@ export function currentHeader(node: NodeRow, meta: Record<string, unknown> | nul
 
 export type ColumnChange = { name: string; before: TableColumn; after: TableColumn; attributes: string[] }
 
-/** Ce qu'un en-tête change à un autre ; `closed` : la nouvelle valeur, `null` si inchangée. */
+/** Ce qu'un en-tête change à un autre ; `closed` et `proof` : la nouvelle valeur, `null` si inchangée. */
 export type HeaderDiff = {
   added: TableColumn[]
   removed: TableColumn[]
@@ -236,11 +237,14 @@ export type HeaderDiff = {
   key: { before: string | null; after: string } | null
   lifecycle: { before: TableLifecycle | null; after: TableLifecycle | null } | null
   closed: boolean | null
+  proof: boolean | null
 }
 
-/** Un attribut comparé : `required` absent vaut `false`. */
+/** Un attribut comparé : `required` absent vaut `false`, `allow_verified_empty` absent vaut `true`. */
 function attributeValue(column: TableColumn, attribute: (typeof ATTRIBUTES)[number]): string {
-  return JSON.stringify(attribute === "required" ? column.required === true : (column[attribute] ?? null))
+  if (attribute === "required") return JSON.stringify(column.required === true)
+  if (attribute === "allow_verified_empty") return JSON.stringify(column.allow_verified_empty !== false)
+  return JSON.stringify(column[attribute] ?? null)
 }
 
 /**
@@ -263,6 +267,7 @@ export function diffTableHeaders(before: TableHeader | null, after: TableHeader)
     key: before?.key === after.key ? null : { before: before?.key ?? null, after: after.key },
     lifecycle: JSON.stringify(lifecycle.before) === JSON.stringify(lifecycle.after) ? null : lifecycle,
     closed: (before?.closed ?? false) === after.closed ? null : after.closed,
+    proof: (before?.proof ?? false) === after.proof ? null : after.proof,
   }
 }
 
@@ -275,6 +280,7 @@ function changeList(diff: HeaderDiff, attributes: boolean): string[] {
     ...(diff.key ? [`set key ${diff.key.after}`] : []),
     ...(diff.lifecycle ? [diff.lifecycle.before ? "replace lifecycle" : "set lifecycle"] : []),
     ...(diff.closed === null ? [] : [diff.closed ? "close" : "reopen"]),
+    ...(diff.proof === null ? [] : [diff.proof ? "require proof" : "stop requiring proof"]),
   ]
 }
 

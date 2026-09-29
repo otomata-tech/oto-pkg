@@ -65,6 +65,13 @@ describe("contrôle avant envoi (AC13)", () => {
     ["a heading of 201 characters", titre("x".repeat(201)), MESSAGES_DU_BLOC.titreLong],
     ["a text of 100 001 characters", { type: "paragraph", text: "x".repeat(100_001), data: {}, key: null }, MESSAGES_DU_BLOC.tropLong],
     ["a list of 501 items", { type: "list", text: null, data: { items: Array.from({ length: 501 }, () => "x") }, key: null }, MESSAGES_DU_BLOC.listeLongue],
+    // E10-S04 (AC-b1, AC-b2) : les sous-éléments comptent ; un quatrième niveau frappé est refusé.
+    ["a list of 501 items, sub-items included", { type: "list", text: null, data: { items: [{ text: "a", children: { items: Array.from({ length: 500 }, () => "x") } }] }, key: null }, MESSAGES_DU_BLOC.listeLongue],
+    [
+      "a list typed four levels deep",
+      { type: "list", text: null, data: { items: [{ text: "a", children: { items: [{ text: "b", children: { items: [{ text: "c", children: { items: ["d"] } }] } }] } }] }, key: null },
+      MESSAGES_DU_BLOC.troisNiveaux,
+    ],
   ])("should refuse %s before sending", (_cas, bloc, message) => {
     expect(controler(bloc)).toEqual({ message })
   })
@@ -73,6 +80,37 @@ describe("contrôle avant envoi (AC13)", () => {
     expect(estVide({ type: "paragraph", text: " \n ", data: {}, key: null })).toBe(true)
     expect(estVide({ type: "list", text: null, data: { items: ["", " "] }, key: null })).toBe(true)
     expect(estVide(titre("Objet"))).toBe(false)
+  })
+})
+
+// E10-S06 : un séparateur n'est jamais vide ; un tableau et un repli, contrôlés avant le schéma, partent sans blanc de bord.
+describe("contrôle d'un tableau, d'un repli et d'un séparateur (E10-S06, AC-a4, AC-b1, AC-b4)", () => {
+  const tableau = (columns: string[], rows: string[][]): BlocEdite => ({ type: "simple_table", text: null, data: { columns, rows }, key: null })
+  const repli = (summary: string, text: string): BlocEdite => ({ type: "toggle", text, data: { summary }, key: null })
+
+  it("should never see a divider as empty, and see a table of blank cells or a toggle without text as empty", () => {
+    expect(estVide({ type: "divider", text: null, data: {}, key: null })).toBe(false)
+    expect(estVide(tableau(["", " "], [["", ""]]))).toBe(true)
+    expect(estVide(tableau(["", "x"], [["", ""]]))).toBe(false)
+    expect(estVide(repli(" ", ""))).toBe(true)
+  })
+
+  it.each<[string, BlocEdite, string]>([
+    ["a table of 21 columns forced in the model", tableau(Array.from({ length: 21 }, () => "x"), []), MESSAGES_DU_BLOC.colonnes],
+    ["a table of 201 rows", tableau(["x"], Array.from({ length: 201 }, () => ["y"])), MESSAGES_DU_BLOC.rangees],
+    ["a toggle without summary", repli("  ", "Le corps"), MESSAGES_DU_BLOC.resumeVide],
+    ["a toggle summary of 201 characters", repli("é".repeat(201), ""), MESSAGES_DU_BLOC.resumeLong],
+    ["a toggle holding a toggle", repli("Détails", "avant\n  <details open>\naprès"), MESSAGES_DU_BLOC.repliDansRepli],
+    ["a toggle holding a closing tag", repli("Détails", "</details>"), MESSAGES_DU_BLOC.repliDansRepli],
+  ])("should refuse %s before sending", (_cas, bloc, message) => {
+    expect(controler(bloc)).toEqual({ message })
+  })
+
+  it("should send the cells without edge blanks and every typed | escaped, the summary trimmed and the body without edge blank lines", () => {
+    expect(MESSAGES_DU_BLOC.colonnes).toBe("20 colonnes au plus.")
+    expect(MESSAGES_DU_BLOC.rangees).toBe("200 rangées au plus.")
+    expect(entree(tableau([" Nom ", "A|B"], [["x\\|y ", ""]]))).toEqual({ type: "simple_table", data: { columns: ["Nom", "A\\|B"], rows: [["x\\|y", ""]] } })
+    expect(entree(repli("  Détails ", "\n\nLe corps\n \n"))).toEqual({ type: "toggle", text: "Le corps", data: { summary: "Détails" } })
   })
 })
 

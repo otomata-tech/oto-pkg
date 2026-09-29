@@ -15,13 +15,17 @@
 // E05-S10 : chaque geste de la personne est signalé à la file (`frapper`), d'où part la publication seule
 // (AC-a6) ; un bloc neuf vide reste quand le focus le quitte, pour qu'on en ajoute plusieurs de suite
 // (AC-a4) ; les gestes neufs du menu, du glisser-déposer et de « @ » vivent dans `gestes-du-menu.ts`.
+//
+// E10-S06 : le « + » insère le bloc choisi, « / » change le Texte en lui (AC-a1, AC-a2) ; un séparateur part tout de
+// suite, jamais vide (AC-a4) ; un tableau et un repli, écrits dans leurs propres champs, partent comme un texte.
 import type { FocusEvent, RefObject } from "react"
 import { EDITEUR } from "../libelles"
+import type { Tableau } from "./blocs-de-page"
 import { clavier } from "./clavier"
 import type { Gestes } from "./gestes"
 import { gestesDuMenu } from "./gestes-du-menu"
 import * as modeleDEdition from "./modele"
-import { avecTexte, formeDe, type BlocEdite, type Focus, type Rangee, type Retiree, type Suite } from "./modele"
+import { avecTexte, formeDe, type BlocEdite, type Choix, type Focus, type Rangee, type Retiree, type Suite } from "./modele"
 import { controler, estVide } from "./operations"
 import type { useEnvois } from "./use-envois"
 
@@ -125,7 +129,8 @@ function textes(etat: EtatDeLEditeur, supprimer: (cle: string, ailleurs: boolean
     annulerLeDiffere(cle)
     const rangee = trouver(cle)
     if (!rangee || envois.conflit?.cle === cle) return true
-    if (formeDe(rangee.bloc) === null) return true
+    // Un séparateur, sans forme, part quand il est neuf ou qu'il remplace un Texte (E10-S06, AC-a4).
+    if (formeDe(rangee.bloc) === null && rangee.bloc.type !== "divider") return true
     const fixe = fixes.current.get(cle)
     if (estVide(rangee.bloc) || (fixe && memeBloc(fixe, rangee.bloc))) {
       setErreur(cle, null)
@@ -160,10 +165,33 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
   }
   /** Un bloc neuf, sans `id`, après une rangée ou en tête, le focus dedans ; il part avec son texte (AC4). */
   const ajouter = (suite: (modele: Rangee[]) => Suite) => (verrouille(etat) ? undefined : appliquer(suite(modele.current)))
+  /** Un séparateur n'a pas de texte à attendre : il part tout de suite (E10-S06, AC-a4) ; un autre bloc attend sa frappe. */
+  const partirOuAttendre = (cle: string, choix: Choix) => {
+    if (choix === "separateur") envoyerLeTexte(cle)
+    else differer(cle)
+    frapper()
+  }
 
   return {
-    inserer: (cle: string) => ajouter((courant) => modeleDEdition.insererApres(courant, cle)),
+    inserer(cle: string, choix: Choix = "texte") {
+      if (verrouille(etat)) return
+      const suite = modeleDEdition.insererApres(modele.current, cle, choix)
+      appliquer(suite)
+      if (choix === "separateur" && suite.focus) partirOuAttendre(suite.focus.cle, choix)
+    },
     insererEnTete: () => ajouter((courant) => modeleDEdition.insererEnTete(courant)),
+    remplacerParChoix(cle: string, choix: Choix, colle?: Tableau) {
+      if (verrouille(etat)) return
+      annulerLeDiffere(cle)
+      appliquer(modeleDEdition.remplacerParChoix(modele.current, cle, choix, colle))
+      partirOuAttendre(cle, choix)
+    },
+    modifierLeBloc(cle: string, bloc: BlocEdite) {
+      if (verrouille(etat)) return
+      changerModele(modeleDEdition.remplacerLeBloc(modele.current, cle, bloc))
+      differer(cle)
+      frapper()
+    },
     /** « Annuler » (AC4) : le même bloc, sans `id`, après son ancien voisin ; le serveur en fabrique un nouveau. */
     retablirSuppression(retiree: Retiree) {
       const suite = modeleDEdition.retablir(modele.current, retiree)
@@ -220,11 +248,20 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
       envoyerLeTexte(cle)
       frapper()
     },
-    saisir(cle: string, texte: string) {
+    saisir(cle: string, texte: string, attendreLeChoix = false) {
       // « 1. » tapé au début d'un Texte en fait une liste numérotée (AC3).
-      appliquer(modeleDEdition.ecrireTexte(modele.current, cle, texte))
-      differer(cle)
-      frapper()
+      const suite = modeleDEdition.ecrireTexte(modele.current, cle, texte)
+      appliquer(suite)
+      const bloc = suite.modele.find((rangee) => rangee.cle === cle)?.bloc
+      // Un Texte devenu séparateur part tout de suite, le Texte neuf d'après a le focus (E10-S06, AC-a4) ; tant que la
+      // liste de « / » est ouverte, le Texte attend le choix d'un bloc : le différé ne l'écrit pas, même armé par une
+      // frappe d'avant (AC-a2, HN-E10S06-10).
+      if (bloc?.type === "divider") partirOuAttendre(cle, "separateur")
+      else if (!attendreLeChoix) partirOuAttendre(cle, "texte")
+      else {
+        annulerLeDiffere(cle)
+        frapper()
+      }
     },
     /** « Annuler les modifications du bloc » (AC2) : son dernier contenu enregistré revient. */
     annulerLesModifications(cle: string) {
@@ -239,8 +276,8 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
   }
 }
 
-/** Le menu de la poignée de la rangée est ouvert : le focus y est parti sans quitter le bloc (E05-S10, AC-a2). */
-const menuOuvert = (rangee: HTMLElement) => rangee.querySelector('[data-geste="poignee"][aria-expanded="true"]') !== null
+/** Le menu de la poignée, ou le choix du « + », est ouvert : le focus y est parti sans quitter le bloc (E05-S10, AC-a2 ; E10-S06, AC-a1). */
+const menuOuvert = (rangee: HTMLElement) => rangee.querySelector('[data-geste="poignee"][aria-expanded="true"], [data-geste="inserer"][aria-expanded="true"]') !== null
 
 /** Les sorties du focus (AC2, AC4) : d'un champ, d'une rangée. */
 function sorties(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolean, retirerSiVide: (cle: string) => void) {
@@ -310,6 +347,7 @@ export function actionsDeLEditeur(etat: EtatDeLEditeur): Omit<Gestes, "poignee" 
     ...sorties(etat, envoyerLeTexte, retirerSiVide),
     ...gestesDuMenu(etat, envoyerLeTexte),
     envoyerLeTexte,
+    annoncer: (message: string) => envois.annoncer(message),
     toucher: clavier(etat, { envoyerLeTexte, fondre, deplacer: struct.deplacer }),
     retablir: retablirSuppression,
     relancer: envois.relancer,

@@ -10,8 +10,10 @@
 // section : il la plie, comme son chevron (E05-S13, AC-12). E05-S10 (partie b) : les
 // branches ouvertes sont tenues ici, pour toutes les sections (AC-b2) ; une ligne se glisse-dépose sur une
 // autre, ou « Déplacer » de son « ⋯ » (AC-b7). Retiré : sections de partages reçus, badges d'exécutions.
+// E10-S01 : le « ⋯ » d'une ligne télécharge son contenu (`.md` ou `.csv` selon son genre), un Contexte compris, qui
+// n'a que ce geste (AC-a5, AC-b6) ; un fichier lâché sur une ligne ouvre l'import sous elle (AC-a3, AC-b1).
 import { useId, useMemo } from "react"
-import type { TreeNode } from "../../schemas"
+import type { NodeKind, TreeNode } from "../../schemas"
 import { ARBRE_VIDE, PERSO, sectionsDeLArbre, titresParChemin } from "../arbre/depuis-l-arbre"
 import type { SectionCle } from "../arbre/types"
 import { Alert } from "../ds/react/primitives"
@@ -21,7 +23,9 @@ import { ARBRE_TRONQUE } from "../noeud/libelles"
 import { LigneDuRail, versArbreDuRail } from "./arbre-du-rail"
 import { useArbreAvecLesCreations, useMenuDeCreation, type CibleDeCreation, type MenuDeCreation } from "./creation-dans-le-rail"
 import { GlisserDansLeRail, useDeplacementDansLeRail, type DeplacementDansLeRail } from "./deplacement-dans-le-rail"
+import { aplatir } from "./freres"
 import { useGestesDuRail, type GestesDuRail } from "./gestes-du-rail"
+import { DeposerSurLeRail } from "./import-de-fichier"
 import { useAdresseCourante } from "./noeud-ouvert"
 import type { EquipeDuRail } from "./types"
 import { DeplierAuClic, useDepliageDuRail, type DepliageDuRail } from "./use-depliage-du-rail"
@@ -42,9 +46,11 @@ type SectionProps = {
   gestes: GestesDuRail
   depliage: DepliageDuRail
   deplacement: DeplacementDansLeRail
+  /** Le genre de chaque nœud visible, par chemin : son téléchargement (E10-S01). */
+  genres: ReadonlyMap<string, NodeKind>
 }
 
-function SectionDuRail({ section, handle, prefixe, plis, creation, gestes, depliage, deplacement }: SectionProps) {
+function SectionDuRail({ section, handle, prefixe, plis, creation, gestes, depliage, deplacement, genres }: SectionProps) {
   const chemin = useAdresseCourante(prefixe)
   const idDeLArbre = useId()
   const cleDuPli = section.cle || "org"
@@ -57,11 +63,12 @@ function SectionDuRail({ section, handle, prefixe, plis, creation, gestes, depli
   // Chaque ligne crée sous elle, Contexte compris (fiche D110 a) ; le titre de la section, à la racine de l'espace.
   const addItems = (ligne: RailTreeNode) => creation.itemsPour({ nom: ligne.label, parent: ligne.id })
   // Le « ⋯ » d'une ligne qui se déplace (AC-b8) : « Déplacer », « Monter », « Descendre » (AC-b7, AC-b9), puis
-  // « Dupliquer » et « Supprimer » (AC-b10, AC-b11). Plus de « Renommer » : le titre s'écrit dans la page (AC-a1).
-  // Un Contexte, un espace personnel partagé : aucun « ⋯ ».
+  // « Dupliquer », le téléchargement et « Supprimer » (AC-b10, AC-b11, E10-S01). Plus de « Renommer » : le titre
+  // s'écrit dans la page (AC-a1). Un Contexte n'a que « Télécharger en .md » (HN-E10S01-24) ; une ligne sans genre
+  // connu, aucun « ⋯ ».
   const moreItems = (ligne: RailTreeNode) => {
-    if (!deplacement.arbre.mobile(ligne.id)) return undefined
-    const cible = { chemin: ligne.id, nom: ligne.label }
+    const cible = { chemin: ligne.id, nom: ligne.label, genre: genres.get(ligne.id) }
+    if (!deplacement.arbre.mobile(ligne.id)) return cible.genre === undefined ? undefined : gestes.exportPour(cible)
     return [...deplacement.itemsPour(cible), ...gestes.itemsPour(cible)]
   }
 
@@ -74,7 +81,7 @@ function SectionDuRail({ section, handle, prefixe, plis, creation, gestes, depli
   )
 }
 
-type ListeProps = Omit<SectionProps, "section" | "plis" | "creation" | "gestes" | "depliage" | "deplacement"> & {
+type ListeProps = Omit<SectionProps, "section" | "plis" | "creation" | "gestes" | "depliage" | "deplacement" | "genres"> & {
   sections: SectionCle[]
   arbre: TreeNode[]
   equipes: EquipeDuRail[]
@@ -91,23 +98,29 @@ function ListeDesSections({ sections, arbre, equipes, handle, prefixe, montrer }
   const depliage = useDepliageDuRail(chemin, prefixe)
   const deplacement = useDeplacementDansLeRail({ arbre, equipes, handle, prefixe, ouverts: depliage.ouverts })
   const gestes = useGestesDuRail({ prefixe, sousContenus: deplacement.arbre.sousContenus, precedente: deplacement.arbre.precedente })
+  const genres = useMemo(() => new Map(aplatir(arbre).map((noeud) => [noeud.path, noeud.kind])), [arbre])
+  const titres = useMemo(() => titresParChemin(arbre), [arbre])
+  const deposer = (chemin: string, fichier: File) => creation.deposer({ nom: titres.get(chemin) ?? chemin, parent: chemin }, fichier)
   return (
     <DeplierAuClic.Provider value={depliage.deplier}>
-      <GlisserDansLeRail.Provider value={deplacement.glisser}>
-        {sections.map((section) => (
-          <SectionDuRail
-            key={section.cle || "org"}
-            section={section}
-            handle={handle}
-            prefixe={prefixe}
-            plis={plis}
-            creation={creation}
-            gestes={gestes}
-            depliage={depliage}
-            deplacement={deplacement}
-          />
-        ))}
-      </GlisserDansLeRail.Provider>
+      <DeposerSurLeRail.Provider value={deposer}>
+        <GlisserDansLeRail.Provider value={deplacement.glisser}>
+          {sections.map((section) => (
+            <SectionDuRail
+              key={section.cle || "org"}
+              section={section}
+              handle={handle}
+              prefixe={prefixe}
+              plis={plis}
+              creation={creation}
+              gestes={gestes}
+              depliage={depliage}
+              deplacement={deplacement}
+              genres={genres}
+            />
+          ))}
+        </GlisserDansLeRail.Provider>
+      </DeposerSurLeRail.Provider>
       {creation.retour}
       {gestes.retour}
       {deplacement.retour}

@@ -10,23 +10,30 @@
 // absorbé, sous-sections emportées et annoncées, id gardé par la forme exacte, dans l'ordre, chaque
 // ancien une fois. Retiré : `region=` et `prepend` (→ opérations par bloc), le markdown comme source.
 import { findSections, normalizeTitle, type BlockInput, type WriteOpBody } from "../../schemas"
+import { listItemTexts } from "../../schemas/blocks"
 import { isUnknownBlock } from "../../schemas/blocks-render"
 import { boundedList } from "../errors"
 import { cut } from "../journal"
 import { blockMarkdown, blocksSize, charCount, displayRefs, formatCount, headingLevel } from "./document"
-import { HEADING_TEXT_MAX } from "./limits"
+import { HEADING_TEXT_MAX, LIST_ITEMS_MAX } from "./limits"
 import { newBlock, OpProblem, parseOpText, plural, quotedList, type OpOutcome, type OpState, type WorkBlock } from "./op-kit"
 
 type Parsed = { blocks: BlockInput[]; lines: number[] }
 
-type Located = { start: number; end: number; heading: WorkBlock; level: 1 | 2 | 3; title: string }
+type Located = { start: number; end: number; heading: WorkBlock; level: 1 | 2 | 3 | 4 | 5; title: string }
+
+/** Le niveau de titre le plus bas (E10-S04, AC-b3) : sous lui, aucun sous-niveau à proposer. */
+const DEEPEST_LEVEL = 5
 
 function headingTitles(blocks: readonly WorkBlock[]): string[] {
   return blocks.flatMap((block) => (headingLevel(block) === null ? [] : [block.text ?? ""]))
 }
 
-/** La section d'un titre (sans casse ni accent, H54) ; inconnue ou portée par deux titres : refus (N10). */
-function locate(state: OpState, title: string, role: "section" | "after"): Located {
+/**
+ * La section d'un titre (sans casse ni accent, H54) ; inconnue ou portée par deux titres : refus (N10).
+ * Exportée pour `move_block` vers une section (E11-S03, AC-c1), qui refuse comme `append`.
+ */
+export function locate(state: OpState, title: string, role: "section" | "after"): Located {
   const found = findSections(state.blocks, title)
   if (found.length === 0) {
     const titles = headingTitles(state.blocks)
@@ -75,7 +82,7 @@ function checkHeadings(parsed: Parsed, text: string, level: number, title: strin
   parsed.blocks.forEach((block, index) => {
     if (block.type !== "heading" || block.data.level > level) return
     const line = parsed.lines[index]
-    const deeper = level < 3 ? `, or use ${"#".repeat(level + 2)} for a sub-section` : ""
+    const deeper = level < DEEPEST_LEVEL ? `, or use ${"#".repeat(level + 2)} for a sub-section` : ""
     throw new OpProblem(
       "invalid_arguments",
       `line ${line} « ${source[line - 1]?.trim() ?? ""} » is a heading at the level of « ${title} » or above; add a new section with add_section${deeper}.`,
@@ -107,7 +114,7 @@ function replaceSection(state: OpState, op: WriteOpBody, text: string): OpOutcom
   const at = locate(state, op.section ?? "", "section")
   const oldBody = state.blocks.slice(at.start + 1, at.end)
   keepNewerBlocks(oldBody, at.title)
-  const parsed = absorbOwnHeading(parseOpText(text), at.title, at.level)
+  const parsed = absorbOwnHeading(parseOpText(text, state), at.title, at.level)
   checkHeadings(parsed, text, at.level, at.title)
   const body = matchByForm(state, oldBody, parsed.blocks)
   const blocks = [...state.blocks.slice(0, at.start + 1), ...body, ...state.blocks.slice(at.end)]
@@ -118,14 +125,49 @@ function replaceSection(state: OpState, op: WriteOpBody, text: string): OpOutcom
   return outcome(op, blocks, fresh, `replaced « ${at.title} » (${size} characters${lost})`)
 }
 
+/** Les éléments d'une liste ou d'une `checklist` ; `null` pour tout autre bloc. */
+function listItems(block: { type: string; data?: Record<string, unknown> }): unknown[] | null {
+  if (block.type !== "list" && block.type !== "checklist") return null
+  const items = block.data?.items
+  return Array.isArray(items) ? items : null
+}
+
+/**
+ * La liste qu'`append` prolonge (E11-S03, AC-c4, AC-c5) : le bloc qui précède le point d'insertion et le
+ * premier bloc du texte sont deux listes du même genre (puces, numéros, ou deux `checklist`) ; les éléments
+ * neufs, sous-éléments compris, rejoignent les siens, `start` gardé (HN-E11S03-9). Au-delà de
+ * `LIST_ITEMS_MAX` ensemble : pas de fusion, et `full` le dit (HN-E11S03-8).
+ */
+function continuedList(previous: WorkBlock | undefined, first: BlockInput | undefined): { list: WorkBlock; added: number } | "full" | null {
+  if (!previous || !first || previous.type !== first.type) return null
+  const old = listItems(previous)
+  const fresh = listItems(first)
+  if (!old || !fresh) return null
+  if (previous.type === "list" && (previous.data.ordered === true) !== (first.data?.ordered === true)) return null
+  const added = listItemTexts(fresh).length
+  if (listItemTexts(old).length + added > LIST_ITEMS_MAX) return "full"
+  return { list: { ...previous, data: { ...previous.data, items: [...old, ...fresh] } }, added }
+}
+
 function append(state: OpState, op: WriteOpBody, text: string): OpOutcome {
   const at = locate(state, op.section ?? "", "section")
-  const parsed = parseOpText(text)
+  const parsed = parseOpText(text, state)
   checkHeadings(parsed, text, at.level, at.title)
-  const fresh = parsed.blocks.map((input) => newBlock(state, input))
-  const blocks = [...state.blocks.slice(0, at.end), ...fresh, ...state.blocks.slice(at.end)]
-  const size = blocksSize(blocks.slice(at.start, at.end + fresh.length))
-  return outcome(op, blocks, fresh, `appended to « ${at.title} » (+${formatCount(blocksSize(fresh))} → ${formatCount(size)} characters)`)
+  const continued = continuedList(state.blocks[at.end - 1], parsed.blocks[0])
+  const merged = continued === "full" ? null : continued
+  const fresh = parsed.blocks.slice(merged ? 1 : 0).map((input) => newBlock(state, input))
+  // La liste prolongée garde sa place, son id et sa clé ; sa révision de bloc et sa provenance suivent à l'écriture.
+  const written = merged ? [merged.list, ...fresh] : fresh
+  const from = merged ? at.end - 1 : at.end
+  const blocks = [...state.blocks.slice(0, from), ...written, ...state.blocks.slice(at.end)]
+  const size = blocksSize(blocks.slice(at.start, from + written.length))
+  const added = merged ? size - blocksSize(state.blocks.slice(at.start, at.end)) : blocksSize(fresh)
+  const list = merged
+    ? `; the list continues with ${formatCount(merged.added)} more ${plural(merged.added, "item")}`
+    : continued === "full"
+      ? `; a new list starts: a list holds ${formatCount(LIST_ITEMS_MAX)} items at most`
+      : ""
+  return outcome(op, blocks, written, `appended to « ${at.title} » (+${formatCount(added)} → ${formatCount(size)} characters${list})`)
 }
 
 function addSection(state: OpState, op: WriteOpBody, text: string): OpOutcome {
@@ -138,7 +180,7 @@ function addSection(state: OpState, op: WriteOpBody, text: string): OpOutcome {
   }
   const anchor = op.after === undefined ? null : locate(state, op.after, "after")
   const level = anchor?.level ?? 1
-  const parsed = absorbOwnHeading(parseOpText(text), title, level)
+  const parsed = absorbOwnHeading(parseOpText(text, state), title, level)
   checkHeadings(parsed, text, level, title)
   const fresh = [newBlock(state, { type: "heading", text: title, data: { level } }), ...parsed.blocks.map((input) => newBlock(state, input))]
   const at = anchor ? anchor.end : state.blocks.length
@@ -175,7 +217,7 @@ function editInBlock(state: OpState, at: Located, span: { block: WorkBlock; star
   const rendered = blockMarkdown(span.block)
   const offset = edit.index - span.start
   const markdown = rendered.slice(0, offset) + edit.text + rendered.slice(offset + edit.find.length)
-  const parsed = parseOpText(markdown)
+  const parsed = parseOpText(markdown, state)
   if (span.block === at.heading) {
     const [first] = parsed.blocks
     if (parsed.blocks.length !== 1 || first.type !== "heading" || first.data.level !== at.level) {
@@ -213,7 +255,7 @@ function replaceText(state: OpState, op: WriteOpBody, text: string): OpOutcome {
     const body = markdown.slice(bodyStart + 2)
     const offset = index - bodyStart - 2
     const newBody = body.slice(0, offset) + text + body.slice(offset + find.length)
-    const parsed = parseOpText(newBody)
+    const parsed = parseOpText(newBody, state)
     checkHeadings(parsed, newBody, at.level, at.title)
     const oldBody = section.slice(1)
     const matched = matchByForm(state, oldBody, parsed.blocks)

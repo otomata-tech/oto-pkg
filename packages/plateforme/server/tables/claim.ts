@@ -146,7 +146,7 @@ async function claimRows(context: FunctionContext, validated: TableClaimArgs): P
   const until = new Date(now + (args.lease_minutes ?? DEFAULT_LEASE_MINUTES) * 60_000).toISOString()
   const found = await candidates(db, table, lifecycle, { at, filtered })
   const eligible = found.filter((row) => !leaseActive(row, now) && matchesRow(rowCells(row, table.header), clauses))
-  const claim: Claim = { worker, actor: { userId: identity.user.id, ctx: context.ctx ?? null, at }, until, lifecycle }
+  const claim: Claim = { worker, actor: { userId: identity.user.id, ctx: context.ctx ?? null, at, host: context.host ?? null, worker }, until, lifecycle }
   // Les réservations de l'appel en une transaction (AC-x4 d'E01-S10) : une panne de la base au milieu les
   // annule toutes ; une panne de son ouverture ou de sa validation se traduit comme les autres (HN-E01S10-15).
   const claimed = await inTransaction(db, "tables: claim", async () => {

@@ -316,7 +316,7 @@ describe("RailApplication menus (AC-a4)", () => {
     const appels = simulerLAPI({ error: { code: "conflict", message: "Path private/claire/sans_titre_2 is not available." } }, { error: { code: "stale_revision", message: "stale revision" } }, { data: { path: "private/claire/sans_titre_4" } })
     const rail = monter({ arbre })
     fireEvent.click(within(rail).getByRole("button", { name: "Créer dans Privé" }))
-    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure"])
+    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure", "Importer un fichier…"])
     fireEvent.click(menu().getByRole("menuitem", { name: "Une page" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/private/claire/sans_titre_4"))
@@ -354,19 +354,58 @@ describe("RailApplication menus (AC-a4)", () => {
     const appels = simulerLAPI({ data: { path: "ventes/qualifier/sans_titre" } })
     const rail = monter()
     fireEvent.click(within(rail).getByRole("button", { name: "Ajouter dans Qualifier un prospect" }))
-    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure"])
+    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure", "Importer un fichier…"])
     fireEvent.click(menu().getByRole("menuitem", { name: "Une procédure" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/qualifier/sans_titre"))
     expect(appels).toEqual([{ url: "/api/plateforme/nodes", methode: "POST", corps: { path: "ventes/qualifier/sans_titre", ...NEUF, summary: RESUMES.procedure, kind: "procedure" } }])
   })
 
-  it("should offer « Déplacer », « Dupliquer » and « Supprimer » in the « ⋯ » of a content, no « Renommer », and no « ⋯ » on a Contexte (AC-b8)", () => {
+  // E10-S01 (AC-a5) : « Télécharger en .md » s'ajoute, et c'est le seul geste du « ⋯ » d'un Contexte.
+  it("should offer « Déplacer », « Dupliquer », « Télécharger en .md » and « Supprimer » in the « ⋯ » of a content, no « Renommer », and only the download on a Contexte (AC-b8)", () => {
     const rail = monter()
-    expect(within(rail).queryByRole("button", { name: "Autres actions sur Contexte · Tout le monde" })).toBeNull()
+    fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Contexte · Tout le monde" }))
+    expect(itemsDuMenu()).toEqual(["Télécharger en .md"])
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Conseil" }))
 
-    expect(itemsDuMenu()).toEqual(["Déplacer", "Dupliquer", "Supprimer"])
+    expect(itemsDuMenu()).toEqual(["Déplacer", "Dupliquer", "Télécharger en .md", "Supprimer"])
+  })
+})
+
+describe("RailApplication, files (E10-S01, AC-a3, AC-a5, AC-b1, AC-b6)", () => {
+  it("should download a table as .csv from its « ⋯ », by GET tables/export, and say a refusal", async () => {
+    const appels = simulerLAPI({ data: { filename: "grille.csv", content: "nom\r\n" } }, { error: { code: "not_found", message: "Unknown path." } })
+    const creer = vi.fn(() => "blob:fichier")
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: creer, revokeObjectURL: vi.fn() }))
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined)
+    const rail = monter()
+    fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Grille tarifaire" }))
+    fireEvent.click(menu().getByRole("menuitem", { name: "Télécharger en .csv" }))
+    await waitFor(() => expect(clic).toHaveBeenCalledTimes(1))
+    expect(appels).toEqual([{ url: "/api/plateforme/tables/export?path=conseil%2Fgrille", methode: "GET", corps: undefined }])
+    expect(creer).toHaveBeenCalledWith(expect.objectContaining({ type: "text/csv;charset=utf-8" }))
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Contexte · Tout le monde" }))
+    fireEvent.click(menu().getByRole("menuitem", { name: "Télécharger en .md" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ce contenu n'est plus visible.")
+    expect(appels[1].url).toMatch(/^\/api\/plateforme\/nodes\/export\?path=/)
+  })
+
+  it("should open the import dialog from « Importer un fichier… » of a « + », and from a file dropped on a line", async () => {
+    const rail = monter()
+    fireEvent.click(within(rail).getByRole("button", { name: "Ajouter dans Conseil" }))
+    fireEvent.click(menu().getByRole("menuitem", { name: "Importer un fichier…" }))
+    expect(screen.getByRole("dialog", { name: "Importer un fichier" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
+    const ligne = within(rail).getByRole("link", { name: "Conseil" })
+    const fichier = new File(["a;b\n1;2"], "notes.txt")
+    const transfert = { types: ["Files"], files: [fichier], dropEffect: "none" }
+    expect(fireEvent.dragOver(ligne, { dataTransfer: transfert })).toBe(false)
+    fireEvent.drop(ligne, { dataTransfer: transfert })
+    expect(screen.getByRole("dialog", { name: "Importer un fichier" })).toBeInTheDocument()
   })
 })
 
@@ -691,7 +730,7 @@ describe("RailApplication, ordering siblings (E05-S10, b2, AC-b9)", () => {
     const appels = simulerLAPI({ data: {} }, { error: { code: "forbidden", message: "Only a manager of tarifs can order it." } })
     render(rangees("/"))
     fireEvent.click(screen.getByRole("button", { name: "Autres actions sur Offres" }))
-    expect(itemsDuMenu()).toEqual(["Déplacer", "Descendre", "Dupliquer", "Supprimer"])
+    expect(itemsDuMenu()).toEqual(["Déplacer", "Descendre", "Dupliquer", "Télécharger en .md", "Supprimer"])
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
 
     choisirAuClavier(screen.getByRole("button", { name: "Autres actions sur Conseil" }), 1)
@@ -699,7 +738,7 @@ describe("RailApplication, ordering siblings (E05-S10, b2, AC-b9)", () => {
     expect(appels[0].corps).toEqual({ path: "conseil", after: null })
 
     fireEvent.click(screen.getByRole("button", { name: "Autres actions sur Tarifs" }))
-    expect(itemsDuMenu()).toEqual(["Déplacer", "Monter", "Dupliquer", "Supprimer"])
+    expect(itemsDuMenu()).toEqual(["Déplacer", "Monter", "Dupliquer", "Télécharger en .md", "Supprimer"])
     fireEvent.click(menu().getByRole("menuitem", { name: "Monter" }))
     expect(await screen.findByRole("alert")).toHaveTextContent("Ranger ce contenu vous est refusé : il faut sa gestion.")
     expect(appels[1].corps).toEqual({ path: "tarifs", after: "offres" })
@@ -818,7 +857,7 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
     const { rerender } = render(railA("/n/conseil/grille"))
     fireEvent.click(within(rail()).getByRole("button", { name: `Ajouter dans ${ligne}` }))
     expect(menu().getByText(`Dans ${ligne}`)).toBeInTheDocument()
-    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure"])
+    expect(itemsDuMenu()).toEqual(["Une page", "Un tableau", "Une procédure", "Importer un fichier…"])
     fireEvent.click(menu().getByRole("menuitem", { name: "Une procédure" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith(`/n/${chemin}`))
@@ -871,7 +910,7 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
     const appels = simulerLAPI({ data: {} }, impact({ changes: false }), { data: { path: "contexte/conseil", moves: [] } })
     render(sousContexte("/n/contexte/relance"))
     fireEvent.click(within(rail()).getByRole("button", { name: "Autres actions sur Tarifs" }))
-    expect(itemsDuMenu()).toEqual(["Déplacer", "Descendre", "Dupliquer", "Supprimer"])
+    expect(itemsDuMenu()).toEqual(["Déplacer", "Descendre", "Dupliquer", "Télécharger en .md", "Supprimer"])
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
 
     choisirAuClavier(within(rail()).getByRole("button", { name: "Autres actions sur Relancer les devis" }), 1)

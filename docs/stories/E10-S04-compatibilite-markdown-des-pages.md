@@ -347,6 +347,26 @@ Une migration additive, aucune table ni colonne :
   - `oto-separator` (`misc.css`) : **réutilisé** pour le séparateur.
   - La grille d'E07-S03 (`ui/tableau/`) est un tableau de données (tri, filtres, revue) : sans
     rapport.
+- `rg -n '`{3,}|~{3,}|`\{3,\}' packages/plateforme --glob '*.ts*'` (lecteurs de clôtures) :
+  - `fencedParts` (`schemas/link-syntax.ts`) et `openingFence`/`closes` de `server/nodes/markdown-parse.ts`
+    lisaient la même clôture chacun à sa façon. Verdict : **fusionner** ; `openingFence`, `closesFence`,
+    `Fence` et `LINE_SEPARATORS` vivent dans `schemas/link-syntax.ts`, que `fencedParts` et l'analyse
+    importent (une seule lecture linéaire, correction de revue).
+  - `CALL_FENCE` (`server/procedures-check.ts`) : cherche une ligne ` ```call ` dans un texte rendu, sans
+    fermeture. Verdict : laisser (autre question, expression ancrée et linéaire).
+  - `beforeOpenFence` (`server/context/blocks/contexts.ts`) : recule une coupe avant une clôture d'accents
+    graves restée ouverte, antérieure à cette story. Verdict : laisser ; candidat à `openingFence` (voir Refacto).
+- `rg -n "\.items\b.*children|children.*\.items|data\.columns|data\.rows" packages/plateforme --glob '*.ts*'`
+  (parcours des éléments d'une liste et des cellules d'un tableau) :
+  - `listItemTexts` (`schemas/blocks.ts`) : remplace les parcours de `humanTexts` (`links.ts`),
+    `renderedTexts` (`procedures-check.ts`) et `textesDe` (`corps-du-noeud.tsx`), qui liraient chacun
+    les sous-éléments. Verdict : **créé, partagé**. `niveauxDe` (`editeur/operations.ts`) compte des
+    niveaux, pas des textes, et `lignesDeListe` (`editeur/modele.ts`) et `Liste` (`rendu-des-blocs.tsx`)
+    gardent la structure : laisser. `block_search_text` lit les mêmes textes en SQL (`strict $.items.**`) :
+    laisser, la parité se teste (`blocs-zod.test.ts`).
+  - `tableCells` (`schemas/blocks.ts`) : les cellules à plat pour les liens, les procédures et l'écran.
+    Verdict : **créé, partagé**. `TableauSimple` (`rendu-des-blocs.tsx`) et `premiersMots`
+    (`editeur/modele.ts`, colonnes seules) gardent l'en-tête et les rangées séparés : laisser.
 
 ### Effet produit
 - **Écran, toutes les pages** : un titre de niveau 2 ou 3 déjà écrit passe de `<h2>` à `<h3>` ou
@@ -377,6 +397,10 @@ Une migration additive, aucune table ni colonne :
 - Écarté : extraire `TableauFixe` d'`ui/equipes/` vers un composant commun avec alignement et clés
   par rang. Sans lui, deux tableaux statiques partagent les mêmes classes. Deux occurrences : à
   proposer au pilote à la fusion (`coding-standards.md § DRY`).
+- Proposé au pilote, non fait : `beforeOpenFence` (`server/context/blocks/contexts.ts`) lirait ses
+  clôtures par `openingFence` et `closesFence`. Sans lui, la coupe d'un Contexte ne reconnaît que les
+  clôtures d'accents graves sans retrait (comportement d'avant cette story, inchangé) ; coût : un test de
+  `context` sur une clôture `~~~` coupée.
 
 ## Hypothèses
 
@@ -393,12 +417,54 @@ Une migration additive, aucune table ni colonne :
   ligne vide ou en tête) ; un tableau commence par `|`. Ainsi un texte existant ne change pas de
   sens (source : `estUnTableau`, GFM restreint).
 - **HN-E10S04-6** : la conversion au premier `write` (Effet produit) est admise, sans migration
-  des données (source : ADR-011 § 5, les blocs font foi et le markdown en est un rendu).
+  des données (source : ADR-011 § 5, les blocs font foi et le markdown en est un rendu). De même, un
+  élément de liste dont une ligne suivante commence par une marque de liste (`"c\n1. x"`, admis par Zod
+  et par la base, écrit seulement par l'API des blocs) est relu en sous-liste aux niveaux 1 et 2, et sa
+  section est refusée au niveau 3 (`line N: lists go three levels deep at most.`) (source : option la plus
+  simple, décision du pilote ; aucune migration, cas que `write` ne produit pas).
 - **HN-E10S04-7** : une marque dans une marque de même caractère (`**a *b* c**`) reste hors
   périmètre : l'expression actuelle exclut ce caractère de son contenu, ce qui la garde linéaire
   (source : `en-ligne.ts`, `MARQUES`).
 - **HN-E10S04-8** : le corps d'un repli n'est pas relu en blocs ; un tableau ou une liste s'y lit
   en texte (source : le corps affiché comme un encart, D114).
+- **HN-E10S04-9** (implémentation) : « précédée d'une ligne vide ou en tête du texte » (AC-a1, AC-a2) se
+  lit « au début d'un bloc, jamais dans un paragraphe » : un tableau ou un séparateur qui suit un titre, une
+  liste ou un encart sans ligne vide est reconnu (source : HN-E10S04-5, dont le but est qu'un paragraphe
+  existant ne change pas de sens ; le rendu met toujours une ligne vide entre deux blocs). Une ligne
+  `<details>` interrompt un paragraphe, comme une clôture ou un titre (source : AC-a3 ne l'exclut pas ;
+  CommonMark, bloc HTML de type 6).
+- **HN-E10S04-10** (implémentation) : la marque qui ouvre une sous-liste est admise de 0 à 3 espaces, ou
+  jusqu'à la largeur de la marque de l'élément moins un quand elle est plus grande : sans cela, un élément
+  numéroté à partir de 1000 (marque de 5 caractères) rendrait sa sous-liste à 6 espaces, que la lecture ne
+  reconnaîtrait plus (source : propriété d'aller-retour de `markdown-parse.ts`).
+- **HN-E10S04-11** (implémentation) : dans une sous-liste, des lignes vides entre deux sous-éléments sont
+  admises et se relisent en liste serrée ; au premier niveau, une ligne vide suivie d'une marque ouvre
+  toujours une seconde liste (comportement inchangé) (source : la plus simple, aucune liste perdue).
+- **HN-E10S04-12** (implémentation) : le résumé d'un repli est lu sans ses blancs de bord et compté comme un
+  titre (`btrim`, 1 à 200 caractères) ; un résumé vide (`<summary></summary>`) reçoit le refus « a toggle
+  starts with <summary>…</summary> on one line. » (source : `heading`, même règle en base et en Zod).
+- **HN-E10S04-13** (implémentation) : `` \` `` ne s'affiche sans sa barre oblique que hors d'un span de code :
+  `codeSpans` (`schemas/link-syntax.ts`), commun à la publication, n'est pas changé, et une barre oblique
+  devant un accent grave qui ferme un span reste dans le code. Un `\<` devant `<https://…>` empêche l'adresse
+  entre chevrons, l'adresse nue qu'il contient restant un lien (source : la plus simple ; la règle des liens
+  reste commune, HN-E05S02-26).
+- **HN-E10S04-14** (implémentation) : dans l'éditeur existant (C4), un élément de liste dont le texte tient sur
+  plusieurs lignes se relit toujours en autant d'éléments (comportement d'avant, inchangé), et les enfants d'un
+  élément racine sur plusieurs lignes suivent sa dernière ligne ; un sous-élément sur plusieurs lignes montre
+  chacune à sa profondeur, avec sa marque (numéros comptés par ligne), et se relit en autant de sous-éléments
+  frères, ses enfants suivant sa dernière ligne : aucun enfant ne change de niveau ni de parent ; les numéros de
+  gouttière d'une liste numérotée comptent les lignes de sous-éléments (`champ-de-bloc.tsx`, hors du
+  périmètre de fichiers) ; une ligne de deux espaces ou plus dans un Texte changé en liste devient un
+  sous-élément. Le rendu à l'écran et la non-perte des enfants (AC-b2) ne sont pas touchés (source : E10-S06
+  porte `Tab` et l'édition des listes, C4). Numéros de gouttière corrigés par E10-S06 : seuls les éléments du premier
+  niveau se comptent, à partir de `start` (`numerosDeGouttiere`).
+- **HN-E10S04-15** (implémentation) : les clôtures d'un corps de repli se lisent par `fencedParts`
+  (`schemas/link-syntax.ts`) : ``` ou ~~~, 0 à 3 espaces avant ; une clôture jamais fermée court jusqu'à la
+  fin ; publication (`links`), écran (`cheminsCites`) et rendu la partagent (source : AC-a4, un seul lecteur,
+  M15).
+- **HN-E10S04-16** (implémentation) : un tableau, un repli et un séparateur se nomment dans l'éditeur par
+  leurs colonnes, leur résumé, ou « bloc vide » (`premiersMots`) ; `h6` se distingue de `h5` par la mono
+  capitales des intitulés (`content.css`) (source : la plus simple).
 
 ## Actions JB
 
@@ -452,8 +518,62 @@ Aucune : pas de secret, pas de service extérieur.
 
 ### Écarts avec l'architecture
 
+Aucun invariant touché (types étendus par migration additive, ADR-011 § 2). À reporter dans
+`docs/architecture.md` : la liste des types de `blocks` (§ 4, ligne `blocks`) prend `simple_table`, `divider`,
+`toggle`.
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `listItemTexts`, `tableCells`, `trimBlanks`, `listItemSchema`, `LIST_DEPTH_MAX`, `SIMPLE_TABLE_COLUMNS_MAX`, `SIMPLE_TABLE_ROWS_MAX`, `TOGGLE_SUMMARY_MAX` | `packages/plateforme/schemas/blocks.ts` | Textes d'une liste (sous-éléments compris) et d'un tableau simple, lus par la publication, le contrôle des procédures et l'écran ; bornes partagées avec l'analyse |
+| `fencedParts`, type `TextPart` | `packages/plateforme/schemas/link-syntax.ts` | Parties d'un corps de repli (texte, clôtures), un seul lecteur pour les liens et le rendu |
+| `openingFence`, `closesFence`, type `Fence`, `LINE_SEPARATORS` (déplacés), `escaped` (exporté) | `packages/plateforme/schemas/link-syntax.ts` | Lecture des clôtures partagée par l'analyse de `write` et `fencedParts` ; échappement lu par les liens et l'écran (`en-ligne.ts`) |
+| `LIST_ITEMS_MAX`, `isBlankLine` (exportés) | `packages/plateforme/schemas/blocks.ts` | Borne de 500 éléments (réexportée par `server/nodes/limits.ts`, importée par `editeur/operations.ts`) ; ligne blanche du corps d'un repli (schéma et `markdown-rich.ts`) |
+| `tableAt`, `isDivider`, `toggleOpening`, `parseToggle`, `ParseProblem`, `refuse` | `packages/plateforme/server/nodes/markdown-rich.ts` | Lecture des trois formes nouvelles ; `ParseProblem` et `refuse` déplacés de `markdown-parse.ts` |
+| `baliseDuTitre` (remplace `BALISE_DE_TITRE`), `TableauSimple`, `Repli` (internes) | `packages/plateforme/ui/noeud/rendu-des-blocs.tsx` | Balise d'un titre par niveau ; tableau simple au balisage de `TableauFixe` ; repli sur `LinkedContent` |
 
 ### Notes
+
+- Lots a, b et c livrés dans le worktree `e10`, sans commit. Migration `20260929170000_platform_page_markdown.sql`
+  appliquée à la base locale seulement ; `mcp-read-write.test.ts` (Supabase Auth) et la spec E2E ne tournent
+  pas en local : à jouer par le pilote après l'application au projet partagé.
+- `markdown-rich.ts` créé hors de la liste de fichiers : `markdown-parse.ts` aurait dépassé `max-lines` (300).
+- Deux attendus d'avant changés par la story : `nodes-parse.test.ts` (`#####` n'est plus refusé ; refus de 501
+  éléments « sub-items included ») et le rendu d'un titre de niveau 2 ou 3 (`h3`, `h4`) dans
+  `ecran-de-noeud.test.tsx` et `editeur-de-blocs.test.tsx` (AC-b3 remplace E05-S10 AC-a5).
+- `m67-blocs-inconnus.test.ts` prenait pour « blocs inconnus » un élément de liste `{text, children}` et des
+  titres de niveau 4 et 5, que cette story rend connus : ses exemples passent à un élément de forme inconnue et
+  aux niveaux 6 et 7 (même règle M67, formes au-delà de cette version). `catalog-contracts.test.ts` compte la
+  ligne de refus ajoutée à `write.procedure`.
+
+### Corrections après revue
+
+- **Lecture des clôtures** : `fencedParts` lisait l'ouverture par `/^ {0,3}(`{3,}|~{3,})(.*)$/`, quadratique
+  sur une suite d'accents graves suivie de U+2028 ou `\r` (19 s pour 99 990 accents graves). La lecture de
+  l'analyse (`openingFence`, `closesFence`) passe dans `schemas/link-syntax.ts` et sert aux deux ;
+  `LINE_SEPARATORS` y prend `\r`, que `parseMarkdown` coupe avant (sans effet sur l'analyse), pour qu'une
+  ligne du corps d'un repli qui en porte reste du texte comme avant. Textes hostiles ajoutés à
+  `link-syntax.test.ts`.
+- **Éditeur (AC-b2)** : `lignesDeListe` écrit chaque ligne d'un sous-élément sur plusieurs lignes à sa
+  profondeur, avec sa marque (HN-E10S04-14).
+- **Doublons retirés** : `enregistrement` (deux copies d'`isRecord`), `echappe` (copie d'`escaped`),
+  `isBlankLine` de `markdown-rich.ts` (copie de celle du schéma), `ELEMENTS_MAX` et le 500 de `limits.ts`.
+
+#### Rayon d'impact des corrections
+
+- **Appelants** : `rg -n "\bopeningFence\b|\bclosesFence\b|\bLINE_SEPARATORS\b|\bescaped\(|\bisBlankLine\b|\bLIST_ITEMS_MAX\b" packages tests --glob '*.ts*' -l`
+  → `schemas/blocks.ts`, `schemas/link-syntax.ts`, `server/nodes/limits.ts`, `server/nodes/markdown-parse.ts`,
+  `server/nodes/markdown-rich.ts`, `ui/noeud/en-ligne.ts`, `ui/noeud/editeur/operations.ts` : les seuls
+  modifiés ; `LIST_ITEMS_MAX` garde son nom et sa valeur pour les importeurs de `limits.ts`
+  (`markdown-parse.ts`). `rg -n "\bisRecord\b" packages/plateforme/ui -l` → `procedure/refus-de-publication.tsx`
+  l'importait déjà ; `noeud/rendu-des-blocs.tsx` et `noeud/editeur/modele.ts` le rejoignent.
+- **Fonction SQL re-versionnée** (`testing-strategy.md § Non-régression`) : `rg -l "block_search_text" tests` →
+  `tests/integration/blocs-zod.test.ts` : vert sur la base locale (2 tests : verdict de chaque cas, dont le
+  nouveau `rows: ["x"]` refusé en 23514 ; texte cherchable égal à la ligne de base V1 sur les formes d'avant) ;
+  `tests/integration/fixtures/search-content-avant.sql` : fixture lue par `tests/integration/recherche-fautes.test.ts`,
+  qui compare l'ancienne `search_content` à celle du paquet, les deux appelant la même `block_search_text` :
+  vert sur la base locale (14 tests).
+- **Effet produit** : aucun parcours ne change ; le corps d'un repli se découpe comme avant, hors une ligne de
+  clôture suivie d'un blanc Unicode autre qu'espace ou tabulation, qui ne ferme plus la clôture, comme dans
+  l'analyse de `write`.
+- **Refacto** : proposé, non fait (§ Refacto, `beforeOpenFence`).

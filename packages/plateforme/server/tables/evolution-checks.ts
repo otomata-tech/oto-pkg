@@ -8,7 +8,7 @@
 // Repris d'Oto (`datastore/schema_ops.py` l. 1-30, 531-617) : avertissements sur la donnée déjà là
 // (valeurs trop longues, valeurs qu'un enum condamne), retrait confirmé qui dit ce qu'il touche.
 // Retiré : `set_schema` qui remplace tout, la clé changée sur un tableau rempli.
-import { isRecord, type TableHeader } from "../../schemas/tables"
+import { isRecord, type TableColumn, type TableHeader } from "../../schemas/tables"
 import { boundedList, PlatformError } from "../errors"
 import { charCount, formatCount } from "../nodes/document"
 import { plural } from "../nodes/op-kit"
@@ -81,8 +81,14 @@ function shortened(change: ColumnChange): number | null {
   return was !== null && now !== null && now < was ? now : null
 }
 
+/** Une colonne requise qui refuse `verified_empty` (E11-S01, AC-b3) : seule une vraie valeur la remplit. */
+function strict(column: TableColumn): boolean {
+  return column.required === true && column.allow_verified_empty === false
+}
+
+/** Une colonne rendue requise, ou requise et rendue stricte (E11-S01, AC-b5) : des lignes peuvent n'y rien avoir. */
 function madeRequired(change: ColumnChange): boolean {
-  return change.after.required === true && change.before.required !== true
+  return (change.after.required === true && change.before.required !== true) || (strict(change.after) && !strict(change.before))
 }
 
 /** Le cycle de vie change d'état de travail (ou de colonne) : des lignes peuvent y être sous bail (AC6). */
@@ -166,10 +172,11 @@ export function warned(spec: WarnedRows, text: (count: number, sampled: string) 
   return [{ warning: { kind, column, count: rows.length, sample_keys: sampled.keys }, text: text(rows.length, sampled.text) }]
 }
 
-/** Une cellule renseignée : une valeur, ou `verified_empty` (AC6). */
-function filled(row: RowBlock, column: string, header: TableHeader): boolean {
-  const provenance = isRecord(row.provenance) ? row.provenance[column] : undefined
-  return rowCells(row, header).has(column) || (isRecord(provenance) && provenance.origin === "verified_empty")
+/** Une cellule renseignée : une valeur, ou `verified_empty` si la colonne publiée l'admet (AC6 ; E11-S01, AC-b5). */
+function filled(row: RowBlock, column: TableColumn, header: TableHeader): boolean {
+  const provenance = isRecord(row.provenance) ? row.provenance[column.name] : undefined
+  const verifiedEmpty = column.allow_verified_empty !== false && isRecord(provenance) && provenance.origin === "verified_empty"
+  return rowCells(row, header).has(column.name) || verifiedEmpty
 }
 
 function missingRequired(check: Check, header: TableHeader): Warned[] {
@@ -181,7 +188,8 @@ function missingRequired(check: Check, header: TableHeader): Warned[] {
     ...diff.added.filter((column) => column.required).flatMap((column) => missing(column.name, rows)),
     ...diff.changed
       .filter((change) => madeRequired(change) && change.name !== check.target.key)
-      .flatMap((change) => missing(change.name, rows.filter((row) => !filled(row, change.name, header)))),
+      // Une colonne déjà requise, rendue stricte : seules les lignes qui n'y ont qu'un `verified_empty` (AC-b5).
+      .flatMap((change) => missing(change.name, rows.filter((row) => !filled(row, change.after, header) && (change.before.required !== true || filled(row, change.before, header))))),
   ]
 }
 

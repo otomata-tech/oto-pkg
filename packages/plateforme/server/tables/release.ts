@@ -54,7 +54,8 @@ async function release(context: FunctionContext, row: StoredRow, change: { colum
   const userId = context.identity.user.id
   const data = { ...(isRecord(row.data) ? row.data : {}), [change.column]: change.state }
   const provenance = isRecord(row.provenance) ? row.provenance : {}
-  const stateProvenance = cellProvenance({ userId, ctx: context.ctx ?? null, at: new Date().toISOString() }, provenance[change.column])
+  const actor = { userId, ctx: context.ctx ?? null, at: new Date().toISOString(), host: context.host ?? null, worker: change.worker }
+  const stateProvenance = cellProvenance(actor, provenance[change.column])
   const values = {
     data: asJson(data),
     provenance: asJson({ ...provenance, [change.column]: stateProvenance }),
@@ -111,13 +112,13 @@ export const tableRelease = defineFunction({
   class: "write",
   origin: "paquet",
   description:
-    "Frees a row you claimed with table.claim and sets its next state (default: the first state of the work queue). Use it when you are done with a claimed row, with the same worker name; the working state is set only by table.claim, and the decisions of a review only by a person.",
+    "Frees a row you claimed with table.claim and sets its next state (default: the first state of the work queue). Use it when you are done with a claimed row, with the same worker name; the working state is set only by table.claim, and the decisions of a review only by a person, unless the table lets assistants decide (table.schema says it).",
   schema: tableReleaseArgsSchema,
   examples: [{ table: "ventes/suivi_prospects", key: "Mairie de Valbrune", worker: "claude-claire", state: "à revoir" }],
   refusals: [
     "Unknown table: not a table you can read; the refusal lists the tables you can read.",
     "Writing is reserved to the team that owns the table: the refusal says whom to ask.",
-    "The working state (set only by table.claim) or a decision of the review (made by a person); an unknown state, with the states you can release to.",
+    "The working state (set only by table.claim) or a decision of the review (made by a person, unless the table lets assistants decide); an unknown state, with the states you can release to.",
     "An unknown row.",
     "A row claimed by another worker or another person.",
     "A row changed meanwhile: read it with table.rows.",

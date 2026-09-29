@@ -63,7 +63,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       expect(claire.result?.text).toBe("Published ventes/salons revision 1: a table with 4 columns, key nom. Write rows with acme_call table.write.")
       const node = await nodeAt(seed, ref, "ventes/salons")
       expect(node).toMatchObject({ kind: "table", status: "published", revision: 1 })
-      expect(node?.meta).toEqual({ ...SALONS_HEADER, closed: false })
+      expect(node?.meta).toEqual({ ...SALONS_HEADER, closed: false, proof: false })
       expect(claire.calls.filter((call) => call.kind === "rpc" && call.name === "open_draft")).toHaveLength(1)
       // `p_node`, `p_base_revision`, `p_draft_stamp`.
       expect(publishCalls(claire.calls)).toEqual([{ kind: "rpc", name: "publish_node", values: [node?.id, 0, expect.any(String)] }])
@@ -80,7 +80,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       })
       const drafted = await nodeAt(seed, ref, "ventes/salons_2")
       expect(drafted).toMatchObject({ kind: "table", revision: 0 })
-      expect(await draftsAt(seed, ref, "ventes/salons_2")).toMatchObject([{ node_id: drafted?.id, meta: { ...SALONS_HEADER, closed: false } }])
+      expect(await draftsAt(seed, ref, "ventes/salons_2")).toMatchObject([{ node_id: drafted?.id, meta: { ...SALONS_HEADER, closed: false, proof: false } }])
       expect(publishCalls(lea.calls)).toEqual([])
     })
 
@@ -99,7 +99,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
         // Un attribut inconnu, refusé par la forme stricte du patch (N1) : à la création, dans le cadre de l'AC2.
         [
           salons("ventes/salons", { ...SALONS_HEADER, columns: [...SALONS_HEADER.columns, { name: "stand", type: "text", width: 3 }] }),
-          `Invalid table header: header.columns[4]: unknown key « width »; keys: name, type, options, required, max_length. ${contract}`,
+          `Invalid table header: header.columns[4]: unknown key « width »; keys: name, type, options, required, allow_verified_empty, max_length. ${contract}`,
         ],
         [{ ...salons("ventes/salons"), ops: [{ op: "append", section: "Colonnes", text: "x" }] }, "ventes/salons is a table: it has no sections. Write its rows with acme_call table.write."],
       ]

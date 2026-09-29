@@ -205,7 +205,9 @@ describe("écran d'une procédure, celui d'une page (M59)", () => {
     const texte = bloc(idDe(30), "paragraph", "Lis le contrat du tableau.")
     const controles = async (genre: NodeKind) => {
       editeur({ blocs: [texte, etapes(32, ["un", "deux"])], genre })
+      // Le « + » ouvre le choix du bloc (E10-S06, AC-a1) : un Texte.
       fireEvent.click(bouton("Ajouter un bloc après — Lis le contrat du"))
+      fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Texte" }))
       await champ("Modifier ce texte — bloc vide")
       const formes = styles(menuDu("bloc vide"))
       const duBlocVide = entreesDuMenu()
@@ -218,7 +220,7 @@ describe("écran d'une procédure, celui d'une page (M59)", () => {
     const surUnePage = await controles("page")
     const surUneProcedure = await controles("procedure")
     expect(surUneProcedure).toEqual(surUnePage)
-    expect(surUneProcedure.formes).toEqual(["Texte", "Titre", "Liste à puces", "Liste numérotée", "Liste à cocher", "Citation", "Code"])
+    expect(surUneProcedure.formes).toEqual(["Texte", "Titre", "Liste à puces", "Liste numérotée", "Liste à cocher", "Citation", "Code", "Repli"])
     expect([...surUneProcedure.duBlocVide, ...surUneProcedure.deLaListe].filter((entree) => /appel/i.test(entree))).toEqual([])
     expect(surUneProcedure.champs).toEqual(["Modifier ce texte — Lis le contrat du", "Modifier ce texte — bloc vide", "Modifier cette liste numérotée — un deux"])
   })

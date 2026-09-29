@@ -57,6 +57,45 @@ export const FORMES = {
   cases: { libelle: "Liste à cocher", champ: "cette liste à cocher" },
   citation: { libelle: "Citation", champ: "cette citation" },
   code: { libelle: "Code", champ: "ce code" },
+  // E10-S06 (AC-a1, AC-a3) : le repli au menu « Style » ; le tableau simple s'insère seulement.
+  repli: { libelle: "Repli", champ: "ce repli" },
+  tableau: { libelle: "Tableau simple", champ: "ce tableau" },
+} as const
+
+/** Le choix du « + » et de « / » (E10-S06, AC-a1, AC-a2) : ses deux groupes, le séparateur, la liste sous le champ. */
+export const CHOIX_DE_BLOC = {
+  texte: "Texte",
+  inserer: "Insérer",
+  separateur: "Séparateur",
+  liste: "Blocs à insérer",
+  aucun: "Aucun bloc",
+  ajouter: (mots: string) => `Ajouter un bloc après — ${mots}`,
+} as const
+
+/** Un tableau simple dans l'éditeur (E10-S06, AC-b1, AC-b2) : le nom de chaque cellule par son en-tête, le menu de sa poignée. */
+export const TABLEAU_EDITE = {
+  enTete: (colonne: number) => `En-tête de la colonne ${colonne}`,
+  cellule: (enTete: string, rangee: number) => `${enTete}, rangée ${rangee}`,
+  colonne: (colonne: number) => `Colonne ${colonne}`,
+  tableau: "Tableau",
+  ajouterRangee: "Ajouter une rangée après",
+  ajouterColonne: "Ajouter une colonne après",
+  retirerRangee: "Retirer la rangée",
+  retirerColonne: "Retirer la colonne",
+  alignement: "Alignement de la colonne",
+  alignements: { aucun: "Aucun", left: "Gauche", center: "Centre", right: "Droite" },
+} as const
+
+/** Un repli dans l'éditeur (E10-S06, AC-b4) : ses deux champs. */
+export const REPLI_EDITE = {
+  resume: (mots: string) => `Résumé du repli — ${mots}`,
+  corps: (mots: string) => `Corps du repli — ${mots}`,
+} as const
+
+/** Les annonces des niveaux de liste (E10-S06, AC-a6) : rien n'a changé, et pourquoi ; la borne est celle du contrôle (`MESSAGES_DU_BLOC`). */
+export const NIVEAUX_DE_LISTE = {
+  rienAuDessus: "Rien au-dessus de cette ligne.",
+  premierNiveau: "Cette ligne est déjà au premier niveau.",
 } as const
 
 /** Les phrases de l'éditeur (AC9 à AC15, AC18). */
@@ -214,6 +253,23 @@ export const MENU_DU_BLOC = {
   supprimer: "Supprimer",
   /** Le nom d'une case d'une liste à cocher, par son texte. */
   case: (texte: string) => `Cocher « ${texte || "élément vide"} »`,
+  /** E10-S01 (AC-b7) : un tableau simple devient un tableau de données, sous la page. */
+  convertir: "Convertir en tableau de données",
+} as const
+
+/**
+ * Coller ou déposer du markdown dans l'éditeur, et convertir un tableau simple (E10-S01, AC-a1, AC-a4, AC-b7). Les
+ * bornes s'écrivent depuis `schemas/` (`portage-ecrans.md § 6`).
+ */
+export const MARKDOWN_DANS_L_EDITEUR = {
+  tropLong: (max: string) => `Ce texte dépasse ${max} caractères : importez-le comme fichier .md`,
+  seulementMarkdown: "Seul un fichier .md s'insère dans une page ; un .csv s'importe depuis le « + » du rail.",
+  tableauDe: (titre: string) => `Tableau de ${titre}`,
+  convertiDepuis: (titre: string, lignes: string) => `Converti depuis ${titre} (${lignes} lignes)`,
+  tableauGarde: (chemin: string) => `Le tableau ${chemin} est créé, mais le bloc n'a pas pu être remplacé : il reste en place.`,
+  conversionRefusee: {
+    forbidden: "Convertir ce tableau demande la gestion de la page : demandez-la à ses responsables.",
+  },
 } as const
 
 /** La publication seule (E05-S10, AC-a6) : ce qui se dit quand elle n'aboutit pas ; le texte reste. */
@@ -231,6 +287,32 @@ export const CITER = {
   recherche: "Recherche…",
   aucun: "Aucun contenu trouvé.",
   panne: "La recherche n'a pas abouti. Continuez à taper pour réessayer.",
+} as const
+
+/**
+ * Le panneau « Lien » d'un bloc (E11-S06, AC-b1 à AC-b5) : modifier le libellé et la destination d'un lien sans lire
+ * sa source. La borne du libellé s'écrit depuis `schemas/` (`portage-ecrans.md § 6`).
+ */
+export const LIEN_DU_BLOC = {
+  groupe: "Modifier le lien",
+  /** Ce que le champ dit du lien sous son curseur (`aria-describedby`), et la touche qui mène au panneau. */
+  decrit: (titre: string) => `Lien vers « ${titre} ». Alt+Entrée pour le modifier.`,
+  libelle: "Libellé",
+  destination: "Destination",
+  page: "Page de la plateforme",
+  web: "Adresse web",
+  aucunePage: "Aucune page choisie.",
+  chercher: "Chercher une page",
+  adresse: "Adresse",
+  appliquer: "Appliquer",
+  retirer: "Retirer le lien",
+  ouvrir: "Ouvrir",
+  libelleLong: (max: string) => `Le libellé tient en ${max} caractères.`,
+  adresseRefusee: "Une adresse web commence par https:// et ne contient pas d'espace.",
+  choisirUnePage: "Choisissez une page.",
+  change: "Ce lien a changé ; rouvrez-le.",
+  /** Le lien construit ne se relit pas tel quel à sa place (un accent grave du libellé, une adresse collée au texte qui suit). */
+  illisible: "Ce lien ne se relirait pas tel quel à sa place : changez son libellé ou son adresse.",
 } as const
 
 /**

@@ -184,7 +184,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_node on a real database"), { tim
       vi.mocked(publishNode).mockResolvedValueOnce({ revision: 4, sections: 1, blocks: 2, rulesChanged: true, warnings: [] })
       const acme = admin.orgs.acme
       expect((await node({ op: "publish", path: "ventes/contexte" })).text).toBe(
-        `ventes/contexte published: revision 4 (was 3).\nventes/contexte is a context page: the open ctx codes of ${acme.slug} expire, and assistants call ${acme.prefix}_context again.`,
+        `ventes/contexte published: revision 4 (was 3).\nventes/contexte is a context page: the conversations it was served to expire, and their assistants call ${acme.prefix}_context again.`,
       )
       // Une publication concurrente et une procédure refusée par E03-S06 : les refus du service, tels quels.
       const stale = "stale revision: ventes/tarifs is at revision 5, not 3. Nothing was published. Read it again, then retry."

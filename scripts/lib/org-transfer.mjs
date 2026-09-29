@@ -160,7 +160,7 @@ export const TABLES = [
     journal: true,
     key: ['code'],
     newKey: 'ctx',
-    columns: cols('code org_id user_id rules_version host user_agent created_at'),
+    columns: cols('code org_id user_id rules_version contexts host user_agent created_at'),
     refs: { org_id: 'orgs' },
     people: { user_id: 'sauter' },
   }),

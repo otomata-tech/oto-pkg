@@ -122,11 +122,10 @@ describe("parseMarkdown — analyses and refusals (AC3)", () => {
     const cases: [string, string][] = [
       ["Intro.\n\n```python\nx = 1", "a code fence opened on line 3 (```python) is never closed."],
       ["# Titre", "line 1 « # Titre » is the level of the page title; headings start at ##."],
-      ["a\n\nb\n##### X", "line 4 « ##### X »: headings go down to #### (three levels)."],
       [`Intro\n#### ${"a".repeat(201)}`, "line 2: a heading holds 200 characters at most (201)."],
       ["a\n\nb\n\n```call\ntable.rows filter\n```", 'line 5: a call block holds <function> {"argument": …}; « table.rows filter » is not followed by a JSON object.'],
       ["a\n```reference\nVentes/X\n```", "line 2: a reference block holds a path such as ventes/relance_devis, then an optional JSON view; « Ventes/X » is not a path."],
-      [Array.from({ length: 501 }, (_, index) => `- ${index}`).join("\n"), "line 1: a list holds 500 items at most (501)."],
+      [Array.from({ length: 501 }, (_, index) => `- ${index}`).join("\n"), "line 1: a list holds 500 items at most, sub-items included (501)."],
     ]
     for (const [text, problem] of cases) {
       expect(refusal(text), problem).toMatchObject({

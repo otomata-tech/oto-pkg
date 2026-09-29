@@ -56,8 +56,31 @@ describe.skipIf(!configured || privatePending)(
         expect((answer.result.structuredContent as { text?: string } | undefined)?.text).toBe(answer.text)
         return answer
       }
-      return { ...connected, call, code }
+      /** Un appel d'outil dont la réponse peut être un refus (E10-S04). */
+      const answer = (tool: string, args: Record<string, unknown>) => connected.call(tool, { ctx: code, ...args })
+      return { ...connected, call, answer, code }
     }
+
+    it("should write a report as an assistant writes it, publish it and read it back identically, and name a refusal (E10-S04)", async () => {
+      const lea = await session("lea", `md-${hex(4)}`)
+      const claire = await session("claire", `md-${hex(4)}`)
+      const path = `ventes/cr_md_${hex(3)}`
+      const body = [
+        "Réunion du **lundi** : ~~report~~ maintenu.<br>Voir [[ventes/devis]].",
+        "---",
+        "| Sujet | Décision | Échéance |\n| :--- | :---: | ---: |\n| Devis \\| Acme | Relancer | vendredi |\n| Pré-étude |  | 15/10 |",
+        "- Actions\n  - Léa : relancer\n    1. appeler\n    2. écrire\n  - Paul : chiffrer\n- Suivi",
+        "### Détail\n\nTexte.\n\n#### Précision\n\n##### Note\n\n###### Fin",
+        "<details>\n<summary>Notes brutes</summary>\n\nTout ce qui a été dit.\n\n</details>",
+      ].join("\n\n")
+      await lea.call("write", { path, title: "CR markdown", summary: "Compte rendu en markdown.", ops: [{ op: "add_section", section: "Réunion", text: body }] })
+      expect((await claire.call("write", { path, base_revision: 0, publish: true })).text).toMatch(new RegExp(`^Published ${path} revision 1 `))
+      expect((await lea.call("read", { path, section: "Réunion" })).text).toContain(`\n\n## Réunion\n\n${body}\n\nTo edit`)
+
+      const refused = await lea.answer("write", { path, base_revision: 1, ops: [{ op: "append", section: "Réunion", text: "| a | b |\n| --- | --- |\n| x | y | z |" }] })
+      expect(refused.isError).toBe(true)
+      expect(refused.text).toContain("line 3: this row has 3 cells; the header has 2.")
+    })
 
     it("should chain context, write, publish, read with references, write one block and read the draft, journaled per call (AC38)", async () => {
       const agent = `rw-${hex(4)}`

@@ -12,6 +12,7 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - Les données de test sont jetables et préfixées (`t<hex>`, `test-<hex>@example.invalid`) et se retirent à la fin du passage ; `pnpm test:cleanup --delete` retire celles d'un passage interrompu. § Base de test
 - `describe` nomme l'unité, `it("should …")` en anglais dit un seul comportement, même dans un fichier aux `it` en français. § Naming Conventions
 - Tester le comportement, jamais l'implémentation ni le CSS : aucune assertion sur un attribut `style` ou une valeur CSS. § Anti-patterns
+- Un test de recherche sème un mot propre à lui, absent des autres contenus semés du fichier. § Anti-patterns
 - Mocker les seules frontières (base, API) ; chaque `it` passe lancé seul, pose sa précondition et consomme un état sur une ressource à lui. § Anti-patterns
 - Jamais de `sleep` : `waitFor` ou `findBy` ; un focus après une action asynchrone se lit par `await waitFor(() => expect(document.activeElement)…)`. § Anti-patterns
 - Aucun test sous jsdom ni spec Playwright ne charge `cli/db-prepare.mjs` ni `scripts/lib/env.mjs` : la règle TLS vient de `cli/ssl-option.mjs` ; un fichier jsdom qui importe une aide SQL porte `// @vitest-environment node`. § Anti-patterns
@@ -47,3 +48,5 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - Démo ne se vide jamais par un script écrit à la main sans `pnpm org:export` avant, tables lues dans `docs/architecture.md § 4` (`org_domains` = adresses), et son adresse vérifiée après. § Base de test
 - Une clause facultative d'un service mesuré par un budget de requêtes passe par un paramètre nul, jamais par un fragment `sql` ; un plafond ne se relève pas pour un fragment. § Anti-patterns
 - Une spec sur l'organisation jetable pose elle-même la précondition d'une partie calculée (contenus récents, nouveautés bornées). § Anti-patterns
+- Un membre inséré sans `profile.handle` (outillage, Démo) reçoit son handle de la base et son espace privé (`ensure_private_space`) : `private/<handle>` et son Contexte existent après l'ajout. § Base de test
+- Une suite du paquet prend ses personnes dans `createSqlFixtures`, ses jetons dans `createLocalFixtures` (`sessionFor`, `verifyToken` passé à la porte) et se garde par `sqlConfigured` ; seules les suites de l'adaptateur Supabase, listées dans `tests/unit/gardes-supabase.test.ts`, gardent le projet. § Base de test locale

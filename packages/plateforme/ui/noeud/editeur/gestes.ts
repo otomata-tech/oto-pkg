@@ -4,8 +4,9 @@
 // des données, jamais une fonction (`portage-ecrans.md § 2`), et lit ici ce que font ses boutons, son
 // champ et son clavier. Sans lui, chaque rangée recevrait une douzaine de rappels en props.
 import { createContext, useContext, type FocusEvent, type KeyboardEvent } from "react"
+import type { Tableau } from "./blocs-de-page"
 import type { PoigneeGlissee } from "./glisser"
-import type { Forme, Retiree } from "./modele"
+import type { BlocEdite, Choix, Forme, Retiree } from "./modele"
 
 export type Gestes = {
   /** La poignée (« Actions sur ce bloc ») se glisse-dépose (E05-S10, AC-a3) ; son clic ouvre le menu du bloc. */
@@ -14,12 +15,29 @@ export type Gestes = {
   dupliquer: (cle: string) => void
   /** Une case d'une liste à cocher, cochée ou décochée ; l'état part tout de suite (E05-S10, AC-a2). */
   basculerLaCase: (cle: string, ligne: number) => void
+  /**
+   * Un collage de plusieurs lignes (E10-S01, AC-a1) : inséré après le bloc entier, en mode tolérant, derrière les
+   * écritures en attente ; un bloc vide est remplacé ; puis le brouillon relu.
+   */
+  insererDuMarkdown: (cle: string, texte: string) => void
+  /** Un `.md` lâché sur un bloc (E10-S01, AC-a4) : inséré après lui, comme un collage. */
+  deposerUnFichier: (cle: string, fichier: File) => void
+  /** « Convertir en tableau de données » d'un tableau simple (E10-S01, AC-b7). */
+  convertirEnTableau: (cle: string) => void
   /** « @ » (E05-S10, AC-a9) : le texte où le lien vient d'être inséré, et le curseur après lui. */
   citer: (cle: string, texte: string, curseur: number) => void
-  inserer: (cle: string) => void
+  /** Le choix du « + » (E10-S06, AC-a1) : le bloc choisi après celui-ci ; un séparateur part tout de suite. */
+  inserer: (cle: string, choix: Choix) => void
   insererEnTete: () => void
-  saisir: (cle: string, texte: string) => void
-  toucher: (cle: string, evenement: KeyboardEvent<HTMLTextAreaElement>) => void
+  /** « / » (E10-S06, AC-a2) : le Texte devient le bloc choisi ; `colle`, le tableau d'un tableur collé (AC-b3). */
+  remplacerParChoix: (cle: string, choix: Choix, colle?: Tableau) => void
+  /** Un tableau ou un repli écrit dans ses champs (E10-S06, AC-b1, AC-b4) : il part comme un texte tapé. */
+  modifierLeBloc: (cle: string, bloc: BlocEdite) => void
+  /** Une phrase dans la ligne d'annonce de l'éditeur (E10-S06, AC-a6, AC-b1) : un geste qui ne change rien, et pourquoi. */
+  annoncer: (message: string) => void
+  /** Une frappe dans un champ ; `attendreLeChoix` : la liste de « / » est ouverte, le différé n'écrit rien (E10-S06, HN-E10S06-10). */
+  saisir: (cle: string, texte: string, attendreLeChoix?: boolean) => void
+  toucher: (cle: string, evenement: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => void
   /** Le focus quitte un champ : son texte part (E05-S08, AC2). */
   quitterLeChamp: (cle: string, evenement: FocusEvent<HTMLElement>) => void
   /** Le focus quitte la rangée : un bloc vidé part en `delete_block` ; un bloc neuf vide reste (E05-S10, AC-a4). */

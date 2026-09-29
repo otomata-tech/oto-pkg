@@ -38,10 +38,10 @@
 | H23 | Annotations : `readOnlyHint: true` sur `context`, `find` et `read` ; `destructiveHint: false` sur `feedback` seul ; `openWorldHint: true` sur `call` seul ; `call` et `write` gardent les autres défauts. |
 | H25 | Descriptions en anglais, sous 1 000 caractères, ouvertes par « Requires the ctx code from <p>_context; call it first. » ; celle de `context` nomme les domaines et borne son usage ; celle de `call` cite deux ou trois fonctions actives. |
 | H26 | Tout résultat d'outil porte le même texte dans `content[0].text` et `structuredContent.text`, ses données en champs et `next_actions`, qui ne propose jamais de fonction sensible ; 45 000 caractères au plus, la suite par curseur. |
-| H27 | Le code `ctx` a la forme Crockford `XXXX-XXXX` et devient périmé quand `rules_version` change ; un code absent ou inconnu, ou périmé, reçoit chacun son texte fixe qui dit de rappeler `<p>_context`. |
-| H28 | `rules_version` n'augmente, par déclencheur en base, qu'à la publication d'un nœud Contexte (`contexte`, `<équipe>/contexte`, `perso/<handle>/contexte`) ; un document republié à l'identique ne l'augmente pas. |
+| H27 | Le code `ctx` a la forme Crockford `XXXX-XXXX` et devient périmé quand l'un des Contextes qu'il a servis change de contenu (ADR-002 § 2, E11-S03) ; un code absent ou inconnu, ou périmé, reçoit chacun son texte fixe qui dit de rappeler `<p>_context`, celui d'un code périmé nommant les chemins changés. |
+| H28 | `rules_version` augmente, par déclencheur en base, à chaque publication d'un nœud Contexte (`contexte`, `<équipe>/contexte`, `private/<handle>/contexte`), republication à l'identique comprise ; compté, il n'est plus lu par la garde du `ctx` (HN-E11S03-3). Une republication à l'identique n'invalide aucun `ctx` et `write` n'en dit rien : les blocs publiés se comparent par `samePublishedContent` (type, texte, données, clé). Tenue depuis E11-S03. |
 | H29 | La signature `client_name@version` de l'`initialize` est lue dans le corps de la requête et posée sur `ctx.host` et `journal.host`. |
-| H30 | `context` assemble des blocs par priorité dans un budget de 20 000 caractères ; le bloc `code` (règles) n'a pas de taille nominale et passe toujours en premier ; chaque autre bloc est coupé à sa taille nominale (Contextes 2 400 et 1 200, procédures 8 000, « Recent content » 1 400, nouveautés 600), à la ligne entière, coupe dite. Les faits de la personne, de l'organisation et d'une équipe ne sont plus des blocs : une ligne en tête de la partie de leur Contexte (D109) ; un Contexte liste ses enfants, procédures comprises (D110). |
+| H30 | `context` sert ses blocs entiers, dans l'ordre servi, sous un plafond de 35 000 caractères (`CONTEXT_BUDGET`, fiche D134) : aucune taille par bloc ; le bloc `code` (règles) passe toujours en premier ; restent des bornes en lignes (listes d'un Contexte 20, procédures utiles 60, nouveautés 10, contenus récents 20). Au-delà du plafond, le premier bloc qui dépasse est coupé à la dernière ligne entière et les suivants omis et nommés ; une partie de Contexte coupée finit par un pointeur vers `read` (ADR-002 § 7). Les faits de la personne, de l'organisation et d'une équipe ne sont plus des blocs : une ligne en tête de la partie de leur Contexte (D109) ; un Contexte liste ses enfants, procédures comprises (D110). |
 | H31 | Les faits de la personne (nom, handle, rôle, équipes, celle par défaut marquée, langue de réponse), lus dans `members.profile`, ouvrent la partie Privé de `context` ; la personne édite son prénom, son nom et sa langue dans son Profil ; ton et préférences s'écrivent dans son Contexte privé. |
 | H32 | Le bloc organisation de `context` donne le nom et les domaines de travail ; le contenu de l'organisation est son Contexte `contexte`, servi avec ses sous-pages, tableaux et pages liées. |
 | H34 | « What's new » liste, depuis le dernier `ctx` de la personne sinon 14 jours, les versions publiées qu'elle lit et les connecteurs activés : 10 lignes et 600 caractères au plus ; sans nouveauté depuis une borne du jour même, le bloc est omis. |
@@ -83,11 +83,11 @@
 | H87 | `next_actions` d'un appel est la liste `next` de la fonction, moins les fonctions sensibles, inactives ou absentes du catalogue. |
 | H90 | Une colonne de tableau a l'un des huit types `text`, `number`, `date`, `datetime`, `bool`, `enum`, `email`, `url`, et les seules contraintes `required`, `max_length`, `options` ; un attribut inconnu est refusé. |
 | H91 | L'en-tête d'un tableau vit dans `nodes.meta` : colonnes, colonne `key` (la clé de chaque ligne), cycle de vie facultatif (états, état de travail, revue) et `closed`, qui refuse les lignes nouvelles ; l'en-tête en attente vit dans `node_drafts.meta`. |
-| H92 | `table.write` écrit 50 lignes au plus, `{key, revision?, set, clear, verified_empty}`, chaque ligne atomique et rapportée ; `null` refuse sa ligne ; une valeur nouvelle exige sa preuve `{value, comment \| link}`, sinon tout l'appel est refusé. |
+| H92 | `table.write` écrit 50 lignes au plus, `{key, revision?, set, clear, verified_empty}`, chaque ligne atomique et rapportée ; `null` refuse sa ligne ; `create_only: true` refuse (`conflict`) une clé qui existe déjà, avec la ligne telle qu'elle est, sans rien écrire pour elle ; dans un tableau `proof: true`, une valeur nouvelle exige sa preuve `{value, comment \| link}`, sinon tout l'appel est refusé ; sans `proof`, elle s'écrit nue (fiche D133). |
 | H93 | Une ligne lue a la forme de l'écriture : `{key, revision, set, verified_empty, provenance?, claim?}` ; `set` ne sert que les colonnes déclarées, et jamais de `null` : une colonne sans valeur est absente. |
-| H94 | Chaque cellule porte sa provenance (`origin`, `by`, `ctx?`, `at`, `comment?`, `link?`, `imported?`) ; une valeur changée perd `comment` et `link`, une valeur identique ne change rien. |
+| H94 | Chaque cellule porte sa provenance (`origin`, `by`, `ctx?`, `at`, `comment?`, `link?`, `imported?`, `host?`, `worker?`) ; `host` est la signature du client MCP du `ctx`, `worker` le travailleur du bail (E11-S01) ; une valeur changée perd `comment` et `link`, une valeur identique ne change rien. |
 | H95 | Une grammaire de filtre pour `rows`, `aggregate` et `claim` : `{col: valeur}` ou `{col: {op: valeur}}` (`eq`, `ne`, `contains`, `in`, `gt`, `gte`, `lt`, `lte`, `empty`, `not_empty`), 30 clauses au plus ; `in: []`, `null`, colonne inconnue refusés. |
-| H96 | `table.rows` rend 20 lignes par défaut, 50 au plus, avec un curseur opaque, un tri selon le type déclaré, une recherche `q` sans accent et le compte au même filtre. |
+| H96 | `table.rows` rend 20 lignes par défaut, 50 au plus, avec un curseur opaque, un tri selon le type déclaré, une recherche `q` par mots (chaque mot, sans casse ni accent, dans une cellule cherchable, en tout ordre : `queryWords`, E11-S01) et le compte au même filtre. |
 | H97 | `table.aggregate` compte, et fait somme, moyenne, minimum et maximum des colonnes nombre, groupé par une colonne ou en totaux, sous un filtre `where`, 1 000 groupes au plus. |
 | H98 | `table.claim` réserve 5 lignes au plus par appel, baux expirés d'abord puis l'attente la plus longue, avec un bail de 15 minutes (60 au plus) lié à la personne et au travailleur, 5 baux par travailleur et tableau ; seul son titulaire rend la ligne. |
 | H99 | La revue humaine sert la file des lignes à l'état de revue ; une décision (approuver ou rejeter) est atomique sous garde de révision, passe la provenance de l'état à `human` avec qui, quand et pourquoi, et écrit une ligne de journal. |
@@ -109,7 +109,7 @@
 
 | Id | Règle |
 |---|---|
-| P10 | Les états de décision d'un cycle avec revue sont réservés à la revue humaine : ni `table.write` ni `table.release` ne les posent. |
+| P10 | Les états de décision d'un cycle avec revue sont réservés à la revue humaine : ni `table.write` ni `table.release` ne les posent, sauf sur un tableau dont la revue déclare `agents_may_decide` (E11-S01, fiche D132 ; provenance `agent`). |
 | P12 | Le déplacement d'un nœud passe par la route `POST /api/plateforme/nodes/move` et l'action « Déplacer… » de l'écran, au niveau gestion ; aucun des six outils ne déplace. |
 | P13 | Les alias d'un déplacement sont écrits en base par le déclencheur `nodes_aliases_on_move`, pour tous les nœuds déplacés, invisibles compris ; l'alias qu'un nœud reprend est retiré. |
 | P14 | Tout texte servi au modèle (description, refus, consigne d'un résultat MCP) se teste mot pour mot ; un message interne ne se compare jamais. |
@@ -523,7 +523,7 @@
 | N2 | Une activation compte comme nouveauté à sa date de dernière mise à jour à l'état actif (`updated_at`, sinon `created_at`). |
 | N3 | L'usage des procédures utiles compte les lignes de journal de la personne et des équipes qu'elle mène (toutes ses équipes si elle administre l'organisation), choisies par la requête du service ; un simple membre ne compte que les siennes. |
 | N4 | Documents récents : pages et tableaux visibles, hors racine, que la personne a lus ou écrits au journal, dont elle a écrit des blocs ou qu'elle a publiés, sur 90 jours ; procédures et Contextes exclus. |
-| N6 | Tailles nominales, chaque bloc coupé à la dernière ligne entière qui tient, titre gardé : Contextes 2 400, 1 200, 1 200 ; nouveautés 600 ; procédures utiles 8 000 ; documents récents 1 400 ; un bloc coupé est rapporté `cut`. |
+| N6 | Plus en vigueur (E11-S03, fiche D134) : plus de taille nominale ni de coupe par bloc ; chaque bloc est servi entier sous le plafond de `context` (H30) ; un bloc coupé par le plafond ou arrêté par une borne en lignes est rapporté `cut`. |
 | N8 | L'aperçu du contexte rend la même première ligne « ctx: XXXX-XXXX » qu'un vrai `context`, pour que les tailles soient les mêmes. |
 | N9 | Bloc d'un Contexte : « ## Context: … », ses blocs publiés rendus un niveau sous `read`, puis « Pages and tables here: » et « Linked pages: » (cibles publiées et lisibles, sans doublon), jamais leur corps ; coupé, il finit par un pointeur vers `read`. |
 | N10 | Contextes servis : Tout le monde, Perso si le profil a un `handle`, puis chaque équipe de l'identité, celle par défaut d'abord, les autres par nom. |
@@ -746,7 +746,7 @@
 | N3 | Deux créations concurrentes d'une même clé donnent un seul bloc `row` : la violation d'unicité `23505` est relue puis appliquée comme une mise à jour, jamais par upsert. |
 | N4 | Une ligne sous le bail actif d'une autre personne refuse l'écriture ; `claimed_by_user` fait foi : la même personne écrit quel que soit son libellé de travailleur. |
 | N8 | Le `comment` d'une cellule fait 1 000 caractères au plus ; son `link` est une URL `http(s)` de 2 000 caractères au plus. |
-| N9 | Quand l'en-tête déclare `review`, les états de décision (`approve`, `reject`) ne se posent ni par `table.write` ni par `table.release`, seulement par la revue humaine de l'écran. |
+| N9 | Quand l'en-tête déclare `review`, les états de décision (`approve`, `reject`) ne se posent ni par `table.write` ni par `table.release`, seulement par la revue humaine de l'écran, sauf quand la revue déclare `agents_may_decide` (E11-S01). |
 | N10 | Libérer une ligne sans bail n'est pas une erreur (`released: false`) ; une ligne réservée par un autre titulaire rend `conflict`. |
 | N11 | 5 baux actifs au plus par personne, travailleur et tableau ; `table.claim` rend le reste du quota, et `conflict` quand il est atteint. |
 | N12 | `table.claim` sert d'abord les lignes au bail expiré, puis l'attente la plus longue (`updated_at`), puis la clé. |
@@ -931,6 +931,64 @@
 | HN-E09S05-12 | Sur un clone de B, une erreur de contrainte (check, clé étrangère, unicité, non-nul) est une fuite ; 42501, 23503 d'un parent invisible et 23514 d'un Contexte à l'équipe invisible sont des refus ; toute autre erreur fait échouer. |
 | HN-E09S05-20 | Le clone d'une insertion porte l'appelant dans les colonnes comparées à `auth.uid()` (`user_id`, `created_by`, `invited_by`, `granted_by`, `activated_by`) et l'état d'une création (`feedback` ouvert, `sim_outbox` brouillon). |
 
+### E10-S04 — Compatibilité markdown des pages : tableau simple, séparateur, repli, listes imbriquées, titres, texte en ligne
+
+| Id | Règle |
+|---|---|
+| HN-E10S04-6 | La conversion au premier `write` d'une section relue est admise, sans migration des données : un paragraphe fait d'un tableau, un « --- » seul, un paragraphe `<details>` ou un élément qui porte une sous-liste deviennent des blocs neufs ; de même, un élément de liste dont une ligne suivante commence par une marque (`"c\n1. x"`, écrit seulement par l'API des blocs) est relu en sous-liste aux niveaux 1 et 2, et sa section refusée au niveau 3 (`line N: lists go three levels deep at most.`). |
+| HN-E10S04-9 | « Précédée d'une ligne vide ou en tête du texte » se lit « au début d'un bloc, jamais dans un paragraphe » : un tableau ou un séparateur qui suit un titre, une liste ou un encart sans ligne vide est reconnu ; une ligne `<details>` interrompt un paragraphe, comme une clôture ou un titre. |
+| HN-E10S04-10 | La marque qui ouvre une sous-liste est admise de 0 à 3 espaces, ou jusqu'à la largeur de la marque de l'élément moins un quand elle est plus grande (un élément numéroté à partir de 1000 relit sa sous-liste). |
+| HN-E10S04-11 | Dans une sous-liste, des lignes vides entre deux sous-éléments sont admises et se relisent en liste serrée ; au premier niveau, une ligne vide suivie d'une marque ouvre toujours une seconde liste. |
+| HN-E10S04-12 | Le résumé d'un repli est lu sans ses blancs de bord et compté comme un titre (`btrim`, 1 à 200 caractères) ; un résumé vide reçoit le refus « a toggle starts with <summary>…</summary> on one line. ». |
+| HN-E10S04-13 | Un accent grave échappé ne s'affiche sans sa barre oblique que hors d'un span de code (`codeSpans` inchangé) ; un `\<` devant `<https://…>` empêche l'adresse entre chevrons, l'adresse nue qu'il contient restant un lien. |
+| HN-E10S04-14 | Dans l'éditeur, un élément de liste sur plusieurs lignes se relit en autant d'éléments, et les enfants d'un élément racine sur plusieurs lignes suivent sa dernière ligne ; un sous-élément sur plusieurs lignes montre chacune à sa profondeur, avec sa marque, et se relit en autant de sous-éléments frères, ses enfants après sa dernière ligne : aucun enfant ne change de niveau ni de parent ; une ligne de deux espaces ou plus d'un Texte changé en liste devient un sous-élément. Numéros de gouttière d'une liste numérotée (corrigés par E10-S06) : seuls les éléments du premier niveau se comptent, à partir de `start` (`numerosDeGouttiere`). |
+| HN-E10S04-15 | Les clôtures d'un corps de repli (accents graves ou tildes, 0 à 3 espaces avant ; une clôture jamais fermée court jusqu'à la fin) se lisent par `fencedParts` (`schemas/link-syntax.ts`), que partagent la publication (`links`), l'écran (`cheminsCites`) et le rendu. |
+| HN-E10S04-16 | Dans l'éditeur, un tableau et un repli se nomment par leurs colonnes ou leur résumé, sinon « bloc vide » (`premiersMots`), un séparateur « Séparateur » (E10-S06) ; `h6` se distingue de `h5` par la mono capitales des intitulés (`content.css`). |
+
+### E10-S01 — Markdown et CSV : coller, importer, exporter ; `table.import`
+
+| Id | Règle |
+|---|---|
+| HN-E10S01-11 | Le `.md` d'une page (`pageMarkdown`) et son inverse (`readPageMarkdown` : titre, résumé, morceaux d'un import) vivent dans `schemas/blocks-render.ts`, exportés par `./schemas` ; `server/nodes/export.ts` les importe. |
+| HN-E10S01-12 | `slugOf`, `OP_TEXT_MAX`, `PAGE_MAX` (`schemas/nodes.ts`), `instantOf`, `maxLengthOf`, `COLUMN_TEXT_MAX` et `ROW_KEY_MAX` (`schemas/tables.ts`) passent dans `schemas/`, réexportés à leur ancienne place (`segments.ts`, `limits.ts`, `meta.ts`) : l'écran et le service appliquent la même règle ; `segmentOf` et `columnNameOf` reposent sur `slugOf`. |
+| HN-E10S01-13 | `kept_as_text` compte les constructions gardées en texte (bloc `code` ou paragraphe) : `call` ou `reference` mal formés, clôture jamais fermée, titre de plus de 200 caractères, source d'image trop longue, tableau hors bornes, résumé de repli refusé, bloc que le schéma refuse encore ; les formes ramenées (`#` en titre de niveau 1, liste coupée ou ramenée au troisième niveau, repli dans un repli, `---` en séparateur, `mermaid` vide retiré) ne comptent pas. |
+| HN-E10S01-14 | En mode tolérant, hors du tableau d'AC-a2 : un texte sans marque dans une sous-liste devient un élément ; puces et numéros mêlés gardent la forme du premier élément ; un repli jamais fermé court jusqu'à la fin ; un résumé trop long est coupé à 200 caractères ; un résumé refusé laisse la ligne `<details>` en texte (compté) ; un bloc de plus de 100 000 caractères reste refusé. |
+| HN-E10S01-15 | En mode tolérant, un `call` ou une `reference` mal formés deviennent un `code` sans mot de tête ; une clôture jamais fermée garde son mot de tête, sauf `call`, `reference` et `mermaid`. |
+| HN-E10S01-16 | Les morceaux d'un `.md` importé partent en `insert_after` sans bloc, du dernier au premier, dans une seule requête : `append` exige une section, qu'une page neuve n'a pas (écart d'AC-a3). |
+| HN-E10S01-17 | L'encart « N éléments conservés en texte » d'un `.md` importé vit dans le retour du rail : le message s'écrit dans sa région `role="status"`, montée vide, quand la page importée devient l'adresse ouverte, et l'encart visible (`role="note"`) part avec son état quand une autre adresse s'ouvre ; après un collage ou un dépôt dans l'éditeur, le compte va dans son annonce (`role="status"`). |
+| HN-E10S01-18 | `GET nodes/export` et `GET tables/export` ne sont pas journalisés, comme toute lecture : leurs routes ne rendent aucune ligne de journal, `exportNode` et `exportTable` ne calculent ni cible ni équipe ; l'export reste borné à 5 000 lignes et décidé par la lecture. Confirmée par JB le 2026-09-29 (D138). |
+| HN-E10S01-19 | `table.import` sur un tableau existant : `key`, s'il est donné, doit nommer sa clé, sinon refus ; les colonnes inconnues, nommées deux fois ou l'état d'une file sont ignorées et listées dans la réponse (texte et champs), comme à l'écran. |
+| HN-E10S01-20 | La borne de 40 000 caractères de `table.import` est une constante à côté du schéma (`IMPORT_CSV_MAX`), dite par sa description et contrôlée par l'adaptateur en `too_large` (un `.max` Zod rendrait `invalid_arguments`). |
+| HN-E10S01-21 | Une création (écran, `table.import`, conversion) décide les droits (gestion du parent), contrôle tout le lot, crée et publie le tableau par le service de `write`, puis écrit les lignes en une transaction ; toute erreur levée après la création (relecture du tableau, lecture de son équipe, refus ou panne du lot) porte `details.created` et le dit (« The table <chemin> was created and published, but none of these rows was written… »), une erreur sans code devenant `internal` ; « Reprendre » remplit ce tableau sans `create`, un refus portant `details.created` n'essaie pas l'adresse suivante, et la conversion garde par rangée le tableau d'un premier lot refusé (`convertis`, `use-envois.ts`). Reste ouvert : M77. |
+| HN-E10S01-22 | La provenance `import` passe par `RowActor.origin` : toute cellule écrite par un import, clé et état d'entrée d'une file compris, porte `origin: "import"` ; le commentaire va aux valeurs posées. |
+| HN-E10S01-23 | Le dépôt d'un `.csv` sur un tableau existant enveloppe son corps (`ui/tableau/tableau-du-noeud.tsx`), vide compris, avec « Importer un fichier… » pour le clavier ; `grille.tsx` n'est pas touché (D140). |
+| HN-E10S01-24 | Le « ⋯ » d'un Contexte offre « Télécharger en .md », son seul geste ; remplace E05-S10 AC-b8 (« aucun ⋯ sur un Contexte »). Confirmée par JB le 2026-09-29 (D139). |
+| HN-E10S01-25 | « Convertir en tableau de données » : adresse `<page>/<segment du titre>`, puis `_2`… (cinq essais) ; les cellules du tableau simple sont prises telles quelles (barres échappées et `<br>` gardés). |
+| HN-E10S01-26 | `server/tables/import.ts` lit `nodes/write` par un import dynamique : sans lui, le registre du catalogue, qui importe `table.import`, forme un cycle (registre, `write`, publication, contrôle des procédures, registre). |
+| HN-E10S01-27 | La phrase d'AC-c2 sur le markdown est écrite telle que l'AC la cite (« with write »), sans le préfixe de l'organisation. |
+| HN-E10S01-28 | Un nombre qui commence par un zéro suivi d'un chiffre (`01000`) n'est pas un nombre : une colonne de codes postaux reste un texte ; l'apostrophe d'un export se retire aussi devant une tabulation ou un retour chariot. |
+
+### E10-S06 — Éditeur des blocs de page : choix du « + » et de `/`, tableau simple, séparateur, repli, niveaux de liste, préfixes de titre
+
+| Id | Règle |
+|---|---|
+| HN-E10S06-6 | Le « + » d'une page vide n'est pas codé : message, bouton de la page vide et `insererEnTete` restent ceux d'avant ; AC-a1 vaut pour le « + » d'un bloc, AC-a2 pour tout Texte vide (décision de JB du 2026-09-29 : la page vide sera remplacée par un premier Texte créé et focalisé). |
+| HN-E10S06-7 | Les bornes d'un ajout (« 20 colonnes au plus. », « 200 rangées au plus. ») et les refus d'un niveau de liste se disent dans la ligne d'annonce de l'éditeur (`LigneDAnnonce`, `role="status"`) : rien n'a changé, rien n'est refusé à l'envoi ; le message sous le champ reste celui du contrôle qui retient un envoi (D142). |
+| HN-E10S06-8 | `Tab` et `Maj+Tab` agissent sur la ligne du curseur, les suivantes gardant leur indentation (`elementsLus`) ; `Maj+Tab` sur une ligne du premier niveau ne change rien et annonce « Cette ligne est déjà au premier niveau. » ; `Tab` qui descendrait de deux niveaux sous la ligne d'avant annonce « Rien au-dessus de cette ligne. » (D143). |
+| HN-E10S06-9 | Un repli ne se fond pas plus qu'un tableau (Retour arrière au début d'un bloc, Suppr à la fin du précédent) : le focus va à sa rangée. |
+| HN-E10S06-10 | Tant que la liste de « / » est ouverte, le Texte attend le choix d'un bloc : le différé de 1 200 ms ne l'écrit pas, et la frappe qui ouvre la liste désarme celui d'une frappe d'avant ; la sortie du champ et ⌘S l'écrivent ; liste fermée (Échap, ou un texte qui ne commence plus par `/`), un texte comme « /etc » part au différé dès la frappe suivante (`useChoixParBarre`) (D144). |
+| HN-E10S06-11 | La liste de « / » garde l'ordre du menu tant que rien ne suit `/`, puis met les meilleures entrées d'abord (`fuzzyScore`) ; casse et accents retirés par `normalizeTitle`. |
+| HN-E10S06-12 | « Séparateur » choisi par « / » met le focus à sa poignée (AC-a1) ; le Texte neuf d'AC-a4 ne suit que `---` tapé. |
+| HN-E10S06-13 | Dans un tableau, `Entrée` sur la dernière rangée ne fait rien ; `Maj+Tab` dans la première cellule sort du tableau ; la cellule courante du menu est la dernière qui a eu le focus, la première cellule d'en-tête avant tout focus. |
+| HN-E10S06-14 | Une cellule montre son markdown tel qu'il est gardé (barre verticale échappée) ; à l'envoi, seule une barre verticale qui n'est pas déjà précédée d'une barre oblique inverse est échappée. |
+| HN-E10S06-15 | Un Texte devenu repli perd les lignes blanches de bord de son corps ; à l'envoi, le résumé perd ses blancs de bord et le corps ses lignes blanches de bord. |
+| HN-E10S06-16 | Un tableau aux cellules vides est un bloc vide (`estVide`) : neuf, il ne part qu'avec sa première frappe ; servi puis vidé, il part en `delete_block` avec « Annuler » quand le focus quitte sa rangée ; un geste du menu d'un tableau part comme une frappe ; en conflit, un tableau se compose en texte, une rangée par ligne, une tabulation par cellule. |
+| HN-E10S06-17 | Le collage d'un tableur ignore sa fin de ligne finale et lit les fins de ligne CRLF. |
+| HN-E10S06-18 | Le menu d'un séparateur n'a ni groupe « Style » ni « Ce bloc se modifie par votre assistant. ». |
+| HN-E10S06-19 | `Tab` sans Maj sur la poignée d'une liste à puces, d'une liste numérotée ou d'un tableau simple porte le focus au premier élément de la tabulation après la rangée (`tabIndex` positif ou nul, ni désactivé, ni sous `[hidden]` ou `[inert]`, ni non rendu : contenu d'un `<details>` fermé, ou `checkVisibility()` là où le navigateur l'a) ; rien après la rangée : la touche reste au navigateur, et les éléments de la tabulation de la rangée qui suivent la poignée passent à `tabIndex = -1` jusqu'au `setTimeout(0)` suivant, qui rend à chacun son attribut ; les autres blocs gardent l'ordre du DOM ; `Maj+Tab` et l'ouverture du menu sont inchangés. |
+| HN-E10S06-20 | `---`, `***` ou `___` ne fait un séparateur que si le Texte valait juste avant un début de la marque (vide, `-`, `--`…) : « ---x » raccourci en `---` reste un Texte. |
+| HN-E10S06-21 | `simpleTableOf` (`schemas/blocks.ts`) est le seul lecteur du `data` d'un tableau simple : ce qui n'est pas un tableau se lit vide, une cellule qui n'est pas une chaîne `""`, un alignement inconnu `null` ; « Convertir en tableau de données » n'est au menu que d'un tableau simple qui a au moins une colonne, et ne fait rien pour un autre bloc. |
+
 ### E11-S04 — Routage des procédures : questions « comment », égalités, formulations du résumé, fautes de frappe
 
 | Id | Règle |
@@ -945,7 +1003,7 @@
 | HN-E11S04-8 | Aucun champ nouveau dans `structuredContent` : `data_question` vaut `false` pour `how` et `request`. |
 | HN-E11S04-9 | `route_candidates` et `search_content` excluent la corbeille (`deleted_at is null`) avant leur coupe ; le service garde `nodeLevels` après la fonction. |
 | HN-E11S04-10 | Aucune branche de présélection pour une formulation contenue dans la demande : ses mots sont des lexèmes de la demande, que la branche plein texte trouve. |
-| HN-E11S04-11 | La story livre son propre fichier de migration ; le pilote le réunit dans la migration unique de 1.0.1 (fiches D131, D124). |
+| HN-E11S04-11 | La story livre son propre fichier de migration ; le pilote le réunit dans la migration unique de 1.1.0 (fiches D131, D145, D124). |
 | HN-E11S04-12 | Les formules de demande (`REQUEST_FORMULAS` de `server/routing.ts`) forment une liste fermée écrite dans le code, comme les interrogatifs. |
 | HN-E11S04-13 | Le seuil de la correction est la clause `set pg_trgm.similarity_threshold = '0.3'` de `lexicon_fix`, sans paramètre : ses deux appelants corrigent à 0,3. |
 | HN-E11S04-14 | Quand des étapes sont servies, la ligne du routage ne change pas, sauf la phrase `how` ; les autres candidates y sont déjà listées. |
@@ -986,7 +1044,7 @@
 | HN-E11S10-22 | « Nouveautés » manquait quand `newsBlock` rend `null` : la vue rend sa section de repli dans les trois cas d'absence. |
 | HN-E11S10-A | `ensure_private_space` n'écrit rien sous un `private/<handle>` tenu par une autre personne : ni Contexte, ni changement de propriétaire. |
 | HN-E11S10-B | La renumérotation `<handle>_<n>` (handle ancien chemin d'un autre nœud) est sautée quand l'espace de la personne est déjà à `private/<handle>` : un second appel n'écrit rien. |
-| HN-E11S10-C | Horodatage de la migration : `20260929160000`, après `20260929140000` d'E11-S04 ; le pilote la réunit dans la migration unique de 1.0.1 (fiches D131, D124). |
+| HN-E11S10-C | Horodatage de la migration : `20260929160000`, après `20260929140000` d'E11-S04 ; le pilote la réunit dans la migration unique de 1.1.0 (fiches D131, D145, D124). |
 | HN-E11S10-D | La section « Nouveautés » de repli se place avant les blocs `procedures` et `recent content`, après toutes les autres parties. |
 | HN-E11S10-E | `VersLaPartie` ne défile au montage que si l'adresse porte une ancre ; une ancre sans partie amène le haut de la vue (`#haut-de-la-vue`). |
 | HN-E11S10-F | Dans l'îlot « Activités » de l'accueil (`h2`), les titres de journée sont des `h3`. |
@@ -995,6 +1053,86 @@ Limites connues : deux insertions concurrentes sans handle dont l'email a le mê
 recevoir le même handle, et la seconde échoue (`23505`) ; `unique_handle` est quadratique pour une
 organisation qui compte beaucoup de membres sans email.
 
+### E11-S03 — Contexte et conversations : invalidation ciblée des ctx, plafond seul et coupe dite, déplacer et compléter une liste
+
+| Id | Règle |
+|---|---|
+| HN-E11S03-1 | `feedback` accepte un code `ctx` connu, de la personne et de l'organisation, mais périmé ; un code absent ou inconnu reste `ctx_missing`. Validée par le responsable d'Oto (2026-09-29). |
+| HN-E11S03-3 | Le déclencheur `bump_rules_version` et `rules_version` restent, comptés, plus lus par la garde. |
+| HN-E11S03-4 | Un code sans `contexts` (émis avant 1.1.0) est périmé, sans reprise. |
+| HN-E11S03-5 | Les révisions se lisent dans la transaction d'`issueCtx`, en parallèle des corps : une publication entre les deux lectures peut périmer le code une fois de trop, ou le laisser valide sur un corps plus ancien de quelques millisecondes. |
+| HN-E11S03-6 | Le contenu comparé est celui des blocs publiés (type, texte, données, clé) ; titre et résumé exclus. |
+| HN-E11S03-7 | La révision d'un Contexte se lit sans filtre de niveaux, à l'émission comme à la garde ; un droit ou une équipe changés sans révision n'invalident rien. |
+| HN-E11S03-8 | `append` au-delà de 500 éléments (sous-éléments compris) ne prolonge pas la liste : un bloc neuf, dit. |
+| HN-E11S03-9 | Une liste numérotée prolongée garde son `start` ; celui du texte ajouté est ignoré. |
+| HN-E11S03-10 | La ligne « - (start of page, N characters) » n'est que dans le texte du plan et de `staleState` : compte de sections, `data.outline` et plan de l'écran inchangés. |
+| HN-E11S03-11 | `context` n'a pas de champ `cut` dans `data` : le texte dit la coupe. |
+| HN-E11S03-13 | Au-delà du plafond, l'ordre est l'ordre servi, sans priorité propre ; l'avis de fin « Context budget reached. Omitted: … » est inchangé. |
+| HN-E11S03-14 | Une partie de Contexte coupée par le plafond recule avant un bloc clôturé resté ouvert et finit par le pointeur « This context is cut… » ; la procédure reconnue qui ne tient pas cède la place à son pointeur (N2) ; l'écran reprend ses lignes existantes, sans phrase neuve. |
+| HN-E11S03-15 | Les bornes en lignes restent : listes d'un Contexte 20, procédures utiles 60, nouveautés 10, contenus récents 20. Validée par le responsable d'Oto (2026-09-29). |
+| HN-E11S03-16 | À la garde, un chemin gardé par le code mais plus attendu (équipe quittée), ou attendu mais pas gardé (équipe rejointe), est ignoré. |
+| HN-E11S03-17 | Le refus nomme les chemins changés dans l'ordre des parties (`expectedContextPaths`), bornés par `boundedList`. |
+| HN-E11S03-18 | Le nombre du pointeur d'une partie coupée est tiré du plafond (`formatCount(CONTEXT_BUDGET)`, « 35,000 »), jamais écrit en dur. |
+| HN-E11S03-19 | Une partie dont même la tête ne tient pas n'est omise que si son corps est servi (`path` posé) ; les autres blocs se coupent à la dernière ligne entière. |
+| HN-E11S03-20 | Un instantané de `node_versions` absent pour l'une des deux révisions comparées vaut un changement : le code est périmé. |
+| HN-E11S03-21 | Nouveautés et contenus récents, arrêtés à 10 et 20 lignes, n'ajoutent pas de ligne « … and k more » ; les listes d'un Contexte et les procédures utiles disent leur arrêt. |
+| HN-E11S03-22 | Dans le résultat d'`append` qui prolonge une liste, « +N » est la croissance de la section en caractères. |
+| HN-E11S03-23 | « the list continues with N more items » compte les éléments ajoutés, sous-éléments compris. |
+| HN-E11S03-24 | `staleState` d'une page sans titre : la ligne de début de page, puis « - (no section) ». |
+| HN-E11S03-25 | Le résultat de `move_block` vers une section cite son titre tel que rangé, non tel que demandé. |
+| HN-E11S03-26 | Un titre déplacé vers une sous-section de la section qu'il ouvre n'est pas refusé ; seul `section` égal à la section qu'il ouvre l'est (« a heading cannot move into the section it heads. »). |
+
+### E11-S14 — Harnais de test sans Supabase : les suites du paquet tournent sur un Postgres nu, seules celles de l'adaptateur Supabase gardent le projet
+
+| Id | Règle |
+|---|---|
+| HN-E11S14-1 | L'identité d'une suite portable est un jeton de la forme « supabase » du port (`sub` = identifiant interne), signé par une clé locale (`testIssuer`) et vérifié par `makeVerifyToken({ jwks, issuer })` injecté ; les personnes viennent de `createSqlFixtures` ; aucun service joint. |
+| HN-E11S14-3 | `api-invitations` pose `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` par `vi.stubEnv` (adresse en `.invalid`), `signInWithOtp` restant espionné : le client se construit, rien n'est joint. |
+| HN-E11S14-4 | La vérification d'un vrai jeton par la JWKS du projet est un `it` explicite de `mcp-http`, gardé par le projet (session par `createFixtures().sessionFor`). |
+| HN-E11S14-5 | AC1 et AC2 de `portabilite-schema` (lecture d'`auth.users` et `auth.oauth_*`) restent sur le projet, entiers. |
+| HN-E11S14-6 | `tests/unit/gardes-supabase.test.ts` lit les noms importés par `import {…} from`, `export {…} from` et un import dynamique déstructuré (`const {…} = await import(…)`), alias et `type` retirés. |
+| HN-E11S14-7 | La liste de `gardes-supabase.test.ts` est fermée dans les deux sens : un fichier qui importe une garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers des lots b et c y sont marqués « pending ». |
+
+### E11-S01 — Tableaux : créer sans écraser, colonne obligatoire stricte, recherche par mots, révision et auteur, décision de revue par l'agent, preuve par tableau (lots a à f)
+
+| Id | Règle |
+|---|---|
+| HN-E11S01-1 | `create_only` est un indicateur par appel, pas par ligne. |
+| HN-E11S01-2 | `create_only` avec `revision` sur une ligne est refusé au schéma ; une valeur nue d'un appel `create_only` suit la règle de l'appel entier (`withoutBareValues`), jugée avant tout. |
+| HN-E11S01-3 | L'attribut de colonne `allow_verified_empty` (défaut `true`) vaut pour toute colonne ; « obligatoire strict » = `required: true` et `allow_verified_empty: false`. |
+| HN-E11S01-4 | Un mot de `q` se découpe sur ce qui n'est ni lettre ni chiffre, après `normalizeTitle`, et se cherche en sous-chaîne ; aucune borne du nombre de mots au-delà des 200 caractères de `q`. |
+| HN-E11S01-5 | `host` et `worker` se rangent à l'écriture dans la provenance ; `host` est la signature de `ctx.host` telle que rangée. |
+| HN-E11S01-6 | `table.write` n'a pas d'argument `worker` : il range celui du bail actif de la même personne. |
+| HN-E11S01-7 | Un assistant au niveau écriture peut publier `agents_may_decide` et `proof` par `write`, comme tout attribut d'en-tête ; canal ouvert voulu, tracé par la ligne de publication, le journal et la provenance `agent`. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S01-8 | Une décision d'un assistant garde `origin: "agent"`, sans origine nouvelle ni commentaire exigé ; la colonne d'état s'écrit nue. |
+| HN-E11S01-9 | La révision servie par `table.schema` est celle du nœud publié, celle que `write` attend en `base_revision`. |
+| HN-E11S01-10 | L'attribut d'en-tête s'appelle `proof`, booléen, comme `closed`. |
+| HN-E11S01-11 | Un tableau créé sans `proof`, ou rangé avant 1.1.0, se lit `proof: false`. |
+| HN-E11S01-12 | Changer `proof` n'avertit de rien et ne réécrit ni ne compte aucune ligne ; une procédure publiée n'est pas recontrôlée au changement de `proof` ou de `closed`. |
+| HN-E11S01-13 | La fixture `PROSPECTS_HEADER` (`tests/factories/table-fixture.ts`) porte `proof: true`, pour que les tests de M53 et d'HN-M53-10 gardent leurs assertions ; un en-tête dérivé sans `proof` sert les cas du lot f. |
+| HN-E11S01-14 | Textes du changement de `proof` : « require proof » et « stop requiring proof » en attente, « proof required » et « proof optional » à la publication. |
+| HN-E11S01-15 | Sans `proof`, `withoutBareValues` retire encore une valeur nue égale à la valeur rangée : un renvoi tel quel ne remplace pas une provenance prouvée ou importée. |
+| HN-E11S01-22 | `agents_may_decide` est `.optional()` dans `tableReviewSchema`, sans défaut écrit : absent, il se lit faux, et un en-tête lu ne gagne pas la clé. |
+| HN-E11S01-23 | La description de `required` du patch d'en-tête (`tableColumnPatchSchema`) reprend celle du schéma de colonne, avec son exemple et son défaut (« e.g. true (default: unchanged; false for a new column) »). |
+| HN-E11S01-24 | Dans `table.schema`, la clé et la colonne d'état se disent `required` seul : `verified_empty` y est toujours refusé. |
+| HN-E11S01-25 | Publier `allow_verified_empty: false` sur une colonne déjà requise avertit (`missing_required`) des seules lignes qui n'y ont qu'un `verified_empty` ; une colonne rendue requise et stricte d'un coup avertit de toute ligne sans vraie valeur. |
+| HN-E11S01-26 | `table.release` range toujours le `worker` de l'appel dans la provenance de l'état ; sa description et sa ligne de refus disent l'exception d'un tableau qui laisse l'assistant décider. |
+
+### E11-S06 — Éditeur : une puce par élément de liste, modifier un lien dans un panneau
+
+| Id | Règle |
+|---|---|
+| HN-E11S06-1 | Le champ garde la source `[[…]]` pendant la frappe : le curseur dans un lien ouvre le panneau, source visible ; un clic sur un lien au repos ouvre le panneau, focus dedans, source cachée ; à la fermeture, le curseur revient au champ. Validée (2026-09-29). |
+| HN-E11S06-2 | Un clic simple sur un lien au repos ouvre le panneau et ne suit plus le lien ; Ctrl, ⌘ ou le bouton du milieu le suivent, et « Ouvrir » aussi. Validée (2026-09-29). |
+| HN-E11S06-8 | La copie des éléments d'une liste précède le champ dans le DOM : au clavier, les cases viennent avant le texte. |
+| HN-E11S06-9 | Un lien qui ne se relirait pas tel quel à sa place est refusé par le panneau : « Ce lien ne se relirait pas tel quel à sa place : changez son libellé ou son adresse. ». |
+| HN-E11S06-10 | « Ouvrir » ouvre la destination saisie dans le panneau. |
+| HN-E11S06-11 | Maj+clic sur un lien le suit, comme Ctrl ou ⌘. |
+| HN-E11S06-12 | En couleurs forcées, le champ est muet au repos et la copie reste lisible. |
+| HN-E11S06-13 | Le panneau du lien n'emploie pas React Hook Form. |
+| HN-E11S06-14 | Un lien écrit sans libellé : le champ du panneau montre le titre de la page choisie, et l'écriture garde `[[chemin]]`. |
+| HN-E11S06-15 | Dans une liste, le curseur, la relecture et le clic lisent la ligne de l'élément. |
+
 ### Tâches de suite
 
 | Id | Règle |
@@ -1002,8 +1140,8 @@ organisation qui compte beaucoup de membres sans email.
 | HN-M08-5 | Sous une session, une ligne `members` qui change de `user_id` perd l'email, le nom et la dernière connexion de la précédente ; si la personne nouvelle est l'appelante, elle reçoit les copies de ses claims. |
 | HN-M37b-3 | Le résumé en échec du pied du tableau s'affiche en alerte : « Le résumé n'a pas pu être calculé. » en titre, le message dessous, un lien « Réessayer », la grille intacte. |
 | HN-M38-1 | L'espace personnel `perso/<handle>` naît titré « Privé » ; un espace encore titré « Perso » par la base le devient, un titre changé par sa personne reste. |
-| HN-M53-10 | À la publication d'une procédure, un bloc `call` de `table.write` qui écrit une colonne de valeur sans `comment` ni `link` est refusé, valeur réservée comprise ; la colonne d'état et la clé s'écrivent nues ; une cellule entière réservée (`"<notes>"`) reste admise ; ce refus s'ajoute à un refus de type (fiche D100). |
-| HN-M53-5 | Dans `table.write`, une valeur nue d'une colonne de valeur est jugée sur les lignes lues avant toute écriture : égale à la valeur rangée, ignorée ; différente, ou sur une ligne à créer, elle refuse l'appel entier. |
+| HN-M53-10 | Sur un tableau `proof: true`, à la publication d'une procédure, un bloc `call` de `table.write` qui écrit une colonne de valeur sans `comment` ni `link` est refusé, valeur réservée comprise ; la colonne d'état et la clé s'écrivent nues ; une cellule entière réservée (`"<notes>"`) reste admise ; ce refus s'ajoute à un refus de type (fiches D100, D133). |
+| HN-M53-5 | Dans `table.write`, une valeur nue d'une colonne de valeur est jugée sur les lignes lues avant toute écriture : égale à la valeur rangée, ignorée ; différente, ou sur une ligne à créer, elle refuse l'appel entier sur un tableau `proof: true`, et s'écrit nue sans lui (fiche D133). |
 | HN-M54-5 | La file de revue lit 20 fiches : au-delà, elle dit « 20 premières sur N », et « Passer » depuis la dernière dit le retour à la première et que les suivantes paraissent après les décisions. |
 | HN-M59-1 | À l'écran, un bloc `call` déjà écrit se lit comme un texte (« Appel de <fonction> : { … } »), jamais exécuté par l'écran ; un appel dont le texte ne change pas reste un appel, et rien ne part pour lui. |
 | HN-M59-3 | Le service refuse encore la publication d'une procédure trop longue ou d'un bloc `call` déjà écrit ; l'écran de refus de publication en dit l'emplacement et le genre. |

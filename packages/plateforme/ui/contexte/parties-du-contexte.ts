@@ -272,7 +272,9 @@ export function morceauxDuBloc(nom: string, texte: string): MorceauServi[] {
 export function morceauxDuContexte(suite: string, { sansCorps = false }: { sansCorps?: boolean } = {}): MorceauServi[] {
   if (suite.startsWith(CONTEXT_INDEX.notLoaded) && !suite.includes("\n")) return [{ genre: "phrase", phrase: "non-charge" }]
   const lignes = suite === "" ? [] : suite.split("\n")
-  const coupe = lignes.length > 0 && lignes[lignes.length - 1].startsWith(CONTEXT_INDEX.rest)
+  const derniere = lignes.at(-1) ?? ""
+  // Les deux pointeurs d'un Contexte servi en partie (E11-S03, AC-b2, AC-b4) : listes arrêtées, ou coupe du plafond.
+  const coupe = [CONTEXT_INDEX.listsStopped, CONTEXT_INDEX.bodyCut].some((debut) => derniere.startsWith(debut)) && derniere.includes(CONTEXT_INDEX.readRest)
   const avantLaCoupe = lignes.length - (coupe ? 1 : 0)
   let fin = avantLaCoupe - 1
   const listes: MorceauServi[] = []

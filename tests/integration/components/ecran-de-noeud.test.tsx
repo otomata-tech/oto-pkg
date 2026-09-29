@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { NodeView, TreeNode } from "@otomata_tech/oto_platform/schemas"
 import { ContexteDeLHote, EcranDeNoeud, EcranDeNoeudChargement } from "@otomata_tech/oto_platform/ui"
+import { cheminsCites } from "../../../packages/plateforme/ui/noeud/corps-du-noeud"
 import { avecCle, bloc, ID, PAGE, vueDuNoeud } from "../../helpers/noeud"
 
 // L'écran d'un nœud (E05-S02 : AC1 à AC9, AC14, AC17, AC19 ; E05-S09, partie c1 : porté d'oto-frontend ;
@@ -254,8 +255,8 @@ describe("EcranDeNoeud, contenus liés et blocs (AC4 ; E05-S10, AC-b6)", () => {
     ]
     const { container } = rendre({ noeud: { data: vueDuNoeud({ blocks: blocs }) }, arbre: { data: { tree: [...ARBRE, noeud("ventes/grille", "page", "Grille")], truncated: false } } })
     expect(screen.getByRole("heading", { level: 2, name: "Objet" })).toHaveAttribute("id", "objet")
-    // Un seul niveau de titre (E05-S10, AC-a5) : un bloc de niveau 3 déjà écrit se lit comme les autres, en `h2`.
-    expect(screen.getByRole("heading", { level: 2, name: "Détails" })).toHaveAttribute("id", "10000000")
+    // Un titre prend la balise de son niveau (E10-S04, AC-b3, qui remplace E05-S10 AC-a5) : un niveau 3 en `h4`.
+    expect(screen.getByRole("heading", { level: 4, name: "Détails" })).toHaveAttribute("id", "10000000")
     const paragraphe = ancre(container, "20000000")
     expect(paragraphe?.tagName).toBe("P")
     expect(paragraphe?.textContent).toBe("Ligne un\nLigne <b>deux</b>")
@@ -335,6 +336,15 @@ describe("EcranDeNoeud, pages citées dans la phrase (E05-S11, AC-26, AC-27)", (
       ["ancien", "/n/ventes/ancien"],
       ["perdu", "/n/ventes/perdu"],
     ])
+  })
+
+  it("should read the pages cited by a table cell, a toggle summary and body outside its fences, and a sub-item (E10-S04, AC-a4)", () => {
+    const blocs = [
+      bloc("22000000-0000-4000-8000-000000000022", "simple_table", null, { columns: ["Nom", "Page"], rows: [["Devis", "[[ventes/cellule]]"]] }),
+      bloc("23000000-0000-4000-8000-000000000023", "toggle", "Voir [[ventes/corps]].\n```\n[[ventes/cloture]]\n```\nFin.", { summary: "Le [[ventes/resume]]" }),
+      bloc("24000000-0000-4000-8000-000000000024", "list", null, { items: [{ text: "Lire", children: { items: ["[[ventes/sous_element]]"] } }] }),
+    ]
+    expect(cheminsCites(blocs)).toEqual(["ventes/cellule", "ventes/resume", "ventes/corps", "ventes/sous_element"])
   })
 })
 
@@ -496,12 +506,12 @@ describe("EcranDeNoeud, sections toujours visibles comme titres (AC14 ; E05-S08,
   it("should give a writer the reader's outline, each heading field mounted in its heading element", () => {
     rendre({ noeud: { data: vueDuNoeud({ blocks: TITRES }) } })
     const lecteur = plan()
-    // Un seul niveau de titre (E05-S10, AC-a5) : les niveaux 2 et 3 déjà écrits se lisent en `h2`.
+    // Un titre de niveau N en `h(N+1)` (E10-S04, AC-b3, qui remplace E05-S10 AC-a5), au repos dans l'éditeur aussi.
     expect(lecteur).toEqual([
       ["H1", "Modèle de relance"],
       ["H2", "Objet"],
-      ["H2", "Détails utiles"],
-      ["H2", "Cas"],
+      ["H3", "Détails utiles"],
+      ["H4", "Cas"],
     ])
     cleanup()
 
@@ -509,7 +519,7 @@ describe("EcranDeNoeud, sections toujours visibles comme titres (AC14 ; E05-S08,
     expect(plan()).toEqual(lecteur)
     const champ = screen.getByRole("textbox", { name: "Modifier ce titre — Détails utiles" })
     expect(champ).toHaveValue("Détails **utiles**")
-    expect(champ.closest("h2")).toHaveAttribute("id", "10000000")
+    expect(champ.closest("h3")).toHaveAttribute("id", "10000000")
   })
 })
 

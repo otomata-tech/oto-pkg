@@ -181,7 +181,9 @@ franchit une de ces règles passe par un ADR.
   `JSON.stringify(…)`** : postgres.js sérialise un paramètre d'après le type que le serveur
   lui décrit, et une chaîne déjà sérialisée y est encodée une seconde fois. Postgres reçoit un JSON
   scalaire : `json_populate_recordset` lève 22023, une colonne `jsonb` garde sans bruit une chaîne au
-  lieu d'un objet. Un paramètre `text` reçoit à bon droit un `JSON.stringify` (`set_config`, claims de
+  lieu d'un objet. Même piège pour une valeur lue en `::text` et réécrite par `${chaine}::jsonb` : le
+  paramètre est déclaré `jsonb`, la chaîne est réencodée ; la réécrire par `${chaine}::text::jsonb`, ou
+  la lire en `jsonb` et passer `sql.json`. Un paramètre `text` reçoit à bon droit un `JSON.stringify` (`set_config`, claims de
   `server/sql.ts`). **Vérifiable :** `rg -nU '(sql|tx)\x60[^\x60]*\$\{JSON\.stringify' packages scripts tests`
   ne trouve que des arguments de `set_config` (`tests/integration/sql-session.test.ts`).
 - **`sql(rows)` prend les colonnes de la première ligne**, pendant de `defaultToNull`

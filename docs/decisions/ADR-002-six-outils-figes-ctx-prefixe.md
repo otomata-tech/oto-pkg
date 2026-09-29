@@ -24,11 +24,21 @@ hosts sans confusion.
    évolution permise est d'en **ajouter** un ; jamais renommer, retirer, rendre un champ
    obligatoire ni changer le sens d'un champ ; un nouveau champ est facultatif avec défaut ; une
    description ne change que pour s'allonger d'un domaine. Ce qui serait un changement cassant
-   devient une procédure ou une fonction, donc du contenu.
+   devient une procédure ou une fonction, donc du contenu. En 1.1.0, sans client (fiche D131, stade
+   R&D), les descriptions de `write` et des fonctions de tableau sont réécrites en place et non
+   seulement allongées : les hosts rafraîchissent la liste d'outils à la mise à jour (amendement
+   E11-S01, E11-S03).
 2. **Le champ `ctx` est requis partout sauf sur `context`.** C'est une ligne en base créée par
-   `context` (personne, organisation, `rules_version`, host, heure) ; il regroupe les appels d'une
-   conversation dans le journal et devient invalide quand les règles changent : le refus
-   « context has changed, call <préfixe>_context again » suffit, le modèle se rafraîchit seul.
+   `context` (personne, organisation, `rules_version`, Contextes servis, host, heure) ; il regroupe
+   les appels d'une conversation dans le journal. Le code `ctx` garde (`ctx.contexts`), pour chaque
+   Contexte que `context` attendait pour la personne (Tout le monde, son Privé si elle a un
+   `handle`, chacune de ses équipes), la révision publiée lue à l'émission. Il devient invalide
+   quand l'un de ceux-là change de contenu servi : première publication, retrait, ou republication
+   différente. Le refus nomme les chemins dans l'ordre des parties, bornés à 20 (« context has
+   changed (<chemins>): call <préfixe>_context again… ») ; il suffit, le modèle se rafraîchit seul.
+   La publication d'un autre Contexte, ou une republication à l'identique, ne l'invalide pas. Un
+   code sans `contexts` (émis avant 1.1.0) est périmé. `feedback` accepte un code connu mais
+   périmé. `rules_version` reste compté, plus lu par la garde (amendement E11-S03, fiche D132).
 3. **Le préfixe de l'organisation** est dans le nom des outils (`acme_context`…), calculé à
    chaque requête depuis l'organisation de l'adresse ; descriptions et messages citent le même
    préfixe. Court, en ASCII, fixé à l'arrivée du client et **jamais changé**. La description de
@@ -42,8 +52,14 @@ hosts sans confusion.
    1 000 caractères, première phrase impérative avec le prérequis. Instructions serveur réduites
    à une phrase qui renvoie à `context`.
 6. **Pas d'outil par famille d'objets** : tableaux, journal et contrats passent par `call` et `read`.
-7. **Budgets et annotations.** `context` : 20 000 caractères par blocs priorisés, coupés par la
-   fin. Tout résultat de `read` et `call` : 45 000 caractères au plus ; morceaux de `write` :
+7. **Budgets et annotations.** `context` : 35 000 caractères au plus (environ 10 000 tokens),
+   blocs servis entiers dans l'ordre servi, sans taille par bloc ; seules restent des bornes en
+   lignes (listes d'un Contexte 20, procédures utiles 60, nouveautés 10, contenus récents 20).
+   Au-delà du plafond, le premier bloc qui dépasse est coupé à la dernière ligne entière (la
+   procédure reconnue, jamais coupée, cède la place à son pointeur), les suivants sont omis et
+   nommés par la ligne finale ; une partie de Contexte coupée recule avant un bloc de code resté
+   ouvert et finit par un pointeur vers `read` ; une partie dont même la tête ne tient pas est
+   omise (amendement E11-S03, fiche D134). Tout résultat de `read` et `call` : 45 000 caractères au plus ; morceaux de `write` :
    20 000 caractères. Annotations : `readOnlyHint: true` sur `context`, `find`, `read` ;
    `destructiveHint: false` sur `feedback` seulement.
 
@@ -69,4 +85,5 @@ Contredit par le banc.
 
 ### Un readme + ack sans code par conversation
 Le levier mesuré 9 fois sur 9 est le champ requis ; l'ack seul prouve l'appel, pas la lecture. Le
-code `ctx` en base ajoute le regroupement du journal et l'invalidation par `rules_version`.
+code `ctx` en base ajoute le regroupement du journal et l'invalidation par les Contextes servis
+(par `rules_version` avant E11-S03).

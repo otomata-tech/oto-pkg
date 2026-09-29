@@ -47,7 +47,8 @@ async function publish(call: OpCall): Promise<AdminOutput> {
   const published = await publishNode(db, identity, node, { baseRevision: node.revision })
   const lines = [`${node.path} published: revision ${published.revision} (was ${node.revision}).`]
   if (published.rulesChanged) {
-    lines.push(`${node.path} is a context page: the open ctx codes of ${identity.org.slug} expire, and assistants call ${identity.org.prefix}_context again.`)
+    // Seules les conversations qui ont reçu ce Contexte périment (E11-S03, AC-a7).
+    lines.push(`${node.path} is a context page: the conversations it was served to expire, and their assistants call ${identity.org.prefix}_context again.`)
   }
   if (published.warnings.length > 0) lines.push("Warnings:", boundedList(published.warnings.map((warning) => `- ${warning}`), "\n"))
   // E05-S10, AC-b12 : l'adresse a suivi le titre publié.

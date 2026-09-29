@@ -6,7 +6,7 @@
 // (`authorize`, l'écran de connexion de l'émetteur), le point de jeton (code avec PKCE, rafraîchissement),
 // la révocation et la déconnexion annoncée, pour le client OIDC de l'hôte.
 import { createHash, randomBytes } from "crypto"
-import { decodeJwt, exportJWK, generateKeyPair, SignJWT, type JWTPayload } from "jose"
+import { decodeJwt, exportJWK, generateKeyPair, SignJWT, type JSONWebKeySet, type JWTPayload } from "jose"
 
 export type TestIssuerOptions = {
   /** Adresse de l'émetteur ; par défaut, une adresse propre à cet émetteur, au chemin `/oidc`. */
@@ -55,6 +55,8 @@ export type TestIssuer = {
    * avec PKCE S256.
    */
   authorize: (authorizationUrl: string, person: TestPerson) => string
+  /** La clé publique, celle que sert le point de clés : un vérificateur local la reçoit (`createLocalJWKSet`), sans `fetch` remplacé. */
+  jwks: JSONWebKeySet
 }
 
 /** Ce qu'une autorisation donne à l'échange de son code. */
@@ -199,6 +201,6 @@ export async function testIssuer(options: TestIssuerOptions = {}): Promise<TestI
     return callback.href
   }
 
-  const issued: TestIssuer = { issuer, requests, userinfo, fetch: serve, sign, clients, refreshTokens, accessTokenTtl: 3600, authorize }
+  const issued: TestIssuer = { issuer, requests, userinfo, fetch: serve, sign, clients, refreshTokens, accessTokenTtl: 3600, authorize, jwks }
   return issued
 }

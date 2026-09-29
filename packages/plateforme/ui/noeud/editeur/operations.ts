@@ -3,48 +3,107 @@
 // (`id` complet, révision lue, bloc structuré en `input`, jamais du markdown : HN-E05S02-17), et ce
 // que devient un refus. Fonctions pures. Sans lui, la traduction vers l'API vivrait dans les composants.
 import { blockInputSchema, type BlockInput, type BlockView, type WriteOpBody } from "../../../schemas"
+import {
+  isToggleFence,
+  LIST_DEPTH_MAX,
+  LIST_ITEMS_MAX,
+  listItemTexts,
+  SIMPLE_TABLE_COLUMNS_MAX,
+  SIMPLE_TABLE_ROWS_MAX,
+  simpleTableOf,
+  TOGGLE_SUMMARY_MAX,
+  trimBlanks,
+} from "../../../schemas/blocks"
 import type { ErreurPlateforme } from "../../api/client"
 import { messageDErreur } from "../../api/messages"
 import { caracteres } from "../en-ligne"
 import { EDITEUR } from "../libelles"
+import { avecTableau, celluleEnvoyee, sansLignesBlanchesDeBord } from "./blocs-de-page"
 import { texteDe, type BlocEdite, type Rangee } from "./modele"
 
-/** Les messages d'un bloc refusé avant l'envoi (AC13) ; `invalide` : un refus du schéma qu'aucun autre ne dit. */
+/** Les messages d'un bloc refusé avant l'envoi (AC13 ; E10-S06, AC-b1, AC-b4) ; `invalide` : un refus du schéma qu'aucun autre ne dit. */
 export const MESSAGES_DU_BLOC = {
   titreVide: "Un titre ne peut pas être vide.",
   titreUneLigne: "Un titre tient sur une ligne.",
   titreLong: "Un titre compte 200 caractères au plus.",
   tropLong: "Ce bloc est trop long : découpez-le en plusieurs blocs.",
-  listeLongue: "Une liste compte 500 éléments au plus : coupez-la en deux.",
+  listeLongue: `Une liste compte ${LIST_ITEMS_MAX} éléments au plus, sous-éléments compris : coupez-la en deux.`,
+  troisNiveaux: "Trois niveaux de liste au plus.",
+  colonnes: `${SIMPLE_TABLE_COLUMNS_MAX} colonnes au plus.`,
+  rangees: `${SIMPLE_TABLE_ROWS_MAX} rangées au plus.`,
+  resumeVide: "Le repli a besoin d'un résumé.",
+  resumeLong: `Le résumé tient en ${TOGGLE_SUMMARY_MAX} caractères.`,
+  repliDansRepli: "Un repli ne contient pas d'autre repli.",
   invalide: "Ce bloc ne peut pas être enregistré tel quel.",
 } as const
 
 /** Bornes de `blockInputSchema` (E01-S06), dites en français avant qu'il ne refuse. */
 const TITRE_MAX = 200
 const TEXTE_MAX = 100_000
-const ELEMENTS_MAX = 500
 
-/** Le bloc tel que `blockInputSchema` le lit : type, texte, données et clé, tels qu'ils sont. */
+/** Le nombre de niveaux d'une liste frappée (E10-S04, AC-b2) : 1 sans sous-liste. */
+function niveauxDe(items: unknown): number {
+  if (!Array.isArray(items)) return 0
+  let niveaux = 1
+  for (const item of items) {
+    const enfants = typeof item === "object" && item !== null && "children" in item && typeof item.children === "object" && item.children !== null && "items" in item.children ? item.children.items : null
+    if (enfants !== null) niveaux = Math.max(niveaux, 1 + niveauxDe(enfants))
+  }
+  return niveaux
+}
+
+/**
+ * Le bloc tel qu'il part (E10-S06) : les cellules d'un tableau sans blanc de bord, chaque `|` échappé (AC-b1) ; le
+ * résumé d'un repli sans blanc de bord, son corps sans ligne blanche de bord (AC-b4). Tout autre bloc, tel quel.
+ */
+function telQuIlPart(bloc: BlocEdite): BlocEdite {
+  if (bloc.type === "simple_table") {
+    const { columns, rows, align } = simpleTableOf(bloc.data)
+    return { ...bloc, data: avecTableau(bloc.data, { columns: columns.map(celluleEnvoyee), rows: rows.map((rangee) => rangee.map(celluleEnvoyee)), align }) }
+  }
+  if (bloc.type !== "toggle") return bloc
+  const resume = typeof bloc.data.summary === "string" ? trimBlanks(bloc.data.summary) : ""
+  return { ...bloc, text: sansLignesBlanchesDeBord((bloc.text ?? "").split("\n")).join("\n"), data: { ...bloc.data, summary: resume } }
+}
+
+/** Le bloc tel que `blockInputSchema` le lit : type, texte, données et clé, tels qu'ils partent. */
 function entreeDe(bloc: BlocEdite): unknown {
   return { type: bloc.type, ...(bloc.text === null ? {} : { text: bloc.text }), data: bloc.data, ...(bloc.key === null ? {} : { key: bloc.key }) }
 }
 
-/** Un bloc sans texte : un Texte, un titre ou une liste vidés. */
+/** Un bloc sans texte : un Texte, un titre, une liste, un tableau ou un repli vidés ; un séparateur ne l'est jamais (E10-S06, AC-a4). */
 export function estVide(bloc: BlocEdite): boolean {
-  return texteDe(bloc).trim() === ""
+  return bloc.type !== "divider" && texteDe(bloc).trim() === ""
+}
+
+/** Ce que le contrôle dit d'un tableau ou d'un repli avant le schéma (E10-S06, AC-b1, AC-b4) ; `null` : rien. */
+function messageDeLaForme(bloc: BlocEdite): string | null {
+  if (bloc.type === "simple_table") {
+    const { columns, rows } = simpleTableOf(bloc.data)
+    if (columns.length > SIMPLE_TABLE_COLUMNS_MAX) return MESSAGES_DU_BLOC.colonnes
+    return rows.length > SIMPLE_TABLE_ROWS_MAX ? MESSAGES_DU_BLOC.rangees : null
+  }
+  if (bloc.type !== "toggle") return null
+  const resume = typeof bloc.data.summary === "string" ? bloc.data.summary : ""
+  if (resume === "") return MESSAGES_DU_BLOC.resumeVide
+  if (caracteres(resume) > TOGGLE_SUMMARY_MAX) return MESSAGES_DU_BLOC.resumeLong
+  return (bloc.text ?? "").split("\n").some(isToggleFence) ? MESSAGES_DU_BLOC.repliDansRepli : null
 }
 
 /** Le bloc confronté à `blockInputSchema` avant tout envoi (AC13) : l'entrée validée, ou le message. */
 export function controler(bloc: BlocEdite): { entree: BlockInput } | { message: string } {
+  const propre = messageDeLaForme(telQuIlPart(bloc))
+  if (propre) return { message: propre }
   if (bloc.type === "heading") {
     const texte = (bloc.text ?? "").replace(/^ +| +$/g, "")
     if (texte === "") return { message: MESSAGES_DU_BLOC.titreVide }
     if (/[\r\n]/.test(texte)) return { message: MESSAGES_DU_BLOC.titreUneLigne }
     if (caracteres(texte) > TITRE_MAX) return { message: MESSAGES_DU_BLOC.titreLong }
   }
-  if (bloc.type === "list" && Array.isArray(bloc.data.items) && bloc.data.items.length > ELEMENTS_MAX) return { message: MESSAGES_DU_BLOC.listeLongue }
+  if (bloc.type === "list" && niveauxDe(bloc.data.items) > LIST_DEPTH_MAX) return { message: MESSAGES_DU_BLOC.troisNiveaux }
+  if (bloc.type === "list" && listItemTexts(bloc.data.items).length > LIST_ITEMS_MAX) return { message: MESSAGES_DU_BLOC.listeLongue }
   if (bloc.text !== null && caracteres(bloc.text) > TEXTE_MAX) return { message: MESSAGES_DU_BLOC.tropLong }
-  const lu = blockInputSchema.safeParse(entreeDe(bloc))
+  const lu = blockInputSchema.safeParse(entreeDe(telQuIlPart(bloc)))
   return lu.success ? { entree: lu.data } : { message: MESSAGES_DU_BLOC.invalide }
 }
 

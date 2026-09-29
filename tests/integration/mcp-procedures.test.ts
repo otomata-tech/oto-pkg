@@ -1,16 +1,17 @@
 // @vitest-environment node
-// Procédures de bout en bout sur le vrai projet (E03-S06, AC11), seul test de la story dont la base est le
+// Procédures de bout en bout sur une vraie base (E03-S06, AC11), seul test de la story dont la base est le
 // sujet : `write` d'une procédure par Léa, clôtures ```call indentées sous leurs étapes (forme de la
 // maquette) ; publication par Claire (`open_draft`, `publish_node` sur le tampon du brouillon) ; `context`
 // qui la sert, appels sous leurs clôtures ; refus exact d'une clôture qui cite une fonction inconnue ;
-// journal. Organisation de référence jetable (H120), `mail` activé, sessions par `fx.sessionFor`. Marqué
-// Supabase : la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, les relectures
-// passent par la connexion d'administration, plus par PostgREST.
+// journal. Organisation de référence jetable (H120), `mail` activé, sessions par `fx.sessionFor`. Suite
+// portable (E11-S14) : personnes sans compte, jetons signés localement (`tests/helpers/session-locale.ts`) ;
+// relectures par la connexion d'administration.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { renderBlocks, type BlockInput } from "../../packages/plateforme/schemas"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type ReferenceOrg } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type SqlReferenceOrg, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -34,21 +35,20 @@ const EXPECTED: BlockInput[] = [
   { type: "call", text: null, data: { function: "mail.send_draft", args: { id: "<id du brouillon>" } } },
 ]
 
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "procedures through MCP on the cloud project"
+const SUITE = "procedures through MCP on a real database"
 
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable(SUITE), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
-    let ref: ReferenceOrg
+    let ref: SqlReferenceOrg
     // Rempli pour chaque personne par `beforeAll`, avant tout test : l'objet vide n'est jamais lu tel quel.
     const tokens = {} as Record<Person, string>
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       ref = await fx.buildReferenceOrg()
       await fx.addActivation(ref.org.id, "mail")

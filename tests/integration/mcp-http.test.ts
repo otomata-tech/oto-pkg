@@ -1,15 +1,16 @@
 // @vitest-environment node
-// La porte HTTP du MCP sur le vrai projet (E03-S01 : AC2, AC9, AC18, AC19) : jetons réels de
-// personnes jetables, vérifiés par la JWKS du projet (`makeVerifyToken()` sans argument), vraie
-// chaîne mcp-handler ; `defer` collecte les tâches, lancées une fois la réponse lue en entier.
+// La porte HTTP du MCP sur une vraie base (E03-S01 : AC2, AC9, AC18, AC19) : jetons signés localement
+// pour des personnes jetables sans compte, vérifiés par `verifyToken` (`tests/helpers/session-locale.ts`),
+// vraie chaîne mcp-handler ; `defer` collecte les tâches, lancées une fois la réponse lue en entier.
 // L'adresse sans organisation (AC4) et la personne qui n'est pas membre (AC5) sont prouvées sans base
 // (`tests/unit/mcp-handler.test.ts`, `tests/unit/mcp-server.test.ts`) : leurs cas sont retirés (M11b).
-// Ce fichier reste à fusionner dans `mcp-core.test.ts`, que modifie une story en cours. Marqué Supabase :
-// la porte vérifie des jetons de Supabase Auth ; depuis E01-S10 f2, les relectures passent par la
-// connexion d'administration, plus par PostgREST.
+// Ce fichier reste à fusionner dans `mcp-core.test.ts`, que modifie une story en cours. Suite portable
+// (E11-S14), relectures par la connexion d'administration ; seul le dernier `describe`, un vrai jeton de
+// Supabase Auth vérifié par la JWKS du projet (`makeVerifyToken()` sans argument), garde le projet.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestOrg } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { createFixtures, hex, type Fixtures, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { onProject, portable, projectConfigured, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 import pkg from "../../packages/plateforme/package.json"
 import { makeVerifyToken } from "../../packages/plateforme/mcp/auth"
 import { handleMcpPost } from "../../packages/plateforme/mcp/handler"
@@ -30,28 +31,26 @@ const initialize = (clientInfo?: { name: string; version: string }) => ({
   params: { protocolVersion: PROTOCOL, capabilities: {}, ...(clientInfo ? { clientInfo } : {}) },
 })
 
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "MCP HTTP door on the cloud project"
+const SUITE = "MCP HTTP door on a real database"
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let org: TestOrg
     let host: string
     let member: { id: string; token: string }
-    const verifyToken = makeVerifyToken()
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       host = `t${hex(4)}.example.invalid`
       org = await fx.createOrg({ hosts: [host] })
       const person = await fx.createUser()
       await fx.addMember(org.id, person.id)
-      member = { id: person.id, token: (await fx.signIn(person.email, person.password)).accessToken }
+      member = { id: person.id, token: (await fx.sessionFor(person)).accessToken }
     }, 120_000)
 
     afterAll(async () => {
@@ -80,7 +79,7 @@ describe.skipIf(!configured)(
         body: JSON.stringify(body),
       })
       const tasks: Task[] = []
-      const response = await handleMcpPost(request, { verifyToken, defer: (task) => tasks.push(task) })
+      const response = await handleMcpPost(request, { verifyToken: fx.verifyToken, defer: (task) => tasks.push(task) })
       // Le corps lu en entier : les outils ont fini d'écrire leurs lignes avant la fin du flux.
       const text = await response.text()
       const data = text.split("\n").find((line) => line.startsWith("data: "))
@@ -155,3 +154,42 @@ describe.skipIf(!configured)(
     })
   },
 )
+
+// La vérification d'un vrai jeton de Supabase Auth par la JWKS du projet (HN-E11S14-4) : le vérificateur de
+// la configuration de l'hôte, `makeVerifyToken()` sans argument. Le reste de la porte est prouvé ci-dessus.
+describe.skipIf(!projectConfigured)(onProject("MCP HTTP door under a Supabase Auth session"), { timeout: NETWORK_TIMEOUT }, () => {
+  let fx: Fixtures
+  let host: string
+  let token: string
+
+  beforeAll(async () => {
+    fx = createFixtures()
+    host = `t${hex(4)}.example.invalid`
+    const org = await fx.createOrg({ hosts: [host] })
+    const person = await fx.createUser()
+    await fx.addMember(org.id, person.id)
+    token = (await fx.sessionFor(person)).accessToken
+  }, 120_000)
+
+  afterAll(async () => {
+    await fx?.cleanup()
+  }, NETWORK_TIMEOUT)
+
+  it("should initialize with 200 under a token verified by the JWKS of the project (AC2)", async () => {
+    const request = new Request("http://localhost:3000/api/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${token}`,
+        "x-forwarded-host": host,
+        "x-forwarded-proto": "https",
+        "mcp-protocol-version": PROTOCOL,
+      },
+      body: JSON.stringify(initialize({ name: "claude-ai", version: "0.1.0" })),
+    })
+    // Le journal de cet appel n'est pas le sujet : prouvé ci-dessus.
+    const response = await handleMcpPost(request, { verifyToken: makeVerifyToken(), defer: () => {} })
+    expect(response.status).toBe(200)
+  })
+})

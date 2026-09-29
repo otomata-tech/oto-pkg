@@ -311,4 +311,31 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
       expect(publishCalls(full.calls)).toEqual([])
     })
   })
+
+  describe("E11-S01: strict required column, proof by table", () => {
+    it("should warn, rewriting no row, about the rows that only have verified_empty in a required column made strict (AC-b5)", async () => {
+      await publish({ columns: [{ name: "email", required: true }] })
+      const before = await tableRows(seed, ref)
+      const strict = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 4, header: { columns: [{ name: "email", allow_verified_empty: false }] }, publish: true })
+      expect(strict.result?.text).toBe(
+        "Published ventes/suivi_prospects revision 5: changed email (allow_verified_empty).\nWarnings:\n- 1 row has no value for required column email (sample key: Boulangerie Fournier).",
+      )
+      expect(strict.result?.data?.warnings).toEqual([{ kind: "missing_required", column: "email", count: 1, sample_keys: ["Boulangerie Fournier"] }])
+      expect(await tableRows(seed, ref)).toEqual(before)
+    })
+
+    it("should publish proof in one step without reading any row, said « proof optional » then « proof required », and pending as « stop requiring proof » (AC-f1)", async () => {
+      await freshTable(seed, ref)
+      const pending = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, header: { proof: false } })
+      expect(pending.result?.text).toContain("header changed (stop requiring proof)")
+      const optional = await publish({ proof: false })
+      expect(optional.result?.text).toBe("Published ventes/suivi_prospects revision 4: proof optional.")
+      expect(blockCalls(optional.calls)).toEqual([])
+      expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual({ ...PROSPECTS_HEADER, proof: false })
+      const required = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 4, header: { proof: true }, publish: true })
+      expect(required.result?.text).toBe("Published ventes/suivi_prospects revision 5: proof required.")
+      expect(blockCalls(required.calls)).toEqual([])
+      expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual(PROSPECTS_HEADER)
+    })
+  })
 })

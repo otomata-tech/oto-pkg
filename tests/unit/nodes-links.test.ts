@@ -67,6 +67,18 @@ describe("links passed to publish_node (AC31)", () => {
     ])
   })
 
+  it("should extract the links of cells, sub-items, a toggle summary and its body outside fences, never an escaped one (E10-S04, AC-a4, AC-c2)", () => {
+    const found = extractLinks(
+      blocks([
+        { type: "simple_table", data: { columns: ["[[ventes/t1]]"], rows: [["\\[[ventes/non]] [[ventes/t2]]"]] } },
+        { type: "list", data: { items: [{ text: "a", children: { items: [{ text: "[[ventes/l2]]", children: { items: ["[[ventes/l3]]"] } }] } }] } },
+        { type: "toggle", text: "[[ventes/corps]]\n```\n[[ventes/code]]\n```", data: { summary: "[[ventes/resume]]" } },
+        { type: "divider", data: {} },
+      ]),
+    )
+    expect(found.links.map(({ blockId, path }) => `${blockId} ${path}`)).toEqual(["b0 ventes/t1", "b0 ventes/t2", "b1 ventes/l2", "b1 ventes/l3", "b2 ventes/resume", "b2 ventes/corps"])
+  })
+
   describe.skipIf(!sqlConfigured)(portable("on a real database"), { timeout: NETWORK_TIMEOUT }, () => {
     let seed: SeededData
     let ref: ReferenceOrgSql

@@ -7,6 +7,7 @@
 // l'en-tête (clé, cycle, options par type) sont dans `server/tables/header.ts` ; ceux d'un filtre,
 // qui dépendent des colonnes, dans `server/tables/filters.ts`.
 import * as z from "zod/v4"
+import { normalizeTitle } from "./blocks-render"
 import { nodePathSchema } from "./nodes"
 
 /** Les huit types de colonne de la V1 (H90), dans l'ordre des refus. */
@@ -29,7 +30,8 @@ export const tableColumnSchema = z.strictObject({
   name: columnNameSchema.describe("Column name, e.g. montant_estime."),
   type: columnTypeSchema.describe("text, number, date, datetime, bool, enum, email or url."),
   options: z.array(z.string()).optional().describe('enum only: the values, 1 to 100, e.g. ["à traiter", "en cours"].'),
-  required: z.boolean().optional().describe("true: a row cannot lack a value in this column (default false)."),
+  required: z.boolean().optional().describe("true: a row cannot lack this column: a value, or verified_empty with a reason (default false)."),
+  allow_verified_empty: z.boolean().optional().describe("false: verified_empty is refused for this column; a row needs a real value there (default true)."),
   max_length: z.number().int().min(1).max(10_000).optional().describe("text, email and url only: characters at most (default 2,000 for text)."),
 })
 
@@ -39,6 +41,10 @@ export const tableReviewSchema = z.strictObject({
   state: z.string().describe("State where rows wait for a person, e.g. à revoir."),
   approve: z.string().describe("State an approved row takes, e.g. qualifié."),
   reject: z.string().describe("State a rejected row takes, e.g. écarté."),
+  agents_may_decide: z
+    .boolean()
+    .optional()
+    .describe("true: an assistant may also set approve or reject, with table.write or table.release; its decision is traced with origin agent (default false)."),
 })
 
 export const tableLifecycleSchema = z.strictObject({
@@ -56,6 +62,7 @@ export const tableHeaderSchema = z.strictObject({
   key: columnNameSchema.describe("Name of the column whose value addresses each row, e.g. entreprise."),
   lifecycle: tableLifecycleSchema.optional().describe("Work queue of the rows (default: none)."),
   closed: z.boolean().default(false).describe("true: only existing rows can be written (default false)."),
+  proof: z.boolean().default(false).describe("true: every new value written by table.write needs its proof, {value, comment | link} (default false)."),
 })
 
 export type TableHeader = z.output<typeof tableHeaderSchema>
@@ -123,6 +130,42 @@ export function isValidDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
 }
 
+const DATETIME = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(?:Z|[+-](\d{2}):(\d{2}))$/
+
+/**
+ * L'instant (ms) d'une date et heure ISO 8601 avec fuseau (`Z` ou décalage) ; `null` sinon. Une seule règle
+ * pour les valeurs du service (E07-S01) et la lecture d'un CSV (E10-S01, `schemas/csv.ts`).
+ */
+export function instantOf(value: string): number | null {
+  const match = DATETIME.exec(value)
+  if (!match || !isValidDate(match[1])) return null
+  const [hour, minute, second, offsetHour, offsetMinute] = match.slice(2).map((part) => Number(part ?? 0))
+  if (hour > 23 || minute > 59 || second > 59 || offsetHour > 23 || offsetMinute > 59) return null
+  const instant = Date.parse(value)
+  return Number.isNaN(instant) ? null : instant
+}
+
+/** Texte sans `max_length` (N2) ; adresse email (AC3) ; URL (AC3). */
+export const COLUMN_TEXT_MAX = 2_000
+const EMAIL_MAX = 254
+const URL_MAX = 2_000
+
+/** Longueur maximale d'une colonne de texte, d'email ou d'URL ; `null` pour les autres types. */
+export function maxLengthOf(column: Pick<TableColumn, "type" | "max_length">): number | null {
+  if (column.type === "text") return column.max_length ?? COLUMN_TEXT_MAX
+  if (column.type === "email") return Math.min(column.max_length ?? EMAIL_MAX, EMAIL_MAX)
+  if (column.type === "url") return Math.min(column.max_length ?? URL_MAX, URL_MAX)
+  return null
+}
+
+/** Une clé de ligne : 200 caractères au plus (N19), sous la borne de `blocks.key` (500) ; lue aussi par l'import d'un CSV. */
+export const ROW_KEY_MAX = 200
+
+/** Une adresse email (AC3) : un seul `@`, une partie de chaque côté, sans blanc (`security-patterns.md § Validation des inputs`). */
+export function isEmail(value: string): boolean {
+  return /^[^@\s]+@[^@\s]+$/.test(value)
+}
+
 /**
  * Le refus d'une valeur de filtre que le schéma rejette, au texte du service (AC8) : `null`, des
  * opérateurs inconnus, un `in` de plus de 100 valeurs ; sinon le message de Zod. `path` finit par la
@@ -180,6 +223,22 @@ const FILTER_HELP =
 
 export const tableSchemaArgsSchema = z.strictObject({ table: tablePathArgSchema })
 
+/** Un séparateur de mots de `q` : tout ce qui n'est ni lettre ni chiffre (E11-S01, AC-c1). */
+const NOT_A_WORD = /[^\p{L}\p{N}]+/u
+
+/**
+ * Les mots de `q` (E11-S01, AC-c1, AC-c3) : sans casse ni accent (`normalizeTitle`), découpés sur tout ce
+ * qui n'est ni lettre ni chiffre, un mot répété compté une fois ; en une passe (`security-patterns.md §
+ * Validation des inputs`). Une seule règle pour le refus du schéma (AC-c2), `table.rows`, la grille et les
+ * vues de tableau : sans elle, « mairie valbrune » ne trouvait rien.
+ */
+export function queryWords(q: string): string[] {
+  return [...new Set(normalizeTitle(q).split(NOT_A_WORD).filter((word) => word !== ""))]
+}
+
+/** Lignes au plus d'une page de `table.rows` (N6). */
+const MAX_PAGE_ROWS = 50
+
 export const tableRowsArgsSchema = z.strictObject({
   table: tablePathArgSchema,
   filter: tableFilterSchema.optional().describe(`Rows to keep, by column: ${FILTER_HELP} (default: all rows).`),
@@ -188,8 +247,9 @@ export const tableRowsArgsSchema = z.strictObject({
     .trim()
     .min(2)
     .max(200)
+    .refine((q) => queryWords(q).length > 0, { error: "write at least one word (letters or digits)" })
     .optional()
-    .describe('Characters to find in the text, email, url and enum columns and in the key, without case or accents, e.g. "bremontier" (default: none).'),
+    .describe('Words to find, without case or accents, in any order: each word must appear in a text, email, url or enum column or in the key, e.g. "mairie valbrune" (default: none).'),
   sort: tableSortSchema.optional().describe('Order: {"column": "montant_estime", "direction": "desc"}; cells without value come last (default: the key, ascending).'),
   columns: z
     .array(columnNameSchema)
@@ -197,7 +257,13 @@ export const tableRowsArgsSchema = z.strictObject({
     .max(100)
     .optional()
     .describe('Columns to return, e.g. ["contact", "email"]; key and revision always come (default: all columns).'),
-  limit: z.number().int().min(1).max(50).optional().describe("Rows per page, 50 at most (default 20)."),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_PAGE_ROWS, { error: `${MAX_PAGE_ROWS} rows at most per page; use next_cursor for more` })
+    .optional()
+    .describe("Rows per page, 50 at most (default 20)."),
   cursor: z
     .string()
     .min(1)
@@ -248,6 +314,9 @@ const provenanceReadSchema = z.strictObject({
   at: z.string().optional(),
   comment: z.string().optional(),
   link: z.string().optional(),
+  /** Le client MCP de la conversation (`ctx.host`, `nom@version`) et le libellé du travailleur sous bail (E11-S01, AC-d4). */
+  host: z.string().optional(),
+  worker: z.string().optional(),
   imported: z.strictObject({ value: cellValueSchema, at: z.string().optional() }).optional(),
 })
 
@@ -273,7 +342,11 @@ export const tableColumnPatchSchema = z.strictObject({
   name: columnNameSchema.describe("Column name: an existing column receives the attributes given, a new one is added at the end, e.g. telephone."),
   type: columnTypeSchema.optional().describe("text, number, date, datetime, bool, enum, email or url; required for a new column, e.g. text (default: unchanged)."),
   options: z.array(z.string()).min(1).max(100).optional().describe('enum only: the values, 1 to 100, e.g. ["à contacter", "inscrit"] (default: unchanged).'),
-  required: z.boolean().optional().describe("true: a new row cannot lack a value in this column, e.g. true (default: unchanged; false for a new column)."),
+  required: z.boolean().optional().describe("true: a row cannot lack this column: a value, or verified_empty with a reason, e.g. true (default: unchanged; false for a new column)."),
+  allow_verified_empty: z
+    .boolean()
+    .optional()
+    .describe("false: verified_empty is refused for this column; a row needs a real value there, e.g. false (default: unchanged; true for a new column)."),
   max_length: z.number().int().min(1).max(10_000).optional().describe("text, email and url only: characters at most, e.g. 250 (default: unchanged)."),
 })
 
@@ -291,6 +364,10 @@ export const tableHeaderPatchSchema = z.strictObject({
   key: columnNameSchema.optional().describe("Name of the key column, e.g. nom; it changes only while the table has no row (default: unchanged)."),
   lifecycle: tableLifecycleSchema.optional().describe("Work queue of the rows, replaced whole, e.g. {column, states, working} (default: unchanged)."),
   closed: z.boolean().optional().describe("true: only existing rows can be written, e.g. true (default: unchanged; false for a new table)."),
+  proof: z
+    .boolean()
+    .optional()
+    .describe("true: every new value written by table.write needs its proof, {value, comment | link}, e.g. true (default: unchanged; false for a new table)."),
   confirm_remove: z
     .boolean()
     .optional()

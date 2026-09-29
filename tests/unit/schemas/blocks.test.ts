@@ -12,7 +12,7 @@ import { BLOCK_CASES } from "../../helpers/block-cases"
 // (`tests/integration/blocs-zod.test.ts`).
 
 describe("BLOCK_TYPES", () => {
-  it("should list the eleven block types of the contract, in its order", () => {
+  it("should list the eleven block types of the contract, in its order, then those of E10-S04", () => {
     expect(BLOCK_TYPES).toEqual([
       "heading",
       "paragraph",
@@ -25,6 +25,9 @@ describe("BLOCK_TYPES", () => {
       "callout",
       "reference",
       "row",
+      "simple_table",
+      "divider",
+      "toggle",
     ])
     expect(blockTypeSchema.safeParse("table").success).toBe(false)
   })

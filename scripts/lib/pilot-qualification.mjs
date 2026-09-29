@@ -162,6 +162,7 @@ const row = (ref, entreprise, ville, filled) => ({ key: ref, data: { ref, entrep
  *     key: string,
  *     lifecycle: { column: string, states: string[], working: string, review: { state: string, approve: string, reject: string } },
  *     closed: boolean,
+ *     proof: boolean,
  *   },
  *   rows: PilotRow[],
  *   completed: { columns: string[], comment: string },
@@ -189,6 +190,8 @@ export const PILOT_TABLE = {
       review: { state: 'à revoir', approve: 'qualifié', reject: 'écarté' },
     },
     closed: true,
+    // La procédure pilote exige la preuve de chaque valeur (fiche D133, E11-S01 AC-f8).
+    proof: true,
   },
   rows: [
     row('P-001', 'Boulangerie des Tilleuls', 'Valbrune', { statut: 'à traiter' }),

@@ -105,6 +105,7 @@ export {
   MAX_FILTER_CLAUSES,
   MAX_IN_VALUES,
   nullInFilterMessage,
+  queryWords,
   tableAggregateArgsSchema,
   tableColumnSchema,
   tableHeaderSchema,
@@ -202,6 +203,26 @@ export type {
   TrashItem,
 } from "./node-gestures"
 export type { PublicTable } from "./node-gestures"
+// E10-S01 : Markdown et CSV. Le fichier d'une page (export et import), la lecture, la déduction, le contrôle et
+// l'écriture d'un CSV, les bornes d'un import et les corps de `tables/import` et des exports.
+export { NODE_HEAD_MAX, nodeExportQuerySchema, OP_TEXT_MAX, PAGE_MAX, slugOf } from "./nodes"
+export { pageMarkdown, readPageMarkdown } from "./blocks-render"
+export type { MarkdownFile } from "./blocks-render"
+export { columnNameOf, columnNames, CSV_SEPARATORS, detectSeparator, fileBaseName, fileExtension, IMPORT_NAME_MAX, parseCsv, segmentOf, toCsv, withLineKey } from "./csv"
+export type { CsvSeparator, CsvTable } from "./csv"
+export { checkImport, importProblemsText, inferTable, readCell } from "./csv-cells"
+export type { CellRead, CheckedImport, ImportColumn, ImportPlan, ImportProblem, ImportRow, InferredTable } from "./csv-cells"
+export {
+  IMPORT_CELL_MAX,
+  IMPORT_COLUMNS_MAX,
+  IMPORT_CSV_MAX,
+  IMPORT_FILE_BYTES_MAX,
+  IMPORT_LOT_ROWS,
+  IMPORT_ROWS_MAX,
+  tableImportArgsSchema,
+  tableImportBodySchema,
+} from "./table-write"
+export type { TableImportArgs, TableImportBody } from "./table-write"
 // M71 : les listes d'index d'une partie de Contexte servie, écrites par le service, relues par la vue « Contexte ».
 export { CONTEXT_INDEX } from "./context-index"
 // E05-S13 (AC-16) : les formats des blocs servis que la vue « Contexte » relit pour les dire en français.

@@ -20,6 +20,7 @@ import {
   type ProcedureRefusal,
   type ProcedureRefusalKind,
 } from "../schemas"
+import { listItemTexts, tableCells } from "../schemas/blocks"
 import type { CatalogFunction } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive } from "./catalog/registry"
 import { loadActiveConnectors } from "./connectors/activations"
@@ -108,8 +109,11 @@ function renderedTexts(block: StoredBlock): string[] {
   if (block.type === "paragraph") return strings([block.text])
   if (block.type === "callout") return strings([block.text, block.data.tone])
   if (block.type === "image") return strings([block.text, block.data.alt, block.data.src])
-  if (block.type === "list") return strings(items)
+  // E10-S04 (AC-a5) : un sous-élément, une cellule, un résumé ou un corps de repli se rendent tels quels aussi.
+  if (block.type === "list") return listItemTexts(items)
   if (block.type === "checklist") return strings(items.map((item) => (isRecord(item) ? item.text : null)))
+  if (block.type === "simple_table") return tableCells(block.data)
+  if (block.type === "toggle") return strings([block.data.summary, block.text])
   return []
 }
 

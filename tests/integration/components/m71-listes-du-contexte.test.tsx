@@ -71,15 +71,22 @@ describe("the index lists of a writable Contexte part (M71)", () => {
   })
 
   it("should read its linked pages after its children, the cut pointer in French, and none when the lines belong to the body", () => {
-    monterLaVue([CORPS, "", ...ENFANTS, ...LIEES, 'Rest of this context: demo_read {"path": "contexte"}.'].join("\n"), 3)
-    expect(lignesDe("Pages citées")).toEqual([["FAQ support — Réponses types.", "/n/support/faq"]])
-    expect(partie().getAllByRole("list").map((liste) => liste.getAttribute("aria-labelledby") && document.getElementById(liste.getAttribute("aria-labelledby") ?? "")?.textContent)).toEqual([
-      "Rangés sous ce contexte",
-      "Pages citées",
-    ])
-    expect(partie().queryByText(/^Rest of this context/)).toBeNull()
-    expect(partie().getByText("La suite de ce contexte est lue à la demande.")).toBeInTheDocument()
-    cleanup()
+    // Les deux pointeurs du service (E11-S03, AC-b2, AC-b4) : listes arrêtées, ou Contexte coupé par le plafond.
+    const pointeurs = [
+      'Only the first 20 entries are listed. Read the rest: demo_read {"path": "contexte"}.',
+      'This context is cut: everything served together exceeds 35,000 characters. Read the rest: demo_read {"path": "contexte"}.',
+    ]
+    for (const pointeur of pointeurs) {
+      monterLaVue([CORPS, "", ...ENFANTS, ...LIEES, pointeur].join("\n"), 3)
+      expect(lignesDe("Pages citées")).toEqual([["FAQ support — Réponses types.", "/n/support/faq"]])
+      expect(partie().getAllByRole("list").map((liste) => liste.getAttribute("aria-labelledby") && document.getElementById(liste.getAttribute("aria-labelledby") ?? "")?.textContent)).toEqual([
+        "Rangés sous ce contexte",
+        "Pages citées",
+      ])
+      expect(partie().queryByText(/Read the rest/)).toBeNull()
+      expect(partie().getByText("La suite de ce contexte est lue à la demande.")).toBeInTheDocument()
+      cleanup()
+    }
     // Sans les listes du service, des lignes du corps qui leur ressemblent n'en sont pas : leur titre ne suit pas
     // une ligne vide.
     monterLaVue([CORPS, ...LIEES].join("\n"), 3)

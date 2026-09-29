@@ -119,13 +119,25 @@ export function outlineLines(entries: readonly OutlineEntry[], withRefs: boolean
   })
 }
 
-/** L'état d'un nœud servi par un refus de révision (AC21) : titre, révision, plan borné à 50 titres. */
+/**
+ * « - (start of page, 240 characters) » quand des blocs précèdent le premier titre (E11-S03, AC-c3) : un bloc
+ * mis en tête y reste visible ; ce n'est pas une section (compte, `data.outline` et plan de l'écran inchangés,
+ * HN-E11S03-10). Aucune ligne sans eux.
+ */
+export function startOfPageLines(blocks: readonly DocBlock[]): string[] {
+  const [start] = splitSections(blocks)
+  const size = start.heading === null ? sectionSizes(blocks, [start])[0] : 0
+  return size > 0 ? [`- (start of page, ${formatCount(size)} characters)`] : []
+}
+
+/** L'état d'un nœud servi par un refus de révision (AC21) : titre, révision, début de page, plan borné à 50 titres. */
 export function staleState(node: NodeRow, blocks: readonly DocBlock[]): string {
   const entries = outlineOf(blocks, null)
   const lines = outlineLines(entries.slice(0, LISTED_MAX), false)
   const more = entries.length - lines.length
   return [
     `# ${node.title} (revision ${node.revision}, ${node.status})`,
+    ...startOfPageLines(blocks),
     ...(lines.length > 0 ? lines : ["- (no section)"]),
     ...(more > 0 ? [`- … and ${formatCount(more)} more`] : []),
   ].join("\n")

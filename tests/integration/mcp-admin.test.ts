@@ -1,17 +1,18 @@
 // @vitest-environment node
-// Le MCP admin sur le projet Supabase d'oto-platform (E08-S02 : AC6, AC16, AC22, N24), la base étant
+// Le MCP admin sur une vraie base (E08-S02 : AC6, AC16, AC22, N24), la base étant
 // le sujet : ligne d'ancrage écrite sous la policy d'`admin_journal`, `create_org` sous la session d'un
 // membre de l'équipe plateforme jetable, contraintes de son `23505` reconnues par leur nom, journal à
 // part. Un seul scénario, par `connectAdminMcp` câblé comme la route (`openAdminRequest`) ; le reste
 // des opérations est prouvé en suites portables, sur la graine de `seedAdminFixture`
-// (`mcp-admin-ops.test.ts`, `admin-orgs.test.ts`). Marqué
-// Supabase : la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, les relectures
-// passent par la connexion d'administration, plus par PostgREST.
+// (`mcp-admin-ops.test.ts`, `admin-orgs.test.ts`). Suite
+// portable (E11-S14) : la porte reçoit les claims et un jeton signé localement
+// (`tests/helpers/session-locale.ts`) ; relectures par la connexion d'administration.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { openAdminRequest } from "../../packages/plateforme/mcp/admin/handler"
 import { connectAdminMcp } from "../helpers/mcp-admin"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestOrg, type TestUser } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type SqlUser, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -19,21 +20,20 @@ import { privateFolderPending, privateFolderSuite } from "../helpers/pending-mig
 const privatePending = await privateFolderPending()
 
 const NETWORK_TIMEOUT = 90_000
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "MCP admin on the cloud project"
+const SUITE = "MCP admin on a real database"
 
-describe.skipIf(!configured)(configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, { timeout: NETWORK_TIMEOUT }, () => {
-  let fx: Fixtures
+describe.skipIf(!sqlConfigured)(portable(SUITE), { timeout: NETWORK_TIMEOUT }, () => {
+  let fx: LocalFixtures
   let admin: TestSql
-  let staff: TestUser
+  let staff: SqlUser
   let taken: TestOrg
 
   beforeAll(async () => {
-    fx = createFixtures()
+    fx = createLocalFixtures()
     admin = testAdminSql()
     staff = await fx.createUser({ fullName: "Admin Test" })
-    await fx.makeStaff(staff.id)
     taken = await fx.createOrg()
+    await fx.makeStaff(staff.id)
   }, 120_000)
 
   afterAll(async () => {

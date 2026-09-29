@@ -1,14 +1,15 @@
 // @vitest-environment node
-// Portabilité du schéma (E01-S09, AC1 à AC7) sur le projet Supabase d'oto-platform, après la migration
-// de portabilité : aucune clé ni lecture vers `auth.users`, invitations et annuaires lus dans les
-// claims et dans les copies de `members` et de `platform_staff`, `forget_user`, `updated_at` sans
-// `moddatetime`. Le catalogue et les sessions aux claims choisis passent par la connexion
-// d'administration des tests (`admin-sql.ts`) ; les données, jetables, par `createFixtures`, et depuis
-// E01-S10 f2 les écritures de mise en place par cette même connexion, plus par PostgREST.
+// Portabilité du schéma (E01-S09, AC1 à AC7) après la migration de portabilité : aucune clé ni lecture
+// vers `auth.users`, invitations et annuaires lus dans les claims et dans les copies de `members` et de
+// `platform_staff`, `forget_user`, `updated_at` sans `moddatetime`. Suite portable (E11-S14) : le
+// catalogue et les sessions aux claims choisis passent par la connexion d'administration des suites
+// portables, les données, jetables, par `createSqlFixtures` ; AC1 et AC2 lisent `auth.users` et
+// `auth.oauth_*`, absents d'un Postgres nu, et gardent le projet (HN-E11S14-5).
 import { randomUUID } from "crypto"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { adminSql, adminSqlConfigured, ADMIN_SQL_SKIP_REASON, asClaims, type AdminSql, type AdminTx } from "../helpers/admin-sql"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestUser } from "../helpers/plateforme"
+import { asClaims, type AdminSql, type AdminTx } from "../helpers/admin-sql"
+import { hex, supabaseConfigured } from "../helpers/plateforme"
+import { createSqlFixtures, onProject, portable, sqlConfigured, testAdminSql, type SqlFixtures, type SqlUser } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -17,7 +18,6 @@ const privatePending = await privateFolderPending()
 
 const NETWORK_TIMEOUT = 60_000
 const SETUP_TIMEOUT = 180_000
-const configured = supabaseConfigured && adminSqlConfigured
 
 /** Les 31 colonnes qui visaient `auth.users`, par ce que faisait leur clé à la suppression du compte. */
 const PERSON_COLUMNS = {
@@ -107,16 +107,16 @@ async function forgetDuring(
   }
 }
 
-describe.skipIf(!configured)(
-  configured ? "schema portability (E01-S09)" : `schema portability (E01-S09) (${supabaseConfigured ? ADMIN_SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable("schema portability (E01-S09)"),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: SqlFixtures
     let sql: AdminSql
 
     beforeAll(() => {
-      fx = createFixtures()
-      sql = adminSql()
+      fx = createSqlFixtures()
+      sql = testAdminSql()
     })
 
     afterAll(async () => {
@@ -124,7 +124,7 @@ describe.skipIf(!configured)(
       await sql?.end({ timeout: 5 })
     }, SETUP_TIMEOUT)
 
-    it("should keep no foreign key to auth.users, the 31 person columns still uuid (AC1)", async () => {
+    it.skipIf(!supabaseConfigured)(onProject("should keep no foreign key to auth.users, the 31 person columns still uuid (AC1)"), async () => {
       const keys = await sql`select conrelid::regclass::text as tbl, conname from pg_catalog.pg_constraint
                               where confrelid = 'auth.users'::regclass and connamespace = 'platform'::regnamespace`
       expect(plain(keys)).toEqual([])
@@ -135,7 +135,7 @@ describe.skipIf(!configured)(
       expect(plain(columns)).toEqual([...ALL_PERSON_COLUMNS].sort().map((col) => ({ col, data_type: "uuid" })))
     })
 
-    it("should leave auth.users to no function of platform, and the OAuth readings to auth.oauth_* and auth.sessions (AC2)", async () => {
+    it.skipIf(!supabaseConfigured)(onProject("should leave auth.users to no function of platform, and the OAuth readings to auth.oauth_* and auth.sessions (AC2)"), async () => {
       const readers = await sql`select p.proname from pg_catalog.pg_proc p
                                  where p.pronamespace = 'platform'::regnamespace and p.prosrc ~ 'auth\\.users'`
       expect(readers.map((row) => row.proname).filter((name) => name !== "hook_before_user_created")).toEqual([])
@@ -199,7 +199,7 @@ describe.skipIf(!configured)(
       await fx.addMember(org.id, ada.id, { role: "admin" })
       const sam = { ...(await fx.createUser({ fullName: "Sam Plateforme" })), fullName: "Sam Plateforme" }
       const tess = { ...(await fx.createUser({ fullName: "Tess Partie" })), fullName: "Tess Partie" }
-      const ugo: TestUser & { fullName?: string } = await fx.createUser()
+      const ugo: SqlUser & { fullName?: string } = await fx.createUser()
       for (const person of [sam, tess, ugo]) await fx.makeStaff(person.id)
       // Tess accorde les trois accès, dont le sien : l'historique la nomme aussi comme auteur.
       for (const person of [sam, tess, ugo]) await fx.grantPlatformAccess(org.id, person.id, tess.id)

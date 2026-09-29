@@ -152,7 +152,8 @@ describe("modèle d'édition, styles d'un bloc (E05-S10, AC-a2, AC-a5)", () => {
     expect(ecrireTexte([ancien], ancien.cle, "Suite revue").modele[0].bloc.data).toEqual({ level: 3 })
     const [paragraphe] = rangeesDepuis([PAGE[1]])
     expect(changerDeForme([paragraphe], paragraphe.cle, "titre").modele[0].bloc.data).toEqual({ level: 1 })
-    expect(FORMES_ECRITES).toEqual(["texte", "titre", "puces", "numerotee", "cases", "citation", "code"])
+    // E10-S06 (AC-a3) : « Style » garde un seul « Titre » et ajoute « Repli ».
+    expect(FORMES_ECRITES).toEqual(["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "repli"])
   })
 
   it("should write a checklist, a quote and code on existing types that blockInputSchema accepts, the text following, the checks kept by line", () => {
@@ -213,5 +214,46 @@ describe("modèle d'édition, appel déjà écrit (M59)", () => {
     // Un autre style prend son texte lisible, sans `function` ni `args`.
     expect(changerDeForme([rangee], rangee.cle, "titre").modele[0].bloc).toEqual({ id: "eeeeeeee-0006", ref: "eeeeeeee", revision: 3, type: "heading", text: LU, data: { level: 1 }, key: "contrat" })
     expect(avecForme(rangee.bloc, "puces")).toMatchObject({ type: "list", text: null, data: { items: [LU] } })
+  })
+})
+
+describe("modèle d'édition, liste imbriquée (E10-S04, AC-b2)", () => {
+  const imbriquee = servi("ffffffff-0012", "list", null, {
+    items: ["a", { text: "b", children: { items: ["c", { text: "d", children: { items: ["e"], ordered: true, start: 3 } }], ordered: false } }],
+    ordered: true,
+    start: 2,
+  })
+
+  it("should show one item per line, two spaces per level, sub-level markers included", () => {
+    expect(texteDe(imbriquee)).toBe("a\nb\n  - c\n  - d\n    3. e")
+  })
+
+  it("should give back the served list plus the typing, children, ordered and start kept", () => {
+    const [rangee] = rangeesDepuis([imbriquee])
+    expect(ecrireTexte([rangee], rangee.cle, texteDe(imbriquee)).modele[0].bloc).toEqual(rangee.bloc)
+    const tape = ecrireTexte([rangee], rangee.cle, "a!\nb\n  - c\n  - d\n    3. e\n    4. f\n  - g").modele[0].bloc
+    expect(tape.data).toEqual({
+      items: ["a!", { text: "b", children: { items: ["c", { text: "d", children: { items: ["e", "f"], ordered: true, start: 3 } }, "g"], ordered: false } }],
+      ordered: true,
+      start: 2,
+    })
+    expect(blockInputSchema.safeParse({ type: "list", data: tape.data }).success).toBe(true)
+  })
+
+  it("should keep the parent of the children of a sub-item written on several lines, its lines becoming sibling sub-items", () => {
+    const [rangee] = rangeesDepuis([servi("ffffffff-0013", "list", null, { items: [{ text: "P", children: { items: ["a\nb", "c"] } }, "Q"] })])
+    expect(texteDe(rangee.bloc)).toBe("P\n  - a\n  - b\n  - c\nQ")
+    expect(ecrireTexte([rangee], rangee.cle, texteDe(rangee.bloc)).modele[0].bloc.data).toEqual({ items: [{ text: "P", children: { items: ["a", "b", "c"] } }, "Q"] })
+    // Une sous-liste numérotée compte ses lignes : relue, elle garde son premier numéro.
+    const [numerotee] = rangeesDepuis([servi("ffffffff-0014", "list", null, { items: [{ text: "P", children: { items: ["a\nb", "c"], ordered: true, start: 4 } }] })])
+    expect(texteDe(numerotee.bloc)).toBe("P\n  4. a\n  5. b\n  6. c")
+    expect(ecrireTexte([numerotee], numerotee.cle, texteDe(numerotee.bloc)).modele[0].bloc.data).toEqual({
+      items: [{ text: "P", children: { items: ["a", "b", "c"], ordered: true, start: 4 } }],
+    })
+  })
+
+  it("should keep the sub-lists when a numbered list becomes bulleted", () => {
+    const [rangee] = rangeesDepuis([imbriquee])
+    expect(avecForme(rangee.bloc, "puces").data).toEqual({ items: imbriquee.data.items })
   })
 })

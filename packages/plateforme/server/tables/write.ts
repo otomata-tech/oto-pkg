@@ -9,10 +9,11 @@
 // Face SQL (E01-S10, lot c1) : les lignes d'un appel s'écrivent en une transaction (AC-x4) ; une panne
 // de la base au milieu n'en laisse aucune, une ligne refusée n'en est pas une. Les noms des membres
 // qu'un refus cite se lisent après elle, qui ne tient que ses requêtes.
-// Une valeur s'écrit avec sa preuve (fiche D99, M53) ; une valeur nue d'une colonne de valeur est jugée
-// dans la transaction, sur les lignes lues et avant toute écriture : égale à la valeur rangée, ignorée ;
-// différente, l'appel entier est refusé (`withoutBareValues`, décisions de JB du 2026-09-27, HN-M53-5).
-// La colonne d'état et la colonne clé n'ont pas de preuve : leurs propres règles jugent la ligne.
+// Une valeur nue d'une colonne de valeur est jugée dans la transaction, sur les lignes lues et avant toute
+// écriture : égale à la valeur rangée, ignorée ; différente, écrite, sauf dans un tableau qui exige la preuve
+// (`proof`, fiche D133), où l'appel entier est refusé (`withoutBareValues`, fiche D99, HN-M53-5). La colonne
+// d'état et la colonne clé n'ont pas de preuve : leurs propres règles jugent la ligne. Avec `create_only`
+// (E11-S01, lot a), une clé qui a déjà sa ligne est refusée avec elle, sans rien écrire.
 //
 // Repris de la maquette (`mcp-test/src/proto/functions/table.ts` l. 222-284) : garde `.eq("revision", …)`,
 // « changed meanwhile », ligne actuelle rendue sur une révision périmée. Retiré : la table `rows` à part
@@ -22,7 +23,7 @@
 // colonnes différentes ne s'écrasent jamais, une ligne réservée par un autre est refusée. Retiré : le
 // lot qui s'arrête au premier refus, le lot sans plafond, `key=` d'appel.
 import type { CellValue, TableHeader, TableRowRead } from "../../schemas"
-import { tableWriteArgsSchema, type TableCellInput, type TableRowWrite, type TableWriteArgs } from "../../schemas/table-write"
+import { CREATE_ONLY_HELP, tableWriteArgsSchema, type TableCellInput, type TableRowWrite, type TableWriteArgs } from "../../schemas/table-write"
 import { isRecord } from "../../schemas/tables"
 import { defineFunction, type FunctionContext, type FunctionOutput } from "../catalog/define"
 import { changedMeanwhile, inTransaction, issuesText, PlatformError } from "../errors"
@@ -75,9 +76,10 @@ function provedColumn(header: TableHeader, name: string): boolean {
  * Les valeurs nues d'un appel, jugées sur les lignes lues avant toute écriture (décision de JB du
  * 2026-09-27, HN-M53-5) : sur une colonne de valeur (`provedColumn`), égale à la valeur rangée
  * (`sameValue`, dans le type de la colonne), une valeur nue sort de `set` sans rien changer ni annoter ;
- * différente, ou sur une ligne à créer, elle refuse l'appel entier, nommée à son chemin. Une clé mal
- * formée et une colonne inconnue restent aux refus de leur ligne (N19, AC5). Sans elle, une ligne lue puis
- * renvoyée telle quelle serait refusée (AC29), ou une valeur nouvelle s'écrirait sans preuve.
+ * différente, ou sur une ligne à créer, elle s'écrit, sauf si le tableau exige la preuve (`proof`, fiche
+ * D133) : elle refuse alors l'appel entier, nommée à son chemin. Une clé mal formée et une colonne inconnue
+ * restent aux refus de leur ligne (N19, AC5). Sans elle, une ligne lue puis renvoyée telle quelle serait
+ * refusée (AC29), ou remplacerait une provenance prouvée par une provenance nue (HN-E11S01-15).
  */
 export function withoutBareValues(
   header: TableHeader,
@@ -95,7 +97,7 @@ export function withoutBareValues(
       if (value === undefined || column === undefined || !provedColumn(header, name)) return true
       const current = isRecord(data) && Object.hasOwn(data, name) ? data[name] : undefined
       if (sameValue(column, current, value)) return false
-      issues.push({ path: ["rows", String(index), "set", name], message: NEW_VALUE_UNPROVED })
+      if (header.proof) issues.push({ path: ["rows", String(index), "set", name], message: NEW_VALUE_UNPROVED })
       return true
     })
     return { ...row, set: Object.fromEntries(set) }
@@ -107,6 +109,8 @@ type Scope = {
   context: FunctionContext
   table: LoadedTable
   actor: RowActor
+  /** `create_only` (E11-S01, AC-a1) : une clé qui a déjà sa ligne est refusée avec elle. */
+  createOnly: boolean
   reviewQueue: string
   now: number
   /** Les lignes connues, par clé : lues en une fois, puis tenues à jour après chaque écriture. */
@@ -152,6 +156,15 @@ function staleRevision(scope: Scope, key: string, given: number, current: Stored
   }
 }
 
+/** AC-a1 : `create_only` sur une clé qui a déjà sa ligne ; la ligne telle qu'elle est, rien d'écrit. */
+function existingRow(scope: Scope, key: string, current: StoredRow): Pending {
+  return (names) => {
+    const read = toReadRow(current, scope.table.header, names, { now: scope.now })
+    const sentence = `refused (conflict): a row with this key already exists (revision ${current.revision}); nothing written (create_only). Current row: ${JSON.stringify(read)}. Pick another key, or write without create_only to update it.`
+    return refusedRow(scope, key, { code: "conflict", sentence, current: read })
+  }
+}
+
 /** N26 : une écriture avec `revision` sur une clé qui n'a plus de ligne. */
 function noRowNow(scope: Scope, key: string, given: number): RowOutcome {
   const sentence = `refused (stale_revision): you read revision ${given}, but no row has this key now; nothing written. Read the table again with table.rows.`
@@ -168,10 +181,17 @@ function claimedByOther(scope: Scope, key: string, current: StoredRow): Pending 
   }
 }
 
+/** Qui écrit la ligne : avec le travailleur de son bail actif, s'il est à la même personne (AC-d3, HN-E11S01-6 ; `claimed_by_user` fait foi, N4). */
+function rowActor(scope: Scope, current: StoredRow | null): RowActor {
+  const held = current !== null && leaseActive(current, scope.now) && current.claimed_by_user === scope.actor.userId
+  return held ? { ...scope.actor, worker: current.claimed_by } : scope.actor
+}
+
 function merged(scope: RowScope, current: StoredRow | null, input: TableRowWrite, key: string): RowWrite {
   const { header, node } = scope.table
   const { set, clear, verified_empty } = input
-  return applyRowWrite({ header, path: node.path, argPath: scope.argPath, reviewQueue: scope.reviewQueue, current, input: { key, set, clear, verified_empty }, actor: scope.actor })
+  const actor = rowActor(scope, current)
+  return applyRowWrite({ header, path: node.path, argPath: scope.argPath, reviewQueue: scope.reviewQueue, current, input: { key, set, clear, verified_empty }, actor })
 }
 
 /** Une ligne à créer (AC1, AC8, AC13, AC14) ; une clé prise entre-temps par une autre création : à relire (N3). */
@@ -191,6 +211,7 @@ async function create(scope: RowScope, input: TableRowWrite, key: string): Promi
 
 /** Une ligne existante (AC9, AC12, AC18) : bail d'un autre, révision périmée, fusion, puis mise à jour gardée. */
 async function update(scope: RowScope, input: TableRowWrite, key: string, current: StoredRow): Promise<Attempt> {
+  if (scope.createOnly) return done(existingRow(scope, key, current))
   const other = claimedByOther(scope, key, current)
   if (other) return done(other)
   if (input.revision !== undefined && input.revision !== current.revision) return done(staleRevision(scope, key, input.revision, current))
@@ -222,12 +243,20 @@ async function writeRow(scope: Scope, input: TableRowWrite, index: number): Prom
   const rowScope: RowScope = { ...scope, argPath: `rows.${index}` }
   let current = scope.rows.get(key) ?? null
   for (let attempt = 0; attempt <= REAPPLY_MAX; attempt++) {
+    const creating = current === null
     const tried = current === null ? await create(rowScope, input, key) : await update(rowScope, input, key, current)
     if (tried.kind === "done") {
       if (tried.row) scope.rows.set(key, tried.row)
       return tried.outcome
     }
     current = await rowByKey(scope.context.db, scope.table.node.id, key)
+    // Une création croisée sous `create_only` (AC-a2) : la ligne relue est refusée, jamais mise à jour ; gardée
+    // pour qu'une seconde occurrence de la clé dans l'appel soit refusée aussi, sans nouvelle insertion.
+    if (scope.createOnly && creating && current) {
+      scope.rows.set(key, current)
+      console.error("[platform] tables: write: create_only key taken meanwhile", target)
+      return existingRow(scope, key, current)
+    }
     // Avec `revision`, seule une mise à jour gardée finit ici : la ligne a changé avant elle, ou est partie.
     if (input.revision !== undefined && current?.revision !== input.revision) {
       console.error("[platform] tables: write: row changed before its update", target)
@@ -251,13 +280,13 @@ async function writeRows(context: FunctionContext, validated: TableWriteArgs): P
     return "key" in keyed ? [keyed.key] : []
   })
   const now = Date.now()
-  const actor = { userId: context.identity.user.id, ctx: context.ctx ?? null, at: new Date(now).toISOString() }
+  const actor = { userId: context.identity.user.id, ctx: context.ctx ?? null, at: new Date(now).toISOString(), host: context.host ?? null }
   const reviewQueue = `${context.origin ?? ""}/n/${table.node.path}`
   // Les lignes de l'appel en une transaction (AC-x4 d'E01-S10) : une panne de la base au milieu les annule
   // toutes ; une panne de son ouverture ou de sa validation se traduit comme les autres (HN-E01S10-15).
   const pending = await inTransaction(context.db, "tables: write", async () => {
-    const scope: Scope = { context, table, actor, reviewQueue, now, rows: await rowsByKey(context.db, table.node.id, keys) }
-    // Les valeurs nues jugées sur les lignes lues, avant toute écriture : une seule nouvelle refuse l'appel entier (HN-M53-5).
+    const scope: Scope = { context, table, actor, createOnly: args.create_only === true, reviewQueue, now, rows: await rowsByKey(context.db, table.node.id, keys) }
+    // Les valeurs nues jugées sur les lignes lues, avant toute écriture : sur un tableau `proof`, une seule nouvelle refuse l'appel entier (HN-M53-5).
     const sorted = withoutBareValues(table.header, args.rows, scope.rows)
     if ("issues" in sorted) throw new PlatformError("invalid_arguments", `${BARE_CALL_REFUSED} ${issuesText(sorted.issues)}.`)
     const written: Pending[] = []
@@ -277,7 +306,7 @@ export const tableWrite = defineFunction({
   class: "write",
   origin: "paquet",
   description:
-    "Writes rows of a table by key; every value you set carries its proof: set {column: {value, comment | link}}, a comment saying where you found it or the link of the source; a bare value equal to the stored one is ignored; any new value needs its proof, except the state column, set bare within its allowed changes. Other operations: clear columns, or verified_empty with the reason for 'searched, nothing found'. Use it to create or complete rows; null is refused and columns you do not name stay unchanged. Pass the revision you read to refuse a stale write. 50 rows at most per call; each row is written or refused on its own, except a new value without its proof, which refuses the whole call; the answer says which and why.",
+    `Writes rows of a table by key: set {column: value}, or {column: {value, comment | link}} with a comment saying where you found it or the link of the source; a new value needs its proof when the table requires it (table.schema says it), except the state column, set bare within its allowed changes; a bare value equal to the stored one is ignored. Other operations: clear columns, or verified_empty with the reason for 'searched, nothing found'. Use it to create or complete rows; null is refused and columns you do not name stay unchanged. Pass the revision you read to refuse a stale write. ${CREATE_ONLY_HELP}. 50 rows at most per call; each row is written or refused on its own, except a new value without its proof on a table that requires it, which refuses the whole call; the answer says which and why.`,
   schema: tableWriteArgsSchema,
   examples: [
     {
@@ -295,10 +324,11 @@ export const tableWrite = defineFunction({
   refusals: [
     "Unknown table: not a table you can read; the refusal lists the tables you can read.",
     "Writing is reserved to the team that owns the table: the refusal says whom to ask.",
-    "A new value without its proof (a bare value that differs from the stored one, or on a new row): nothing is written in the whole call; add the comment or the link, then call again.",
+    "A new value without its proof on a table that requires it (a bare value that differs from the stored one, or on a new row): nothing is written in the whole call; add the comment or the link, then call again.",
     "No row or more than 50 rows; a verified_empty reason of fewer than 3 characters.",
     "A row refused on its own, nothing written for it: null in set (use clear, or verified_empty with a reason), unknown column, a value of the wrong type, a column named twice, the key column changed, a required column missing at creation, a state set only by table.claim or by the review, a new key in a closed table.",
     "A stale revision: the row comes back as it is now; read it again, then write with its revision.",
+    "With create_only, a key that already has its row: refused (conflict), the row comes back as it is; a row with revision and create_only is refused.",
     "A row claimed by someone else: wait for its release or the end of the lease.",
   ],
   next: ["table.rows"],

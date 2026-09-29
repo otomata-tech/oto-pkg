@@ -14,6 +14,8 @@
 // d'enregistrement d'un tableau se pose en haut à droite de son brouillon (AC-1).
 import type { ReactNode } from "react"
 import type { BlockView, NodeView } from "../../schemas"
+import { listItemTexts, tableCells } from "../../schemas/blocks"
+import { fencedParts } from "../../schemas/link-syntax"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
@@ -41,14 +43,18 @@ export function blocsAffiches(vue: NodeView, versionPubliee: boolean): BlockView
   return niveauDEcritureDe(vue, versionPubliee) !== null && vue.draft ? vue.draft.blocks : vue.blocks
 }
 
-/** Les textes d'un bloc qui peuvent citer une page : son texte, et chaque élément d'une liste ou d'une liste à cocher. */
+/**
+ * Les textes d'un bloc qui peuvent citer une page : son texte, et chaque élément d'une liste, sous-éléments
+ * compris, ou d'une liste à cocher ; les cellules d'un tableau simple, le résumé d'un repli et son corps hors de
+ * ses clôtures de code (E10-S04, AC-a4), comme la publication les lit (`server/nodes/links.ts`).
+ */
 function textesDe(bloc: BlockView): string[] {
-  const elements = Array.isArray(bloc.data.items) ? bloc.data.items : []
-  const texteDElement = (element: unknown) => {
-    if (typeof element === "string") return element
-    return typeof element === "object" && element !== null && "text" in element && typeof element.text === "string" ? element.text : ""
+  if (bloc.type === "simple_table") return tableCells(bloc.data)
+  if (bloc.type === "toggle") {
+    const resume = typeof bloc.data.summary === "string" ? [bloc.data.summary] : []
+    return [...resume, ...fencedParts(bloc.text ?? "").flatMap((partie) => (partie.code ? [] : [partie.text]))]
   }
-  return [bloc.text ?? "", ...elements.map(texteDElement)]
+  return [bloc.text ?? "", ...listItemTexts(bloc.data.items)]
 }
 
 /** Les chemins que citent des blocs (E05-S11, AC-27) : l'écran n'en lit les cibles que pour eux. */

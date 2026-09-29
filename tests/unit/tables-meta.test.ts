@@ -16,21 +16,23 @@ function variant(change: Record<string, unknown>): Record<string, unknown> {
 const LIFECYCLE = PROSPECTS_HEADER.lifecycle
 
 describe("parseTableHeader (AC1, AC2)", () => {
-  it("should accept the header of the reference table, closed false when absent (AC1)", () => {
+  it("should accept the header of the reference table, closed and proof false when absent (AC1; E11-S01 AC-f1)", () => {
     expect(parseTableHeader(PROSPECTS_HEADER)).toEqual({ header: PROSPECTS_HEADER })
     const open: Record<string, unknown> = structuredClone(PROSPECTS_HEADER)
     delete open.closed
-    expect(parseTableHeader(open)).toEqual({ header: { ...open, closed: false } })
+    delete open.proof
+    expect(parseTableHeader(open)).toEqual({ header: { ...open, closed: false, proof: false } })
+    expect(parseTableHeader([])).toEqual({ problems: ["header: expected an object {columns, key, lifecycle?, closed?, proof?}."] })
   })
 
   it("should name each problem with its path (AC2)", () => {
     const columns = PROSPECTS_HEADER.columns
     const cases: [Record<string, unknown>, string][] = [
-      [variant({ columns: [...columns.slice(0, 2), { name: "email", type: "email", read_only: true }, ...columns.slice(3)] }), "columns[2].read_only: unknown attribute. Allowed: name, type, options, required, max_length."],
+      [variant({ columns: [...columns.slice(0, 2), { name: "email", type: "email", read_only: true }, ...columns.slice(3)] }), "columns[2].read_only: unknown attribute. Allowed: name, type, options, required, allow_verified_empty, max_length."],
       [variant({ columns: [...columns.slice(0, 4), { name: "montant_estime", type: "money" }, ...columns.slice(5)] }), "columns[4].type: unknown type money. Types: text, number, date, datetime, bool, enum, email, url."],
-      [variant({ stricte: true }), "stricte: unknown attribute. Allowed: columns, key, lifecycle, closed."],
+      [variant({ stricte: true }), "stricte: unknown attribute. Allowed: columns, key, lifecycle, closed, proof."],
       [variant({ lifecycle: { ...LIFECYCLE, stricte: true } }), "lifecycle.stricte: unknown attribute. Allowed: column, states, working, review."],
-      [variant({ lifecycle: { ...LIFECYCLE, review: { ...LIFECYCLE.review, auto: true } } }), "lifecycle.review.auto: unknown attribute. Allowed: state, approve, reject."],
+      [variant({ lifecycle: { ...LIFECYCLE, review: { ...LIFECYCLE.review, auto: true } } }), "lifecycle.review.auto: unknown attribute. Allowed: state, approve, reject, agents_may_decide."],
       [variant({ key: "societe" }), "key: unknown column societe. Columns: entreprise, contact, email, ville, montant_estime, dernier_contact, relance_le, actif, notes, statut."],
       [variant({ key: "statut" }), "key: the key column must be text, email, url or number; statut is enum."],
       [variant({ lifecycle: { ...LIFECYCLE, states: [...STATES].reverse() } }), "lifecycle.states must list exactly the options of statut, in the same order."],
@@ -67,9 +69,9 @@ describe("parseTableHeader (AC1, AC2)", () => {
     const parsed = parseTableHeader(header)
     expect("problems" in parsed && [...parsed.problems].sort()).toEqual(
       [
-        "columns[2].read_only: unknown attribute. Allowed: name, type, options, required, max_length.",
+        "columns[2].read_only: unknown attribute. Allowed: name, type, options, required, allow_verified_empty, max_length.",
         "columns[4].type: unknown type money. Types: text, number, date, datetime, bool, enum, email, url.",
-        "couleur: unknown attribute. Allowed: columns, key, lifecycle, closed.",
+        "couleur: unknown attribute. Allowed: columns, key, lifecycle, closed, proof.",
         "columns[1].options: options apply to enum columns only; notes is text.",
         "columns[3].name: duplicate column contact.",
         "key: the key column must be text, email, url or number; statut is enum.",

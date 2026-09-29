@@ -21,6 +21,7 @@ const ENTETE: TableHeader = {
   key: "ref",
   lifecycle: { column: "statut", states: STATES, working: "en cours", review: { state: "à revoir", approve: "qualifié", reject: "écarté" } },
   closed: false,
+  proof: false,
 }
 
 const aRevoir = (key: string, entreprise: string, revision = 4): TableRowRead => ({ key, revision, set: { ref: key, entreprise, montant_estime: 95000, statut: "à revoir" } })
@@ -137,31 +138,42 @@ describe("FileDeRevue, the queue (AC10)", () => {
 })
 
 describe("FileDeRevue, the proof of each value on the card (fiche D99, M54, P3)", () => {
+  // La preuve exigée par le tableau (fiche D133, E11-S01 AC-f7) : « sans preuve » ne se dit que là.
+  const entete: TableHeader = {
+    ...ENTETE,
+    proof: true,
+    columns: [ENTETE.columns[0], ENTETE.columns[1], { name: "contact", type: "text" }, { name: "email", type: "email" }, { name: "site", type: "url" }, ...ENTETE.columns.slice(2)],
+  }
+  const agent = { origin: "agent" as const, by: "Léa Roux", at: "2026-09-27T10:00:00.000Z" }
+  const ligne: TableRowRead = {
+    key: "P-004",
+    revision: 3,
+    set: { ref: "P-004", entreprise: "Garage Moreau", contact: "Luc Moreau", site: "https://garage-moreau.test", statut: "à revoir" },
+    verified_empty: [{ column: "email", reason: "Aucune adresse publiée" }],
+    provenance: {
+      entreprise: { origin: "import", by: "Ada Martin" },
+      contact: agent,
+      email: { origin: "verified_empty", by: "Léa Roux" },
+      site: { ...agent, comment: "Registre public", link: "https://registre.test/garage-moreau" },
+      statut: agent,
+    },
+  }
+
   it("should show the comment and the link of a value, the reason of verified_empty, « sans preuve » for an assistant's value without one, nothing for an imported value", () => {
-    const entete: TableHeader = {
-      ...ENTETE,
-      columns: [ENTETE.columns[0], ENTETE.columns[1], { name: "contact", type: "text" }, { name: "email", type: "email" }, { name: "site", type: "url" }, ...ENTETE.columns.slice(2)],
-    }
-    const agent = { origin: "agent" as const, by: "Léa Roux", at: "2026-09-27T10:00:00.000Z" }
-    const ligne: TableRowRead = {
-      key: "P-004",
-      revision: 3,
-      set: { ref: "P-004", entreprise: "Garage Moreau", contact: "Luc Moreau", site: "https://garage-moreau.test", statut: "à revoir" },
-      verified_empty: [{ column: "email", reason: "Aucune adresse publiée" }],
-      provenance: {
-        entreprise: { origin: "import", by: "Ada Martin" },
-        contact: agent,
-        email: { origin: "verified_empty", by: "Léa Roux" },
-        site: { ...agent, comment: "Registre public", link: "https://registre.test/garage-moreau" },
-        statut: agent,
-      },
-    }
     render(ecran({ entete, revue: file(ligne, 1) }))
     const valeurs = document.querySelector(".oto-wait-item-demand")?.nextElementSibling
     expect(valeurs).toHaveTextContent(
       "entreprise Garage Moreau · contact Luc Moreau (sans preuve) · email vérifié vide (« Aucune adresse publiée ») · site https://garage-moreau.test (« Registre public », https://registre.test/garage-moreau) · montant_estime — · statut à revoir",
     )
     expect(within(valeurs as HTMLElement).getByRole("link", { name: "https://registre.test/garage-moreau" })).toHaveAttribute("rel", "noopener noreferrer")
+  })
+
+  it("should not say « sans preuve » on a table that does not require proof, and keep the comment, the link and the reason (E11-S01, AC-f7)", () => {
+    render(ecran({ entete: { ...entete, proof: false }, revue: file(ligne, 1) }))
+    const valeurs = document.querySelector(".oto-wait-item-demand")?.nextElementSibling
+    expect(valeurs).toHaveTextContent(
+      "entreprise Garage Moreau · contact Luc Moreau · email vérifié vide (« Aucune adresse publiée ») · site https://garage-moreau.test (« Registre public », https://registre.test/garage-moreau) · montant_estime — · statut à revoir",
+    )
   })
 })
 

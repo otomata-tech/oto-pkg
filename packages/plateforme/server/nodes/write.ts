@@ -43,6 +43,11 @@ function parseBody(input: unknown): WriteNodeBody {
   return wellFormed(parsed.data)
 }
 
+/** Le mode tolérant de l'analyse (E10-S01, AC-a2) : demandé par le corps de l'API seulement ; le MCP ne le porte jamais. */
+function tolerantFor(body: WriteNodeBody, origin: WriteOrigin): boolean {
+  return origin.kind === "human" && body.tolerant === true
+}
+
 /** À qui demander (H68) : la partie « à qui » d'`access.ts` pour le propriétaire effectif, lu une fois par l'appelant. */
 async function whoToAsk(db: PlatformDb, identity: Identity, owner: Owner | null): Promise<string> {
   return owner ? describeOwner(db, identity, owner) : "its managers"
@@ -150,7 +155,7 @@ async function saveEdits(db: PlatformDb, identity: Identity, edit: Edit): Promis
   // Un tableau n'a pas de blocs de document : ses lignes (`row`) ne passent jamais par le brouillon (N27).
   const state = draft || edit.created ? "draft" : "published"
   const current = node.kind === "table" ? [] : await loadBlocks(db, node.id, state)
-  const applied = applyOps(current, body.ops ?? [], { path: node.path, revision: node.revision })
+  const applied = applyOps(current, body.ops ?? [], { path: node.path, revision: node.revision, tolerant: tolerantFor(body, edit.origin) })
   const next: WorkBlock[] = placeBlocks(applied.blocks)
   const header = edit.created ? null : pendingHeader(body, node)
   const table = node.kind === "table" ? tableHeaderEdit(edit, draft, identity.org.prefix) : null
@@ -182,7 +187,7 @@ async function saveEdits(db: PlatformDb, identity: Identity, edit: Edit): Promis
     stamp,
     provenance: provenanceOf(identity, edit.origin),
   })
-  return { blocks: saved.blocks, stamp: saved.stamp, touched: applied.touched, header, headerChange: table?.text }
+  return { blocks: saved.blocks, stamp: saved.stamp, touched: applied.touched, header, headerChange: table?.text, keptAsText: applied.keptAsText }
 }
 
 /** L'en-tête en attente (`node_drafts`) : titre, résumé, genre (page ↔ procédure, N26). */
@@ -273,7 +278,7 @@ async function create(db: PlatformDb, identity: Identity, body: WriteNodeBody, o
     throw new PlatformError("forbidden", reservedTo("write", `under ${parentAt}`, await whoToAsk(db, identity, await ownerOf(db, parent.node.id))))
   }
   // Rien n'est écrit tant que les opérations ne sont pas passées (AC22) : elles s'appliquent d'abord à vide.
-  applyOps([], body.ops ?? [], { path })
+  applyOps([], body.ops ?? [], { path, tolerant: tolerantFor(body, origin) })
   const spec = { path, parent: parent.node, kind, title: body.title, summary: body.summary }
   // Le nœud, son brouillon et son contenu dans une seule transaction (E01-S10, AC-x4) : une création arrêtée
   // au milieu ne laisse ni nœud ni brouillon. Un nœud neuf hérite du propriétaire et des règles de son

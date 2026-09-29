@@ -5,10 +5,12 @@
 // bloc son `id`, sa référence et sa révision ; un refus s'annonce près du texte, ou fait relire la
 // page pour régler un conflit au bloc (`resolution.ts`). Sans lui, l'éditeur mêlerait l'orchestration
 // du clavier et celle des écritures. L'état des écritures se dit par la carte du document, qui lit la file
-// (`IndicationDEnregistrement`, E05-S11, AC-1).
+// (`IndicationDEnregistrement`, E05-S11, AC-1). E10-S01 : une écriture qui change plusieurs blocs d'un coup (collage,
+// `.md` déposé, tableau simple converti) part derrière les autres, puis fait relire le brouillon (`envoyerEtRelire`).
 import { useCallback, useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react"
 import type { BlockView } from "../../../schemas"
 import type { ErreurPlateforme } from "../../api/client"
+import { IMPORT } from "../../coque/libelles"
 import { messageDErreur } from "../../api/messages"
 import { useRafraichir } from "../../hote/rafraichir"
 import { EDITEUR } from "../libelles"
@@ -81,6 +83,7 @@ export function useEnvois(parametres: Parametres) {
   const [conflit, setConflit] = useState<Conflit | null>(null)
   const [attente, setAttente] = useState<Attente | null>(null)
   const numero = useRef(0)
+  const convertis = useRef(new Map<string, string>())
   // Les blocs servis au moment d'un refus : ceux d'une relecture arrivent après, en nouvelles props.
   const blocsLus = useRef(blocs)
   useEffect(() => {
@@ -202,6 +205,31 @@ export function useEnvois(parametres: Parametres) {
         return identite && trouver(modele.current, cle) ? { ops: [operationDeplacer(identite.id, idPrecedent(modele.current, cle))] } : null
       }),
     annoncer: (message: string, retiree?: Retiree) => setAnnonce({ id: ++numero.current, message, retiree }),
+    /**
+     * Une écriture qui change plusieurs blocs d'un coup (E10-S01, AC-a1, AC-a4, AC-b7), derrière les écritures en
+     * attente : à la réponse, le brouillon est relu (le modèle prend ce qu'il lit) et ce que le mode tolérant a gardé
+     * en texte s'annonce (AC-a2) ; un refus se dit près du bloc, et la file repart sans elle.
+     */
+    envoyerEtRelire: (cle: string, corps: () => CorpsDEnvoi | null, refus: (erreur: ErreurPlateforme) => string) =>
+      file.envoyer({
+        corps,
+        issue: (issue) => {
+          if (issue.erreur) {
+            file.remplacerLArret(null)
+            return setAlerte({ message: refus(issue.erreur), copier: false, recharger: false, reessayer: false, texte: "", cle })
+          }
+          const conserves = issue.data.kept_as_text ?? 0
+          if (conserves > 0) setAnnonce({ id: ++numero.current, message: IMPORT.conserves(conserves) })
+          rafraichir()
+        },
+      }),
+    /** Le chemin de la page, que la conversion d'un tableau simple range dessous (AC-b7). */
+    chemin: file.chemin,
+    /**
+     * Par rangée, le tableau qu'une conversion a créé sans y écrire son premier lot (HN-E10S01-21) : « Convertir »
+     * relancé le remplit, sans en créer un autre à l'adresse suivante.
+     */
+    convertis,
     fermerAnnonce,
     /** « Réessayer » : l'alerte part avec son bouton, le focus va au bloc du geste refusé. */
     relancer: () => {

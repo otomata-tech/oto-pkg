@@ -281,6 +281,12 @@ par ajout seul. Ordre proposé :
 - **HN-E11S14-5** : AC1 et AC2 de `portabilite-schema` restent en B, entiers ; la moitié portable d'AC1
   (colonnes `uuid`) n'est pas détachée (source : garde-fou « changement sans effet observable » ;
   `check:migrations` tient déjà l'absence de clé vers `auth.users`).
+- **HN-E11S14-6** (implémentation) : `tests/unit/gardes-supabase.test.ts` lit les noms importés par
+  `import {…} from`, `export {…} from` et un import dynamique déstructuré (`const {…} = await import(…)`),
+  alias et `type` retirés (source : les formes présentes dans `tests/`).
+- **HN-E11S14-7** (implémentation) : la liste est fermée dans les deux sens : un fichier qui importe une
+  garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers des
+  lots b et c y sont marqués « pending » jusqu'à leur lot (source : AC-a7).
 
 ## Textes proposés (écrits par le pilote à la fusion)
 
@@ -326,8 +332,22 @@ la fusion. »
 
 ### Écarts avec l'architecture
 
+Aucun : ni `packages/` ni `src/` ne changent. Seul le lot a est livré ; les lots b et c restent ouverts
+(`status.md`).
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `createLocalFixtures`, type `LocalFixtures` | `tests/helpers/session-locale.ts` | `createSqlFixtures()` plus `sessionFor(user)` (jeton signé localement) et `verifyToken` à passer aux portes |
+| champ `jwks` de `TestIssuer` | `tests/helpers/oidc-issuer.ts` | JWKS publique de l'émetteur de test, pour un vérificateur local sans `fetch` (ajout seul) |
+| liste fermée des fichiers gardés par Supabase | `tests/unit/gardes-supabase.test.ts` | AC-a7 ; chaque ligne porte sa raison |
 
 ### Notes
+
+- Lot a livré dans le worktree `e11-s14`, revue approuvée, fusionné sur `main` sans commit (commit commun
+  à venir). En base locale, 23 → 16 fichiers sautés.
+- AC-a5 : la session du projet s'ouvre par `createFixtures().sessionFor`, pas `signIn` (décision du pilote).
+- Textes proposés écrits par le pilote : `CLAUDE.md § Vérifier, commiter, pousser` (puce « Base de test
+  locale ») et `testing-strategy.md § Base de test locale` (puce « Ce qui se saute en local ») et sa fiche.
+- Tâche M24 : le signataire de jetons commun est livré, retiré de la tâche ; tâche de suite M85 ouverte pour
+  le mode sans Supabase des scripts à comptes (Hors périmètre). HN-E11S14-2 reste à confirmer avant le lot c.

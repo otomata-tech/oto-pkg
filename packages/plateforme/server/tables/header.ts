@@ -171,7 +171,7 @@ function lifecycleProblems(raw: unknown, columns: readonly IndexedColumn[], name
  * forme par `tableHeaderSchema`, puis les contrôles croisés sur les parties de forme valide.
  */
 export function parseTableHeader(meta: unknown): { header: TableHeader } | { problems: string[] } {
-  if (!isRecord(meta)) return { problems: ["header: expected an object {columns, key, lifecycle?, closed?}."] }
+  if (!isRecord(meta)) return { problems: ["header: expected an object {columns, key, lifecycle?, closed?, proof?}."] }
   const parsed = tableHeaderSchema.safeParse(meta, { reportInput: true })
   const columns = validColumns(meta.columns)
   const names = declaredNames(meta.columns)

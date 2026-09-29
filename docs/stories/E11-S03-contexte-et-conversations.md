@@ -370,6 +370,29 @@ rest:` ajoutés. `SERVED_BUDGET` inchangé.
 - **HN-E11S03-15 — validée (2026-09-29)** : les bornes en lignes restent (listes d'un Contexte 20, N20 ;
   procédures utiles 60, H35 ; nouveautés 10, H34 ; contenus récents 20, H36) : elles choisissent quoi
   lister, pas une taille, et chaque arrêt est dit à l'assistant (AC-b2, ligne « … and k more »).
+- **HN-E11S03-16** (implémentation) : à la garde, un chemin gardé par le code mais plus attendu (équipe
+  quittée), ou attendu mais pas gardé (équipe rejointe), est ignoré (source : HN-E11S03-7).
+- **HN-E11S03-17** (implémentation) : le refus nomme les chemins changés dans l'ordre des parties
+  (`expectedContextPaths`), bornés par `boundedList` (source : AC-a5).
+- **HN-E11S03-18** (implémentation) : le nombre du pointeur d'une partie coupée est tiré du plafond
+  (`formatCount(CONTEXT_BUDGET)`), jamais écrit en dur (source : AC-b4).
+- **HN-E11S03-19** (implémentation) : une partie dont même la tête ne tient pas n'est omise que si son corps
+  est servi (`path` posé) ; les autres blocs se coupent à la dernière ligne entière (source : AC-b4, `renderContext`).
+- **HN-E11S03-20** (implémentation) : un instantané de `node_versions` absent pour l'une des deux révisions
+  comparées vaut un changement : le code est périmé (source : option sûre, un rappel de `context` de trop).
+- **HN-E11S03-21** (implémentation) : nouveautés et contenus récents, arrêtés à 10 et 20 lignes, n'ajoutent
+  pas de ligne « … and k more » ; les listes d'un Contexte et les procédures utiles disent leur arrêt
+  (source : leur borne choisit les plus récents).
+- **HN-E11S03-22** (implémentation, lot c, renumérotée à la fusion) : dans le résultat d'`append` qui
+  prolonge une liste, « +N » est la croissance de la section en caractères.
+- **HN-E11S03-23** (implémentation, lot c) : « the list continues with N more items » compte les éléments
+  ajoutés, sous-éléments compris (source : `LIST_ITEMS_MAX`, E10-S04).
+- **HN-E11S03-24** (implémentation, lot c) : `staleState` d'une page sans titre : la ligne de début de page,
+  puis « - (no section) ».
+- **HN-E11S03-25** (implémentation, lot c) : le résultat de `move_block` vers une section cite son titre
+  tel que rangé, non tel que demandé.
+- **HN-E11S03-26** (implémentation, lot c) : un titre déplacé vers une sous-section de la section qu'il
+  ouvre n'est pas refusé ; seul `section` égal à la section qu'il ouvre l'est (AC-c1).
 
 ## Actions JB
 
@@ -412,8 +435,27 @@ rest:` ajoutés. `SERVED_BUDGET` inchangé.
 
 ### Écarts avec l'architecture
 
+Invariants touchés comme prévu : ADR-002 § 2 et § 7 amendés par le pilote à la fusion ; `docs/architecture.md`
+(`ctx`, `bump_rules_version`, `context/`, « Flexible sans ADR ») et `docs/prd.md` suivent. La version qui réunit
+E10 et E11 est la 1.1.0 (fiche D145) : les mentions « 1.0.1 » de cette story valent 1.1.0. Migration renommée à
+la fusion `20260929180000_ctx_contexts.sql` (depuis `20260929150000`), après `20260929170000` d'E10-S04.
+`beforeOpenFence` passe de `blocks/contexts.ts` à `engine.ts` (la tâche M82 suit).
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `expectedContextPaths` | `packages/plateforme/server/context/blocks/contexts.ts` | Chemins des Contextes attendus de la personne, dans l'ordre des parties ; ceux que garde le `ctx` (AC-a1) |
+| `readRest` | `packages/plateforme/server/context/engine.ts` | Fin commune des deux pointeurs d'un Contexte servi en partie (AC-b2, AC-b4) |
+| `samePublishedContent` | `packages/plateforme/server/nodes/diff.ts` | Deux états publiés au même contenu servi (AC-a4, H28) |
+| `startOfPageLines` | `packages/plateforme/server/nodes/read-format.ts` | Ligne « - (start of page, N characters) » du plan et de `staleState` (AC-c3) |
+| `locate` (exporté) | `packages/plateforme/server/nodes/section-ops.ts` | Section d'un titre, refus communs d'`append` et de `move_block` vers une section (AC-c1) |
 
 ### Notes
+
+- Lots a et b livrés dans le worktree `e11-s03`, lot c dans `e11-s03c` (parti de `main` avec E10) ; revue
+  approuvée ; fusion sur `main` sans commit, commit commun à venir.
+- Hypothèses d'implémentation HN-E11S03-16 à 26 (celles du lot c renumérotées 22 à 26 à la fusion),
+  reportées dans `docs/decisions/hypotheses.md`.
+- La migration attend son application au projet Supabase de test avant le `verify` de la fusion (action JB,
+  `status.md`) ; toutes les conversations ouvertes au déploiement rappellent `context` une fois.
+- Golden queries C2 (réécrite), C2 bis, RW9 et RW10 ajoutées, à jouer sur les hosts.

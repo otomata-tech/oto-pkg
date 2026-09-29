@@ -21,6 +21,19 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - Without a clear match, `context` offers every shown candidate as a choice for a question, a « comment » question or a polite request; it answers or explains first and runs nothing unpicked.
 - `context` matches a procedure on each phrasing its summary lists, weighs rare words above common ones, and forgives a typo in the request through the organisation's lexicon.
 - Content in the trash no longer takes a place among `find` and `context` results before their cut: a live match ranked lower now shows instead.
+- `write` reads GFM tables, `---` dividers, `<details>` toggles, lists nested three levels deep and headings down to `######`; `read` and `context` serve them back in the same form.
+- Page text shows ~~strikethrough~~, backslash escapes, `<br>`, a mark inside a mark of another character and `<https://…>` links; `\[[path]]` is not a link.
+- Publishing a procedure refuses a `call` fence inside a table cell, a toggle or a sub-item, as in a paragraph; a step stays a top-level item of the numbered list.
+- `call table.import` files a CSV into a new table (`create`) or an existing one: 40,000 characters per call, each piece starting with the header line, rows merged on the key.
+- The `write.table` contract says a CSV the user gives you becomes a table through `table.import`, and a markdown file a page whose first # heading is the title.
+- A ctx expires only when a Context served to your conversation changes, and the refusal names which; `feedback` accepts an expired ctx.
+- `context` serves each block whole, up to 35,000 characters in all; beyond, the cut is said, with the `read` call that gives the rest.
+- `write`: `move_block` takes `section` to move a block to the end of that section; `append` continues the list that ends the section.
+- `call table.write` takes `create_only: true`: a key that already exists is refused (conflict) with the row as it is, and nothing is written for it.
+- `table.rows` finds rows by words: each word of `q`, in any order, without case or accents, in any searchable cell, e.g. "mairie valbrune".
+- `table.schema` gives the table's revision; `table.rows` with `provenance: true` shows the MCP client (`host`) and the `worker` behind each value.
+- A column with `allow_verified_empty: false` needs a real value; a table whose review has `agents_may_decide: true` lets you set approve or reject.
+- Proof is per table: a new value needs `{value, comment | link}` only where the header says `proof: true`, as `table.schema` tells.
 
 ### Hosts
 - Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
@@ -31,6 +44,20 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - Migrations: applying `20260929160000_private_spaces.sql` sets every missing member handle and creates the « Privé » space and its Context of each member who had none; run `oto-platform migrations sync`.
 - UI: the home page no longer reads `?onglet=`; give the rail `adresses.contexte` (`/context`) and mount `EcranDuContexte` on that route (example: `src/app/(dashboard)/context/page.tsx`).
 - UI: `ContexteServi` and `EcranDAccueil` lose `hrefDuProfil`; `EcranDAccueil` loses `onglet` and `hrefDOnglet`; `ONGLETS_DE_L_ACCUEIL` and `OngletDeLAccueil` are no longer exported.
+- Migrations: `20260929170000_platform_page_markdown.sql` widens `blocks_type_check` and `blocks_shape_check` (block types `simple_table`, `divider`, `toggle`; nested list items; heading levels 1 to 5) and recreates `block_search_text`; every existing row stays valid; run `oto-platform migrations sync`, then apply it.
+- UI: headings render one level lower: a heading of level N is an `h(N+1)`, at most `h6` (`h(N+2)` under `baliseDeTitre="h3"`); level 2 and 3 headings already written become `h3` and `h4`.
+- UI: pages show the new blocks (simple table scrolling inside its block, divider, toggle closed by default, nested lists); in the editor, a block's « + » and `/` in an empty text open a choice in two groups (« Texte », « Insérer »), and a simple table, a divider and a toggle are written on screen.
+- UI: the rail's « ⋯ » offers « Télécharger en .md » (page, procedure, Contexte) and « Télécharger en .csv » (table); « Importer un fichier… » in the rail's « + », or a file dropped on a rail line, imports a `.md` as a page or a `.csv` as a table; to who writes a table, its screen offers « Importer un fichier… » above the table and takes a dropped `.csv`.
+- MCP: `table.import` joins the `call` catalogue; the tool list served to hosts is unchanged, nothing to refresh.
+- API: `GET nodes/export?path=` (the `.md` of a published node) and `GET tables/export?path=` (the `.csv` of a table, 5,000 rows at most) answer `{filename, content}` and are reads, never journaled; `POST tables/import` writes one lot of 500 CSV rows at most, creating the table only for who manages its parent.
+- API: the body of `POST nodes` takes `tolerant: true` (paste and file import: nothing refused, `kept_as_text` counts what stayed text); `write` over MCP stays strict.
+- Schemas: `./schemas` exports the CSV functions (`parseCsv`, `columnNameOf`, `inferTable`, `checkImport`, `toCsv`…), `pageMarkdown`, `readPageMarkdown`, `tableImportArgsSchema`, `tableImportBodySchema` and the import bounds (`IMPORT_*`).
+- Migrations: `20260929180000_ctx_contexts.sql` adds the column `platform.ctx.contexts`; every conversation open at the upgrade calls `context` once more; run `oto-platform migrations sync`, then apply it.
+- Server: `context` returns up to 35,000 characters (20,000 before), each block whole; `previewContext` and the « Contexte » view follow.
+- Server: the header attribute `proof` defaults to false: an existing table no longer requires proof until `header: {"proof": true}` is published through `write`; the review queue shows « sans preuve » only then.
+- Schemas: `./schemas` exports `queryWords`; `tableHeaderSchema` gains `proof`, `tableColumnSchema` `allow_verified_empty`, `tableReviewSchema` `agents_may_decide`.
+- MCP: unlike `table.import`, the description of `write` changes (`move_block` into a section): refresh the tool list in each host after upgrading; the table functions, described through `read`, need nothing.
+- UI: the editor draws one marker per list item, on its first line, and edits a link in a « Lien » panel; nothing for the host to do.
 
 ## 1.0.0 — 2026-09-28
 

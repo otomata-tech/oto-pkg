@@ -110,13 +110,13 @@ describe("read and write input schemas, extended by additions only (AC1)", () =>
     const fields = at(items, "properties")
     strip(ops, " Block operations address a block by its reference instead.")
     strip(at(fields, "op"), " By block: replace_block, insert_after, delete_block or move_block.")
-    strip(at(fields, "section"), " Section operations only.")
+    strip(at(fields, "section"), " Section operations, and move_block (to the end of that section).")
     strip(at(fields, "text"), " delete_block and move_block take no text either.")
     expect(at(fields, "op").enum).toEqual(["replace_section", "append", "add_section", "delete_section", "replace_text", "replace_block", "insert_after", "delete_block", "move_block"])
     at(fields, "op").enum = ["replace_section", "append", "add_section", "delete_section", "replace_text"]
     expect([fields.block, fields.after_block]).toEqual([
       { description: 'Block operations: reference of the block, from read with refs: true, e.g. "3f9a2c1b" or a key such as "etapes".', type: "string", minLength: 1, maxLength: 500 },
-      { description: "move_block only: reference of the block to put it after (default: the start of the page).", type: "string", minLength: 1, maxLength: 500 },
+      { description: "move_block only: reference of the block to put it after (default: the start of the page, outside any section).", type: "string", minLength: 1, maxLength: 500 },
     ])
     delete fields.block
     delete fields.after_block

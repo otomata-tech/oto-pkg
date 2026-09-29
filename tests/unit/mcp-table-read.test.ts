@@ -79,6 +79,7 @@ describe.skipIf(!sqlConfigured)(portable("acme_read of a table (AC18)"), { timeo
         "Review: rows « à revoir » wait for a person, who approves them (« qualifié ») or rejects them (« écarté »).",
         "Write with table.write: rows [{key, revision?, set: {column: {value, comment | link}}, clear: [column], verified_empty: [{column, reason}]}]; a bare value equal to the stored one is ignored; any new value needs its proof (comment or link), except the state column statut, set bare within its allowed changes; null is refused; unnamed columns stay unchanged.",
         "Closed: no — a new key creates a row.",
+        "Proof: required — every new value needs {value, comment | link}; a new value without it refuses the whole call.",
         "Rows: 12.",
         'Read rows with acme_call {"function": "table.rows", "arguments": {"table": "ventes/suivi_prospects"}}.',
       ].join("\n"),

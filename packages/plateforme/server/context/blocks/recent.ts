@@ -2,7 +2,7 @@
 // AC-20 : renommé seulement) : les pages et tableaux que la
 // personne a lus ou écrits sur 90 jours — lectures et écritures au journal, blocs qu'elle a écrits
 // (brouillon d'une page, ligne d'un tableau), nœuds qu'elle a publiés —, datés de leur source la plus
-// récente, 20 au plus et 1 400 caractères au plus ; ni procédure, ni Contexte, ni la racine, ni nœud
+// récente, 20 au plus (sans taille, E11-S03) ; ni procédure, ni Contexte, ni la racine, ni nœud
 // qu'elle ne lit pas. Sans lui, la personne ne retrouve pas ce sur quoi elle travaillait.
 //
 // Repris de la maquette (`mcp-test/src/proto/services/context.ts` l. 205-208, 227-230) : forme des
@@ -15,14 +15,11 @@ import { inTransaction } from "../../errors"
 import type { Identity } from "../../identity"
 import { ROOT_PATH } from "../../nodes/lookup"
 import { day } from "../../nodes/read-format"
-import { daysAgo, withinSize, type ContextBlock } from "../engine"
+import { daysAgo, type ContextBlock } from "../engine"
 import { byPath } from "./contexts"
 
 /** Documents listés au plus (H36). */
 const RECENT_MAX = 20
-
-/** Taille nominale (H30, N6). */
-export const RECENT_SIZE = 1400
 
 const RECENT_DAYS = 90
 
@@ -116,15 +113,15 @@ async function recentDocuments(db: PlatformDb, identity: Identity): Promise<(Doc
 }
 
 /**
- * Le texte du bloc (AC5, AC6 ; E05-S12, AC-20) : « ## Recent content » et une ligne par document, 1 400 caractères au
- * plus ; `null` sans document. Formats de `SERVED_RECENT`, que l'écran relit (E05-S13, AC-16) ; exporté pour son test
+ * Le texte du bloc (AC5, AC6 ; E05-S12, AC-20) : « ## Recent content » et une ligne par document, servi entier
+ * (E11-S03, AC-b1) ; `null` sans document. Formats de `SERVED_RECENT`, que l'écran relit (E05-S13, AC-16) ; exporté pour son test
  * de parité, sans base.
  */
 export function recentText(documents: readonly (Pick<DocumentNode, "path" | "kind" | "title"> & { at: string })[]): ContextBlock | null {
   if (documents.length === 0) return null
   const { title, item, kindStart, dateStart, dateEnd } = SERVED_RECENT
   const lines = documents.map((document) => `${item}${document.path}${kindStart}${document.kind}${dateStart}${day(document.at)}${dateEnd}${document.title}`)
-  return withinSize({ name: "recent content", text: [title, ...lines].join("\n") }, RECENT_SIZE)
+  return { name: "recent content", text: [title, ...lines].join("\n") }
 }
 
 /** Le bloc : les documents récents de la personne (`recentDocuments`), rendus par `recentText`. */

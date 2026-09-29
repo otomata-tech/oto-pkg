@@ -217,7 +217,8 @@ const WRITTEN = {
   org_domains: { host: REQUIRED, org_id: REQUIRED, created_at: now },
   connector_activations: { org_id: REQUIRED, connector: REQUIRED, state: "active", activated_by: null, created_at: now, updated_at: now },
   // `rules_version` : celle d'une organisation neuve (`orgs.rules_version`, défaut 1).
-  ctx: { code: REQUIRED, org_id: REQUIRED, user_id: REQUIRED, rules_version: 1, host: null, user_agent: null, created_at: now },
+  // `contexts` : aucun Contexte gardé, jamais périmé (E11-S03) ; un test pose les révisions qu'il garde.
+  ctx: { code: REQUIRED, org_id: REQUIRED, user_id: REQUIRED, rules_version: 1, contexts: {}, host: null, user_agent: null, created_at: now },
   // `connector` et `function` : ceux du seul écrivain de la table, `mail.create_draft` (connecteur simulé).
   sim_outbox: {
     id: REQUIRED,
@@ -312,7 +313,7 @@ const DRAWN: Partial<Record<string, { column: string; draw: () => string }>> = {
  */
 const ORG_COLUMNS = ["name", "brand", "settings", "flags", "rules_version"] as const
 
-const JSON_COLUMNS: ReadonlySet<string> = new Set(["profile", "meta", "data", "provenance", "blocks", "brand", "settings", "flags", "args", "payload"])
+const JSON_COLUMNS: ReadonlySet<string> = new Set(["profile", "meta", "data", "provenance", "blocks", "brand", "settings", "flags", "args", "payload", "contexts"])
 const UUID_COLUMN = /^(id|\w+_id|(created|updated|invited|granted|revoked|added|accepted|activated|handled|sent)_by|claimed_by_user|author)$/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** Lignes par insertion : sous la borne de 65 535 paramètres d'une requête Postgres (18 colonnes au plus). */

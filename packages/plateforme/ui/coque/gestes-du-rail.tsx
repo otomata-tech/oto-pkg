@@ -8,12 +8,16 @@
 // contenu que la personne ne voit pas, HN-E05S10e-3), puis envoie `POST trash` ; la page ouverte partie avec
 // lui, son parent s'ouvre ; le focus va à la ligne qui la précède. Droits décidés par le service, refus dit
 // dans le rail. Écrit dans le style du menu d'oto-frontend, qui avait retiré ces gestes faute de service.
+// E10-S01 (AC-a5, AC-b6) : « Télécharger en .md » d'une page, d'une procédure ou d'un Contexte, « Télécharger en
+// .csv » d'un tableau, par `GET nodes/export` et `GET tables/export` ; le fichier rendu part au navigateur.
 import { useEffect, useState, type ReactNode } from "react"
 import { Copy } from "@phosphor-icons/react/dist/csr/Copy"
+import { DownloadSimple } from "@phosphor-icons/react/dist/csr/DownloadSimple"
 import { Trash } from "@phosphor-icons/react/dist/csr/Trash"
-import { nodePathBodySchema } from "../../schemas"
+import { nodePathBodySchema, type NodeKind } from "../../schemas"
 import { appelerPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
+import { telecharger, type FichierRendu } from "../api/telecharger"
 import { RACINE } from "../arbre/depuis-l-arbre"
 import { ConfirmDialog } from "../ds/react/confirm-dialog"
 import { AnimatedIcon } from "../ds/react/icon"
@@ -22,10 +26,11 @@ import { Alert } from "../ds/react/primitives"
 import { useHote } from "../hote/navigation"
 import { useRafraichir } from "../hote/rafraichir"
 import { parentDe } from "./freres"
-import { GESTES_DU_RAIL } from "./libelles"
+import { EXPORTS, GESTES_DU_RAIL } from "./libelles"
 import { useAdresseCourante } from "./noeud-ouvert"
 
-type Cible = { chemin: string; nom: string }
+/** Une ligne du rail ; `genre` choisit son export (E10-S01). */
+type Cible = { chemin: string; nom: string; genre?: NodeKind }
 
 /** Les refus qui ont leur phrase : les droits de chaque geste (HN-E05S10e-3, HN-E05S10e-6), et la course de « Supprimer » (HN-E05S10e-24). */
 const REFUS = {
@@ -50,8 +55,10 @@ export function ligneDuRail(prefixe: string, chemin: string): HTMLElement | unde
 }
 
 export type GestesDuRail = {
-  /** Les items du « ⋯ » d'une ligne qui se déplace : « Dupliquer », puis « Supprimer ». */
+  /** Les items du « ⋯ » d'une ligne qui se déplace : « Dupliquer », le téléchargement, puis « Supprimer ». */
   itemsPour: (cible: Cible) => MenuItem[]
+  /** Le téléchargement seul, pour une ligne qui ne se déplace pas (un Contexte, E10-S01). */
+  exportPour: (cible: Cible) => MenuItem[]
   /** À rendre une fois : la confirmation de la suppression, l'annonce et le refus. */
   retour: ReactNode
 }
@@ -119,6 +126,21 @@ export function useGestesDuRail({ prefixe, sousContenus, precedente }: Lecture):
     rafraichir()
   }
 
+  async function exporter(cible: Cible) {
+    commencer(EXPORTS.enCours)
+    const tableau = cible.genre === "table"
+    const ressource = `${tableau ? "tables" : "nodes"}/export?path=${encodeURIComponent(cible.chemin)}`
+    const reponse = await appelerPlateforme<FichierRendu>({ methode: "GET", ressource })
+    setEnCours(null)
+    if (reponse.erreur) return setRefus(messageDErreur(reponse.erreur, EXPORTS.refus))
+    telecharger(reponse.data, tableau ? "text/csv;charset=utf-8" : "text/markdown;charset=utf-8")
+    setAnnonce(EXPORTS.pret(reponse.data.filename))
+  }
+
+  const exportPour = (cible: Cible): MenuItem[] => [
+    { label: cible.genre === "table" ? EXPORTS.csv : EXPORTS.markdown, icon: <AnimatedIcon as={DownloadSimple} size="xs" />, onSelect: () => void exporter(cible) },
+  ]
+
   const nombre = aSupprimer ? sousContenus(aSupprimer.chemin) : 0
   const retour = (
     <>
@@ -146,9 +168,11 @@ export function useGestesDuRail({ prefixe, sousContenus, precedente }: Lecture):
   return {
     itemsPour: (cible) => [
       { label: GESTES_DU_RAIL.dupliquer, icon: <AnimatedIcon as={Copy} size="xs" />, onSelect: () => void dupliquer(cible) },
+      ...exportPour(cible),
       { separator: true },
       { label: GESTES_DU_RAIL.supprimer, icon: <AnimatedIcon as={Trash} size="xs" />, destructive: true, onSelect: () => setASupprimer(cible) },
     ],
+    exportPour,
     retour,
   }
 }

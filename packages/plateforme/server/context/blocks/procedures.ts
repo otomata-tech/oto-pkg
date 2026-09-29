@@ -1,6 +1,6 @@
 // Bloc « Procedures you can run » de `context` (E03-S08, AC4, AC6 ; H35, P37) : les procédures publiées
 // que la personne lit, chacune par son résumé, qui dit comment on la demande, triées par l'usage de la
-// personne et de ses équipes sur 90 jours, puis par chemin ; 60 lignes et 8 000 caractères au plus, la
+// personne et de ses équipes sur 90 jours, puis par chemin ; 60 lignes au plus (sans taille, E11-S03), la
 // dernière ligne comptant celles qui ne sont pas listées. Sans lui, le modèle ne sait pas quelles
 // procédures existent hors de la phrase routée.
 //
@@ -19,9 +19,6 @@ import { byPath } from "./contexts"
 
 /** Procédures listées au plus (H35). */
 const PROCEDURES_MAX = 60
-
-/** Taille nominale (H30, N6). */
-export const PROCEDURES_SIZE = 8000
 
 /** Fenêtre de l'usage compté (H35). */
 const USAGE_DAYS = 90
@@ -92,8 +89,8 @@ async function usageByPath(db: PlatformDb, identity: Identity): Promise<Map<stri
 
 /**
  * Le texte du bloc (AC4, AC6) : « ## Procedures you can run (<n>) », puis une ligne par procédure dans
- * l'ordre reçu, 60 au plus et 8 000 caractères au plus ; dès qu'une procédure n'est pas listée, la
- * dernière ligne la compte, comprise dans les 8 000. Aucune : « None published yet. ». Formats de
+ * l'ordre reçu, 60 au plus, sans taille (E11-S03, AC-b1) ; dès qu'une procédure n'est pas listée, la
+ * dernière ligne la compte. Aucune : « None published yet. ». Formats de
  * `SERVED_PROCEDURES`, que l'écran relit (E05-S13, AC-16) ; exporté pour son test de parité, sans base.
  */
 export function proceduresText(procedures: readonly Pick<Procedure, "path" | "summary">[], prefix: string): ContextBlock {
@@ -105,8 +102,7 @@ export function proceduresText(procedures: readonly Pick<Procedure, "path" | "su
     const more = shown < lines.length ? [`${moreStart}${lines.length - shown}${moreEnd}${prefix}_find, type procedure.`] : []
     return [header, ...lines.slice(0, shown), ...more].join("\n")
   }
-  let shown = Math.min(lines.length, PROCEDURES_MAX)
-  while (shown > 0 && text(shown).length > PROCEDURES_SIZE) shown -= 1
+  const shown = Math.min(lines.length, PROCEDURES_MAX)
   return { name: "procedures", text: text(shown), ...(shown < lines.length ? { cut: true } : {}) }
 }
 

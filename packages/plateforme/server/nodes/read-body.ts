@@ -10,7 +10,7 @@ import { blocksSize, displayRefs, formatCount, type DocBlock } from "./document"
 import { PAGE_FULL_MAX } from "./limits"
 import type { NodeRow } from "./lookup"
 import { plural, quotedList } from "./op-kit"
-import { diffLines, outlineLines, outlineOf, renderServed, type ReferenceRender, type Version } from "./read-format"
+import { diffLines, outlineLines, outlineOf, renderServed, startOfPageLines, type ReferenceRender, type Version } from "./read-format"
 import type { DraftRow } from "./store"
 
 /** Ce que `read` sert après l'en-tête : le corps (coupé en parties au besoin), les lignes de fin, les blocs lus. */
@@ -54,6 +54,7 @@ function outlineText(request: BodyRequest, refs: Map<DocBlock, string> | null, o
   const flags = { draft: request.draftMode || undefined, refs: input.refs || undefined }
   return [
     `outline (${formatCount(entries.length)} ${plural(entries.length, "section")}, ${formatCount(blocksSize(blocks))} characters${limit}):`,
+    ...startOfPageLines(blocks),
     ...outlineLines(entries, refs !== null),
     `Read one with ${prefix}_read ${callArguments({ path: request.context.node.path, ...flags, section: "<title>" })}.`,
   ].join("\n")

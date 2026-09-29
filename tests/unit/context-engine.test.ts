@@ -79,6 +79,62 @@ describe("renderContext (AC21)", () => {
     expect(text).toBe(BLOCKS[0].text)
   })
 
+  // E11-S03 (lot b, fiche D134) : un plafond de 35 000 caractères, blocs gardés dans l'ordre servi ; une partie de
+  // Contexte coupée par le plafond finit par son pointeur, une partie dont la tête ne tient pas est omise.
+  describe("the cap of context (E11-S03, AC-b3, AC-b4)", () => {
+    const head = "## Context: team Ventes (ventes/contexte)\nTeam Ventes. Lead: Claire Morel."
+    const pointer = 'This context is cut: everything served together exceeds 35,000 characters. Read the rest: acme_read {"path": "ventes/contexte"}.'
+    const rules = Array.from({ length: 400 }, (_, index) => `Règle ${index} : chaque devis est relu avant envoi.`)
+    const fence = ["```text", ...Array.from({ length: 40 }, (_, index) => `modèle ${index}`), "```"]
+    /** La partie de Ventes : sa tête, puis un bloc clôturé au milieu de ses règles ; ses listes arrêtées au besoin. */
+    const ventes = (lists = false) => {
+      const body = [...rules.slice(0, 200), ...fence, ...rules.slice(200)].join("\n")
+      const text = `${head}\n${body}${lists ? '\nOnly the first 20 entries are listed. Read the rest: acme_read {"path": "ventes/contexte"}.' : ""}`
+      return { name: "ventes/contexte", path: "ventes/contexte", head: head.length, text, ...(lists ? { cut: true } : {}) }
+    }
+    const filler = (name: string, size: number) => ({ name, text: `## ${name}\n${"x".repeat(size - name.length - 4)}` })
+    const notice = (named: string) => `\n\n[Context budget reached. Omitted: ${named}. Use acme_find or acme_read for more.]`
+
+    it("should keep the blocks in the served order, cut the first that does not fit at a whole line before an open fenced block, end it with its pointer and name it with the next ones", () => {
+      // Le code prend la place : la coupe de Ventes tombe à 200 caractères dans son bloc clôturé.
+      const upToFence = `${head}\n${rules.slice(0, 200).join("\n")}`
+      const code = filler("code", 35_000 - 240 - 2 - upToFence.length - 1 - pointer.length - 200)
+      const blocks = [code, ventes(true), filler("news", 900), filler("procedures", 9_000), filler("recent content", 1_000)]
+      expect(fence.join("\n").length).toBeGreaterThan(200)
+
+      const { text, report } = renderContext(blocks, CONTEXT_BUDGET, "acme")
+      expect(text.length).toBeLessThanOrEqual(CONTEXT_BUDGET)
+      expect(text).toBe(`${code.text}\n\n${upToFence}\n${pointer}${notice("ventes/contexte (cut), news, procedures, recent content")}`)
+      expect(text).not.toContain("Only the first 20")
+      expect(report.map(({ name, status }) => [name, status])).toEqual([
+        ["code", "full"],
+        ["ventes/contexte", "cut"],
+        ["news", "omitted"],
+        ["procedures", "omitted"],
+        ["recent content", "omitted"],
+      ])
+      expect(report[1]).toMatchObject({ chars: upToFence.length + 1 + pointer.length, head: head.length, path: "ventes/contexte" })
+    })
+
+    it("should cut a Contexte at its last whole line outside any fence, the pointer counted within the cap", () => {
+      const code = filler("code", 34_000 - 240 - head.length - 2 - 400)
+      const { text } = renderContext([code, ventes()], CONTEXT_BUDGET, "acme")
+      const part = text.slice(code.text.length + 2, text.indexOf("\n\n[Context budget reached."))
+      const kept = part.slice(head.length + 1, -pointer.length - 1)
+      expect([part.startsWith(`${head}\n`), part.endsWith(`\n${pointer}`), rules.join("\n").startsWith(`${kept}\n`)]).toEqual([true, true, true])
+      // Une ligne de plus ne tiendrait pas avec le pointeur.
+      const next = rules[kept.split("\n").length]
+      expect(code.text.length + 2 + head.length + 1 + kept.length + 1 + next.length + 1 + pointer.length).toBeGreaterThan(35_000 - 240)
+    })
+
+    it("should omit and name a part whose head does not fit, and go on omitting", () => {
+      const code = filler("code", 35_000 - 240 - 2 - head.length + 10)
+      const { text, report } = renderContext([code, ventes(), filler("news", 500)], CONTEXT_BUDGET, "acme")
+      expect(text).toBe(`${code.text}${notice("ventes/contexte, news")}`)
+      expect(report.map((entry) => entry.status)).toEqual(["full", "omitted", "omitted"])
+    })
+  })
+
   // E03-S02, AC9 : une procédure trop longue n'est jamais coupée au milieu.
   it.skipIf(!sqlConfigured)(
     portable("should replace the served procedure that does not fit by its pointer to read and go on, or omit it with the next ones"),

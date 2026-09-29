@@ -13,6 +13,9 @@
 // frappe (`frapper`) et y inscrit ce qu'il fait avant une publication (`participer` : envoyer son texte en
 // attente, dire s'il la retient) ; la publication écoute les frappes et publie 3 s après la dernière. Sans ce
 // relais, l'en-tête d'un tableau, qui n'a pas d'éditeur de blocs, ne publierait jamais seul.
+//
+// E10-S01 : la réponse dit ce que le mode tolérant a gardé en texte (`kept_as_text`, AC-a2), et la file donne le
+// chemin de sa page, sous lequel la conversion d'un tableau simple range le tableau (AC-b7).
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { WriteNodeBody } from "../../../schemas"
 import { appelerPlateforme, type ErreurPlateforme } from "../../api/client"
@@ -26,6 +29,8 @@ export type ReponseDEcriture = {
   status: string
   draft_stamp: string | null
   touched: { op: string; blocks: { id: string; ref: string; revision: number }[] }[]
+  /** Les constructions gardées en texte par le mode tolérant (E10-S01, AC-a2) ; absent en mode strict. */
+  kept_as_text?: number
 }
 
 export type IssueDEnvoi =
@@ -54,6 +59,8 @@ type Instantane = { revision: number; tampon: string | null; brouillon: boolean;
 export type Participant = { vider: () => void; retient: () => boolean }
 
 export type File = Instantane & {
+  /** Le chemin de la page, que la file écrit. */
+  chemin: string
   envoyer: (envoi: Envoi) => void
   /** Renvoie l'écriture refusée, puis les suivantes (AC15, AC18). */
   relancer: () => void
@@ -229,6 +236,7 @@ export function FileDOperations({ chemin, revisionPubliee, tampon, children }: F
   const valeur = useMemo<File>(
     () => ({
       ...instantane,
+      chemin,
       envoyer: file.envoyer,
       relancer: file.relancer,
       remplacerLArret: file.remplacerLArret,
@@ -238,7 +246,7 @@ export function FileDOperations({ chemin, revisionPubliee, tampon, children }: F
       preparer: file.preparer,
       aUnBrouillon: file.aUnBrouillon,
     }),
-    [instantane, file],
+    [instantane, file, chemin],
   )
   return <ContexteDeLaFile.Provider value={valeur}>{children}</ContexteDeLaFile.Provider>
 }

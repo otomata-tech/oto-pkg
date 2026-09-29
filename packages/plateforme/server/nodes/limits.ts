@@ -6,17 +6,14 @@
 /** Au-delà de ces caractères rendus, `read` sert le plan d'une page qui a des titres (N1). */
 export const PAGE_FULL_MAX = 12_000
 
-/** Texte d'une opération de `write` (banc E04, mesure 4 : un appel porte ~47 000 caractères). */
-export const OP_TEXT_MAX = 40_000
+/** Texte d'une opération de `write` et caractères rendus d'une page : dans `schemas/nodes.ts`, que l'écran lit aussi (E10-S01). */
+export { OP_TEXT_MAX, PAGE_MAX } from "../../schemas/nodes"
 
 /** Opérations par appel de `write`. */
 export const OPS_MAX = 50
 
 /** Caractères rendus d'une section, sous-sections comprises. */
 export const SECTION_MAX = 100_000
-
-/** Caractères rendus d'une page. */
-export const PAGE_MAX = 300_000
 
 /** Blocs d'une page, d'une procédure ou d'un Contexte. */
 export const BLOCKS_MAX = 1_000
@@ -54,8 +51,8 @@ export const TOUCHED_BLOCKS_MAX = 20
 /** Texte d'un titre, et titre d'une section créée par `add_section`. */
 export const HEADING_TEXT_MAX = 200
 
-/** Éléments d'une liste ou d'une `checklist`. */
-export const LIST_ITEMS_MAX = 500
+/** Éléments d'une liste (sous-éléments compris) ou d'une `checklist`. */
+export { LIST_ITEMS_MAX } from "../../schemas/blocks"
 
 /** Nom de la fonction d'un bloc `call`. */
 export const FUNCTION_NAME_MAX = 100

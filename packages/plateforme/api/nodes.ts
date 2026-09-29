@@ -9,12 +9,13 @@
 // Gestes du rail et du panneau « Partager » (E05-S10, partie e) : `GET nodes/links` (« Contenus liés »,
 // AC-b6), `GET nodes/impact` (aperçu d'un déplacement, AC-b7), `POST nodes/position` (ordre des frères,
 // AC-b9), `POST nodes/duplicate` (AC-b10), `POST nodes/access` (accès général, AC-b13) ; aucun outil MCP
-// ne les porte (liste figée, ADR-002).
+// ne les porte (liste figée, ADR-002). `GET nodes/export?path=` (E10-S01, AC-a5) : le `.md` d'un nœud publié.
 import { generalAccessSchema, moveNodeSchema, nodePathBodySchema, placeNodeSchema, writeNodeBodySchema } from "../schemas"
 import { nodeHeadQuerySchema, type NodeHead } from "../schemas/search"
 import { invalidInput } from "../server/errors"
 import { setGeneralAccess } from "../server/general-access"
 import { duplicateNode } from "../server/nodes/duplicate"
+import { exportNode } from "../server/nodes/export"
 import { moveImpact } from "../server/nodes/move-impact"
 import { moveNode } from "../server/nodes/move"
 import { nodeLinks } from "../server/nodes/node-links"
@@ -64,6 +65,15 @@ export const nodesRoutes: ResourceRoutes = {
       fixed: { 0: "impact" },
       async handle({ db, identity, request }) {
         return { status: 200, data: await moveImpact(db, identity, queryOf(request)) }
+      },
+    },
+    {
+      // E10-S01 (AC-a5) : « Télécharger en .md » ; le service exige la lecture avant de lire les blocs. Une lecture :
+      // aucune ligne de journal (HN-E10S01-18).
+      params: 1,
+      fixed: { 0: "export" },
+      async handle({ db, identity, request }) {
+        return { status: 200, data: await exportNode(db, identity, queryOf(request)) }
       },
     },
   ],

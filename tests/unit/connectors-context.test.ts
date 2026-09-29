@@ -183,7 +183,7 @@ describe("activation hides the functions (AC4, AC22)", () => {
     expect(isActive(fn("table.rows", "read", "paquet"), none)).toBe(true)
     expect(isActive(fn("erp.list_invoices", "read", "erp"), none)).toBe(true)
     // Les fonctions natives des tableaux (E07-S01) sont toujours actives.
-    const native = ["table.schema", "table.rows", "table.aggregate", "table.write", "table.claim", "table.release"]
+    const native = ["table.schema", "table.rows", "table.aggregate", "table.write", "table.claim", "table.release", "table.import"]
     expect(catalogFunctions().filter((candidate) => isActive(candidate, none)).map((candidate) => candidate.name)).toEqual(native)
     expect(catalogFunctions().filter((candidate) => isActive(candidate, mail)).map((candidate) => candidate.name)).toEqual([
       "mail.create_draft",

@@ -161,7 +161,9 @@ test.describe("procédure et contexte", () => {
       }
 
       // Une étape écrite en texte, comme sur une page, publiée seule (E05-S10, AC-a6).
+      // Le « + » ouvre le choix du bloc (E10-S06, AC-a1) : un Texte.
       await cliquerDansLaRangee(page.getByRole("button", { name: "Ajouter un bloc après — Premier paragraphe." }))
+      await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
       await page.getByRole("textbox", { name: "Modifier ce texte — bloc vide" }).fill(ETAPE)
       await page.keyboard.press("Escape")
       await attendreLEnregistrement(page)

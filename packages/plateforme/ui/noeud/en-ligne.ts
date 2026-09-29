@@ -16,13 +16,19 @@
 // E05-S11 (retour 11, fiche D107) : un lien se lit en lien hypertexte dans la phrase. Une page citée montre
 // son titre, jamais son chemin (`titreDuLien`) ; une adresse web montre le texte de son lien markdown
 // (`[texte](https://…)`), sinon, nue, son domaine.
+//
+// E10-S04 (AC-c1) : `~~barré~~` ; une marque dans une marque d'un autre caractère, sur deux niveaux ; les
+// échappements (`\*`, `\_`, `\|`, `` \` ``, `\[`, `\~`, `\<`, `\\`) hors du code en ligne ; `<br>` en saut de
+// ligne ; `<https://…>` en adresse web. Tout autre HTML reste du texte, que React échappe.
 import { chars } from "../../schemas/blocks"
-import { codeSpans, linksIn, type CodeSpan } from "../../schemas/link-syntax"
+import { codeSpans, escaped, linksIn, type CodeSpan } from "../../schemas/link-syntax"
 
 export type Segment =
   | { genre: "texte" | "code"; texte: string }
   | { genre: "gras"; contenu: Segment[] }
   | { genre: "italique"; contenu: Segment[] }
+  | { genre: "barre"; contenu: Segment[] }
+  | { genre: "saut" }
   /** `libelle` : le libellé écrit (`[[chemin|libellé]]`), vide sans lui. */
   | { genre: "lien"; chemin: string; reference: string | null; libelle: string }
   | { genre: "web"; adresse: string; libelle: string }
@@ -97,18 +103,34 @@ export function libelleDUneAdresse(adresse: string): string {
   return hote.replace(/^www\./iu, "") || sansSchema
 }
 
+/** Une marque : son segment, le caractère qui l'écrit (`famille`), la longueur de son bord, son expression. */
+type Forme = { genre: "gras" | "italique" | "barre"; famille: string; bord: number; motif: string }
+
 /**
- * `**` avant `*` ; une marque n'en contient pas d'autre, mais un lien ou un span de code y entre entier
- * (il y tient en un caractère, `ATOME`). Les gardes réparent des cas mesurés dans oto-frontend :
- * « 2 * 3 * 4 » n'est pas un italique, `{{first_name}}` traverse intact.
+ * `**` avant `*`, et `~~` (E10-S04, AC-c1) ; le contenu d'une marque n'a pas son caractère, ce qui garde la
+ * lecture linéaire, mais un lien, un span de code, un échappement ou un saut de ligne y entrent entiers (ils y
+ * tiennent en un caractère, `ATOME`). Les gardes réparent des cas mesurés dans oto-frontend : « 2 * 3 * 4 »
+ * n'est pas un italique, `{{first_name}}` traverse intact.
  */
-const MARQUES = new RegExp(
-  [
-    "\\*\\*([^\\s*](?:[^*]*[^\\s*])?)\\*\\*",
-    "\\*([^\\s*](?:[^*]*[^\\s*])?)\\*",
-    "(?<![\\p{L}\\p{N}_])_([^\\s_](?:[^_]*[^\\s_])?)_(?![\\p{L}\\p{N}_])",
-  ].join("|"),
-  "gu",
+const FORMES: readonly Forme[] = [
+  { genre: "gras", famille: "*", bord: 2, motif: "\\*\\*([^\\s*](?:[^*]*[^\\s*])?)\\*\\*" },
+  { genre: "italique", famille: "*", bord: 1, motif: "\\*([^\\s*](?:[^*]*[^\\s*])?)\\*" },
+  { genre: "italique", famille: "_", bord: 1, motif: "(?<![\\p{L}\\p{N}_])_([^\\s_](?:[^_]*[^\\s_])?)_(?![\\p{L}\\p{N}_])" },
+  { genre: "barre", famille: "~", bord: 2, motif: "~~([^\\s~](?:[^~]*[^\\s~])?)~~" },
+]
+
+type Lecteur = { expression: RegExp; formes: readonly Forme[] }
+
+const lecteur = (formes: readonly Forme[]): Lecteur => ({ expression: new RegExp(formes.map((forme) => forme.motif).join("|"), "gu"), formes })
+
+const MARQUES = lecteur(FORMES)
+
+/**
+ * Dans une marque, les marques d'un autre caractère (E10-S04, AC-c1 : `**gras _italique_**`,
+ * `_italique **gras**_`, `~~barré **gras**~~`), sur deux niveaux : chaque caractère lu deux fois au plus.
+ */
+const DANS_UNE_MARQUE: Readonly<Record<string, Lecteur>> = Object.fromEntries(
+  ["*", "_", "~"].map((famille) => [famille, lecteur(FORMES.filter((forme) => forme.famille !== famille))]),
 )
 
 /** La place d'un lien ou d'un span de code dans le texte que lisent les marques : ni blanc, ni marque, ni lettre. */
@@ -146,6 +168,27 @@ function atomesDe(texte: string): Atome[] {
   return avecLesAdresses(texte, atomes)
 }
 
+/** Un lien d'un texte (E11-S06) : ses bornes dans le texte source, sa forme écrite, et ce qu'il lit. */
+export type LienDuTexte = {
+  debut: number
+  fin: number
+  /** `page` : `[[…]]` ; `web-libelle` : `[texte](https://…)` ; `web-nu` : une adresse nue ou `<https://…>`, sans balisage à retirer. */
+  forme: "page" | "web-libelle" | "web-nu"
+  lien: Extract<Segment, { genre: "lien" | "web" }>
+}
+
+/**
+ * Les liens d'un texte, dans l'ordre, lus comme l'écran les rend (`atomesDe`) : le panneau « Lien » de l'éditeur
+ * (E11-S06) les retrouve sous le curseur et relit ce qu'il écrit, et le rang d'un lien rendu (`data-lien`) y est son rang.
+ */
+export function liensDuTexte(texte: string): LienDuTexte[] {
+  return atomesDe(texte).flatMap(({ debut, fin, segment }): LienDuTexte[] => {
+    if (segment.genre === "lien") return [{ debut, fin, forme: "page", lien: segment }]
+    if (segment.genre === "web") return [{ debut, fin, forme: texte[debut] === "[" ? "web-libelle" : "web-nu", lien: segment }]
+    return []
+  })
+}
+
 /**
  * Un lien markdown vers une adresse web (E05-S11, fiche D107) : `[texte](https://…)`. Chaque classe exclut le
  * caractère qui la ferme : le balayage reste linéaire (`security-patterns.md § Validation des inputs`).
@@ -174,22 +217,37 @@ function horsDesAtomes(atomes: Atome[], candidats: Atome[]): Atome[] {
   return ranges
 }
 
+/** Une adresse web entre chevrons (E10-S04, AC-c1) : `<https://…>`, sans blanc ni chevron dedans. */
+const ADRESSE_EN_CHEVRONS = /<(https?:\/\/[^\s<>]+)>/giu
+
+/** Un caractère échappé (E10-S04, AC-c1) : la barre oblique inverse ne s'affiche pas. */
+const ECHAPPEMENT = /\\[*_|`[~<\\]/gu
+
+/** Un saut de ligne écrit en HTML (E10-S04, AC-c1) : `<br>`, `<br/>`, `<br />`. */
+const SAUT = /<br ?\/?>/giu
+
+/** Les correspondances d'une expression, en atomes d'un segment. */
+function candidats(texte: string, expression: RegExp, segment: (trouve: RegExpExecArray) => Segment): Atome[] {
+  return [...texte.matchAll(expression)].map((trouve) => ({ debut: trouve.index, fin: trouve.index + trouve[0].length, segment: segment(trouve) }))
+}
+
 /**
  * Les adresses web d'un texte hors des liens et du code, rangées parmi eux dans l'ordre du texte : d'abord
- * les liens markdown (leur texte pour libellé), puis les adresses nues (leur domaine, AC-a8, D107).
+ * les liens markdown (leur texte pour libellé), puis les adresses entre chevrons non échappés et les adresses
+ * nues (leur domaine, AC-a8, D107) ; enfin les échappements, puis les sauts de ligne (E10-S04, AC-c1).
  */
 function avecLesAdresses(texte: string, atomes: Atome[]): Atome[] {
-  const markdown = [...texte.matchAll(LIEN_WEB)].map((trouve): Atome => ({
-    debut: trouve.index,
-    fin: trouve.index + trouve[0].length,
-    segment: { genre: "web", adresse: trouve[2], libelle: trouve[1].trim() || libelleDUneAdresse(trouve[2]) },
-  }))
-  const avecMarkdown = horsDesAtomes(atomes, markdown)
+  const markdown = candidats(texte, LIEN_WEB, (trouve) => ({ genre: "web", adresse: trouve[2], libelle: trouve[1].trim() || libelleDUneAdresse(trouve[2]) }))
+  const chevrons = candidats(texte, ADRESSE_EN_CHEVRONS, (trouve) => ({ genre: "web", adresse: trouve[1], libelle: libelleDUneAdresse(trouve[1]) })).filter(
+    (atome) => !escaped(texte, atome.debut),
+  )
   const nues = [...texte.matchAll(ADRESSE_WEB)].map((trouve): Atome => {
     const adresse = sansPonctuationFinale(trouve[0])
     return { debut: trouve.index, fin: trouve.index + adresse.length, segment: { genre: "web", adresse, libelle: libelleDUneAdresse(adresse) } }
   })
-  return horsDesAtomes(avecMarkdown, nues)
+  const echappements = candidats(texte, ECHAPPEMENT, (trouve) => ({ genre: "texte", texte: trouve[0][1] }))
+  const sauts = candidats(texte, SAUT, () => ({ genre: "saut" }))
+  return [markdown, chevrons, nues, echappements, sauts].reduce(horsDesAtomes, atomes)
 }
 
 /**
@@ -223,24 +281,35 @@ export function segmentsEnLigne(texte: string): Segment[] {
     }
     if (fin > curseur) dans.push({ genre: "texte", texte: surface.slice(curseur, fin) })
   }
-  const segments: Segment[] = []
-  let marque = 0
-  for (const trouve of surface.matchAll(MARQUES)) {
-    lire(marque, trouve.index, segments)
-    // Le premier groupe est le gras (`**`) ; les deux autres, l'italique (`*`, `_`), qui a un caractère de bord.
-    const [tout, gras] = trouve
-    const bord = gras === undefined ? 1 : 2
-    const contenu: Segment[] = []
-    lire(trouve.index + bord, trouve.index + tout.length - bord, contenu)
-    segments.push({ genre: gras === undefined ? "italique" : "gras", contenu })
-    marque = trouve.index + tout.length
+  /**
+   * Les segments de `surface` entre `debut` et `fin`, ajoutés à `dans` : les marques que lit `par`, et dans
+   * chacune, au premier niveau seulement, celles d'un autre caractère (`DANS_UNE_MARQUE`).
+   */
+  const marquer = (debut: number, fin: number, par: Lecteur, dans: Segment[]) => {
+    let lu = debut
+    for (const trouve of surface.slice(debut, fin).matchAll(par.expression)) {
+      const index = debut + trouve.index
+      lire(lu, index, dans)
+      // Chaque forme a un seul groupe, jamais vide : le groupe posé dit la forme.
+      const forme = par.formes[trouve.findIndex((groupe, rang) => rang > 0 && groupe !== undefined) - 1]
+      const contenu: Segment[] = []
+      const interieur = [index + forme.bord, index + trouve[0].length - forme.bord] as const
+      if (par === MARQUES) marquer(interieur[0], interieur[1], DANS_UNE_MARQUE[forme.famille], contenu)
+      else lire(interieur[0], interieur[1], contenu)
+      dans.push({ genre: forme.genre, contenu })
+      lu = index + trouve[0].length
+    }
+    lire(lu, fin, dans)
   }
-  lire(marque, surface.length, segments)
+  const segments: Segment[] = []
+  marquer(0, surface.length, MARQUES, segments)
   return segments
 }
 
+const aDuContenu = (segment: Segment): segment is Extract<Segment, { contenu: Segment[] }> => "contenu" in segment
+
 function porteUnLien(segments: readonly Segment[]): boolean {
-  return segments.some((segment) => segment.genre === "lien" || segment.genre === "web" || ((segment.genre === "gras" || segment.genre === "italique") && porteUnLien(segment.contenu)))
+  return segments.some((segment) => segment.genre === "lien" || segment.genre === "web" || (aDuContenu(segment) && porteUnLien(segment.contenu)))
 }
 
 /** Un texte porte un lien (une page citée, une adresse web) : l'éditeur le rend au repos, liens dans la phrase (E05-S11, AC-26). */
@@ -253,14 +322,16 @@ function texteDes(segments: readonly Segment[]): string {
     .map((segment) => {
       if (segment.genre === "lien") return titreDuLien(segment)
       if (segment.genre === "web") return segment.libelle
-      return segment.genre === "gras" || segment.genre === "italique" ? texteDes(segment.contenu) : segment.texte
+      if (segment.genre === "saut") return " "
+      return aDuContenu(segment) ? texteDes(segment.contenu) : segment.texte
     })
     .join("")
 }
 
 /**
- * Le texte tel qu'il se lit, balisage retiré (libellé d'un lien compris) : nom d'un titre ouvert dans
- * l'éditeur, qui garde celui du titre rendu (AC14), et premiers mots d'un bloc (AC8).
+ * Le texte tel qu'il se lit, balisage retiré (libellé d'un lien compris, échappements lus, un saut de ligne en
+ * espace) : nom d'un titre ouvert dans l'éditeur, qui garde celui du titre rendu (AC14), et premiers mots d'un
+ * bloc (AC8).
  */
 export function texteLu(texte: string): string {
   return texteDes(segmentsEnLigne(texte))

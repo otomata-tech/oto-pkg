@@ -10,9 +10,12 @@ import { formatResult } from "../../packages/plateforme/mcp/result"
 import { renderBlocks, type BlockInput, type ReadNodeInput } from "../../packages/plateforme/schemas"
 import { defineFunction } from "../../packages/plateforme/server/catalog/define"
 import { catalogFunctions, describeFunction } from "../../packages/plateforme/server/catalog/registry"
-import { diffBlocks } from "../../packages/plateforme/server/nodes/diff"
+import { diffBlocks, samePublishedContent } from "../../packages/plateforme/server/nodes/diff"
 import { displayRefs, type DocBlock } from "../../packages/plateforme/server/nodes/document"
+import type { NodeRow } from "../../packages/plateforme/server/nodes/lookup"
+import { applyOps } from "../../packages/plateforme/server/nodes/ops"
 import { readNode } from "../../packages/plateforme/server/nodes/read"
+import { staleState } from "../../packages/plateforme/server/nodes/read-format"
 import {
   addBlocks,
   addVersion,
@@ -45,7 +48,7 @@ afterEach(() => {
 const NETWORK_TIMEOUT = 60_000
 const SETUP_TIMEOUT = 180_000
 
-const heading = (text: string, level: 1 | 2 | 3 = 1, key?: string): BlockInput => ({ type: "heading", text, data: { level }, key })
+const heading = (text: string, level: 1 | 2 | 3 | 4 | 5 = 1, key?: string): BlockInput => ({ type: "heading", text, data: { level }, key })
 const paragraph = (text: string): BlockInput => ({ type: "paragraph", text, data: {} })
 const list = (items: string[], ordered = false): BlockInput => ({ type: "list", text: null, data: ordered ? { items, ordered } : { items } })
 
@@ -241,6 +244,8 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
         "i".repeat(200),
         "",
         `outline (12 sections, ${page.toLocaleString("en-US")} characters, over the 12,000-character page limit):`,
+        // E11-S03 (AC-c3) : les blocs d'avant le premier titre, en première ligne, hors du compte des sections.
+        "- (start of page, 200 characters)",
         ...outline(sizes),
         'Read one with acme_read {"path": "conseil/methode_etude", "section": "<title>"}.',
       ].join("\n")
@@ -273,6 +278,25 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
         code: "not_found",
         message: "Unknown section « Budget » in conseil/methode_etude. Sections: « Objet de l'étude », « Dimensionnement », « Hypothèses », « Calcul », « Exemple », « Exemple ».",
       })
+    })
+
+    it("should outline five heading levels and serve a level-4 section with its level-5 sub-section (E10-S04, AC-b3)", async () => {
+      const blocks: BlockInput[] = ([1, 2, 3, 4, 5] as const).flatMap((level) => [heading(`Niveau ${level}`, level), paragraph(`p${level}`)])
+      const tables = base([{ path: "conseil/niveaux" }])
+      addBlocks(tables, "conseil/niveaux", "published", blocks)
+      await content(tables)
+      const outlined = await read("ada", { path: "conseil/niveaux", outline: true })
+      expect(outlined.text).toContain("\n- Niveau 1 (")
+      expect(outlined.text).toContain("\n        - Niveau 5 (")
+      const section = await read("ada", { path: "conseil/niveaux", section: "Niveau 4" })
+      expect(section.text).toContain("\n\n##### Niveau 4\n\np4\n\n###### Niveau 5\n\np5\n\nTo edit")
+      // `replace_section` sur un titre de niveau 4 : un sous-niveau `######` passe, un titre de son niveau est refusé.
+      const docBlocks = blocks.map((block, index): DocBlock => ({ id: blockUuid(900 + index), type: block.type, text: block.text ?? null, data: block.data ?? {}, key: block.key ?? null, position: index + 1, revision: 1, provenance: {} }))
+      const replaced = applyOps(docBlocks, [{ op: "replace_section", section: "Niveau 4", text: "p\n\n###### Fin" }], { path: "conseil/niveaux" })
+      expect(replaced.blocks.slice(6).map((block) => block.text)).toEqual(["Niveau 4", "p", "Fin"])
+      expect(() => applyOps(docBlocks, [{ op: "replace_section", section: "Niveau 4", text: "##### Autre" }], { path: "conseil/niveaux" })).toThrow(
+        "line 1 « ##### Autre » is a heading at the level of « Niveau 4 » or above; add a new section with add_section, or use ###### for a sub-section.",
+      )
     })
 
     it("should refuse two modes at once (AC10)", async () => {
@@ -504,5 +528,61 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       await content(base())
       expect((await read("ada", { path: "ventes/devis" })).text).toContain("\naccess: manage (drafts and publishing)\n")
     })
+  })
+})
+
+// E11-S03 (AC-a4, H28) : deux états publiés au même contenu servi, sans base.
+describe("samePublishedContent (E11-S03, AC-a4)", () => {
+  const block = (fields: Partial<DocBlock> = {}): DocBlock => ({ id: "b1", type: "paragraph", text: "Tutoyer.", data: {}, key: null, position: 1, revision: 1, provenance: {}, ...fields })
+
+  it("should ignore ids, positions, block revisions and provenance", () => {
+    expect(samePublishedContent([block(), block({ id: "b2", text: "Signer." })], [block({ id: "x", position: 9, revision: 4, provenance: { by: "assistant" } }), block({ id: "y", text: "Signer." })])).toBe(true)
+  })
+
+  it("should see a changed text, data, key, type, order or count", () => {
+    const two = [block(), block({ id: "b2", text: "Signer." })]
+    for (const other of [
+      [block({ text: "Vouvoyer." }), two[1]],
+      [block({ data: { level: 1 } }), two[1]],
+      [block({ key: "ton" }), two[1]],
+      [block({ type: "quote" }), two[1]],
+      [two[1], two[0]],
+      [two[0]],
+    ]) {
+      expect(samePublishedContent(two, other)).toBe(false)
+    }
+  })
+})
+
+// E11-S03 (AC-c3, HN-E11S03-10) : l'état servi par un refus de révision montre les blocs d'avant le premier titre.
+describe("staleState (E11-S03, AC-c3)", () => {
+  const node: NodeRow = {
+    id: "n1",
+    org_id: "o1",
+    parent_id: null,
+    path: "ventes/devis",
+    kind: "page",
+    title: "Devis",
+    summary: "Le devis.",
+    status: "published",
+    revision: 4,
+    meta: null,
+    owner_kind: null,
+    owner_team_id: null,
+    owner_user_id: null,
+    created_by: null,
+    updated_by: null,
+    created_at: CONTENT_AT,
+    updated_at: CONTENT_AT,
+  }
+  const block = (type: string, text: string, data: Record<string, unknown> = {}): DocBlock => ({ id: null, type, text, data, key: null, position: null, revision: 1, provenance: {} })
+
+  it("should put the start of the page first, outside the sections, and nothing without it", () => {
+    const moved = block("paragraph", "Relancer.")
+    const objet = [block("heading", "Objet", { level: 1 }), block("paragraph", "x")]
+    // « ## Objet » (8), une ligne vide, « x » (1).
+    expect(staleState(node, [moved, ...objet])).toBe("# Devis (revision 4, published)\n- (start of page, 9 characters)\n- Objet (11 characters)")
+    expect(staleState(node, objet)).toBe("# Devis (revision 4, published)\n- Objet (11 characters)")
+    expect(staleState(node, [moved])).toBe("# Devis (revision 4, published)\n- (start of page, 9 characters)\n- (no section)")
   })
 })

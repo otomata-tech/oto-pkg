@@ -10,7 +10,7 @@
 //
 // Écrit dans le style d'oto-frontend, qui n'a pas de « @ » (`portage-ecrans.md`) : la liste reprend la surface
 // et les lignes du menu du design system (`oto-pop`, `oto-menu-item`), posée dans le flux sous le champ.
-import { useEffect, useState } from "react"
+import { useEffect, useState, type KeyboardEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { RechercheDeContenus } from "../../api/use-recherche-de-contenus"
 import { CITER } from "../libelles"
@@ -44,6 +44,33 @@ type ListeACiterProps = {
   /** Le rang de l'option active, que le champ désigne. */
   actif: number
   choisir: (trouve: SearchMatch) => void
+}
+
+/**
+ * L'option active d'une liste au clavier (« @ », la page du panneau « Lien ») : les flèches la font tourner, son rang
+ * reste borné à la liste, une touche de choix la prend.
+ */
+export function useOptionActive<T>(options: readonly T[]) {
+  const [actif, setActif] = useState(0)
+  const rang = Math.min(actif, Math.max(options.length - 1, 0))
+  return {
+    actif: rang,
+    remettre: () => setActif(0),
+    /** Les flèches et les touches de choix, la liste ayant une option : `true` si la touche est prise. */
+    toucher(evenement: KeyboardEvent, touches: readonly string[], choisir: (option: T) => void): boolean {
+      if (options.length === 0) return false
+      if (evenement.key === "ArrowDown" || evenement.key === "ArrowUp") {
+        evenement.preventDefault()
+        const pas = evenement.key === "ArrowDown" ? 1 : options.length - 1
+        setActif((un) => (un + pas) % options.length)
+        return true
+      }
+      if (!touches.includes(evenement.key)) return false
+      evenement.preventDefault()
+      choisir(options[rang])
+      return true
+    },
+  }
 }
 
 /** L'`id` d'une option de la liste, que le champ désigne par `aria-activedescendant`. */

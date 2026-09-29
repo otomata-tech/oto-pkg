@@ -13,13 +13,16 @@ import { parseFilter, unknownColumns } from "./filters"
 import { columnOf } from "./header"
 import { loadTable, valueProblem, type LoadedTable } from "./meta"
 import { decisionNames, releaseStates, stateRule } from "./row-rules"
-import { NULL_REFUSED } from "./write-row"
+import { NULL_REFUSED, REAL_VALUE_NEEDED } from "./write-row"
 
 type CheckContext = Pick<FunctionContext, "db" | "identity">
 type Path = readonly PropertyKey[]
 
 /** Le refus d'une valeur sans preuve dans un bloc `call` de `table.write` (fiche D100, HN-M53-10). */
 const PROOF_REQUIRED = 'a new value needs its proof: write {"value": …, "comment": "…"} or {"value": …, "link": "…"}'
+
+/** Le refus de `create_only` sur un tableau fermé (E11-S01, AC-a6) : aucune ligne ne s'y crée. */
+const CREATE_ONLY_CLOSED = "create_only on a closed table: no row can be created"
 type IsPlaceholder = (path: Path) => boolean
 type Args = Readonly<Record<string, unknown>>
 
@@ -95,6 +98,8 @@ function rowProblems(table: LoadedTable, row: Record<string, unknown>, path: Pat
     ? row.verified_empty.flatMap((entry, index) => (isRecord(entry) && typeof entry.column === "string" && !isPlaceholder([...path, "verified_empty", index, "column"]) ? [entry.column] : []))
     : []
   const unknown = unknownColumnProblems(table, [...Object.keys(set), ...namesAt(row.clear, [...path, "clear"], isPlaceholder), ...empties])
+  // Une colonne qui exige une vraie valeur refuse `verified_empty` à chaque passage (E11-S01, AC-b6) : refusé ici.
+  const strict = empties.flatMap((name) => (columnOf(header, name)?.allow_verified_empty === false ? [`${name}: ${REAL_VALUE_NEEDED}`] : []))
   const values = Object.entries(set).flatMap(([name, raw]) => {
     const column = columnOf(header, name)
     const valuePath = isRecord(raw) ? [...path, "set", name, "value"] : [...path, "set", name]
@@ -104,10 +109,11 @@ function rowProblems(table: LoadedTable, row: Record<string, unknown>, path: Pat
     if (value === null) return [`${name}: ${NULL_REFUSED}`]
     if (name === header.key) return []
     const state = name === header.lifecycle?.column
-    // Fiche D100 (HN-M53-10) : une valeur nouvelle d'une colonne de valeur porte sa preuve ; une valeur nue
-    // n'est admise que si elle égale la valeur rangée, ce que la publication ne peut savoir : refusée ici,
-    // valeur réservée comprise. La colonne d'état s'écrit nue.
-    const proof = !state && !(isRecord(raw) && (raw.comment !== undefined || raw.link !== undefined)) ? [`${name}: ${PROOF_REQUIRED}`] : []
+    // Fiche D100 (HN-M53-10) : dans un tableau qui exige la preuve (`proof`, fiche D133), une valeur nouvelle
+    // d'une colonne de valeur la porte ; une valeur nue n'est admise que si elle égale la valeur rangée, ce que
+    // la publication ne peut savoir : refusée ici, valeur réservée comprise. La colonne d'état s'écrit nue.
+    const unproved = header.proof && !state && !(isRecord(raw) && (raw.comment !== undefined || raw.link !== undefined))
+    const proof = unproved ? [`${name}: ${PROOF_REQUIRED}`] : []
     if (isPlaceholder(valuePath)) return proof
     const problem = valueProblem(column, value)
     if (problem !== null) return [...proof, `${name}: ${problem}`]
@@ -116,7 +122,7 @@ function rowProblems(table: LoadedTable, row: Record<string, unknown>, path: Pat
     if (rule === "working") return [`${name}: « ${value} » is set only by table.claim, with a lease`]
     return rule === "decision" ? [`${name}: ${decisionNames(header)} are decided by a person in the review queue`] : []
   })
-  return [...unknown, ...values]
+  return [...unknown, ...strict, ...values]
 }
 
 /** Contrôle d'un appel : le tableau d'abord, puis ce qui lui est propre ; les problèmes, sans doublon. */
@@ -152,7 +158,8 @@ export const checkAggregateArgs = check((table, args, isPlaceholder) => {
 /** `table.write` : colonnes de `set`, `clear` et `verified_empty`, valeurs typées, ni état de travail ni décision de revue. */
 export const checkWriteArgs = check((table, args, isPlaceholder) => {
   const rows = Array.isArray(args.rows) ? args.rows : []
-  return rows.flatMap((row, index) => (isRecord(row) && !isPlaceholder(["rows", index]) ? rowProblems(table, row, ["rows", index], isPlaceholder) : []))
+  const closed = args.create_only === true && table.header.closed ? [CREATE_ONLY_CLOSED] : []
+  return [...closed, ...rows.flatMap((row, index) => (isRecord(row) && !isPlaceholder(["rows", index]) ? rowProblems(table, row, ["rows", index], isPlaceholder) : []))]
 })
 
 /** `table.claim` : une file de travail, puis les colonnes et valeurs du filtre. */

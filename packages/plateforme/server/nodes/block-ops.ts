@@ -10,6 +10,7 @@ import type { BlockInput, WriteOpBody } from "../../schemas"
 import { isUnknownBlock } from "../../schemas/blocks-render"
 import { displayRefs, headingLevel, resolveBlockRef } from "./document"
 import { newBlock, OpProblem, parseOpText, plural, type OpOutcome, type OpState, type WorkBlock } from "./op-kit"
+import { locate } from "./section-ops"
 
 /** Le bloc d'une référence (N13) ; inconnue, trop courte ou partagée par plusieurs blocs : refus. */
 function target(state: OpState, ref: string, role: "block" | "after_block"): WorkBlock {
@@ -61,13 +62,13 @@ function checkKey(state: OpState, key: string | null | undefined, except: WorkBl
 }
 
 /** Les blocs d'une opération : un bloc structuré (`input`, API) ou le texte analysé ; vide : refus. */
-function contentOf(op: WriteOpBody, empty: string): BlockInput[] {
+function contentOf(state: OpState, op: WriteOpBody, empty: string): BlockInput[] {
   if (op.input) {
     if (op.input.type === "row") throw new OpProblem("invalid_arguments", "a row block belongs to a table, not to a page.")
     return [op.input]
   }
   const text = op.text ?? ""
-  const blocks = text.trim() === "" ? [] : parseOpText(text).blocks
+  const blocks = text.trim() === "" ? [] : parseOpText(text, state).blocks
   if (blocks.length === 0) throw new OpProblem("invalid_arguments", empty)
   return blocks
 }
@@ -80,7 +81,7 @@ function replaceBlock(state: OpState, op: WriteOpBody): OpOutcome {
   const block = target(state, op.block ?? "", "block")
   checkRevision(state, block, op)
   keepNewerBlock(block, op)
-  const [first, ...rest] = contentOf(op, "text is empty; to remove the block use delete_block.")
+  const [first, ...rest] = contentOf(state, op, "text is empty; to remove the block use delete_block.")
   // Un bloc structuré remplace aussi la clé (absente : retirée, N45) ; un texte la garde.
   const key = op.input ? (op.input.key ?? null) : block.key
   checkKey(state, key, block)
@@ -94,7 +95,7 @@ function replaceBlock(state: OpState, op: WriteOpBody): OpOutcome {
 
 function insertAfter(state: OpState, op: WriteOpBody): OpOutcome {
   const anchor = op.block === undefined ? null : target(state, op.block, "block")
-  const inputs = contentOf(op, "text is empty; nothing to insert.")
+  const inputs = contentOf(state, op, "text is empty; nothing to insert.")
   checkKey(state, op.input?.key, null)
   const fresh = inputs.map((input) => newBlock(state, input))
   const at = anchor ? state.blocks.indexOf(anchor) + 1 : 0
@@ -120,18 +121,31 @@ function deleteBlock(state: OpState, op: WriteOpBody): OpOutcome {
   return { blocks, touched: { op: op.op, uids: [], describe: () => `deleted block ${op.block}${moved}` } }
 }
 
+/**
+ * Où va le bloc déplacé : après `after_block`, à la fin d'une section (E11-S03, AC-c1 : le point
+ * d'`append`, sous-sections comprises), sinon en tête de page, hors de toute section (AC-c2). L'indice
+ * se lit dans `state.blocks`, le bloc déplacé encore à sa place.
+ */
+function destination(state: OpState, op: WriteOpBody, block: WorkBlock): { at: number; where: string } {
+  if (op.after_block !== undefined) {
+    const anchor = target(state, op.after_block, "after_block")
+    if (anchor === block) throw new OpProblem("invalid_arguments", "a block cannot move after itself.")
+    return { at: state.blocks.indexOf(anchor) + 1, where: `after ${op.after_block}` }
+  }
+  if (op.section === undefined) return { at: 0, where: "to the start of the page, outside any section" }
+  const section = locate(state, op.section, "section")
+  if (section.heading === block) throw new OpProblem("invalid_arguments", "a heading cannot move into the section it heads.")
+  return { at: section.end, where: `to the end of « ${section.title} »` }
+}
+
 function moveBlock(state: OpState, op: WriteOpBody): OpOutcome {
   const block = target(state, op.block ?? "", "block")
   checkRevision(state, block, op)
   keepNewerBlock(block, op)
-  const anchor = op.after_block === undefined ? null : target(state, op.after_block, "after_block")
-  if (anchor === block) throw new OpProblem("invalid_arguments", "a block cannot move after itself.")
-  const without = state.blocks.filter((candidate) => candidate !== block)
-  const at = anchor ? without.indexOf(anchor) + 1 : 0
+  const { at, where } = destination(state, op, block)
   // Sans position, le bloc est replacé entre ses nouveaux voisins (`placeBlocks`) ; son contenu ne change pas.
   const moved: WorkBlock = { ...block, position: null }
-  const blocks = [...without.slice(0, at), moved, ...without.slice(at)]
-  const where = anchor ? `after ${op.after_block}` : "to the start"
+  const blocks = [...state.blocks.slice(0, at), moved, ...state.blocks.slice(at)].filter((candidate) => candidate !== block)
   return { blocks, touched: { op: op.op, uids: [moved.uid], describe: () => `moved block ${op.block} ${where}` } }
 }
 

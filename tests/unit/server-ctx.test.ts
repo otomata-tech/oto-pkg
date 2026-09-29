@@ -48,12 +48,23 @@ describe("messages (H27)", () => {
       "context has changed: call acme_context again with the same request, then retry this call.",
     )
   })
+
+  // E11-S03, AC-a5 : les Contextes changés, dans l'ordre des parties, bornés comme toute liste d'un refus.
+  it("should name the changed Contextes, bounded to 20", () => {
+    expect(staleCtxMessage("acme", ["contexte", "ventes/contexte"])).toBe(
+      "context has changed (contexte, ventes/contexte): call acme_context again with the same request, then retry this call.",
+    )
+    const many = Array.from({ length: 22 }, (_, index) => `equipe${index}/contexte`)
+    expect(staleCtxMessage("acme", many)).toContain(", equipe19/contexte, … and 2 more): call acme_context again")
+  })
 })
 
 describe("requireCtx (AC11)", () => {
   it("should refuse a missing, non-string or malformed code before the database", async () => {
     for (const raw of [undefined, 42, "", "ZZZZ", "X".repeat(100_000)]) {
       await expect(requireCtx(untouchable, IDENTITY, raw)).rejects.toMatchObject({ code: "ctx_missing", message: missingCtxMessage("acme") })
+      // `feedback` (E11-S03, AC-a6) : un code périmé passe, un code absent jamais.
+      await expect(requireCtx(untouchable, IDENTITY, raw, { staleAllowed: true })).rejects.toMatchObject({ code: "ctx_missing" })
     }
   })
 })

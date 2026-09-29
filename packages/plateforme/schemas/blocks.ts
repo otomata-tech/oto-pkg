@@ -1,4 +1,4 @@
-// Blocs du contenu (ADR-011 § 2, E01-S06) : les onze types, la clé d'un bloc, la forme minimale de
+// Blocs du contenu (ADR-011 § 2, E01-S06) : les quatorze types, la clé d'un bloc, la forme minimale de
 // `text` et de `data` par type, et la référence courte d'un bloc. Mêmes bornes que la base
 // (`blocks_shape_check`, colonnes `text` et `key`), pas plus : le test de parité (AC36) confronte les
 // deux. `position`, `revision`, `provenance`, `org_id` et l'identité sont posées par le service et la
@@ -11,7 +11,7 @@
 import * as z from "zod/v4"
 import { NODE_PATH_PATTERN } from "./nodes"
 
-/** Les onze types de la V1, dans l'ordre du contrat d'E01-S06 ; une migration additive en ajoute. */
+/** Les onze types de la V1, dans l'ordre du contrat d'E01-S06, puis ceux qu'une migration additive ajoute (E10-S04). */
 export const BLOCK_TYPES = [
   "heading",
   "paragraph",
@@ -24,6 +24,9 @@ export const BLOCK_TYPES = [
   "callout",
   "reference",
   "row",
+  "simple_table",
+  "divider",
+  "toggle",
 ] as const
 
 export const blockTypeSchema = z.enum(BLOCK_TYPES)
@@ -56,7 +59,7 @@ const within = (min: number, max: number) => (value: string) => chars(value) >= 
 /** Texte de tout bloc : 100 000 caractères au plus (`blocks.text`). */
 const blockText = z.string().refine(within(0, 100_000), "Text: 100 000 characters at most.")
 
-/** Là où la base veut `text` nul (`list`, `checklist`, `call`, `reference`, `row`). */
+/** Là où la base veut `text` nul (`list`, `checklist`, `call`, `reference`, `row`, `simple_table`, `divider`). */
 const noText = z.null().optional()
 
 /** `data` sans forme imposée : un objet. */
@@ -79,20 +82,61 @@ const heading = z.object({
   text: blockText
     .refine((value) => within(1, 200)(btrim(value)), "Heading: 1 to 200 characters.")
     .refine((value) => !/[\r\n]/.test(value), "Heading: a single line."),
-  data: z.looseObject({ level: z.union([z.literal(1), z.literal(2), z.literal(3)]) }),
+  // Cinq niveaux, `##` à `######` sous le titre du nœud (E10-S04, AC-b3).
+  data: z.looseObject({ level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5)]) }),
   key: optionalKey,
 })
 
 const paragraph = z.object({ type: z.literal("paragraph"), text: blockText, data: anyData.optional(), key: optionalKey })
 
+/** Niveaux d'une liste imbriquée (E10-S04, AC-b1) : un élément de troisième niveau n'a plus d'enfants. */
+export const LIST_DEPTH_MAX = 3
+
+/**
+ * Éléments d'une liste, sous-éléments compris (E10-S04, AC-b1) : une seule borne pour le schéma, l'analyse
+ * (réexportée par `server/nodes/limits.ts`) et le contrôle de l'éditeur (`ui/noeud/editeur/operations.ts`).
+ */
+export const LIST_ITEMS_MAX = 500
+
+/** La sous-liste d'un élément : ses éléments, puis sa numérotation, propre à son niveau. */
+const childrenOf = <T extends z.ZodType>(item: T) =>
+  z.strictObject({ items: z.array(item).min(1), ordered: z.boolean().optional(), start: z.number().min(1).optional() })
+
+/** Un élément : sa chaîne (forme d'avant E10-S04), ou son texte et sa sous-liste ; toute autre clé est refusée. */
+const itemWith = <T extends z.ZodType>(children: T) => z.union([z.string(), z.strictObject({ text: z.string(), children })])
+
+/** Un élément de liste, sur trois niveaux au plus (E10-S04, AC-b1). */
+export const listItemSchema = itemWith(childrenOf(itemWith(childrenOf(z.string()))))
+
+export type ListItem = z.infer<typeof listItemSchema>
+
+/**
+ * Les textes des éléments d'une liste, sous-éléments compris, dans l'ordre de lecture ;
+ * ce qui n'a pas la forme d'un élément est sauté, et rien n'est lu sous le troisième niveau. Lu par la
+ * publication (liens), le contrôle des procédures et l'écran : sans lui, chacun parcourrait les
+ * sous-éléments à sa façon.
+ */
+export function listItemTexts(items: unknown, level = 1): string[] {
+  if (!Array.isArray(items) || level > LIST_DEPTH_MAX) return []
+  return items.flatMap((item: unknown): string[] => {
+    if (typeof item === "string") return [item]
+    if (item === null || typeof item !== "object") return []
+    const text = "text" in item && typeof item.text === "string" ? [item.text] : []
+    const children = "children" in item && item.children !== null && typeof item.children === "object" && "items" in item.children ? item.children.items : null
+    return [...text, ...listItemTexts(children, level + 1)]
+  })
+}
+
 const list = z.object({
   type: z.literal("list"),
   text: noText,
-  data: z.looseObject({
-    items: z.array(z.string()).min(1).max(500),
-    ordered: z.boolean().optional(),
-    start: z.number().min(1).optional(),
-  }),
+  data: z
+    .looseObject({
+      items: z.array(listItemSchema).min(1).max(500),
+      ordered: z.boolean().optional(),
+      start: z.number().min(1).optional(),
+    })
+    .refine((data) => listItemTexts(data.items).length <= LIST_ITEMS_MAX, `List: ${LIST_ITEMS_MAX} items at most, sub-items included.`),
   key: optionalKey,
 })
 
@@ -151,6 +195,112 @@ const reference = z.object({
 /** Ligne d'un tableau : sa clé métier est obligatoire ; aucun type de cellule contrôlé ici (E07-S01). */
 const row = z.object({ type: z.literal("row"), text: noText, data: anyData.optional(), key: blockKeySchema })
 
+/** Bornes d'un tableau simple (E10-S04, AC-a1, HN-E10S04-3) : au-delà, c'est un tableau de données. */
+export const SIMPLE_TABLE_COLUMNS_MAX = 20
+export const SIMPLE_TABLE_ROWS_MAX = 200
+
+/** Le résumé d'un repli, comme un titre : 200 caractères au plus, sans les espaces de bord (E10-S04, AC-a3). */
+export const TOGGLE_SUMMARY_MAX = 200
+
+/** Une ligne faite d'espaces et de tabulations : le bord d'un corps de repli, pour le schéma et l'analyse (`server/nodes/markdown-rich.ts`). */
+export const isBlankLine = (line: string) => /^[ \t]*$/.test(line)
+
+/** La ligne sans espaces ni tabulations de bord, par boucle (` +$` repartirait de chaque espace). */
+export function trimBlanks(line: string): string {
+  let start = 0
+  let end = line.length
+  while (start < end && (line[start] === " " || line[start] === "\t")) start++
+  while (end > start && (line[end - 1] === " " || line[end - 1] === "\t")) end--
+  return line.slice(start, end)
+}
+
+/**
+ * Une cellule de tableau simple : une ligne, sans espace ni tabulation de bord, chaque `|` écrit `\|` (un `|`
+ * précédé d'un nombre pair de `\` fermerait la cellule). Un parcours : chaque caractère lu une fois.
+ */
+function isCell(value: string): boolean {
+  if (/[\r\n]/.test(value) || trimBlanks(value) !== value) return false
+  for (let at = 0; at < value.length; at++) {
+    if (value[at] === "\\") at++
+    else if (value[at] === "|") return false
+  }
+  return true
+}
+
+const cell = z.string().refine(isCell, "Cell: one line, no leading or trailing blank, every | written \\|.")
+
+/**
+ * Les cellules d'un tableau simple, en-tête puis rangées, dans l'ordre ; ce qui n'est pas une chaîne est
+ * sauté. Lu par la publication (liens), le contrôle des procédures et l'écran, comme `listItemTexts`.
+ */
+export function tableCells(data: Record<string, unknown>): string[] {
+  const strings = (values: unknown) => (Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : [])
+  return [...strings(data.columns), ...(Array.isArray(data.rows) ? data.rows.flatMap(strings) : [])]
+}
+
+export type SimpleTableAlign = "left" | "center" | "right" | null
+
+/** Un tableau simple lu dans `data` (E10-S04, AC-a1) : l'en-tête, les rangées, l'alignement par colonne s'il y en a un. */
+export type SimpleTable = { columns: string[]; rows: string[][]; align?: SimpleTableAlign[] }
+
+/**
+ * Le tableau simple d'un `data`, lu sans le valider : ce qui n'est pas un tableau se lit vide, une cellule qui n'est
+ * pas une chaîne se lit `""`, un alignement inconnu `null`. Seul lecteur de l'écran (rendu, éditeur, conversion en
+ * tableau de données) ; `tableCells` en garde la liste plate des publications.
+ */
+export function simpleTableOf(data: Record<string, unknown>): SimpleTable {
+  const strings = (values: unknown) => (Array.isArray(values) ? values.map((value) => (typeof value === "string" ? value : "")) : [])
+  const alignOf = (value: unknown): SimpleTableAlign => (value === "left" || value === "center" || value === "right" ? value : null)
+  const table = { columns: strings(data.columns), rows: Array.isArray(data.rows) ? data.rows.map(strings) : [] }
+  return Array.isArray(data.align) ? { ...table, align: data.align.map(alignOf) } : table
+}
+
+const simpleTable = z.object({
+  type: z.literal("simple_table"),
+  text: noText,
+  data: z
+    .looseObject({
+      columns: z.array(cell).min(1).max(SIMPLE_TABLE_COLUMNS_MAX),
+      rows: z.array(z.array(cell)).max(SIMPLE_TABLE_ROWS_MAX),
+      align: z.array(z.enum(["left", "center", "right"]).nullable()).optional(),
+    })
+    .refine((data) => data.rows.every((cells) => cells.length === data.columns.length), "Table: every row has one cell per column.")
+    .refine((data) => data.align === undefined || data.align.length === data.columns.length, "Table: one alignment per column."),
+  key: optionalKey,
+})
+
+const divider = z.object({ type: z.literal("divider"), text: noText, data: anyData.optional(), key: optionalKey })
+
+/**
+ * Une ligne qui, blancs de bord retirés, ouvre un repli (`<details…`) ou le ferme (`</details>`) : dans un corps de
+ * repli, relue, elle fermerait le repli ou en ouvrirait un autre. Lue par le schéma, l'analyse
+ * (`server/nodes/markdown-rich.ts`) et le contrôle de l'éditeur (`ui/noeud/editeur/operations.ts`).
+ */
+export function isToggleFence(line: string): boolean {
+  const trimmed = trimBlanks(line)
+  return trimmed.startsWith("<details") || trimmed === "</details>"
+}
+
+/** Le corps d'un repli : vide, ou sans ligne blanche en tête ni en fin, et sans ligne qui ouvre ou ferme un repli. */
+function isToggleBody(value: string): boolean {
+  if (value === "") return true
+  const lines = value.split("\n")
+  if (isBlankLine(lines[0]) || isBlankLine(lines[lines.length - 1])) return false
+  return !lines.some(isToggleFence)
+}
+
+const toggle = z.object({
+  type: z.literal("toggle"),
+  text: blockText.refine(isToggleBody, "Toggle: no blank first or last line, no <details> or </details> line."),
+  data: z.looseObject({
+    summary: z
+      .string()
+      .refine((value) => within(1, TOGGLE_SUMMARY_MAX)(btrim(value)), "Summary: 1 to 200 characters.")
+      .refine((value) => !/[\r\n]/.test(value), "Summary: a single line."),
+  }),
+  key: optionalKey,
+})
+
 /** Un bloc à écrire : `text`, `data` et `key` selon son type (contrat d'E01-S06, § 2). */
 export const blockInputSchema = z.discriminatedUnion("type", [
   heading,
@@ -164,6 +314,9 @@ export const blockInputSchema = z.discriminatedUnion("type", [
   callout,
   reference,
   row,
+  simpleTable,
+  divider,
+  toggle,
 ])
 
 export type BlockInput = z.infer<typeof blockInputSchema>

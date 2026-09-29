@@ -66,6 +66,20 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   (signature et privilèges inchangés, déclencheur inchangé). La migration répare tous les membres,
   un à la fois, pour que `unique_handle` voie les handles posés aux tours précédents. Aucune table,
   colonne, policy ni index.
+- `20260929170000_platform_page_markdown.sql` (E10-S04 ; fiches D111 b, D114, D115) : `blocks_type_check` et
+  `blocks_shape_check` élargies en une instruction. Trois types de bloc : `simple_table` (`columns`, `rows`,
+  `align` facultatif ; 1 à 20 colonnes, 200 rangées, cellules d'une ligne sans blanc de bord, `|` écrit `\|`),
+  `divider` (`text` nul) et `toggle` (`data.summary` d'une ligne, 200 caractères ; corps dans `text`, sans ligne
+  blanche de bord ni ligne `<details…` ou `</details>`). Un élément de `list` est une chaîne ou
+  `{text, children: {items, ordered?, start?}}`, trois niveaux, 500 éléments en tout ; `heading.level` de 1 à 5.
+  Toute ligne existante reste valide. `block_search_text` re-versionnée (même signature, privilèges redits) :
+  sous-éléments, cellules et résumé d'un repli cherchables ; même texte qu'avant pour toute forme existante
+  (`search_tsv` n'est pas recalculée). Aucune table, colonne, policy ni index.
+- `20260929180000_ctx_contexts.sql` (E11-S03, lot a ; fiche D132) : colonne `platform.ctx.contexts jsonb`
+  (contrainte `ctx_contexts_check` : nulle ou objet), la révision publiée de chaque Contexte servi à la
+  conversation, `{<chemin>: <révision>}` ; un code périme quand l'un d'eux change, non plus par
+  `orgs.rules_version`. Additive : un code émis avant est nul, donc périmé, et les conversations ouvertes
+  au déploiement rappellent `context` une fois. Déclencheur, policies et index inchangés.
 
 ## Installer sur un hôte neuf
 

@@ -350,11 +350,15 @@ describe.skipIf(!configured || privatePending)(
       ]
       const write = await call("table.write", { table: TABLE, rows })
       expect([write.isError, resultOf(write).written, resultOf(write).refused]).toEqual([false, 3, 0])
+      // Écrites sous le bail de M : le travailleur du bail et le client MCP du `ctx`, s'il est connu (E11-S01, AC-d2, AC-d3).
+      const [conversation] = await admin<{ host: string | null }[]>`select host from platform.ctx where code = ${ctx}`
+      const assistant = { worker: WORKER, ...(conversation?.host ? { host: conversation.host } : {}) }
       const proof = (cell: { comment?: string; link?: string }) => ({
         origin: "agent",
         by: m.id,
         ctx,
         at: expect.any(String),
+        ...assistant,
         ...(cell.comment === undefined ? {} : { comment: cell.comment }),
         ...(cell.link === undefined ? {} : { link: cell.link }),
       })
@@ -368,7 +372,7 @@ describe.skipIf(!configured || privatePending)(
           row.key,
           {
             contact: proof(row.set.contact),
-            email: row.set.email ? proof(row.set.email) : { origin: "verified_empty", by: m.id, ctx, at: expect.any(String), reason: noEmail },
+            email: row.set.email ? proof(row.set.email) : { origin: "verified_empty", by: m.id, ctx, at: expect.any(String), ...assistant, reason: noEmail },
             montant_estime: proof(row.set.montant_estime),
           },
         ]),

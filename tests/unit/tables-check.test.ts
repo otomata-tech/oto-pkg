@@ -124,4 +124,36 @@ describe.skipIf(!sqlConfigured)(portable("checkArgs of the table functions on a 
       }
     })
   })
+
+  describe("E11-S01: create_only, strict column, decisions by the assistant, proof by table", () => {
+    it("should refuse create_only on a closed table (AC-a6)", async () => {
+      const args = { table: TICKETS.path, create_only: true, rows: [{ key: "<numero>", set: { sujet: "<sujet>" } }] }
+      expect(await problemsOf(tableWrite, args, ref.identityOf("paul"))).toEqual(["create_only on a closed table: no row can be created"])
+      expect(await problemsOf(tableWrite, { ...args, create_only: false }, ref.identityOf("paul"))).toEqual([])
+    })
+
+    it("should admit a bare value without proof, decisions by the assistant, and refuse verified_empty on a column that needs a real value (AC-b6, AC-e4, AC-f6)", async () => {
+      const id = ref.nodeId(TABLE)
+      // Le tableau sans preuve exigée, sa revue confiée aussi à l'assistant, `email` (rang 2) sans `verified_empty`.
+      await seed.admin`
+        update platform.nodes
+           set meta = jsonb_set(jsonb_set(jsonb_set(meta, '{proof}', 'false'::jsonb), '{lifecycle,review,agents_may_decide}', 'true'::jsonb), '{columns,2,allow_verified_empty}', 'false'::jsonb)
+         where id = ${id}`
+      try {
+        const cases: [CatalogFunction, Record<string, unknown>, string[]][] = [
+          [tableWrite, { table: TABLE, rows: [{ key: "<ref>", set: { ville: "Valbrune" } }] }, []],
+          [tableWrite, { table: TABLE, rows: [{ key: "<ref>", set: { montant_estime: "15000", contact: null } }] }, ['montant_estime: expected a number, e.g. 12000 (not "15000")', nullRefused("contact")]],
+          [tableWrite, { table: TABLE, rows: [{ key: "<ref>", set: { statut: "qualifié" } }] }, []],
+          [tableRelease, { table: TABLE, key: "<ref>", worker: "<prénom>", state: "écarté" }, []],
+          [tableWrite, { table: TABLE, rows: [{ key: "<ref>", verified_empty: [{ column: "email", reason: "<où>" }] }] }, ["email: needs a real value; verified_empty is not allowed for this column"]],
+        ]
+        for (const [fn, args, expected] of cases) expect(await problemsOf(fn, args), `${fn.name} ${JSON.stringify(args)}`).toEqual(expected)
+      } finally {
+        await seed.admin`
+          update platform.nodes
+             set meta = jsonb_set(jsonb_set(meta, '{proof}', 'true'::jsonb), '{columns,2}', (meta #> '{columns,2}') - 'allow_verified_empty') #- '{lifecycle,review,agents_may_decide}'
+           where id = ${id}`
+      }
+    })
+  })
 })

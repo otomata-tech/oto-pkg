@@ -6,7 +6,7 @@
 // Sans elles, l'hôte n'atteindrait les lignes que par `call` : une page de `table.rows` est coupée à
 // 16 000 caractères pour le modèle (N11), et 200 lignes avec leur provenance y demanderaient une
 // dizaine de lectures du tableau entier.
-import { normalizeTitle, type CellValue, type TableHeader, type TableSort } from "../../schemas"
+import { queryWords, type CellValue, type TableHeader, type TableSort } from "../../schemas"
 import { GRID_ROWS_MAX, type TableGridRows, type TableGridSummary, type TableReviewQueue } from "../../schemas/table-screen"
 import { isRecord } from "../../schemas/tables"
 import type { PlatformDb } from "../db"
@@ -25,7 +25,7 @@ export type RowSelection = { filter?: unknown; q?: string | null; sort?: TableSo
 /** Un tableau déjà décidé par l'appelant (niveau 1 au moins) : son organisation, son nœud, son en-tête publié. */
 export type ReadableTable = { orgId: string; nodeId: string; path: string; header: TableHeader }
 
-type Checked = { clauses: FilterClause[]; q: string | null; sort: TableSort | undefined }
+type Checked = { clauses: FilterClause[]; q: string[] | null; sort: TableSort | undefined }
 
 type Entry = { block: RowBlock; cells: Map<string, CellValue> }
 
@@ -40,8 +40,9 @@ function checkedSelection(header: TableHeader, selection: RowSelection): Checked
   if (unknown.length > 0) throw new PlatformError("invalid_arguments", unknownColumnsMessage(header, unknown))
   const parsed = parseFilter(selection.filter, header)
   if ("problems" in parsed) throw new PlatformError("invalid_arguments", boundedList(parsed.problems, " "))
-  const q = selection.q ? normalizeTitle(selection.q) : ""
-  return { clauses: parsed.clauses, q: q === "" ? null : q, sort: selection.sort ?? undefined }
+  // Un `q` sans mot est ignoré par la grille (E11-S01, AC-c2), que `table.rows` refuse.
+  const q = selection.q ? queryWords(selection.q) : []
+  return { clauses: parsed.clauses, q: q.length === 0 ? null : q, sort: selection.sort ?? undefined }
 }
 
 /** Les lignes du tableau qui répondent au filtre et à `q`, sur 5 000 lignes au plus (N6 d'E07-S01) ; au-delà, `too_large`. */

@@ -333,6 +333,7 @@ export type Database = {
       ctx: {
         Row: {
           code: string
+          contexts: Json | null
           created_at: string
           host: string | null
           org_id: string
@@ -342,6 +343,7 @@ export type Database = {
         }
         Insert: {
           code: string
+          contexts?: Json | null
           created_at?: string
           host?: string | null
           org_id: string
@@ -351,6 +353,7 @@ export type Database = {
         }
         Update: {
           code?: string
+          contexts?: Json | null
           created_at?: string
           host?: string | null
           org_id?: string

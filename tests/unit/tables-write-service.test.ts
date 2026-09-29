@@ -21,6 +21,7 @@ import { tableWrite } from "../../packages/plateforme/server/tables/write"
 import { nodeId, PEOPLE, teamOf, type RuleSpec } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
 import type { Row, Tables } from "../helpers/simulated-db"
+import { loggedText } from "../helpers/logs"
 import { dbSpy, isWrite, type DbSpy, type SpiedCall } from "../helpers/spy-t1-c1a"
 import { sqlConfigured, seedWithAdmin, type SeededData, portable } from "../helpers/sql"
 import { fixtureTables, PROSPECT_ROWS, PROSPECTS, PROSPECTS_HEADER, rowBlocks, runFunction, TICKETS } from "../factories/table-fixture"
@@ -375,6 +376,117 @@ describe.skipIf(!sqlConfigured)(portable("table.write on a real database"), { ti
       const output = await call(tableWrite, lea, { table: PROSPECTS.path, rows }, simulated)
       expect(rowsOf(output).map((row) => [row.key, row.status, row.revision])).toEqual(read.map((row) => [row.key, "unchanged", row.revision]))
       expect(blockWrites(simulated.calls)).toEqual([])
+    })
+  })
+
+  describe("E11-S01: create_only, host and worker, proof by table", () => {
+    const HOST = "claude-ai@0.1.0"
+
+    function readHeader() {
+      const parsed = parseTableHeader(PROSPECTS_HEADER)
+      if (!("header" in parsed)) throw new Error("fixture header")
+      return parsed.header
+    }
+
+    /** Le tableau des prospects sans la preuve exigée, le temps d'un cas (fiche D133, HN-E11S01-13). */
+    async function withoutProof(run: () => Promise<void>): Promise<void> {
+      const id = ref.nodeId(PROSPECTS.path)
+      await seed.admin`update platform.nodes set meta = jsonb_set(meta, '{proof}', 'false'::jsonb) where id = ${id}`
+      try {
+        await run()
+      } finally {
+        await seed.admin`update platform.nodes set meta = jsonb_set(meta, '{proof}', 'true'::jsonb) where id = ${id}`
+      }
+    }
+
+    it("should refuse a key that has its row under create_only, with the row as it is, create the others, and refuse a key written twice after creating it (AC-a1, AC-a3)", async () => {
+      const simulated = await fixture.database(withProspect("Atelier 2", { revision: 3 }))
+      const before = structuredClone(await fixture.row("Atelier 2"))
+      const rows = [
+        { key: "Atelier 2", set: { notes: proved("Relancer") } },
+        { key: "Boulangerie du Pont", set: { ville: proved("Valbrune") } },
+        { key: "Boulangerie du Pont", set: { contact: proved("Anne Roy") } },
+      ]
+      const output = await call(tableWrite, ref.identityOf("lea"), { table: PROSPECTS.path, create_only: true, rows }, simulated)
+      const atelier = PROSPECT_ROWS.find((row) => row.key === "Atelier 2")
+      if (!atelier) throw new Error("fixture row")
+      const current = toReadRow({ ...atelier, revision: 3 }, readHeader(), new Map())
+      const created = { key: "Boulangerie du Pont", revision: 1, set: { entreprise: "Boulangerie du Pont", ville: "Valbrune", statut: "à traiter" } }
+      expect(lines(output)).toEqual([
+        "ventes/suivi_prospects: 1 row(s) written (1 created, 0 updated), 0 unchanged, 2 refused.",
+        `Atelier 2: refused (conflict): a row with this key already exists (revision 3); nothing written (create_only). Current row: ${JSON.stringify(current)}. Pick another key, or write without create_only to update it.`,
+        "Boulangerie du Pont: created (revision 1): set ville; statut = « à traiter » (queue entry).",
+        `Boulangerie du Pont: refused (conflict): a row with this key already exists (revision 1); nothing written (create_only). Current row: ${JSON.stringify(created)}. Pick another key, or write without create_only to update it.`,
+      ])
+      expect(rowsOf(output).map((row) => [row.status, row.code ?? null])).toEqual([["refused", "conflict"], ["created", null], ["refused", "conflict"]])
+      expect(rowsOf(output)[0]).toMatchObject({ current })
+      expect(await fixture.row("Atelier 2")).toEqual(before)
+      expect(await fixture.row("Boulangerie du Pont")).toMatchObject({ revision: 1, data: { entreprise: "Boulangerie du Pont", ville: "Valbrune", statut: "à traiter" } })
+    })
+
+    it("should refuse, never update, a key another creation took meanwhile under create_only, and log the race (AC-a2)", async () => {
+      const taken = rowBlocks(TABLE_ID, [
+        { key: "Nouveau Prospect", data: { entreprise: "Nouveau Prospect", statut: "à traiter" }, provenance: {}, revision: 1, claimed_by: null, claimed_by_user: null, lease_until: null },
+      ]).map((row) => ({ ...row, id: `${TABLE_ID}:row:pris` }))
+      let raced = false
+      // L'autre création passe juste avant l'insertion du service : `uq_blocks_node_id_state_key` écarte la sienne.
+      const simulated = await fixture.database(fixtureTables(), async (spied) => {
+        if (raced || spied.op !== "insert" || !spied.tables.includes("blocks")) return
+        raced = true
+        await ref.write({ blocks: taken })
+      })
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined)
+      try {
+        const args = { table: PROSPECTS.path, create_only: true, rows: [{ key: "Nouveau Prospect", set: { ville: proved("Valbrune") } }] }
+        const output = await call(tableWrite, ref.identityOf("lea"), args, simulated)
+        const current = { key: "Nouveau Prospect", revision: 1, set: { entreprise: "Nouveau Prospect", statut: "à traiter" } }
+        expect(lines(output)[1]).toBe(
+          `Nouveau Prospect: refused (conflict): a row with this key already exists (revision 1); nothing written (create_only). Current row: ${JSON.stringify(current)}. Pick another key, or write without create_only to update it.`,
+        )
+        expect(loggedText(logged)).toBe(`[platform] tables: write: create_only key taken meanwhile ${ref.nodeId(PROSPECTS.path)}#Nouveau Prospect`)
+        // Une seule écriture tentée, l'insertion écartée : aucune mise à jour de la ligne prise.
+        expect(blockWrites(simulated.calls).map((one) => one.op)).toEqual(["insert"])
+        expect(await fixture.row("Nouveau Prospect")).toMatchObject({ revision: 1, data: { entreprise: "Nouveau Prospect", statut: "à traiter" } })
+      } finally {
+        logged.mockRestore()
+      }
+    })
+
+    it("should store the host of the conversation, and the worker of the writer's own active lease only (AC-d2, AC-d3)", async () => {
+      const simulated = await fixture.database()
+      const claire = ref.identityOf("claire")
+      const args = { table: PROSPECTS.path, rows: [{ key: "Atelier 10", set: { notes: proved("Relancer") } }, { key: "Atelier 2", set: { notes: proved("Relancer") } }] }
+      await runFunction(tableWrite, { db: await clientOf(ref, claire, simulated), identity: claire, ctx: CTX, origin: ORIGIN, host: HOST }, args)
+      const agent = { origin: "agent", by: PEOPLE.claire.id, ctx: CTX, at: expect.stringMatching(/Z$/), host: HOST, comment: PROOF }
+      // Atelier 10 est sous le bail actif de Claire (claude-claire) : le travailleur suit ; Atelier 2, sans bail, n'en a pas.
+      expect((await fixture.row("Atelier 10"))?.provenance).toHaveProperty("notes", { ...agent, worker: "claude-claire" })
+      expect((await fixture.row("Atelier 2"))?.provenance).toHaveProperty("notes", agent)
+      // Sans client connu, aucun `host` ; Scierie Vallon est au bail de Léa (claude-lea), expiré : aucun `worker`.
+      await call(tableWrite, ref.identityOf("lea"), { table: PROSPECTS.path, rows: [{ key: "Scierie Vallon", set: { notes: proved("Relancer") } }] }, simulated)
+      const lea = { origin: "agent", by: PEOPLE.lea.id, ctx: CTX, at: expect.stringMatching(/Z$/), comment: PROOF }
+      expect((await fixture.row("Scierie Vallon"))?.provenance).toHaveProperty("notes", lea)
+    })
+
+    it("should write bare values on a table without proof, with an agent provenance, and leave a proved value sent back bare untouched (AC-f2)", async () => {
+      await withoutProof(async () => {
+        const simulated = await fixture.database()
+        const lea = ref.identityOf("lea")
+        const agent = { origin: "agent", by: PEOPLE.lea.id, ctx: CTX, at: expect.stringMatching(/Z$/) }
+        const created = await call(tableWrite, lea, { table: PROSPECTS.path, rows: [{ key: "Boulangerie du Pont", set: { ville: "Valbrune" } }] }, simulated)
+        expect(lines(created)[0]).toBe(SUMMARY_ONE_CREATED)
+        expect((await fixture.row("Boulangerie du Pont"))?.provenance).toHaveProperty("ville", agent)
+        const updated = await call(tableWrite, lea, { table: PROSPECTS.path, rows: [{ key: "Atelier 2", set: { ville: { value: "Coudray" } } }] }, simulated)
+        expect(rowsOf(updated).map((row) => row.status)).toEqual(["updated"])
+        const atelier = await fixture.row("Atelier 2")
+        expect(atelier?.data).toHaveProperty("ville", "Coudray")
+        // Sans commentaire ni lien : la provenance d'une valeur nue (§ Sécurité de la story).
+        expect(atelier?.provenance).toHaveProperty("ville", agent)
+        // Une valeur nue égale à la valeur prouvée rangée : ignorée, sa provenance (commentaire, lien, origine) intacte.
+        const ecole = structuredClone(await fixture.row("École de Valbrune"))
+        const same = await call(tableWrite, lea, { table: PROSPECTS.path, rows: [{ key: "École de Valbrune", set: { montant_estime: 10000 } }] }, simulated)
+        expect(rowsOf(same).map((row) => row.status)).toEqual(["unchanged"])
+        expect(await fixture.row("École de Valbrune")).toEqual(ecole)
+      })
     })
   })
 })

@@ -7,15 +7,15 @@
 // (`dbSpy`) à la place de celui de la base simulée.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { formatResult } from "../../packages/plateforme/mcp/result"
-import { tableRowReadSchema } from "../../packages/plateforme/schemas/tables"
+import { isRecord, tableRowReadSchema } from "../../packages/plateforme/schemas/tables"
 import type { PlatformError } from "../../packages/plateforme/server/errors"
 import type { RowBlock } from "../../packages/plateforme/server/tables/meta"
 import { tableRows } from "../../packages/plateforme/server/tables/rows"
-import type { Person } from "../helpers/reference-org"
+import { PEOPLE, type Person } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
 import { dbSpy } from "../helpers/spy-t1-c1a"
 import { sqlConfigured, seedWithAdmin, type SeededData, portable } from "../helpers/sql"
-import { PROSPECT_ROWS, PROSPECTS, runFunction, TICKETS } from "../factories/table-fixture"
+import { PROSPECT_ROWS, PROSPECTS, runFunction, TICKETS, WRITTEN_AT } from "../factories/table-fixture"
 import { seedTableFixture } from "../factories/table-fixture-sql"
 import { CASE_TIMEOUT, clientOf, fixtureRows, SEED_TIMEOUT, type FixtureRows } from "../factories/table-rows-sql"
 
@@ -268,6 +268,22 @@ describe.skipIf(!sqlConfigured)(portable("table.rows on a real database"), { tim
         message: "Row Atelier 3 is larger than 16,000 characters: read it with columns to project fewer columns.",
       })
       expect(keys(await rows({ filter: { entreprise: "Atelier 3" }, columns: ["statut"] }, { rows: huge }))).toEqual(["Atelier 3"])
+    })
+  })
+
+  describe("E11-S01: q by words, host and worker served", () => {
+    it("should keep a row when every word of q appears in its searched cells, in any order and in different cells (AC-c1)", async () => {
+      expect(keys(await rows({ q: "coudray MAIRIE" }))).toEqual(["Mairie de Coudray"])
+      expect(keys(await rows({ q: "valbrune nina" }))).toEqual(["Atelier 2"])
+      expect(keys(await rows({ q: "valbrune inconnu" }))).toEqual([])
+    })
+
+    it("should serve host and worker in the provenance when stored, and never the ctx code (AC-d4)", async () => {
+      const written = { origin: "agent", by: PEOPLE.lea.id, ctx: "ABCD-1234", at: WRITTEN_AT, host: "claude-ai@0.1.0", worker: "claude-lea" }
+      const atelier = PROSPECT_ROWS.map((row) => (row.key === "Atelier 2" ? { ...row, provenance: { ...(isRecord(row.provenance) ? row.provenance : {}), ville: written } } : row))
+      const page = await rows({ provenance: true, filter: { entreprise: "Atelier 2" } }, { rows: atelier })
+      expect(page.data.rows[0]?.provenance?.ville).toEqual({ origin: "agent", by: "Léa Roux", at: "2026-09-01T08:00:00.000Z", host: "claude-ai@0.1.0", worker: "claude-lea" })
+      expect(page.text).not.toContain("ABCD-1234")
     })
   })
 })

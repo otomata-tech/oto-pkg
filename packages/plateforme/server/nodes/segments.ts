@@ -1,6 +1,7 @@
 // Le segment d'un chemin tiré d'un titre, et le premier chemin libre (E05-S10 : adresse qui suit le titre,
 // AC-b12 ; copie d'un sous-arbre, AC-b10 ; restauration sous un ancêtre, AC-b11). Sans lui, chacun de ces
 // gestes tirerait son segment et chercherait son chemin libre à sa façon.
+import { slugOf } from "../../schemas/nodes"
 import type { PlatformDb } from "../db"
 import { inTransaction } from "../errors"
 import type { Identity } from "../identity"
@@ -12,23 +13,8 @@ export const SEGMENT_MAX = 60
 /** Le segment d'un titre sans lettre ni chiffre, comme la création depuis le rail (HN-E05S10b-3). */
 export const UNTITLED_SEGMENT = "sans_titre"
 
-/**
- * Un texte en segment de chemin (le slug d'une équipe, HN-E05S03-8) : sans accents, en minuscules, tout ce qui
- * n'est pas `[a-z0-9]` devient `_`, `max` caractères au plus, sans `_` en tête ni en fin ; `""` pour un
- * texte sans lettre ni chiffre. Parcours linéaire (`security-patterns.md § Validation des inputs`).
- */
-export function slugOf(text: string, max: number): string {
-  return text
-    .replace(/œ/gi, "oe")
-    .replace(/æ/gi, "ae")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+/, "")
-    .slice(0, max)
-    .replace(/_+$/, "")
-}
+// Le segment d'un texte vit dans `schemas/nodes.ts` depuis E10-S01, que l'écran lit aussi ; les services le lisent ici.
+export { slugOf }
 
 /** Le segment d'un titre (AC-b12) : `Tarifs 2026` → `tarifs_2026` ; `sans_titre` sans lettre ni chiffre. */
 export function titleSegment(title: string): string {

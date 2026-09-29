@@ -2,8 +2,8 @@
 // genre. (1) Préparer : la gestion exigée d'abord (`requireNodeLevel`, action `publish`), puis le
 // tampon du brouillon, ses blocs lus une fois, les contrôles du genre publié, les liens extraits ; un
 // refus ici garde le brouillon et n'appelle pas `publish_node`. (2) Publier : `publish_node`, atomique
-// (garde de révision, instantané, liens, brouillon effacé). (3) Dériver : ligne « rules changed » d'un
-// Contexte ; purge des colonnes retirées d'un tableau (E07-S04). Sans lui, la publication serait mêlée
+// (garde de révision, instantané, liens, brouillon effacé). (3) Dériver : ligne d'un Contexte au
+// contenu changé (E11-S03) ; purge des colonnes retirées d'un tableau (E07-S04). Sans lui, la publication serait mêlée
 // à l'écriture du brouillon.
 //
 // Repris de la maquette (`mcp-test/src/proto/services/write.ts` l. 139-191) : la publication qui
@@ -14,14 +14,16 @@ import { splitSections } from "../../schemas"
 import { requireNodeLevel, unknownPath } from "../access"
 import type { Json } from "../database"
 import type { PlatformDb } from "../db"
-import { fromDatabaseError, PlatformError } from "../errors"
+import { fromDatabaseError, inTransaction, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import { checkProcedureBlocks, procedurePublicationError } from "../procedures-check"
 import { finishTablePublication, prepareTablePublication, type TablePublication } from "../tables/evolution-publish"
+import { samePublishedContent } from "./diff"
+import type { DocBlock } from "./document"
 import { prepareLinks } from "./links"
 import type { NodeRow } from "./lookup"
 import { followTitle } from "./rename"
-import { currentRevision, loadBlocks, loadDraft } from "./store"
+import { currentRevision, loadBlocks, loadDraft, snapshotBlocks } from "./store"
 
 /**
  * `table` : ce que la publication d'un en-tête de tableau a changé et ses avertissements (E07-S04) ;
@@ -90,6 +92,22 @@ async function publishDraft(db: PlatformDb, node: NodeRow, publication: { baseRe
 }
 
 /**
+ * Un Contexte publié change ce que `context` sert (E11-S03, AC-a7, H28) : sa première publication, ou des blocs
+ * publiés différents de ceux de la révision précédente (son instantané, `node_versions`), comparés comme la
+ * garde du `ctx` les compare ; une republication à l'identique ne périme aucune conversation.
+ */
+async function contextChanged(db: PlatformDb, node: NodeRow, revision: number, blocks: readonly DocBlock[]): Promise<boolean> {
+  if (node.kind !== "context") return false
+  if (revision <= 1) return true
+  const [previous] = await inTransaction(
+    db,
+    "publish: previous version",
+    (sql) => sql<{ blocks: Json }[]>`select blocks from platform.node_versions where node_id = ${node.id} and revision = ${revision - 1}`,
+  )
+  return !previous || !samePublishedContent(snapshotBlocks(previous.blocks), blocks)
+}
+
+/**
  * Publie le brouillon d'un nœud (N22) : exige la gestion avant toute lecture du brouillon et tout
  * appel à `publish_node` ; lit le tampon du brouillon avant les contrôles et le passe en
  * `p_draft_stamp` (N46, E03-S06 N9) ; `draftStamp` (l'écran) exige en plus que le
@@ -122,9 +140,10 @@ export async function publishNode(
   // (2) Publier, sur le tampon lu en (1) : un brouillon écrit depuis n'est jamais publié (`PT409`, M02).
   // Seule dans sa transaction : `publish_node` est atomique, et ses refus relisent la base après elle.
   const revision = await publishDraft(db, node, { baseRevision: options.baseRevision, stamp: draft.stamp, links: links?.pLinks ?? null })
-  // (3) Dériver : un Contexte publié change les règles de l'organisation (H28, P39) ; avertissements
-  // des liens et des blocs `reference` (E03-S07) ; purge des colonnes retirées d'un tableau et
-  // avertissements de son en-tête (E07-S04).
+  // (3) Dériver : un Contexte publié à un contenu neuf périme les conversations qui l'ont reçu (H28, P39,
+  // E11-S03) ; avertissements des liens et des blocs `reference` (E03-S07) ; purge des colonnes retirées
+  // d'un tableau et avertissements de son en-tête (E07-S04).
+  const rulesChanged = await contextChanged(db, node, revision, blocks)
   const evolved = await finishTablePublication(db, identity, node, table)
   // (4) L'adresse suit un titre changé par le brouillon publié, pour l'écran comme pour un assistant
   // (AC-b12, HN-E05S10e-5) ; sans titre en attente, rien à relire.
@@ -133,7 +152,7 @@ export async function publishNode(
     revision,
     sections: splitSections(blocks).length - 1,
     blocks: blocks.length,
-    rulesChanged: node.kind === "context",
+    rulesChanged,
     warnings: [...(links?.warnings ?? []), ...(evolved?.texts ?? [])],
     ...(evolved ? { table: evolved } : {}),
     ...(renamed ? { renamed } : {}),

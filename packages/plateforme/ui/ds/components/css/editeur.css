@@ -8,29 +8,12 @@
 
 .oto-block-row[data-state="moving"] [data-geste="poignee"] { cursor: grabbing; }
 
-/* ── la liste à cocher (AC-a2) : une case par ligne, dans le retrait du texte, comme la colonne de numéros ; une ligne repliée décale les cases suivantes, écart cosmétique assumé (le même que les numéros). */
+/* ── la liste à cocher (AC-a2) : une case par élément, dans le retrait du texte, posée par la copie des éléments comme la puce d'une liste. */
 .oto-block-field[data-kind="checklist"] {
   padding-inline-start: calc(var(--space-2) + var(--space-5));
 }
 
-.oto-block-checks {
-  position: absolute;
-  inset-inline-start: 0;
-  inset-block-start: 0;
-  inline-size: var(--space-5);
-  padding-block-start: calc(var(--space-1) + 1px);
-  /* Une grille : chaque rangée fait exactement une boîte de ligne, comme `.oto-block-numbers`. */
-  display: grid;
-  grid-auto-rows: 1lh;
-  justify-items: center;
-  font-size: var(--fs-sm);
-  line-height: var(--lh-relaxed);
-  /* Au-dessus du champ, que la colonne recouvre : la case se clique. */
-  z-index: 1;
-}
-
 .oto-block-check {
-  align-self: center;
   inline-size: 14px;
   block-size: 14px;
   margin: 0;
@@ -141,7 +124,87 @@
   visibility: hidden;
 }
 
-/* En couleurs forcées, le texte transparent ne se tait plus : le rendu se retire, le champ reste seul et lisible. */
+/* ── les éléments d'une liste (E11-S06, lot a) : une copie du texte du champ, aux classes du champ, que le navigateur replie comme lui ; posée au-dessus du champ (elle le précède, pour que ses cases viennent avant lui au clavier), elle laisse passer le pointeur, sauf sur une case ou un lien. */
+.oto-block-pile > .oto-block-copie {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  background: none;
+  border-color: transparent;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.oto-block-copie a,
+.oto-block-copie input {
+  pointer-events: auto;
+}
+
+/* Un élément vide garde sa ligne, comme dans le champ. */
+.oto-block-element {
+  display: block;
+  position: relative;
+  min-block-size: 1lh;
+}
+
+/* Au focus, ou sans lien, la copie est le texte brut, qu'on ne voit pas : le champ se lit au travers ; seuls ses repères paraissent. */
+.oto-block-element-texte[data-brut] {
+  visibility: hidden;
+}
+
+/* Le repère d'un élément, dans le retrait réservé par le champ, à la hauteur de sa première ligne ; il rythme, il ne parle pas, comme le `::marker` de la lecture. */
+.oto-block-repere {
+  position: absolute;
+  inset-inline-end: 100%;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--space-4);
+  block-size: 1lh;
+  color: var(--faint);
+  user-select: none;
+}
+
+/* Un numéro s'aligne sur le texte, à droite ; `tabular-nums` garde 9 et 10 à l'aplomb. */
+.oto-block-repere[data-numero] {
+  justify-content: flex-end;
+  padding-inline-end: var(--space-1);
+}
+
+.oto-block-repere > span {
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.oto-block-copie[data-kind="checklist"] .oto-block-repere {
+  inline-size: var(--space-5);
+}
+
+/* ── le panneau « Lien » (E11-S06, lot b) : la surface d'un menu, dans le flux sous le champ comme la liste de « @ » ; le corps du texte courant, même sous un titre. */
+.oto-pop.oto-lien {
+  position: static;
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-1);
+  padding: var(--space-3);
+  max-inline-size: min(420px, 100%);
+  overflow: visible;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  letter-spacing: normal;
+  line-height: var(--lh-normal);
+}
+
+/* La page liée : son titre, puis son chemin en légende. */
+.oto-lien-page {
+  display: grid;
+  overflow-wrap: anywhere;
+}
+
+/* En couleurs forcées, le texte transparent ne se tait plus : le rendu d'un texte se retire, le champ reste seul et lisible. La copie d'une liste reste, lisible en couleurs du système : le champ, dessous, se tait vraiment, sans quoi deux textes se recouvriraient. */
 @media (forced-colors: active) {
   .oto-block-pile > .oto-block-rendu {
     display: none;
@@ -149,6 +212,12 @@
 
   .oto-block-pile > .oto-block-field[data-rendu]:not(:focus) {
     color: CanvasText;
+  }
+
+  .oto-block-pile > .oto-block-field[data-rendu][data-kind="list"]:not(:focus),
+  .oto-block-pile > .oto-block-field[data-rendu][data-kind="checklist"]:not(:focus) {
+    forced-color-adjust: none;
+    color: transparent;
   }
 }
 

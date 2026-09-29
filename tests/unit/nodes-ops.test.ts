@@ -3,6 +3,7 @@
 // réponses et refus mot pour mot, bornes chiffrées, positions (renumérotation sous 1e-6 comprise).
 import { describe, expect, it } from "vitest"
 import { renderBlocks, type BlockInput } from "../../packages/plateforme/schemas"
+import { planDraftWrites } from "../../packages/plateforme/server/nodes/diff"
 import { blockMarkdown, blocksSize, charCount, placeBlocks, type DocBlock } from "../../packages/plateforme/server/nodes/document"
 import type { WorkBlock } from "../../packages/plateforme/server/nodes/op-kit"
 import { applyOps } from "../../packages/plateforme/server/nodes/ops"
@@ -200,7 +201,7 @@ describe("block operations (AC24)", () => {
     expect(placed.map((block) => block.position).slice(0, 3)).toEqual([1024, 1536, 2048])
     expect(placed[1]).toMatchObject({ revision: 1, provenance: { origin: "import" } })
     const start = apply([{ op: "move_block", block: ref(P3) }])
-    expect([ids(start.blocks)[0], start.describe[0], placeBlocks(start.blocks)[0].position]).toEqual([P3, `moved block ${ref(P3)} to the start`, 0])
+    expect([ids(start.blocks)[0], start.describe[0], placeBlocks(start.blocks)[0].position]).toEqual([P3, `moved block ${ref(P3)} to the start of the page, outside any section`, 0])
   })
 
   it("should check the read revision, structured blocks and keys given by the API", () => {
@@ -235,6 +236,10 @@ describe("block operations (AC24)", () => {
       [{ op: "move_block", block: "objet", after_block: "x" }, "Op 1 (move_block objet): unknown block « x » for after_block. Read the page with refs: true to get the references."],
       [{ op: "delete_block", block: "objet", section: "Objet" }, "Op 1 (delete_block objet): section is not used by delete_block; remove it."],
       [{ op: "move_block", block: "objet", text: "x" }, "Op 1 (move_block objet): text is not used by move_block; remove it."],
+      // E11-S03 (AC-c1) : une destination à la fois ; la section se trouve comme pour `append` ; un titre ne va pas dans sa section.
+      [{ op: "move_block", block: ref(P3), after_block: "objet", section: "Étapes" }, `Op 1 (move_block ${ref(P3)}): give after_block or section, not both.`],
+      [{ op: "move_block", block: ref(P3), section: "Budget" }, `Op 1 (move_block ${ref(P3)}): unknown section « Budget ». Sections: « Objet », « Étapes », « Cas particulier », « Règles ».`],
+      [{ op: "move_block", block: "etapes", section: "Étapes" }, "Op 1 (move_block etapes): a heading cannot move into the section it heads."],
     ]
     for (const [op, message, blocks] of cases) {
       expect(refused([op], blocks), message).toMatchObject({ code: "invalid_arguments", message: `${message} Nothing was written.` })
@@ -245,5 +250,71 @@ describe("block operations (AC24)", () => {
     const tight = doc([paragraph("a"), paragraph("b"), paragraph("c")]).map((block, index) => ({ ...block, position: 1 + index * 1e-7 }))
     const inserted = apply([{ op: "insert_after", block: ref(blockUuid(1)), text: "between" }], tight)
     expect(placeBlocks(inserted.blocks).map((block) => block.position)).toEqual([1024, 2048, 3072, 4096])
+  })
+})
+
+describe("move_block to a section, append that continues a list (E11-S03, AC-c1, AC-c4, AC-c5)", () => {
+  it("should move a block to the end of a section, sub-sections included, keeping its revision", () => {
+    const moved = apply([{ op: "move_block", block: ref(P1), section: "étapes" }])
+    expect(ids(moved.blocks)).toEqual([OBJET, ETAPES, L1, CAS, P2, P1, REGLES, P3, P4])
+    expect(moved.describe[0]).toBe(`moved block ${ref(P1)} to the end of « Étapes »`)
+    expect(placeBlocks(moved.blocks)[5]).toMatchObject({ id: P1, position: 6656, revision: 1 })
+  })
+
+  /** « Tâches » finie par une liste numérotée qui commence à 3, dont un élément a sa sous-liste (E10-S04), puis « Notes ». */
+  const taches = (list: BlockInput = { type: "list", text: null, data: { items: ["Lire.", { text: "Écrire.", children: { items: ["Brouillon."] } }], ordered: true, start: 3 } }) =>
+    doc([heading("Tâches", 1), list, heading("Notes", 1), paragraph("Rien.")], 30)
+  const [TACHES, LIST, NOTES, RIEN] = taches().map((block) => block.id)
+
+  it("should add the new items, sub-items included, to the list before the insertion point, then the other blocks", () => {
+    const before = taches()
+    const appended = apply([{ op: "append", section: "Tâches", text: "1. Relire.\n   - Vérifier le montant.\n2. Envoyer.\n\nFin de la liste." }], before)
+    expect(ids(appended.blocks)).toEqual([TACHES, LIST, null, NOTES, RIEN])
+    expect(appended.blocks[1].data).toEqual({
+      items: ["Lire.", { text: "Écrire.", children: { items: ["Brouillon."] } }, { text: "Relire.", children: { items: ["Vérifier le montant."] } }, "Envoyer."],
+      ordered: true,
+      start: 3,
+    })
+    expect(appended.blocks[2]).toMatchObject({ type: "paragraph", text: "Fin de la liste." })
+    const size = blocksSize(appended.blocks.slice(0, 3))
+    const added = size - blocksSize(before.slice(0, 2))
+    expect(appended.describe[0]).toBe(`appended to « Tâches » (+${added} → ${size} characters; the list continues with 3 more items)`)
+    // Écrite comme un `replace_block` : même id, révision de bloc suivante, contenu (donc provenance) réécrit.
+    const plan = planDraftWrites(before, placeBlocks(appended.blocks))
+    expect(plan.updates.find((update) => update.block.id === LIST)).toMatchObject({ expected: 1, content: true, block: { revision: 2 } })
+
+    const checklist = taches({ type: "checklist", text: null, data: { items: [{ text: "Relire", checked: true }] } })
+    const checked = apply([{ op: "append", section: "Tâches", text: "- [ ] Signer." }], checklist)
+    expect(ids(checked.blocks)).toEqual([TACHES, LIST, NOTES, RIEN])
+    expect(checked.blocks[1].data).toEqual({ items: [{ text: "Relire", checked: true }, { text: "Signer.", checked: false }] })
+    expect(checked.describe[0]).toMatch(/; the list continues with 1 more item\)$/)
+  })
+
+  it("should start a new list for another kind, another block in between, or beyond 500 items, and say the last", () => {
+    const checklist: BlockInput = { type: "checklist", text: null, data: { items: [{ text: "Relire", checked: false }] } }
+    const cases: [DocBlock[], string, string][] = [
+      [taches(), "Tâches", "- Relire."],
+      [taches(checklist), "Tâches", "1. Relire."],
+      [taches({ type: "list", text: null, data: { items: ["Lire."] } }), "Tâches", "- [ ] Relire."],
+      // La liste d'« Étapes » est suivie de « Cas particulier » : le point d'insertion vient après P2.
+      [devis(), "Étapes", "1. Relancer."],
+    ]
+    for (const [blocks, section, text] of cases) {
+      const appended = apply([{ op: "append", section, text }], blocks)
+      expect(appended.blocks, text).toHaveLength(blocks.length + 1)
+      expect(appended.describe[0], text).toMatch(/ characters\)$/)
+    }
+
+    const items = (count: number): BlockInput => ({ type: "list", text: null, data: { items: Array.from({ length: count }, (_, index) => `Élément ${index}.`) } })
+    // 498 et 2 font 500 : la liste continue ; 499 et 2, une liste neuve.
+    expect(apply([{ op: "append", section: "Tâches", text: "- a\n- b" }], taches(items(498))).blocks).toHaveLength(4)
+    const full = apply([{ op: "append", section: "Tâches", text: "- a\n- b" }], taches(items(499)))
+    expect(ids(full.blocks)).toEqual([TACHES, LIST, null, NOTES, RIEN])
+    expect(full.describe[0]).toMatch(/ characters; a new list starts: a list holds 500 items at most\)$/)
+    // 498 au premier niveau, dont un porte un enfant : 499 en tout, sous-éléments compris ; et 2, une liste neuve.
+    const nested: BlockInput = { type: "list", text: null, data: { items: [{ text: "Parent.", children: { items: ["Enfant."] } }, ...Array.from({ length: 497 }, (_, index) => `Élément ${index}.`)] } }
+    const counted = apply([{ op: "append", section: "Tâches", text: "- a\n- b" }], taches(nested))
+    expect(ids(counted.blocks)).toEqual([TACHES, LIST, null, NOTES, RIEN])
+    expect(counted.describe[0]).toMatch(/ characters; a new list starts: a list holds 500 items at most\)$/)
   })
 })

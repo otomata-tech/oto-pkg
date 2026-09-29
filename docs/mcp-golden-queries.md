@@ -63,7 +63,8 @@ Delta : exploitation).
 | # | Prompt | Attendu au journal |
 |---|--------|--------------------|
 | C1 | Qu'est-ce que je peux te demander ici ? | `acme_context` seul (ligne `tools/call`, `target` = la phrase) ; aucun autre appel |
-| C2 | Tour 1 : « Prépare mon rendez-vous de demain avec la Mairie de Valbrune. » ; entre les tours, `rules_version` + 1 (publication d'un nœud Contexte, P39) ; tour 2 : « Et le devis 041 ? » | Tour 2 : premier appel refusé `ctx_stale` → `acme_context` rappelé avec la phrase du tour 1 (« with the same request ») → l'appel refusé rejoué une fois (mesure 5) |
+| C2 | Tour 1 : « Prépare mon rendez-vous de demain avec la Mairie de Valbrune. » ; entre les tours, le Contexte de Tout le monde (`contexte`) est publié avec un contenu changé (E11-S03) ; tour 2 : « Et le devis 041 ? » | Tour 2 : premier appel refusé `ctx_stale` « context has changed (contexte): … » → `acme_context` rappelé avec la phrase du tour 1 (« with the same request ») → l'appel refusé rejoué une fois (mesure 5) |
+| C2 bis | Même conversation ; entre les tours, le Privé d'une autre personne est publié changé, ou `contexte` republié à l'identique (négatif, E11-S03) | Tour 2 : aucun refus `ctx_stale`, aucun rappel de `acme_context` ; l'appel passe du premier coup |
 | C3 | Fiche du connecteur sur claude.ai, premier appel de `context`, `find`, `read` | Rangés en lecture : aucune demande « Toujours autoriser » ; titres « Acme Énergies: … » |
 | C4 | Quoi de neuf depuis la dernière fois ? | `acme_context` seul ; la réponse reprend « What's new » ; aucun autre appel |
 | C5 | Quelles procédures puis-je lancer ? | `acme_context` seul ; la réponse vient de « Procedures you can run » (chemin et résumé) ; aucune exécution |
@@ -95,6 +96,8 @@ Delta : exploitation).
 | RW6 | Dans la FAQ support, remplace « 48 h » par « 24 h ouvrées ». | `acme_context` → `acme_read support/faq` → `acme_write` avec `replace_text` ou `replace_block` (références lues avec `refs: true`) ; jamais `replace_section` de toute la section ni réécriture de la page |
 | RW7 | Mets le paragraphe sur l'adresse de contact en tête de la FAQ support. | `acme_context` → `acme_read support/faq` avec `refs: true` → `acme_write` avec `move_block` sans `after_block` ; aucune suppression suivie d'un ajout |
 | RW8 | Qu'est-ce qui attend d'être publié sur la FAQ support ? | `acme_context` → `acme_read support/faq` avec `draft: true` et `since_revision` = la révision publiée ; aucune écriture |
+| RW9 | Dans la méthode d'étude, mets le paragraphe sur les hypothèses à la fin de la section Dimensionnement. | `acme_context` → `acme_read conseil/methode_etude` avec `refs: true` → `acme_write` avec `move_block` et `section: "Dimensionnement"` (résultat « moved block <ref> to the end of « Dimensionnement » ») ; ni `after_block` en plus, ni bloc laissé en tête de page, ni suppression suivie d'un ajout (E11-S03) |
+| RW10 | Ajoute trois points à la liste de la section « Délais » de la FAQ support : devis sous 48 h, rappel sous 24 h, visite sous une semaine. | `acme_context` → `acme_read support/faq` → `acme_write` avec `append` sur « Délais » et une liste du même genre : résultat « …; the list continues with 3 more items », une seule liste dont la numérotation suit ; aucun `replace_section` (E11-S03) |
 | RWN1 | Envoie ce compte rendu par email à Sophie. | Pas de `acme_write` : `acme_context` puis `acme_call mail.create_draft` (le `write` n'envoie rien) |
 
 ### `call` : droits, compte, confirmation — E03-S04 ; connecteurs V1 — E04-S01
@@ -163,6 +166,15 @@ Delta : exploitation).
 | TB2 | Ajoute une colonne « secteur » au suivi des prospects. | `acme_context` → `acme_read ventes/suivi_prospects` (révision) → `acme_write` avec `base_revision` et `header.columns: [{name: "secteur", type: "text"}]` → publication ou demande ; ni `table.rows` ni `table.write` |
 | TB3 | Supprime la colonne ville du suivi des prospects. | `acme_write` avec `header.remove_columns: ["ville"]` et `publish: true` → refus `needs_confirmation` → question à l'utilisateur ; tour 2 « Oui, efface-les. » : `acme_write` avec `header.confirm_remove: true` et `publish: true` ; jamais `confirm_remove` avant l'accord |
 | TBN1 | Ajoute le prospect Boulangerie Martin au suivi. | Pas de `acme_write` sur l'en-tête : `acme_context` puis `acme_call table.write` (E07-S02) |
+| T9 | Crée ces tâches sans écraser les existantes : Atelier 2, Relance Valbrune, Devis 041. | `acme_call table.write` avec `create_only: true` ; une clé déjà prise sort `refused (conflict)` avec la ligne telle qu'elle est, rien n'est écrit pour elle → la réponse le dit et propose une autre clé ou la mise à jour ; aucun second `table.write` sans `create_only` sans accord (E11-S01) |
+| T10 | Cherche mairie valbrune dans le suivi des prospects. | `acme_call table.rows` avec `q: "mairie valbrune"` (mots en tout ordre, sans casse ni accent) → la ligne de la Mairie de Valbrune ; aucun second appel sur un seul mot (E11-S01) |
+
+### Fichiers donnés par la personne — E10-S01
+
+| # | Prompt | Attendu au journal |
+|---|--------|--------------------|
+| IM1 | Voici l'export CSV de nos clients, range-le dans l'espace ventes. <CSV joint> | `acme_context` → (`acme_read write.table` ou `acme_read table.import`, facultatif) → `acme_call table.import` avec `create` (`{title, summary}`) et un chemin sous `ventes/`, par morceaux de 40 000 caractères au plus, chacun ouvert par la ligne d'en-tête ; les morceaux suivants sans `create` ; aucun `table.write` ligne à ligne |
+| IM2 | Mets ce compte rendu (markdown) dans les réunions. <fichier .md joint> | `acme_context` → `acme_write` qui crée une page sous le dossier des réunions : titre tiré du premier `#` du fichier, le reste dans le texte ; `publish: true` ou demande de publication ; aucun `table.import` |
 
 ### Journal — E05-S05
 
@@ -270,6 +282,7 @@ L'attendu se lit dans `admin_journal`.
 |------|---------------|-------------------------------|----------|
 | 2026-09-24 | Contrat initial des six outils et instructions (serveur oto-platform 0.1.0, E03-S01, fiche D8 = B) | — (première version) | Descriptions de 761, 384, 429, 544, 717 et 350 caractères, instructions de 193 (Acme) ; instantané `tests/unit/__snapshots__/mcp-tools.test.ts.snap` ; smoke HTTP sur la Démo OK ; C1 à C3 à jouer sur les hosts après E02-S02 (campagne E06-S02) |
 | 2026-09-25 | Description de `<p>_call` : cite `table.rows` pour toute organisation, `mail.create_draft` et `table.rows` quand `mail` est actif (E07-S01) | fonction native de lecture toujours active | à rejouer après « Actualiser » : I3, T1, T2, N-T1 |
+| 2026-09-29 | Description de `<p>_write` (`move_block` vers une section, E11-S03) ; descriptions des fonctions `table.write` (`create_only`, preuve par tableau), `table.rows` (`q` par mots), `table.release` et du contrat `write.table` (E11-S01), réécrites en place (ADR-002 § 1) | FB-0001, FB-0003, FB-0008, FB-0009 (rapport de tests sur Démo) | à rejouer après « Actualiser » : C2, C2 bis, RW7, RW9, RW10, T6 à T10, N-T2 |
 
 ## Rapports de frictions agent (mcp-patterns §8)
 
@@ -281,7 +294,7 @@ L'attendu se lit dans `admin_journal`.
 
 ## Preuve des valeurs de `table.write`, consigne d'accord, ordre de `table.claim`
 
-- `table.write` : chaque valeur nouvelle d'une colonne de valeur porte `{value, comment | link}` ; une valeur nue égale à la valeur rangée est ignorée ; la colonne d'état s'écrit nue, dans ses transitions permises.
+- `table.write` : sur un tableau `proof: true` (celui de la Démo), chaque valeur nouvelle d'une colonne de valeur porte `{value, comment | link}` ; sans `proof`, elle s'écrit nue (E11-S01, fiche D133) ; une valeur nue égale à la valeur rangée est ignorée ; la colonne d'état s'écrit nue, dans ses transitions permises.
 - Consigne d'accord servie avec une procédure : « … before anything that sends, or that changes data beyond the steps of the procedure the user asked for ».
 - `table.claim` dit l'ordre de la file et `left` ; « What's new » omis quand rien n'est nouveau depuis le jour même.
 

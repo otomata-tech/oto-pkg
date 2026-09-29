@@ -386,7 +386,7 @@ lu par `schemas/tables.ts` l. 246.
 | Formule exécutée à l'ouverture d'un export dans un tableur | Fermé : apostrophe devant `=`, `+`, `-`, `@`, tabulation, retour chariot | `exports.test.ts` |
 | HTML d'un markdown importé | Fermé : il reste du texte échappé (`ui/noeud/en-ligne.ts`) | `nodes-parse-tolerant.test.ts` (rendu) |
 | Stockage du fichier importé | Fermé : lu dans le navigateur, jamais envoyé tel quel | `import-de-fichier.test.tsx` : seules les requêtes JSON partent |
-| Export de tout ce qu'une personne lit | Ouvert, voulu : 5 000 lignes au plus, journalisé comme toute route (`GET tables/export`) | `exports.test.ts` : ligne de journal |
+| Export de tout ce qu'une personne lit | Ouvert, voulu : 5 000 lignes au plus ; export non journalisé, comme toute lecture (décision de JB, 2026-09-29) | `exports.test.ts` : lecture exigée, `too_large`, route rendue sans ligne de journal |
 
 ## Rayon d'impact
 
@@ -437,9 +437,9 @@ lu par `schemas/tables.ts` l. 246.
   Description de `write` inchangée ; contrat `write.table` allongé.
 - `find` et `context` : pages et tableaux importés sont des nœuds ordinaires, routés par titre et
   résumé.
-- Journal : `table.import` s'inscrit comme toute fonction ; `GET nodes/export`, `GET tables/export`
-  et `POST tables/import` comme toute route (`api/handler.ts`). Les arguments y sont coupés à 2 048
-  caractères (`loggedArgs`, `server/journal.ts` l. 112).
+- Journal : `table.import` s'inscrit comme toute fonction ; `POST tables/import` comme toute route
+  (`api/handler.ts`). Les arguments y sont coupés à 2 048 caractères (`loggedArgs`, `server/journal.ts`
+  l. 112). `GET nodes/export` et `GET tables/export` sont des lectures, non journalisées (HN-E10S01-18).
 - Partage public, corbeille, transfert d'organisation, suite d'isolation : aucune table ni colonne
   nouvelle, donc rien à ajouter à `TABLES` ni à `donnees.ts`. Une adresse tenue par un nœud de la
   corbeille est traitée comme par le « + » du rail.
@@ -476,6 +476,80 @@ lu par `schemas/tables.ts` l. 246.
   organisations de la V1, `languageSchema`, `schemas/brand.ts` l. 33).
 - **HN-E10S01-10** : l'éditeur relit le brouillon après un collage ou un dépôt, plutôt que de
   convertir dans le navigateur (source : décision du pilote C10).
+- **HN-E10S01-11** (implémentation) : la composition du `.md` d'une page (`pageMarkdown`) et son inverse
+  (`readPageMarkdown` : titre, résumé, morceaux d'AC-a3) vivent dans `schemas/blocks-render.ts`, exportés par
+  `schemas/index.ts` ; `server/nodes/export.ts` les importe (source : consigne du pilote, décision JB 2026-09-29 ;
+  une story ultérieure les lit sur la page publique, `portage-ecrans.md § 6`).
+- **HN-E10S01-12** (implémentation) : `slugOf` (`schemas/nodes.ts`), `OP_TEXT_MAX` et `PAGE_MAX` (idem), `instantOf`,
+  `maxLengthOf`, `COLUMN_TEXT_MAX` et `ROW_KEY_MAX` (`schemas/tables.ts`) passent dans `schemas/`, réexportés à leur
+  ancienne place (`segments.ts`, `limits.ts`, `meta.ts`) : l'écran et le service appliquent la même règle (source :
+  `portage-ecrans.md § 6` ; `segmentOf` et `columnNameOf` sont `slugOf`, que la story ne citait pas).
+- **HN-E10S01-13** (implémentation) : `kept_as_text` compte les constructions gardées en texte (bloc `code` ou
+  paragraphe) : `call`/`reference` mal formés, clôture jamais fermée, titre de plus de 200 caractères, source d'image
+  trop longue, tableau hors bornes (colonnes, rangées ou rangée inégale), résumé de repli refusé, bloc que le schéma
+  refuse encore. Les formes ramenées (`#` en titre de niveau 1, liste coupée ou ramenée au troisième niveau, repli dans
+  un repli, `---` en séparateur, `mermaid` vide retiré) ne sont pas comptées (source : libellé de l'encart ; AC-a6
+  exige 0 sur les cas valides).
+- **HN-E10S01-14** (implémentation) : refus stricts absents du tableau d'AC-a2, en mode tolérant : un texte sans
+  marque dans une sous-liste devient un élément ; puces et numéros mêlés gardent la forme du premier élément ; un
+  repli jamais fermé court jusqu'à la fin ; un résumé trop long est coupé à 200 ; un résumé refusé laisse la ligne
+  `<details>` en texte (compté). Un bloc de plus de 100 000 caractères reste refusé, même gardé en code : une
+  opération en porte 40 000 au plus (source : « rien n'est refusé », la plus simple).
+- **HN-E10S01-15** (implémentation) : un `call` ou une `reference` mal formés deviennent un `code` sans mot de tête
+  (relu, un bloc `call` redeviendrait refusé) ; une clôture jamais fermée garde son mot de tête, sauf `call`,
+  `reference` et `mermaid` (source : la plus simple).
+- **HN-E10S01-16** (implémentation, écart d'AC-a3) : les morceaux d'un `.md` partent en `insert_after` sans bloc, du
+  dernier au premier, dans une seule requête : `append` exige une section (`locate`), qu'une page neuve n'a pas
+  (source : `section-ops.ts`, `findSections` ne rend jamais le début de page).
+- **HN-E10S01-17** (implémentation) : l'encart « N éléments conservés en texte » d'un `.md` importé vit dans le
+  retour du rail, qui reste monté quand la page s'ouvre : le message s'écrit dans sa région `role="status"`, montée
+  vide, quand la page importée devient l'adresse ouverte, et l'encart visible (`role="note"`) part quand une autre
+  adresse s'ouvre, avec son état : un retour arrière sur la page ne le rend pas ; après un collage ou un dépôt dans l'éditeur, dans son annonce (`role="status"`) (source : la plus
+  simple, aucun écran de page touché ; `accessibility-patterns.md § Régions dynamiques`).
+- **HN-E10S01-18** (implémentation, confirmée par JB le 2026-09-29) : `GET nodes/export` et `GET tables/export` ne
+  sont pas journalisés, comme toute lecture : la porte ne journalise que les mutations (`api/handler.ts`, H07), et la
+  story dit « `api/handler.ts` ne change pas ». L'export reste borné à 5 000 lignes et décidé par la lecture ; ses
+  routes ne rendent aucune ligne de journal, et `exportNode` et `exportTable` ne calculent ni cible ni équipe (aucune
+  requête `ownerOf` ni `tableTeamId`) (source : `handler.ts`, `MUTATIONS` ; décision de JB).
+- **HN-E10S01-19** (implémentation) : `table.import` sur un tableau existant : `key`, s'il est donné, doit nommer sa
+  clé, sinon refus ; les colonnes inconnues, nommées deux fois ou l'état d'une file sont ignorées et listées dans la
+  réponse (texte et champs), comme à l'écran (source : AC-b5, HN-E10S01-5).
+- **HN-E10S01-20** (implémentation) : la borne de 40 000 caractères de `table.import` est une constante à côté du
+  schéma (`IMPORT_CSV_MAX`), dite par sa description, contrôlée par l'adaptateur en `too_large` ; un `.max` Zod
+  rendrait `invalid_arguments`, que l'AC-c1 ne veut pas (source : AC-c1).
+- **HN-E10S01-21** (implémentation) : une création (écran, `table.import`, conversion) décide les droits (gestion du
+  parent), contrôle tout le lot, crée et publie le tableau par le service de `write`, puis écrit les lignes en une
+  transaction. Le tout ou rien couvre les lignes ; un refus ou une panne du lot après la création laisse le tableau
+  publié et vide : le refus le dit (« The table <chemin> was created and published, but none of these rows was
+  written: … Send them again to <chemin>, without create. ») et rend son chemin dans `details.created`. Toute erreur
+  levée après la création la porte : relecture du tableau, lecture de son équipe (faite avant la première ligne,
+  `output.ts`), refus ou panne du lot ; une erreur sans code devient `internal`, sa pile au log serveur. L'écran le
+  garde : « Reprendre » remplit ce tableau sans `create`, et un refus portant `details.created`, `conflict` compris,
+  n'essaie pas l'adresse suivante (pas de `_2`) ; la conversion d'AC-b7 garde, par rangée, le tableau d'un premier
+  lot refusé (`convertis` de `use-envois.ts`) : « Convertir » relancé le remplit sans `create` (source : `write.ts`
+  publie hors de la transaction de l'écriture, AC29 d'E03-S03 ; décision du pilote).
+- **HN-E10S01-22** (implémentation) : la provenance `import` passe par `RowActor.origin` : toute cellule écrite par
+  un import (clé, état d'entrée d'une file compris) porte `origin: "import"` ; le commentaire va aux valeurs posées
+  (source : `cellProvenance`, seule construction d'une provenance de cellule).
+- **HN-E10S01-23** (implémentation, écart de la liste de fichiers) : le dépôt d'un `.csv` sur un tableau existant
+  enveloppe son corps dans `tableau/tableau-du-noeud.tsx`, vide compris, avec « Importer un fichier… » pour le
+  clavier ; `grille.tsx` n'est pas touché (source : la grille n'existe pas pour un tableau vide ;
+  `uploads-patterns.md § Côté composant`, zone doublée d'un champ de fichier).
+- **HN-E10S01-24** (implémentation, confirmée par JB le 2026-09-29) : le « ⋯ » d'un Contexte offre « Télécharger en
+  .md », son seul geste (AC-a5) ; E05-S10 AC-b8 disait « aucun ⋯ sur un Contexte » : le test du rail suit AC-a5
+  (source : AC-a5).
+- **HN-E10S01-25** (implémentation) : conversion d'AC-b7 : adresse `<page>/<segment du titre>`, puis `_2` … (cinq
+  essais) ; les cellules du tableau simple sont prises telles quelles (`\|` et `<br>` gardés) (source : la plus
+  simple).
+- **HN-E10S01-26** (implémentation) : `tables/import.ts` lit `nodes/write` par un import dynamique : sans lui, le
+  registre du catalogue, qui importe `table.import`, formait un cycle (registre → `write` → publication → contrôle des
+  procédures → registre), qui cassait la simulation du registre de `connectors-services.test.ts` (source : précédent
+  `functionNames` de `tables/schema.ts`).
+- **HN-E10S01-27** (implémentation) : la phrase d'AC-c2 sur le markdown est écrite telle que l'AC la cite (« with
+  write »), sans le préfixe de l'organisation (source : AC-c2).
+- **HN-E10S01-28** (implémentation) : un nombre commençant par un zéro suivi d'un chiffre (`01000`) n'est pas un
+  nombre : une colonne de codes postaux reste un texte ; l'apostrophe d'un export se retire aussi devant une
+  tabulation ou un retour chariot, comme l'export la pose (source : la plus simple, aucune donnée perdue ; AC-b6).
 
 ## Actions JB
 
@@ -524,8 +598,60 @@ Aucune (D120 est posée par le pilote).
 
 ### Écarts avec l'architecture
 
+Aucun invariant touché : aucune table, aucune colonne, aucune migration ; la provenance `import` était déjà lue. Le
+catalogue de `call` gagne `table.import` (ajout, ADR-002 § 1) ; la liste des six outils et la description de `write`
+ne changent pas. À reporter dans `docs/architecture.md` : § 5 `tables/` (`import.ts`, `export.ts`), `nodes/`
+(`export.ts`, `markdown-lists.ts`), `schemas/` (`csv.ts`, `csv-cells.ts`) ; l'API gagne `GET nodes/export`,
+`GET tables/export`, `POST tables/import`. Écarts de la story : HN-E10S01-16 (`insert_after` au lieu d'`append`),
+HN-E10S01-18 (exports non journalisés, décision de JB), HN-E10S01-23 (dépôt sur le corps du tableau, pas sur `grille.tsx`).
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `parseCsv`, `detectSeparator`, `columnNameOf`, `columnNames`, `segmentOf`, `fileBaseName`, `fileExtension`, `withLineKey`, `toCsv`, `CSV_SEPARATORS`, `IMPORT_NAME_MAX` | `packages/plateforme/schemas/csv.ts` | Lecture et écriture d'un CSV, noms de colonnes, segment et extension d'un fichier ; écran et service |
+| `readCell`, `inferTable`, `checkImport`, `importProblemsText` ; types `ImportColumn`, `ImportPlan`, `ImportProblem`, `ImportRow`, `ImportBound`, `CheckedImport` | `packages/plateforme/schemas/csv-cells.ts` | Cellules, déduction, contrôle d'un import ; le service le rejoue sur chaque lot |
+| `pageMarkdown`, `readPageMarkdown` | `packages/plateforme/schemas/blocks-render.ts` | Le `.md` d'une page et son inverse (consigne 1 du pilote) |
+| `tableImportArgsSchema`, `tableImportBodySchema`, `IMPORT_*` ; `LINK_PATTERN` exporté | `packages/plateforme/schemas/table-write.ts` | Entrées de `table.import` et de `POST tables/import`, bornes d'un import |
+| `nodeExportQuerySchema`, `slugOf` (déplacé), `OP_TEXT_MAX`, `PAGE_MAX` (déplacés), `NODE_HEAD_MAX` | `packages/plateforme/schemas/nodes.ts` | Chemin d'un export ; règles partagées avec l'écran (borne d'un titre et d'un résumé) |
+| `instantOf`, `maxLengthOf`, `COLUMN_TEXT_MAX`, `ROW_KEY_MAX`, `isEmail` (déplacés) | `packages/plateforme/schemas/tables.ts` | Règles d'une valeur, lues par `csv-cells.ts` et `server/tables/meta.ts` |
+| `importRows`, `importLot`, `tableImport`, `PIECES` | `packages/plateforme/server/tables/import.ts` | Le service d'un import, ses deux portes |
+| `exportNode`, `exportPath`, type `ExportedFile` | `packages/plateforme/server/nodes/export.ts` | `.md` d'un nœud publié |
+| `exportTable` | `packages/plateforme/server/tables/export.ts` | `.csv` d'un tableau |
+| `parseList`, `markerOf`, `indentedFence`, `isBlank`, `isComment`, `indentOf` (déplacés) | `packages/plateforme/server/nodes/markdown-lists.ts` | Listes de l'analyse et leur mode tolérant |
+| `ParseMode`, `refuseOrKeep` | `packages/plateforme/server/nodes/markdown-rich.ts` | Mode d'une analyse |
+| `ImportDeFichier`, `DepotSurLeTableau`, `DeposerSurLeRail`, `aDesFichiers` | `packages/plateforme/ui/coque/import-de-fichier.tsx` | Dialogue d'import, dépôt sur un tableau, sur une ligne du rail |
+| `ReglagesDuCsv`, `phraseDuProbleme` | `packages/plateforme/ui/coque/import-csv.tsx` | Réglages, aperçu, problèmes, envoi par lots |
+| `planDuCsv`, `importerUnePage`, `envoyerLesLots`, `colonnesEnvoyees`, `encodageDe`, `decoder` | `packages/plateforme/ui/coque/envoi-d-import.ts` | Plan d'un CSV et envois ; partagés avec la conversion d'AC-b7 |
+| `telecharger` | `packages/plateforme/ui/api/telecharger.ts` | Un fichier `{filename, content}` téléchargé |
+| `adressesAEssayer` (exportée) | `packages/plateforme/ui/coque/creation-dans-le-rail.tsx` | Adresses d'une création, lues aussi par la conversion d'AC-b7 |
+| `envoyerEtRelire` et `convertis` (use-envois), gestes `insererDuMarkdown`, `deposerUnFichier`, `convertirEnTableau` | `packages/plateforme/ui/noeud/editeur/` | Collage, dépôt, conversion ; relecture du brouillon |
 
 ### Notes
+
+- Trois lots livrés dans le worktree `e10`, sans commit ni `git add` (l'index porte E10-S04). Aucune migration.
+- Correction de la revue 1 : titre `#` lu sans retour en arrière, règle email unique (`schemas/tables.ts`), aucun
+  ajout à `server/index.ts`, encart annoncé par une région montée vide, reprise sans recréer (HN-E10S01-21), exports
+  non journalisés (HN-E10S01-18), « Annuler » inerte pendant l'envoi des lots, consigne propre à chaque borne d'un lot.
+- Correction 2 :
+  - après la création, `loadTable`, `tableTeamId` (lu avant `writeLot`) et `writeLot` sont dans une même zone
+    (`afterCreation`, `server/tables/import.ts`) qui pose `details.created` sur toute erreur (HN-E10S01-21) ;
+  - `writeNodeSchema` borne titre et résumé par `NODE_HEAD_MAX` ;
+  - pendant un envoi (`.md` ou lots d'un `.csv`), ni « Annuler », ni Échap, ni le fond, ni « Fermer » ne ferment le
+    dialogue : `occuper`, passé aux deux panneaux, remplace le second paramètre de `pied` ;
+  - la conversion garde le tableau d'un premier lot refusé (HN-E10S01-21) ;
+  - l'encart des éléments conservés part avec son état quand l'adresse change (HN-E10S01-17).
+- Reste ouvert, hors de la correction 2 : une panne de la relecture du propriétaire que `writeNode` fait après
+  `publish_node` (`finish`, `server/nodes/write.ts`) sort de `createTable` sans `details.created`, le tableau publié.
+- Fichiers hors de la liste de la story, avec leur raison : `schemas/csv-cells.ts`, `server/nodes/markdown-lists.ts`,
+  `ui/coque/import-csv.tsx`, `ui/coque/envoi-d-import.ts` (borne de 300 lignes) ; `server/nodes/markdown-rich.ts`
+  (mode des tableaux et des replis) ; `schemas/tables.ts`, `server/tables/meta.ts`, `server/tables/row-rules.ts`,
+  `server/nodes/segments.ts`, `server/nodes/limits.ts` (règles partagées, HN-E10S01-12) ; `ui/coque/sections-du-rail.tsx`
+  (« ⋯ » d'un Contexte, genre d'une ligne, contexte du dépôt) ; `ui/tableau/tableau-du-noeud.tsx` (HN-E10S01-23) ;
+  `ui/noeud/editeur/gestes.ts`, `use-envois.ts`, `rangee-de-bloc.tsx`, `ui/noeud/libelles.ts` (gestes, relecture,
+  entrée du menu, libellés) ; `tests/unit/catalog.test.ts`, `tests/unit/connectors-context.test.ts` et
+  `tests/integration/components/rail-application.test.tsx` (listes attendues du catalogue et des menus, que la
+  story allonge ; cas du rail ajoutés). `server/tables/rows.ts` et `api/handler.ts` ne changent pas.
+- Tests E2E écrits (`tests/e2e/import-de-fichiers.spec.ts`), non lancés : ils demandent le projet Supabase et un
+  serveur. Contrôle visuel des deux thèmes : par ses captures, au passage du pilote.
+- `docs/mcp-golden-queries.md` (AC-c3) : les deux requêtes sont au pilote ; la description d'aucun des six outils ne
+  change, le catalogue de `call` gagne `table.import` et le contrat `write.table` deux phrases.

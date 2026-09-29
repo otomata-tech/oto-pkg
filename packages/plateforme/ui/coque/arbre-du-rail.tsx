@@ -8,8 +8,9 @@
 // un nœud de genre `context` (P39). E05-S10 (partie b) : une procédure a son « + » (AC-b1) ; le clic sur le
 // nom d'une branche la déplie (AC-b2, `use-depliage-du-rail.ts`) ; une ligne se glisse sur une autre, qui la
 // reçoit (AC-b7, `deplacement-dans-le-rail.tsx`), ou se range avant ou après elle (AC-b9, partie b2). Retiré : exécutions, agents, ligne de reste, poignées
-// d'écriture.
-import { useState, type AnchorHTMLAttributes, type DragEvent, type MouseEvent } from "react"
+// d'écriture. E10-S01 (AC-a3, AC-b1) : un fichier lâché sur une ligne, distingué d'une ligne glissée par
+// `dataTransfer.types` qui contient `Files`, ouvre le dialogue d'import sous elle (`DeposerSurLeRail`).
+import { useContext, useState, type AnchorHTMLAttributes, type DragEvent, type MouseEvent } from "react"
 import { FileText } from "@phosphor-icons/react/dist/csr/FileText"
 import { Info } from "@phosphor-icons/react/dist/csr/Info"
 import { ListBullets } from "@phosphor-icons/react/dist/csr/ListBullets"
@@ -21,6 +22,7 @@ import { cx } from "../ds/react/outils"
 import type { RailTreeNode } from "../ds/react/rail-tree"
 import { useHote } from "../hote/navigation"
 import { useGlisserDansLeRail, type GlisserDuRail } from "./deplacement-dans-le-rail"
+import { aDesFichiers, DeposerSurLeRail } from "./import-de-fichier"
 import type { Zone } from "./freres"
 import { useDeplierAuClic, type DepliageDuRail } from "./use-depliage-du-rail"
 
@@ -95,6 +97,7 @@ function zoneDuSurvol(glisser: GlisserDuRail, chemin: string, evenement: DragEve
  */
 function useGlisserDeLaLigne(glisser: GlisserDuRail | null, chemin: string | null) {
   const [survol, setSurvol] = useState<Zone | null>(null)
+  const deposer = useContext(DeposerSurLeRail)
   if (!glisser || chemin === null) return {}
   return {
     draggable: glisser.peutGlisser(chemin) || undefined,
@@ -106,6 +109,10 @@ function useGlisserDeLaLigne(glisser: GlisserDuRail | null, chemin: string | nul
     },
     onDragEnd: () => glisser.finir(),
     onDragOver: (evenement: DragEvent<HTMLAnchorElement>) => {
+      if (deposer && aDesFichiers(evenement)) {
+        evenement.preventDefault()
+        return setSurvol("dans")
+      }
       const zone = zoneDuSurvol(glisser, chemin, evenement)
       if (!glisser.accepte(chemin, zone)) return setSurvol(null)
       evenement.preventDefault()
@@ -115,6 +122,11 @@ function useGlisserDeLaLigne(glisser: GlisserDuRail | null, chemin: string | nul
     onDragLeave: () => setSurvol(null),
     onDrop: (evenement: DragEvent<HTMLAnchorElement>) => {
       setSurvol(null)
+      const fichier = evenement.dataTransfer?.files?.[0]
+      if (deposer && fichier) {
+        evenement.preventDefault()
+        return deposer(chemin, fichier)
+      }
       const zone = zoneDuSurvol(glisser, chemin, evenement)
       if (!glisser.accepte(chemin, zone)) return
       evenement.preventDefault()

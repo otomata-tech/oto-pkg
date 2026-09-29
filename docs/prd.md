@@ -35,7 +35,7 @@ une base. Il apporte les écrans, l'API, le MCP, les services et les migrations 
 Chaque client reçoit la plateforme par une version du paquet et ses procédures par du contenu.
 
 Le pilote de la V1 fait qualifier des prospects par l'assistant, dans un tableau, par une procédure,
-avec une revue humaine de chaque décision. La V2 branche les connecteurs réels (CRM, mail) et la
+avec une revue humaine de chaque décision, sauf si le tableau la confie à l'assistant. La V2 branche les connecteurs réels (CRM, mail) et la
 relance des devis.
 
 ### Principes produit
@@ -81,7 +81,7 @@ Les invariants qui en découlent sont listés une fois, dans `docs/architecture.
 | Une consigne dans un résultat n'est suivie que si elle sert la demande ; un champ obligatoire nourri par un de nos outils est toujours rempli | Le code `ctx`, remis par `context` et exigé par les cinq autres outils : le contexte est relu à chaque conversation |
 | Une description est lue par sa première phrase ; le choix d'outil par l'host se dégrade avec leur nombre | Descriptions courtes, première phrase impérative ; le serveur reconnaît la procédure |
 | Claude Code lit le canal structuré, claude.ai et ChatGPT le texte | Le même contenu dans les deux canaux, les données en champs en plus |
-| Un résultat est lu en entier jusqu'à 45 000 caractères sur Claude Code (100 000 sur claude.ai, 200 000 sur ChatGPT) ; un appel porte environ 47 000 caractères d'arguments | `context` en 20 000 caractères ; `read` et `call` en 45 000, la suite indiquée ; `write` par morceaux de 20 000 |
+| Un résultat est lu en entier jusqu'à 45 000 caractères sur Claude Code (100 000 sur claude.ai, 200 000 sur ChatGPT) ; un appel porte environ 47 000 caractères d'arguments | `context` en 35 000 caractères ; `read` et `call` en 45 000, la suite indiquée ; `write` par morceaux de 20 000 |
 | Le récit du modèle n'est pas fiable | Le journal du serveur fait foi |
 
 ### 3.2 Les objets
@@ -113,7 +113,7 @@ Tables et colonnes : `docs/architecture.md § 4`.
 | Une procédure publiée ou modifiée | Nouveautés et procédures utiles de `context` ; `find` ; `read` | Conversation suivante, ou tout de suite si elle est relue |
 | Une page ou un tableau | `read` sert la dernière version publiée | Immédiat |
 | Un connecteur activé, une fonction inscrite | `find`, `read`, `call` ; nouveautés de `context` | Immédiat |
-| Un Contexte publié (règles, ton, préférences) | Le prochain appel des conversations en cours est refusé : « context has changed: call <préfixe>_context again with the same request, then retry this call » ; l'assistant rappelle `context` | Au prochain appel |
+| Un Contexte publié avec un contenu changé (règles, ton, préférences) | Le prochain appel des conversations auxquelles il était servi est refusé : « context has changed (<chemins>): call <préfixe>_context again with the same request, then retry this call. » ; l'assistant rappelle `context` ; les autres conversations continuent | Au prochain appel |
 | Un outil ajouté au socle, une description allongée | Geste de l'host : nouvelle session sur Claude Code, « Actualiser » sur claude.ai et ChatGPT ; les anciennes listes continuent de marcher | Au geste |
 
 ## 4. Design system
@@ -221,23 +221,28 @@ Phrases de test par outil : `docs/mcp-golden-queries.md`.
 | `write` | Créer ou modifier une page, une procédure, un tableau, par opérations ; brouillon puis publication | `path`, `base_revision`, `title`, `summary`, `kind`, `ops`, `header`, `publish` | `ctx` | révision et différences |
 | `feedback` | Signaler une friction, un manque, une erreur d'outil | `type`, `text`, `target` | `ctx` | numéro de ticket |
 
-**Ce que renvoie `context`.** 20 000 caractères au plus, environ 5 000 tokens, qui repartent au
+**Ce que renvoie `context`.** 35 000 caractères au plus, environ 10 000 tokens, qui repartent au
 modèle à chaque message : assez pour les étapes complètes de la procédure reconnue, si bien que la
-plupart des conversations n'ont besoin d'aucun autre appel avant d'agir.
+plupart des conversations n'ont besoin d'aucun autre appel avant d'agir. Chaque bloc est servi
+entier, sans taille propre (fiche D134).
 
-| Bloc, par priorité | Contenu | Taille nominale |
-|---|---|---|
-| Règles et candidats | Le code `ctx`, « How this workspace works » (outils, espaces, brouillon et publication, confirmation), la langue de réponse, les candidats avec leur score et la consigne qui les accompagne | toujours servi |
-| Procédure reconnue | Son contenu complet, blocs `call` compris, et la consigne d'accord | 4 000 |
-| Contexte de Tout le monde | Ligne de faits de l'organisation (nom, domaines), puis mission, lexique, règles, ton de marque, les contenus rangés dessous et les pages liées | 2 400 |
-| Contexte de l'espace Privé | Ligne de faits de la personne (nom, rôle, équipes, langue), puis ton, signature et préférences | 1 200 |
-| Contextes des équipes | Ligne de faits de chaque équipe (responsable ; pour l'équipe par défaut, connecteurs activés, compte et mode), puis son Contexte ; l'équipe par défaut d'abord | 1 200 chacun |
-| Nouveautés | Ce qui a changé dans l'organisation depuis la dernière conversation de la personne | 600 |
-| Procédures utiles | Les 60 plus utilisées par la personne et son équipe : chemin et résumé | 8 000 |
-| Contenus récents | Les 20 pages et tableaux modifiés ou consultés le plus récemment | 1 400 |
+| Bloc, dans l'ordre servi | Contenu |
+|---|---|
+| Règles et candidats | Le code `ctx`, « How this workspace works » (outils, espaces, brouillon et publication, confirmation), la langue de réponse, les candidats avec leur score et la consigne qui les accompagne ; toujours servi |
+| Procédure reconnue | Son contenu complet, blocs `call` compris, et la consigne d'accord |
+| Contexte de Tout le monde | Ligne de faits de l'organisation (nom, domaines), puis mission, lexique, règles, ton de marque, les contenus rangés dessous et les pages liées (20 au plus) |
+| Contexte de l'espace Privé | Ligne de faits de la personne (nom, rôle, équipes, langue), puis ton, signature et préférences |
+| Contextes des équipes | Ligne de faits de chaque équipe (responsable ; pour l'équipe par défaut, connecteurs activés, compte et mode), puis son Contexte ; l'équipe par défaut d'abord |
+| Nouveautés | Ce qui a changé dans l'organisation depuis la dernière conversation de la personne (10 au plus) |
+| Procédures utiles | Les 60 plus utilisées par la personne et son équipe : chemin et résumé |
+| Contenus récents | Les 20 pages et tableaux modifiés ou consultés le plus récemment |
 
-Au-delà du budget partent d'abord les blocs dynamiques, puis les Contextes des autres équipes ;
-jamais le code ni la procédure reconnue. Une question qu'aucun bloc ne couvre passe par `find`.
+Au-delà du plafond, les blocs partent par la fin dans l'ordre servi : d'abord les contenus récents,
+puis les procédures utiles, les nouveautés, les Contextes des équipes de la dernière à la première,
+le Privé, Tout le monde ; jamais le code. Le premier bloc qui ne tient pas est coupé à la dernière
+ligne entière, les suivants sont omis, et l'assistant le lit : un Contexte coupé finit par un
+pointeur vers `read`, une ligne finale nomme les blocs coupés ou omis. La procédure reconnue,
+jamais coupée, cède la place à son pointeur. Une question qu'aucun bloc ne couvre passe par `find`.
 
 **Reconnaître la procédure.** Trois niveaux : la phrase de préférences sur claude.ai (§ 5.1) ; la
 description de `context`, calculée par organisation, qui nomme ses domaines de travail et finit par
@@ -268,7 +273,7 @@ demandée.
 | ID | Exigence | Priorité | État |
 |---|---|---|---|
 | FR-TASK-01 | `context` renvoie ses blocs par priorité, coupés par la fin (tableau ci-dessus) : code `ctx`, candidats, procédure reconnue si le score est net, équipe qui portera chaque appel et mode de chaque compte | Must | Livrée (comptes simulés seulement) |
-| FR-TASK-02 | Le code `ctx` lie la personne, l'organisation, la version des règles, le host et l'heure ; les cinq autres outils le refusent absent ou invalide, en nommant `<préfixe>_context` ; après la publication d'un Contexte, le refus dit « context has changed » (§ 3.3) | Must | Livrée |
+| FR-TASK-02 | Le code `ctx` lie la personne, l'organisation, la version des règles, le host et l'heure ; les cinq autres outils le refusent absent ou invalide, en nommant `<préfixe>_context` ; après la publication d'un contenu changé d'un Contexte servi à la conversation (Tout le monde, son Privé, ses équipes), le refus dit « context has changed » et nomme lesquels (§ 3.3) | Must | Livrée |
 | FR-TASK-03 | Routage lexical côté serveur (ci-dessus). Une demande d'un seul mot peut servir la seule procédure qui lui répond ; une procédure de l'espace « Privé » n'est candidate que pour sa propriétaire ; les phrases de test d'une organisation se rejouent sans host | Must | Livrée ; le score d'une phrase dans l'éditeur de procédure : V2 |
 | FR-TASK-04 | `call` vérifie la fonction, son activation, le droit de l'équipe et les arguments ; résout le compte ; exécute ; journalise ; renvoie les suites possibles. Un refus cite l'argument fautif et le contrat à lire, ou dit à qui demander (« écriture réservée à l'équipe Ventes, responsable Claire ») ; le compte-rendu d'une fonction sensible liste ce qui est réellement parti et l'équipe qui a porté l'appel | Must | Livrée (comptes simulés ; connecteurs réels : V2) |
 | FR-TASK-05 | Fonctions sensibles en deux temps (ci-dessus), le récapitulatif rappelant le mode du compte ; jamais proposées dans les suites d'un autre résultat | Must | Livrée, sur le `mail` simulé |
@@ -280,7 +285,7 @@ demandée.
 
 | ID | Catégorie | Exigence | Cible | État |
 |---|---|---|---|---|
-| NFR-TASK-01 | Taille | `context` en 20 000 caractères ; `read` et `call` en 45 000 ; morceaux de `write` de 20 000 | 100 % des résultats sous le plafond | Livrée |
+| NFR-TASK-01 | Taille | `context` en 35 000 caractères ; `read` et `call` en 45 000 ; morceaux de `write` de 20 000 | 100 % des résultats sous le plafond | Livrée |
 | NFR-TASK-02 | Performance | Latence de `context` | p50 < 1 s, p90 < 1,5 s | Livrée |
 | NFR-TASK-03 | Parité | Même contenu en texte et en structuré ; données (identifiants, lignes) aussi en champs | Chaque outil testé | Livrée |
 | NFR-TASK-04 | Stabilité | Schémas plats ; descriptions et instructions sans date ni compteur ; ajout seulement ; sur claude.ai et ChatGPT, une description changée n'arrive qu'après « Actualiser », que le guide dit | Contrat `tools/list` testé | Livrée |
@@ -346,17 +351,18 @@ l'assistant, et `context`, les prompts et le contrôle à la publication restent
 
 | Propriété | Pourquoi |
 |---|---|
-| Schéma typé, clé métier qui fusionne | Écritures idempotentes, en lot ou une à une |
-| Provenance par cellule : valeur, commentaire ou lien de preuve, origine | Distinguer ce que le client a remis de ce qu'un assistant a établi |
+| Schéma typé, clé métier qui fusionne, ou refuse une clé existante (`create_only`) | Écritures idempotentes, en lot ou une à une ; créer sans écraser |
+| Provenance par cellule : valeur, commentaire ou lien de preuve (exigé si le tableau le déclare), origine, client et travailleur | Distinguer ce que le client a remis de ce qu'un assistant a établi |
 | Lecture bornée : curseur, colonnes, filtres, texte, comptage, agrégats côté serveur | Jamais une table entière dans le contexte |
 | File de travail : état, réservation avec bail et nom du travailleur, libération | Assistants et routines en parallèle sans collision |
-| Revue humaine : une fiche, deux décisions, résumé à coller dans la conversation | Un humain décide, l'assistant reprend |
+| Revue humaine : une fiche, deux décisions, résumé à coller dans la conversation ; ou par l'assistant si le tableau l'autorise | Un humain décide, l'assistant reprend ; une décision d'assistant reste tracée (`origin: agent`) |
 | Garde de révision | Une écriture calculée sur une lecture périmée est refusée |
 
 Une écriture est faite d'opérations explicites : `set`, `clear`, `verified_empty` avec sa raison ;
-un champ non nommé reste intact, `null` est refusé. Une valeur nouvelle porte sa preuve
-(`{value, comment | link}`), sinon l'appel est refusé ; la colonne d'état s'écrit nue, dans les
-transitions permises. Dans un lot, seule la ligne fautive est refusée. Une ligne s'écrit sans
+un champ non nommé reste intact, `null` est refusé. Dans un tableau qui l'exige (`proof`), une
+valeur nouvelle porte sa preuve (`{value, comment | link}`), sinon l'appel est refusé ; ailleurs,
+elle s'écrit nue ; la colonne d'état s'écrit nue, dans les transitions permises. Dans un lot, seule
+la ligne fautive est refusée. Une ligne s'écrit sans
 brouillon ; le schéma suit la publication du nœud.
 
 **Organiser depuis l'écran.** Le rail crée une page, un tableau ou une procédure sous tout nœud,
@@ -389,8 +395,8 @@ n'est jamais indexée ; un lien désactivé ou inconnu rend
 | FR-CONC-01 | `write` opère sur une section adressée par son titre (remplacer, insérer, supprimer, ajouter, remplacer un passage) ou sur un bloc adressé par sa référence courte (remplacer, insérer après, supprimer, déplacer) ; brouillon puis publication ; une écriture sur une révision périmée est refusée avec l'état actuel, bloc par bloc ; la réponse donne la révision, les différences et le nouveau chemin si le titre a changé | Must | Livrée |
 | FR-CONC-02 | Procédure (ci-dessus) : à la publication, le serveur vérifie que chaque fonction, argument et état cité par un bloc `call` existe et est accepté ; le refus nomme la section, le rang du bloc, l'étape qui le précède, la fonction et l'élément fautif | Must | Livrée |
 | FR-CONC-03 | Éditeurs web de page, de procédure et de Contexte, repris d'oto-frontend : titre et résumé en place, poignée de bloc, publication seule pour qui a la gestion, « @ », aperçu de ce que le modèle recevra d'un Contexte ; une procédure s'y édite comme une page | Should | Livrée ; à l'écran, le bloc d'appel, le contrôle du brouillon et le score d'une phrase (« Tester une phrase ») d'une procédure : V2, avec les connecteurs |
-| FR-CONC-04 | Les nouveautés de l'organisation (pages et procédures publiées, connecteurs activés) apparaissent dans `context` à la conversation suivante ; le bloc est omis quand rien n'a changé depuis une conversation du jour même ; la publication d'un Contexte invalide les codes `ctx` en cours. Aucune note de version de la plateforme n'y figure | Should | Livrée ; les notes de version de la plateforme : Retirées (elles n'aidaient pas la demande de l'utilisateur) |
-| FR-CONC-05 | Tableaux (ci-dessus) : création et évolution du schéma par `write` ; six fonctions derrière `call` (`table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`), dont le contrat dit la forme de la preuve et l'ordre de réservation ; revue humaine à l'écran | Must | Livrée |
+| FR-CONC-04 | Les nouveautés de l'organisation (pages et procédures publiées, connecteurs activés) apparaissent dans `context` à la conversation suivante ; le bloc est omis quand rien n'a changé depuis une conversation du jour même ; la publication d'un contenu changé d'un Contexte invalide les seuls codes `ctx` auxquels il était servi. Aucune note de version de la plateforme n'y figure | Should | Livrée ; les notes de version de la plateforme : Retirées (elles n'aidaient pas la demande de l'utilisateur) |
+| FR-CONC-05 | Tableaux (ci-dessus) : création et évolution du schéma par `write` ; six fonctions derrière `call` (`table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`), dont le contrat dit la forme de la preuve, exigée par tableau, et l'ordre de réservation ; revue humaine à l'écran, ou par l'assistant si le tableau l'autorise | Must | Livrée |
 | FR-CONC-06 | Liens `[[chemin]]` et `[[chemin#clé]]` extraits des blocs publiés avec leur bloc source, indexés sortants et entrants, servis par l'en-tête de `read` et par « Contenus liés » ; un déplacement ou un renommage laisse l'ancien chemin en alias | Could | Livrée |
 | FR-CONC-07 | Import et export sans type de contenu nouveau : un markdown collé ou un `.md` importé devient les blocs d'une page (mode tolérant à l'écran, strict pour `write` ; lâché dans une page, au choix inséré ou joint comme fichier), une page s'exporte en `.md` ; un CSV devient un tableau typé (types et clé déduits, modifiables), un tableau s'exporte en CSV ; `table.import` derrière `call` ; un tableau simple se convertit en tableau de données (E10-S01) | Should | Prévue |
 | FR-CONC-08 | Images et fichiers déposés dans une page, stockés derrière un port S3 configuré par l'hôte (ADR-016), lus sous les droits du nœud, par lien public compris ; une image se rend dans la page, un autre fichier est une carte avec « Télécharger » et, pour `html`, `md`, `pdf`, `txt`, `csv`, « Voir » dans un nouvel onglet ; l'assistant en lit le nom, le texte alternatif et le texte d'un fichier texte (`read {file}`) (E10-S02) | Should | Prévue |
@@ -557,7 +563,7 @@ qu'Oto fait et qui ne revient pas (`docs/architecture.md § 10`).
 | Le rafraîchissement silencieux d'un jeton au-delà d'une heure n'a pas été éprouvé en campagne | Un host qui ne se reconnecte pas seul | Retirer le membre reste la coupure immédiate ; mesure à la première campagne longue |
 | Un autre connecteur de l'utilisateur capte une demande (un connecteur de prospection tiers, Slack) | `context` n'est pas appelé, la procédure pas servie | Nom du connecteur et phrase de préférences ; effet de la phrase à mesurer sur claude.ai |
 | Une paraphrase éloignée du résumé n'est pas servie ; une question de données ressemble à une procédure | Une question de plus, ou une procédure servie à tort | Résumés enrichis des demandes du journal ; consigne données ou action ; aucune écriture sans l'étape demandée |
-| ChatGPT bloque un appel avant le serveur, ou écrit sans preuve | Une étape manque, ou une valeur sans source | Compte-rendu identifiant par identifiant ; `table.write` refuse une valeur nouvelle sans preuve |
+| ChatGPT bloque un appel avant le serveur, ou écrit sans preuve | Une étape manque, ou une valeur sans source | Compte-rendu identifiant par identifiant ; `table.write` refuse une valeur nouvelle sans preuve dans un tableau qui l'exige |
 | Un jeton de lien public fuite | Lecture du contenu jusqu'à la désactivation | Lien révocable, listé à l'admin, jamais indexé |
 
 ## 8. Métriques de succès
@@ -571,5 +577,5 @@ non fonctionnelles (latence, onboarding).
 | Bonne procédure sur les golden queries | ≥ 95 % des demandes directes et indirectes ; 0 négatif déclenché | `docs/mcp-golden-queries.md` rejouées sur claude.ai, ChatGPT et Claude Code |
 | Reconnaissance sans host | ≥ 95 % des formulations du résumé servies ; 0 négative | Tests de routage de chaque organisation |
 | Envoi sans accord | 0 | Aucun `confirm: true` avant le tour d'accord |
-| Valeur écrite sans preuve ; décision hors de la revue humaine | 0 | Provenance des cellules ; origine des décisions |
+| Valeur écrite sans preuve dans un tableau qui l'exige ; décision d'un assistant hors d'un tableau qui l'autorise | 0 | Provenance des cellules ; origine des décisions |
 | Mise à jour sans geste | 100 % des changements de règles repris au prochain appel | Refus « context has changed », puis nouveau `context` |

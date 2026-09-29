@@ -10,11 +10,14 @@
 // Porté d'oto-frontend (`src/routes/n.$nodeId.lazy.tsx`, `CorpsTableauDuNoeud`) : les îlots du corps d'un
 // tableau posés l'un sous l'autre, dans le contenu. Retiré : « Qui s'en sert » et l'îlot d'activité du
 // tableau (le journal d'une ligne, V2 : E07-S03 hors périmètre).
+// E10-S01 (AC-b5) : pour qui l'écrit, le corps du tableau reçoit un `.csv` lâché sur lui, ou choisi par « Importer
+// un fichier… » (`DepotSurLeTableau`), vide compris.
 import type { TableGridRows, TableGridSummary, TableHeader, TableReviewQueue } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { Island, IslandBody } from "../ds/react/island"
 import { Skeleton } from "../ds/react/skeleton"
+import { DepotSurLeTableau } from "../coque/import-de-fichier"
 import type { Reglages, ReglagesLus } from "./adresse"
 import { CorpsTableau } from "./corps-tableau"
 import { FileDeRevue } from "./file-de-revue"
@@ -42,20 +45,29 @@ export type TableauDuNoeudProps = {
 
 export function TableauDuNoeud(props: TableauDuNoeudProps) {
   const { chemin, entete, revue, reglages, Lien, hrefDuTableau } = props
+  const corps = (
+    <CorpsTableau
+      entete={entete}
+      titre={props.titre}
+      lignes={props.lignes}
+      resume={props.resume}
+      reglages={reglages}
+      avis={reglages.ignores}
+      Lien={Lien}
+      hrefDuTableau={hrefDuTableau}
+      adresse={props.adresse}
+    />
+  )
   return (
     <div className="flex flex-col gap-3">
       {revue && <FileDeRevue chemin={chemin} entete={entete} revue={revue} redacteur={props.niveau >= 2} Lien={Lien} ici={hrefDuTableau(reglages)} />}
-      <CorpsTableau
-        entete={entete}
-        titre={props.titre}
-        lignes={props.lignes}
-        resume={props.resume}
-        reglages={reglages}
-        avis={reglages.ignores}
-        Lien={Lien}
-        hrefDuTableau={hrefDuTableau}
-        adresse={props.adresse}
-      />
+      {props.niveau >= 2 ? (
+        <DepotSurLeTableau chemin={chemin} titre={props.titre} entete={entete}>
+          {corps}
+        </DepotSurLeTableau>
+      ) : (
+        corps
+      )}
     </div>
   )
 }

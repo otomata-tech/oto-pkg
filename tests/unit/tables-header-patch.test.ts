@@ -152,12 +152,12 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table written by patch
         [{ header: { remove_columns: ["entreprise"] } }, `Invalid table header: remove_columns: « entreprise » is the key of ventes/suivi_prospects; a key column cannot be removed. ${contract}`],
         [{ header: { columns: [{ name: "fax", type: "text" }], remove_columns: ["fax"] } }, `Invalid table header: « fax » is both in columns and remove_columns. ${contract}`],
         [{ header: { remove_columns: ["notes"], confirm_remove: true } }, "confirm_remove only applies with publish: true."],
-        [{ header: { order: ["ville"] } }, "header: unknown key « order »; keys: columns, remove_columns, key, lifecycle, closed, confirm_remove"],
-        [{ header: { columns: [{ name: "ville", width: 3 }] } }, "header.columns[0]: unknown key « width »; keys: name, type, options, required, max_length"],
+        [{ header: { order: ["ville"] } }, "header: unknown key « order »; keys: columns, remove_columns, key, lifecycle, closed, proof, confirm_remove"],
+        [{ header: { columns: [{ name: "ville", width: 3 }] } }, "header.columns[0]: unknown key « width »; keys: name, type, options, required, allow_verified_empty, max_length"],
         // Des clés inconnues sans nombre fixé : 20 citées, puis leur nombre restant (`mcp-patterns.md § 4`).
         [
           { header: Object.fromEntries(Array.from({ length: 25 }, (_, index) => [`k${index + 1}`, 1])) },
-          `header: unknown keys ${Array.from({ length: 20 }, (_, index) => `« k${index + 1} »`).join(", ")}, … and 5 more; keys: columns, remove_columns, key, lifecycle, closed, confirm_remove`,
+          `header: unknown keys ${Array.from({ length: 20 }, (_, index) => `« k${index + 1} »`).join(", ")}, … and 5 more; keys: columns, remove_columns, key, lifecycle, closed, proof, confirm_remove`,
         ],
         [{ header: { columns: [{ name: "telephone", type: "text" }, { name: "telephone", type: "email" }] } }, `Invalid table header: columns[1].name: duplicate column telephone. ${contract}`],
         [

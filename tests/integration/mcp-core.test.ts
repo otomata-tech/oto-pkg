@@ -230,19 +230,24 @@ describe.skipIf(!configured)(
         expect((await jbOnA.call("feedback", { ...VALID_ARGS.feedback, ctx: otherOrg })).text).toBe(missing)
       })
 
-      it("should refuse a ctx issued before the rules changed, then accept a fresh one", async () => {
+      // E11-S03 : le code périme par les Contextes qu'il a servis (`tests/integration/server-ctx.test.ts`), plus par
+      // `rules_version` ; un code sans Contextes gardés (émis avant la 1.0.1) est périmé, `feedback` le prend quand même.
+      it("should refuse a ctx issued before 1.0.1 but let feedback through, then accept a fresh one", async () => {
         const session = await connectMcp(orgA, people.claire)
         const { code } = await session.openContext("Relance les devis en attente")
-        expect((await session.call("feedback", { ...VALID_ARGS.feedback, ctx: code })).isError).toBe(false)
+        expect((await session.call("find", { ...VALID_ARGS.find, ctx: code })).isError).toBe(false)
 
         await admin`update platform.orgs set rules_version = ${(await rulesVersion(orgA.id)) + 1} where id = ${orgA.id}`
+        expect((await session.call("find", { ...VALID_ARGS.find, ctx: code })).isError).toBe(false)
 
-        const stale = await session.call("feedback", { ...VALID_ARGS.feedback, ctx: code })
+        await admin`update platform.ctx set contexts = null where code = ${code}`
+        const stale = await session.call("find", { ...VALID_ARGS.find, ctx: code })
         expect(stale.isError).toBe(true)
         expect(stale.text).toBe(`context has changed: call ${orgA.prefix}_context again with the same request, then retry this call.`)
+        expect((await session.call("feedback", { ...VALID_ARGS.feedback, ctx: code })).isError).toBe(false)
 
         const fresh = await session.openContext("Relance les devis en attente")
-        expect((await session.call("feedback", { ...VALID_ARGS.feedback, ctx: fresh.code })).isError).toBe(false)
+        expect((await session.call("find", { ...VALID_ARGS.find, ctx: fresh.code })).isError).toBe(false)
       })
     })
 

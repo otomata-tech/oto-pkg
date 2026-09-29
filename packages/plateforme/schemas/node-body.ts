@@ -22,6 +22,9 @@ export const writeNodeBodySchema = writeNodeSchema.extend({
   // PostgREST rend `timestamptz` avec son décalage (« +00:00 ») : sans `offset`, le tampon qu'il a
   // lui-même servi serait refusé.
   draft_stamp: z.iso.datetime({ offset: true }).optional(),
+  // E10-S01 (AC-a2) : le mode tolérant de l'analyse, pour un collage ou un fichier importé par l'écran ; absent de
+  // `writeNodeSchema`, qui retire les clés inconnues : `write` reste strict.
+  tolerant: z.literal(true).optional(),
 })
 
 export type WriteNodeBody = z.infer<typeof writeNodeBodySchema>

@@ -106,6 +106,9 @@ permutation de plus sans nommer la faille qu'elle révélerait.
   l'organisation, pas ses domaines de travail), après un `pnpm org:export`, et l'adresse de Démo répond
   encore après le ménage (`curl -s -o /dev/null -w '%{http_code}' <adresse>/login` = 200 ; les specs
   `connect`, consentement et authentification ne se sautent plus).
+- **Un membre inséré sans `profile.handle`** (outillage, Démo) reçoit son handle de la base et son
+  espace privé (`ensure_private_space`, E11-S10). Vérifiable : `private/<handle>` et son Contexte
+  existent après l'ajout.
 
 ## Base de test locale
 
@@ -127,13 +130,13 @@ que les suites propres à Supabase, lancées sans la variable.
   chaque passage de Vitest, la mise en place globale (`tests/local-db.setup.ts`) applique d'elle-même les
   migrations nouvelles ; une migration pas encore fusionnée, réécrite après son application, se rejoue
   par `pnpm db:local --reset`.
-- **Ce qui se saute en local** (les mêmes fichiers que dans `bare-postgres`) : les
-  suites qui ouvrent une session Supabase Auth ou lisent le Data API, dont l'isolation par l'API et
-  le MCP (`tests/integration/isolation/`), le MCP de bout en bout (`mcp-*.test.ts`), OAuth,
-  l'export-import et les scripts d'outillage. Elles comptent parmi les « toujours testés » (§ Budget
-  de tests) : à la fusion sur `main`, `PLATFORM_TEST_DB=local pnpm verify`, puis ces fichiers sautés relancés
-  sur le projet (`vitest run <fichiers>` sans la variable) ; le commit attend les deux (`CLAUDE.md § Vérifier,
-  commiter, pousser`).
+- **Ce qui se saute en local** (comme dans `bare-postgres`) : les suites de l'adaptateur Supabase
+  seules, liste fermée dans `tests/unit/gardes-supabase.test.ts` (Data API, serveur OAuth et schéma
+  `auth`, scripts à comptes Auth). Une suite du paquet prend ses personnes dans `createSqlFixtures`, ses
+  jetons dans `createLocalFixtures` (`sessionFor`, `verifyToken` passé à la porte) et se garde par
+  `sqlConfigured` : un jeton de Supabase Auth ne prouve rien du paquet qu'un jeton signé localement ne
+  prouve. Les suites sautées restent « toujours testées » (§ Budget de tests) : relancées sur le projet
+  à la fusion (`CLAUDE.md § Vérifier, commiter, pousser`).
 - **Vérifiable :** en mode local, `tests/unit/test-db-local.test.ts` échoue si une variable de Supabase
   atteint les suites ; la sortie de Vitest nomme chaque suite sautée et sa raison.
 
@@ -261,6 +264,7 @@ test("should display projects list", async ({ authenticatedPage }) => {
 | Anti-pattern | Pourquoi c'est mauvais | Faire plutôt |
 |-------------|----------------------|-------------|
 | Tester l'implémentation | Casse à chaque refacto | Tester le comportement |
+| Test de recherche qui sème un mot déjà présent dans un autre contenu semé du même fichier | Deux stories écrites en parallèle semant le même mot trouvent chacune le contenu de l'autre : l'attente exacte casse à la fusion | Un mot propre au test, absent du fichier avant lui. **Vérifiable :** `rg -i <mot> <fichier>` ne le trouve que dans ce test |
 | `expect(component).toMatchSnapshot()` partout | Faux positifs, snapshots géants | Snapshots ciblés (petits composants) |
 | Spec sur l'organisation jetable qui affirme une partie calculée des écritures de la personne (contenus récents, nouveautés bornées) sans la poser | Sur une organisation neuve, elle dépend de l'ordre des specs parallèles : absente seule, chassée de la borne en campagne | Poser la précondition dans la spec (journal, date d'activation) par la connexion d'administration, juste avant la lecture ; la spec passe seule et en campagne complète |
 | Clause facultative écrite en fragment (`${id ? sql\`and t.id = ${id}\` : sql\`\`}`) dans un service que mesure un budget de requêtes (`recordDb`, `e05s10c-requetes-de-la-page.test.tsx`) | L'espion compte chaque gabarit `sql\`…\``, fragment compris : une instruction de plus par appel, sans aller-retour réel | Paramètre nul (`${id ?? null}::uuid is null or t.id = ${id ?? null}::uuid`) ; un plafond ne se relève jamais pour un fragment |

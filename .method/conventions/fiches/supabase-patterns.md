@@ -24,7 +24,7 @@ Texte complet : `.method/conventions/supabase-patterns.md`. La fiche suffit pour
 - Un `db.tx` ne tient que ses requêtes : il n'ouvre pas la transaction d'une autre session, et son `fn` n'appelle ni `fetch`, ni `db.auth`, ni un client Auth, ni le service connecteurs. § Couplage à Supabase (ADR-012)
 - Dans un `db.tx`, aucun `catch` ne rattrape une erreur de base ; une course sur une clé unique se lit par `insert … on conflict do nothing returning` sans ligne. § Couplage à Supabase (ADR-012)
 - Tout `update` et tout `delete` de la face SQL portent un `where`. § Couplage à Supabase (ADR-012)
-- Un paramètre `json` ou `jsonb` passe par `sql.json(valeur)`, jamais `JSON.stringify(…)` (réservé à un paramètre `text`). § Couplage à Supabase (ADR-012)
+- Un paramètre `json` ou `jsonb` passe par `sql.json(valeur)`, jamais `JSON.stringify(…)` (réservé à un paramètre `text`) ; une chaîne lue en `::text` se réécrit par `${chaine}::text::jsonb`, jamais `${chaine}::jsonb`. § Couplage à Supabase (ADR-012)
 - `sql(rows)` prend les colonnes de la première ligne : ses lignes sortent d'une même fabrique ou d'un groupe par colonnes. § Couplage à Supabase (ADR-012)
 - Un paramètre `timestamptz` est une `Date` à la milliseconde ; une date relue pour être réécrite ou comparée à l'égalité reste en base ou passe en texte (`${tampon}::text::timestamptz`). § Couplage à Supabase (ADR-012)
 - Un ordre promis se pose par `order by` au niveau qui rend les lignes, jamais dans une sous-requête lue par `to_json` ou `json_agg`. § Couplage à Supabase (ADR-012)

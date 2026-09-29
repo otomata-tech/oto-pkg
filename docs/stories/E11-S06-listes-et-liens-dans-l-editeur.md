@@ -307,6 +307,19 @@ message d'AC-b5 (`portage-ecrans.md § 6`). Le texte écrit passe `controler` pu
   (une clé est propre à son tableau). Source : `link-syntax.ts`.
 - **HN-E11S06-7** : repères dessinés au seul premier niveau ; un sous-élément garde sa marque écrite
   (E10-S04 AC-b2). Source : E10-S04, E10-S06.
+- **HN-E11S06-8** (implémentation) : la copie des éléments d'une liste précède le champ dans le DOM : au
+  clavier, les cases viennent avant le texte.
+- **HN-E11S06-9** (implémentation) : un lien qui ne se relirait pas tel quel à sa place est refusé par le
+  panneau : « Ce lien ne se relirait pas tel quel à sa place : changez son libellé ou son adresse. ».
+- **HN-E11S06-10** (implémentation) : « Ouvrir » ouvre la destination saisie dans le panneau.
+- **HN-E11S06-11** (implémentation) : Maj+clic sur un lien le suit, comme Ctrl ou ⌘.
+- **HN-E11S06-12** (implémentation) : en couleurs forcées, le champ est muet au repos et la copie reste
+  lisible.
+- **HN-E11S06-13** (implémentation) : le panneau du lien n'emploie pas React Hook Form.
+- **HN-E11S06-14** (implémentation) : un lien écrit sans libellé : le champ du panneau montre le titre de
+  la page choisie, et l'écriture garde `[[chemin]]`.
+- **HN-E11S06-15** (implémentation) : dans une liste, le curseur, la relecture et le clic lisent la ligne
+  de l'élément.
 
 ## Actions JB
 
@@ -348,8 +361,25 @@ Aucune : pas de secret, pas de service extérieur. Confirmer HN-E11S06-1 et HN-E
 
 ### Écarts avec l'architecture
 
+Aucun invariant touché. Écarts avec la story :
+- pas de test unitaire des éléments de la copie : la règle est déjà testée par `numerosDeGouttiere` ;
+- `data-ordered` retiré ;
+- e2e en deux passages (thème clair à 390 px, thème sombre à 1 280 px) ;
+- `e10s06-editeur.test.tsx` adapté d'une ligne ; le test « bloc neuf pas retiré » est rayé, sans objet ;
+- surface `numeroter` et `data-lien` sur `EnLigne` : sans eux, un clic sur un lien rendu ne désigne pas le
+  lien de la source.
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `ElementsDeListe` | `packages/plateforme/ui/noeud/editeur/elements-de-liste.tsx` | Copie des éléments d'une liste : un repère ou une case par élément, sur sa première ligne |
+| `useLienAuCurseur`, `PanneauDuLien` | `packages/plateforme/ui/noeud/editeur/lien-du-bloc.tsx` | Panneau « Lien » ouvert par le curseur dans un lien, Alt+Entrée ou un clic au repos |
+| `avecLeLien`, `sansLeLien` | `packages/plateforme/ui/noeud/editeur/lien-du-bloc.tsx` | Réécriture relue d'un lien, refusée si elle ne se relit pas à sa place |
+| `liensDuTexte` | `packages/plateforme/ui/noeud/en-ligne.ts` | Liens d'un texte, dans l'ordre, avec leur place dans la source |
+| `useOptionActive` | `packages/plateforme/ui/noeud/editeur/citer.tsx` | Clavier d'une liste d'options (flèches au modulo, choix de l'option active) ; lu par `champ-de-bloc.tsx` et `lien-du-bloc.tsx`, à reprendre par `choix-de-bloc.tsx` (M84) |
+| `LABEL_MAX` (exporté) | `packages/plateforme/schemas/link-syntax.ts` | Borne du libellé d'un lien, lue par le panneau |
 
 ### Notes
+
+- Revue approuvée ; fusionnée sur `main` sans commit (commit commun à venir).
+- Hypothèses d'implémentation HN-E11S06-8 à 15, reportées dans `docs/decisions/hypotheses.md`.

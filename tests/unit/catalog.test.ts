@@ -98,6 +98,7 @@ describe("catalog (AC23)", () => {
       "table.write",
       "table.claim",
       "table.release",
+      "table.import",
     ])
     expect(callExamples(catalogFunctions(), NONE)).toEqual(["table.rows"])
   })

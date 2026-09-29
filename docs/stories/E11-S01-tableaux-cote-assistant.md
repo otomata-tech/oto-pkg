@@ -175,7 +175,7 @@ service le suit sans refus propre au rédacteur (AC-g1, AC-g8, HN-E11S01-21).
   verified_empty is not allowed for this column. ».
 - [ ] **AC-b3** — **Given** une colonne `required: true, allow_verified_empty: false` **When** une
   ligne est créée sans valeur pour elle **Then** la ligne est refusée : « <colonne>: required when
-  creating a row: set it with its proof; verified_empty is not allowed for this column. ». **And**
+  creating a row: set it with its proof; verified_empty is not allowed for this column. » sur un tableau `proof: true`, « … set it; verified_empty is not allowed for this column. » sans `proof` (amendé en revue le 2026-09-29 : « with its proof » ne se dit que si le tableau l'exige). **And**
   sur une ligne existante qui n'a qu'un `verified_empty` rangé, une écriture rend la note « note:
   <colonne> is required and has no value on this row. ».
 - [ ] **AC-b4** — Sans l'attribut (défaut `true`), `required` se satisfait d'un `verified_empty` comme
@@ -184,7 +184,7 @@ service le suit sans refus propre au rédacteur (AC-g1, AC-g8, HN-E11S01-21).
   `allow_verified_empty: false` sur une colonne requise avertit (`missing_required`) du nombre de
   lignes qui n'y ont qu'un `verified_empty`, sans réécrire de ligne.
 - [ ] **AC-b6** — `table.schema` dit, par colonne : `required (a value or verified_empty)` par défaut,
-  `required (a value; verified_empty not allowed)` avec l'attribut. **And** la règle 1 du contrat
+  `required (a value; verified_empty not allowed)` avec l'attribut ; la clé et la colonne d'état se disent `required` seul, puisque `verified_empty` y est toujours refusé (amendé en revue le 2026-09-29). **And** la règle 1 du contrat
   `write.table` nomme l'attribut. **And** `checkWriteArgs` refuse un `verified_empty` sur une telle
   colonne à la publication d'une procédure.
 
@@ -815,6 +815,20 @@ publié par `writeNode` (lot g compris).
   s'ouvre au niveau écriture (`vue.level >= 2`, AC-g1), comme la publication d'un en-tête changé
   d'un tableau publié après E11-S02 AC-a2 ; AC-g8 n'a plus de refus au niveau écriture ; le lot g
   vient donc après E11-S02. Option écartée : le panneau réservé à la gestion.
+- **HN-E11S01-22** (implémentation) : `agents_may_decide` est `.optional()` dans `tableReviewSchema`, sans
+  défaut écrit : absent, il se lit faux, et un en-tête lu ne gagne pas la clé (écart de forme avec AC-e1,
+  même comportement).
+- **HN-E11S01-23** (implémentation) : la description de `required` du patch d'en-tête
+  (`tableColumnPatchSchema`) reprend celle d'AC-b1, avec son exemple et son défaut (« e.g. true (default:
+  unchanged; false for a new column) »).
+- **HN-E11S01-24** (implémentation) : dans `table.schema`, la clé et la colonne d'état se disent `required`
+  seul, `verified_empty` y étant toujours refusé (AC-b6 amendé en revue).
+- **HN-E11S01-25** (implémentation) : publier `allow_verified_empty: false` sur une colonne déjà requise
+  avertit (`missing_required`) des seules lignes qui n'y ont qu'un `verified_empty` ; une colonne rendue
+  requise et stricte d'un coup avertit de toute ligne sans vraie valeur (AC-b5).
+- **HN-E11S01-26** (implémentation) : `table.release` range toujours le `worker` de l'appel dans la
+  provenance de l'état ; sa description et sa ligne de refus disent l'exception d'un tableau qui laisse
+  l'assistant décider (AC-d3, AC-e4).
 
 ## Actions JB
 
@@ -896,10 +910,27 @@ publié par `writeNode` (lot g compris).
 
 ### Écarts avec la référence UI
 
+Lots a à f : aucun (la file de revue ne montre « sans preuve » que sur un tableau `proof: true`, AC-f7). Lot g
+non livré.
+
 ### Écarts avec l'architecture
+
+Aucun invariant touché. ADR-002 § 1 amendé par le pilote : en 1.1.0, sans client (fiche D131), les
+descriptions de `write` et des fonctions de tableau sont réécrites en place. AC-b3 et AC-b6 amendés en revue
+(2026-09-29). `docs/architecture.md` (ligne `tables/`) et `docs/prd.md` (l. 38, § Tableau, FR-CONC-05, risques,
+métriques) suivent.
 
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `queryWords` | `packages/plateforme/schemas/tables.ts` | Mots de `q` (AC-c1) : une seule règle pour le refus du schéma, `table.rows`, la grille et les vues ; exporté par `./schemas` |
 
 ### Notes
+
+- Lots a à f livrés dans le worktree `e11-s01`, revue approuvée, fusionnés sur `main` sans commit (commit
+  commun à venir) ; lot g après E11-S02.
+- Hypothèses d'implémentation HN-E11S01-22 à 26, reportées dans `docs/decisions/hypotheses.md` avec les
+  amendements de P10, N9 (E07-S02), H92, H94, H96, HN-M53-5 et HN-M53-10.
+- Tableaux existants : `proof: false` après la mise à jour ; le tableau de la Démo repose `proof: true` au
+  prochain `pnpm demo:seed` (AC-f8).
+- Golden queries T9 (`create_only`) et T10 (`q` par mots) ajoutées.

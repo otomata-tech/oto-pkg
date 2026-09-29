@@ -8,7 +8,8 @@
 // Repris d'Oto (`oto_mcp/db/backlinks.py` l. 1-60) : extraction bornée et dédupliquée, espaces de bord
 // retirées, liens sans cible gardés et signalés, extraction sur tout chemin d'écriture (ici la
 // publication, seule voie). Retiré : la résolution par titre, la portée par projet, l'ambiguïté entre titres.
-import { linksIn } from "../../schemas/link-syntax"
+import { listItemTexts, tableCells } from "../../schemas/blocks"
+import { fencedParts, linksIn } from "../../schemas/link-syntax"
 import type { Json } from "../database"
 import type { PlatformDb } from "../db"
 import { PlatformError } from "../errors"
@@ -22,10 +23,13 @@ export type ExtractedLink = { blockId: string; path: string; key: string | null 
 
 export type NotLink = { text: string; blockId: string }
 
-/** Les textes humains d'un bloc (N23) : jamais le code, `mermaid` ni `call`. */
+/**
+ * Les textes humains d'un bloc (N23) : jamais le code, `mermaid` ni `call`. E10-S04 (AC-a4) : les
+ * sous-éléments d'une liste, les cellules d'un tableau simple, le résumé d'un repli et son corps hors de
+ * ses clôtures de code.
+ */
 function humanTexts(block: DocBlock): string[] {
   const texts = (value: unknown) => (typeof value === "string" ? [value] : [])
-  const items = Array.isArray(block.data.items) ? block.data.items : []
   switch (block.type) {
     case "heading":
     case "paragraph":
@@ -33,9 +37,13 @@ function humanTexts(block: DocBlock): string[] {
     case "image":
       return texts(block.text)
     case "list":
-      return items.flatMap(texts)
+      return listItemTexts(block.data.items)
     case "checklist":
-      return items.flatMap((item) => texts(item !== null && typeof item === "object" && "text" in item ? item.text : null))
+      return (Array.isArray(block.data.items) ? block.data.items : []).flatMap((item) => texts(item !== null && typeof item === "object" && "text" in item ? item.text : null))
+    case "simple_table":
+      return tableCells(block.data)
+    case "toggle":
+      return [...texts(block.data.summary), ...fencedParts(block.text ?? "").flatMap((part) => (part.code ? [] : [part.text]))]
     default:
       return []
   }

@@ -70,5 +70,5 @@ périmés, ni rester bloqué sur un brouillon. Une personne doit comprendre ce q
 Les identifiants E11-S08, S11, S12 et S13 ont été fondus le 2026-09-29 dans S01 (lot g), S10
 (lots a à c), S05 (lots e à h) et S02 (lots a à c) : moins de stories, plus longues.
 
-Livraison avec l'epic E10 dans une seule version du paquet, 1.0.1, avec un seul fichier de
-migration (fiches D131, D124) : `.method/sprint/status.md § Contenus riches et retours de la démo`.
+Livraison avec l'epic E10 dans une seule version du paquet, 1.1.0, avec un seul fichier de
+migration `<horodatage>_v1_1_0.sql` (fiches D131, D145, D124) : `.method/sprint/status.md § Contenus riches et retours de la démo`.

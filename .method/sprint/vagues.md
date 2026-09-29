@@ -52,13 +52,15 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
   (`git show main:<fichier>`), jamais recopiée.
 - Une story découpée en lots donne à chaque lot la **liste explicite** de ses fichiers. Vérifiable
   avant la fusion : les `git diff --name-only` des lots, hors fichiers d'ajout, n'ont aucune ligne commune.
-- **Mémoire** : les agents lancent Vitest avec `VITEST_MAX_FORKS=2` ; chaque commande lourde
-  (`pnpm verify`, `type-check`, Vitest complet, `build`, `next dev`, Playwright : 2 à 3 Go au pic)
-  passe par le sémaphore du pilote, N créneaux = (RAM libre − 3 Go) / 3 Go, au moins 1 ; sous 3 Go
-  libres, plus de nouvelle commande lourde.
-- **Un seul `pnpm verify` complet par fusion** : dans son worktree, un agent lance `type-check`,
-  `lint`, `check:framework` et Vitest sur ses tests et sur les suites qui importent ses fichiers
-  (liste citée dans son rapport) ; le `verify` complet tourne sur `main` à la fusion.
+- **Mémoire** : `type-check` (2 à 3 Go au pic) passe par le sémaphore du pilote, N créneaux =
+  (RAM libre − 3 Go) / 3 Go, au moins 1 ; sous 3 Go libres, plus de nouvelle commande lourde. Le
+  `verify` du commit lance Vitest avec `VITEST_MAX_FORKS=2`.
+- **Aucune commande longue avant le commit** : pendant l'implémentation, la correction et la revue,
+  un agent ne lance que `type-check`, `lint` et `check:framework` ; il écrit ses tests sans les
+  exécuter, et la revue les lit. Vitest, `verify`, Playwright et `build` tournent une seule fois, au
+  moment du commit, sur toutes les stories fusionnées d'un coup : un `pnpm verify`, puis un commit,
+  la machine étant partagée entre les vagues (vérifiable : aucun rapport d'agent ne cite une
+  commande Vitest, Playwright ou `build`).
 
 ## Base de test et migrations
 
@@ -83,7 +85,7 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
 
 ## Cycle, revue et fusion
 
-- **Cycle** : implémentation et tests ; vérifications ciblées ; revue par un agent isolé (skill
+- **Cycle** : implémentation et tests (écrits, non lancés) ; vérifications légères ; revue par un agent isolé (skill
   `revue`) jusqu'à approbation, par le pilote pour une taille S ; fusion et `commit-push` par le pilote.
 - **Revues** : la première est complète ; après une correction, elle est ciblée (chaque constat
   bloquant corrigé, la vérification, le code que la correction a changé ; un constat nouveau ailleurs
@@ -92,10 +94,9 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
   MOYENNE de sécurité, de droits ou d'AC, la bloque. Une tâche sans story reçoit en revue les
   hypothèses et les écarts de son rapport : un reste qu'il ne source pas est un critère non livré.
 - **Fusion** : le diff de la branche s'applique sur `main` (le gate bloque `git merge` et
-  `git rebase`), puis `pnpm verify` tourne sur `main` avant le commit. Deux ou trois stories
-  approuvées, sans fichier source commun hors des fichiers d'ajout, se fusionnent ensemble, avec un
-  `verify` et un commit qui les nomment toutes ; une Ⓜ passe en tête du lot, sa migration appliquée
-  avant le `verify`.
+  `git rebase`), sans commit ni `verify`. Quand JB veut commiter, toutes les stories fusionnées
+  passent ensemble : un `pnpm verify` sur `main`, puis un commit qui les nomme toutes ; les
+  migrations Ⓜ sont appliquées avant le `verify`, dans l'ordre de leurs horodatages.
 - **Signature changée** : une story qui change une signature exportée ou un type partagé casse les
   stories fusionnées depuis sa base. Avant le `verify`, le pilote cherche dans `main` les appelants
   (`rg` sur le nom), les doublures de test qui servent la forme retirée et celles qui reçoivent le

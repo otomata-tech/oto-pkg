@@ -62,6 +62,7 @@ const ENTETE: TableHeader = {
   key: "ref",
   lifecycle: { column: "statut", states: STATES, working: "en cours", review: { state: "à revoir", approve: "qualifié", reject: "écarté" } },
   closed: false,
+  proof: false,
 }
 
 const SESSION: PlatformSession = { user: { id: "user-lea", email: "lea@demo.test" }, accessToken: "session-token", host: "localhost:3000", db: {} as PlatformDb }

@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Lecteur tolérant des blocs inconnus (tâche M67, fiche D122) : un bloc qu'une version plus récente de la
-// plateforme a écrit (type nouveau, liste de forme objet, titre de niveau 4 ou 5) est servi à sa place par
+// plateforme a écrit (type nouveau, élément de liste d'une forme inconnue, titre de niveau 6 ou 7) est servi à sa place par
 // une ligne de commentaire, jamais effacé en silence, par le rendu commun (`read`, `context`), et `write`
 // refuse par `conflict` toute opération qui le perdrait. Blocs en mémoire, textes comparés mot pour mot.
 import { describe, expect, it } from "vitest"
@@ -20,8 +20,9 @@ type Seed = Pick<DocBlock, "type" | "text" | "data"> & { key?: string }
 
 const heading = (text: string, level: number, key?: string): Seed => ({ type: "heading", text, data: { level }, key })
 const paragraph = (text: string): Seed => ({ type: "paragraph", text, data: {} })
-const TOGGLE: Seed = { type: "toggle", text: "Détails", data: { children: [] } }
-const OBJECT_LIST: Seed = { type: "list", text: null, data: { items: [{ text: "Lire", children: { items: ["Le devis"], ordered: true } }] } }
+const CAROUSEL: Seed = { type: "carousel", text: "Détails", data: { children: [] } }
+// E10-S04 lit `toggle`, les éléments `{text, children}` et cinq niveaux de titre : les formes inconnues passent au-delà.
+const OBJECT_LIST: Seed = { type: "list", text: null, data: { items: [{ text: "Lire", checked: true }] } }
 
 function doc(blocks: Seed[]): DocBlock[] {
   return blocks.map((block, index) => ({
@@ -36,14 +37,14 @@ function doc(blocks: Seed[]): DocBlock[] {
   }))
 }
 
-/** Objet, P1, Suite (TOGGLE, niveau 4, P2, P2b), Fin, P3 : les blocs inconnus sont tous dans « Suite ». */
+/** Objet, P1, Suite (CAROUSEL, niveau 6, P2, P2b), Fin, P3 : les blocs inconnus sont tous dans « Suite ». */
 function page(): DocBlock[] {
   return doc([
     heading("Objet", 1),
     paragraph("Relancer un devis."),
     heading("Suite", 1, "suite"),
-    TOGGLE,
-    heading("Détail", 4),
+    CAROUSEL,
+    heading("Détail", 6),
     paragraph("Un devis ancien se requalifie."),
     paragraph("Il se relance."),
     heading("Fin", 1),
@@ -66,22 +67,22 @@ function refusal(ops: Op[], blocks = page()): unknown {
 }
 
 const inSection = (title: string) =>
-  `section « ${title} » holds a toggle block newer than this platform version, which this operation would lose: update the platform to change it, or edit the other blocks one by one with block operations (read with refs: true).`
+  `section « ${title} » holds a carousel block newer than this platform version, which this operation would lose: update the platform to change it, or edit the other blocks one by one with block operations (read with refs: true).`
 
 const onBlock = (block: string, type: string) =>
   `block ${block} is a ${type} block newer than this platform version: only an updated platform can replace, delete or move it. Update the platform to change it.`
 
 describe("rendering a block this platform version does not know (M67)", () => {
   it("should render the exact line for a block of an unknown type, with its reference line when asked", () => {
-    expect(renderBlock(TOGGLE)).toBe("<!-- block toggle not shown: this platform version does not know it -->")
-    expect(renderBlock(TOGGLE, { refs: () => "t1" })).toBe(`<!-- ref: t1 -->\n${line("toggle")}`)
+    expect(renderBlock(CAROUSEL)).toBe("<!-- block carousel not shown: this platform version does not know it -->")
+    expect(renderBlock(CAROUSEL, { refs: () => "t1" })).toBe(`<!-- ref: t1 -->\n${line("carousel")}`)
   })
 
-  it("should render the line for a list whose items are objects", () => {
+  it("should render the line for a list whose items are objects of an unknown shape", () => {
     expect(renderBlock(OBJECT_LIST)).toBe(line("list"))
   })
 
-  it.each([4, 5])("should render the line for a heading of level %i, which opens no section", (level) => {
+  it.each([6, 7])("should render the line for a heading of level %i, which opens no section", (level) => {
     const blocks: BlockLike[] = [
       { ...heading("A", 1), id: "a" },
       { ...heading("B", level), id: "b" },
@@ -134,7 +135,7 @@ describe("read of a page holding unknown blocks (M67)", () => {
         "## Objet",
         "Relancer un devis.",
         "## Suite",
-        line("toggle"),
+        line("carousel"),
         line("heading"),
         "Un devis ancien se requalifie.",
         "Il se relance.",
@@ -145,7 +146,7 @@ describe("read of a page holding unknown blocks (M67)", () => {
   })
 
   it("should serve each unknown block at its place in a section", () => {
-    expect(serve({ section: "Suite" })).toBe(["## Suite", line("toggle"), line("heading"), "Un devis ancien se requalifie.", "Il se relance."].join("\n\n"))
+    expect(serve({ section: "Suite" })).toBe(["## Suite", line("carousel"), line("heading"), "Un devis ancien se requalifie.", "Il se relance."].join("\n\n"))
   })
 })
 
@@ -154,18 +155,18 @@ describe("write around a block this platform version does not know (M67)", () =>
     ["replace_section", { op: "replace_section", section: "Suite", text: "Nouveau texte." }],
     ["delete_section", { op: "delete_section", section: "Suite" }],
     ["replace_text over several blocks", { op: "replace_text", section: "Suite", find: "requalifie.\n\nIl se", text: "requalifie ; il se" }],
-    ["replace_text inside the line of the unknown block", { op: "replace_text", section: "Suite", find: "block toggle", text: "x" }],
+    ["replace_text inside the line of the unknown block", { op: "replace_text", section: "Suite", find: "block carousel", text: "x" }],
   ])("should refuse %s on a section holding it, with conflict", (_name, op) => {
     const error = refusal([op])
     expect(error).toBeInstanceOf(PlatformError)
     expect(error).toMatchObject({ code: "conflict", message: `Op 1 (${op.op} « Suite »): ${inSection("Suite")} Nothing was written.` })
   })
 
-  it("should refuse a section holding only a heading of level 4, naming its type", () => {
-    const blocks = doc([heading("Suite", 1), heading("Détail", 5), paragraph("Texte.")])
+  it("should refuse a section holding only a heading of level 6, naming its type", () => {
+    const blocks = doc([heading("Suite", 1), heading("Détail", 7), paragraph("Texte.")])
     expect(refusal([{ op: "replace_section", section: "Suite", text: "Autre." }], blocks)).toMatchObject({
       code: "conflict",
-      message: `Op 1 (replace_section « Suite »): ${inSection("Suite").replace("a toggle block", "a heading block")} Nothing was written.`,
+      message: `Op 1 (replace_section « Suite »): ${inSection("Suite").replace("a carousel block", "a heading block")} Nothing was written.`,
     })
   })
 
@@ -174,10 +175,10 @@ describe("write around a block this platform version does not know (M67)", () =>
     ["move_block", { op: "move_block", block: ref(T), after_block: ref(P3) }],
     ["replace_block", { op: "replace_block", block: ref(T), text: "Remplacé." }],
   ])("should refuse %s of the unknown block itself, with conflict", (_name, op) => {
-    expect(refusal([op])).toMatchObject({ code: "conflict", message: `Op 1 (${op.op} ${ref(T)}): ${onBlock(ref(T), "toggle")} Nothing was written.` })
+    expect(refusal([op])).toMatchObject({ code: "conflict", message: `Op 1 (${op.op} ${ref(T)}): ${onBlock(ref(T), "carousel")} Nothing was written.` })
   })
 
-  it("should refuse to delete or move a heading of level 4", () => {
+  it("should refuse to delete or move a heading of level 6", () => {
     expect(refusal([{ op: "delete_block", block: ref(H4) }])).toMatchObject({ code: "conflict", message: `Op 1 (delete_block ${ref(H4)}): ${onBlock(ref(H4), "heading")} Nothing was written.` })
     expect(refusal([{ op: "move_block", block: ref(H4) }])).toMatchObject({ code: "conflict" })
   })

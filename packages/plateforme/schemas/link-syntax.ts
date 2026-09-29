@@ -9,7 +9,8 @@ import { NODE_PATH_PATTERN } from "./nodes"
 
 const PATH_MAX = 200
 const KEY_MAX = 500
-const LABEL_MAX = 200
+/** Le libellé d'un lien, en caractères : la publication le refuse au-delà, l'éditeur le dit avant (E11-S06, AC-b5). */
+export const LABEL_MAX = 200
 
 /** Un span de code en ligne : ses bornes dans le texte, accents graves compris, et le code entre eux. */
 export type CodeSpan = { start: number; end: number; content: string }
@@ -85,14 +86,29 @@ function firstStop(text: string, from: number): number {
 }
 
 /**
+ * Un caractère échappé (E10-S04, AC-c1, AC-c2) : précédé d'un nombre impair de `\`. Chaque `\` d'une suite
+ * n'est compté que pour le caractère qui la suit : le compte reste linéaire. Lu par les liens et par l'écran
+ * (`ui/noeud/en-ligne.ts`).
+ */
+export function escaped(text: string, at: number): boolean {
+  let before = at
+  while (before > 0 && text[before - 1] === "\\") before--
+  return (at - before) % 2 === 1
+}
+
+/**
  * Chaque `[[…]]` d'un texte, dans l'ordre, sans `]` ni saut de ligne entre les crochets (ce que lisait
- * `/\[\[([^\]\n]*)\]\]/g`) : ses bornes. En temps linéaire : la fin cherchée pour un `[[` sert aux
- * suivants tant qu'elle est devant eux.
+ * `/\[\[([^\]\n]*)\]\]/g`) : ses bornes. Un `\[[` n'ouvre pas de lien (E10-S04, AC-c2). En temps linéaire :
+ * la fin cherchée pour un `[[` sert aux suivants tant qu'elle est devant eux.
  */
 function bracketed(text: string): { start: number; end: number }[] {
   const found: { start: number; end: number }[] = []
   let stop = -1
   for (let at = text.indexOf("[["); at !== -1; ) {
+    if (escaped(text, at)) {
+      at = text.indexOf("[[", at + 1)
+      continue
+    }
     if (stop < at + 2) stop = firstStop(text, at + 2)
     if (text.startsWith("]]", stop)) {
       found.push({ start: at, end: stop + 2 })
@@ -120,6 +136,68 @@ function parseLink(inner: string, written: string): FoundLink["link"] {
   const key = hash === -1 ? null : target.slice(hash + 1).trim()
   if (key !== null && (key === "" || chars(key) > KEY_MAX)) return null
   return { path, key, label: bar === -1 ? "" : written.slice(bar + 1) }
+}
+
+/** Une clôture de code ouverte : son retrait, son caractère (`` ` `` ou `~`), sa longueur et son info, sans blancs de bord. */
+export type Fence = { indent: number; marker: string; length: number; info: string }
+
+/**
+ * Les fins de ligne que `.` ne lit pas, hors `\n` : une ligne qui en porte n'est ni un titre, ni une image, ni une
+ * clôture ouvrante (N52, N70). `parseMarkdown` a déjà changé `\r` en `\n` ; un corps de repli écrit par l'API des
+ * blocs peut encore en porter.
+ */
+export const LINE_SEPARATORS = /[\r\u2028\u2029]/
+
+/**
+ * Une clôture ouvrante d'accents graves ou de tildes, indentée de `maxIndent` espaces au plus. Une seule lecture
+ * des clôtures pour l'analyse de `write` (`server/nodes/markdown-parse.ts`) et le corps d'un repli
+ * (`fencedParts`), en temps linéaire : aucune expression n'y lit la fin de la ligne après une suite d'accents graves.
+ */
+export function openingFence(line: string, maxIndent: number): Fence | null {
+  const match = /^( *)(`{3,}|~{3,})/.exec(line)
+  if (!match || match[1].length > maxIndent) return null
+  const info = line.slice(match[0].length)
+  if (LINE_SEPARATORS.test(info)) return null
+  // CommonMark : l'info d'une clôture d'accents graves n'en contient aucun (sinon, du code en ligne).
+  if (match[2][0] === "`" && info.includes("`")) return null
+  return { indent: match[1].length, marker: match[2][0], length: match[2].length, info: info.trim() }
+}
+
+/** La ligne ferme la clôture : même caractère, au moins aussi long, 0 à 3 espaces avant, rien après que des blancs. */
+export function closesFence(line: string, fence: Fence): boolean {
+  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line)
+  return match !== null && match[1][0] === fence.marker && match[1].length >= fence.length
+}
+
+/** Une partie d'un texte de plusieurs lignes : du texte, ou une clôture de code (`language` : le premier mot de son info). */
+export type TextPart = { code: false; text: string } | { code: true; text: string; language: string }
+
+/**
+ * Les parties du corps d'un repli (E10-S04, AC-a3, AC-a4), dans l'ordre : le texte, et chaque clôture de code
+ * (``` ou ~~~, 0 à 3 espaces avant, lue comme l'analyse la lit), son contenu sans ses lignes de clôture ; une
+ * clôture jamais fermée court jusqu'à la fin. Comme le code en ligne, une clôture cache les liens : la
+ * publication et l'écran ne lisent les `[[…]]` que dans le texte. Chaque ligne lue une fois.
+ */
+export function fencedParts(text: string): TextPart[] {
+  const parts: TextPart[] = []
+  let lines: string[] = []
+  let fence: Fence | null = null
+  const flush = () => {
+    if (fence) parts.push({ code: true, text: lines.join("\n"), language: fence.info.split(/\s+/)[0] ?? "" })
+    else if (lines.length > 0) parts.push({ code: false, text: lines.join("\n") })
+    lines = []
+  }
+  for (const line of text.split("\n")) {
+    const opening: Fence | null = fence === null ? openingFence(line, 3) : null
+    if (opening !== null || (fence !== null && closesFence(line, fence))) {
+      flush()
+      fence = opening
+    } else {
+      lines.push(line)
+    }
+  }
+  flush()
+  return parts
 }
 
 /**

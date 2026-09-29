@@ -24,12 +24,9 @@ import type { DocBlock } from "../../nodes/document"
 import { resolveTargets, targetKey, type TargetNode, type TargetResolution } from "../../nodes/link-resolution"
 import { contextReference, extractReferences, referenceLines, resolvedReferences, type ReferenceBlock } from "../../nodes/references"
 import { BLOCK_SQL_COLUMNS, docBlock } from "../../nodes/store"
-import { linesThatFit, type ContextBlock } from "../engine"
+import { readRest, type ContextBlock } from "../engine"
 
-/** Tailles nominales de H30 (N6), listes comprises, du corps seul : la tête d'une partie n'y compte pas (E05-S12, AC-5). */
-export const CONTEXT_SIZES = { all: 2400, private: 1200, team: 1200 } as const
-
-/** Lignes des deux listes d'un Contexte, enfants d'abord (AC12). */
+/** Lignes des deux listes d'un Contexte, enfants d'abord (AC12) ; au-delà, son pointeur le dit (E11-S03, AC-b2). */
 const CONTEXT_LIST_MAX = 20
 
 /**
@@ -48,9 +45,9 @@ export type PartFacts = {
 
 /**
  * Une partie attendue pour la personne : son nom au rapport, le chemin de son Contexte (`null` : jamais
- * cherché, un Privé sans `handle`), son en-tête, sa taille nominale et ses lignes de faits.
+ * cherché, un Privé sans `handle`), son en-tête et ses lignes de faits.
  */
-type ContextPath = { name: string; path: string | null; header: string; size: number; facts: (facts: PartFacts) => readonly string[] }
+type ContextPath = { name: string; path: string | null; header: string; facts: (facts: PartFacts) => readonly string[] }
 
 /** Le corps rendu d'un Contexte servi : ses blocs, puis ses listes ; `listsCut` : listes arrêtées à 20 lignes. */
 export type ContextBody = { text: string; listsCut: boolean }
@@ -91,16 +88,23 @@ function contextPaths(identity: Identity): ContextPath[] {
   const handle = identity.member.profile.handle
   const personal = handle ? `private/${handle}/contexte` : null
   return [
-    { name: "contexte", path: "contexte", header: "everyone", size: CONTEXT_SIZES.all, facts: (facts) => [facts.everyone, ...facts.connectors] },
-    { name: personal ?? "private", path: personal && searchable(personal), header: "you only", size: CONTEXT_SIZES.private, facts: (facts) => [facts.private] },
+    { name: "contexte", path: "contexte", header: "everyone", facts: (facts) => [facts.everyone, ...facts.connectors] },
+    { name: personal ?? "private", path: personal && searchable(personal), header: "you only", facts: (facts) => [facts.private] },
     ...identity.teams.map((team, index): ContextPath => ({
       name: `${team.slug}/contexte`,
       path: searchable(`${team.slug}/contexte`),
       header: `team ${team.name}`,
-      size: CONTEXT_SIZES.team,
       facts: (facts) => [facts.teams[index], ...(facts.teamConnectors[index] ?? [])],
     })),
   ]
+}
+
+/**
+ * Les chemins des Contextes attendus pour la personne, dans l'ordre des parties (E11-S03, AC-a1) : ceux que
+ * `context` cherche, donc ceux que garde son code `ctx` (`server/ctx.ts`). Un Privé sans `handle` n'en a pas.
+ */
+export function expectedContextPaths(identity: Identity): string[] {
+  return contextPaths(identity).flatMap((entry) => (entry.path ? [entry.path] : []))
 }
 
 function headerOf(entry: ContextPath): string {
@@ -116,19 +120,6 @@ export function byPath(a: { path: string }, b: { path: string }): number {
 function readable(levels: ReadonlyMap<string, AccessLevel>, id: string): boolean {
   // Un filtre de liste compare `nodeLevels` à 1 seulement (`security-patterns.md § Droits dans le service`).
   return (levels.get(id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read
-}
-
-/** Le texte sans un bloc clôturé resté ouvert à sa fin : la coupe recule avant son ouverture (AC1). */
-function beforeOpenFence(text: string): string {
-  let open: { fence: string; at: number } | null = null
-  let at = 0
-  for (const line of text.split("\n")) {
-    const run = /^`{3,}/.exec(line)?.[0]
-    if (open === null && run !== undefined) open = { fence: run, at }
-    else if (open !== null && line.trimEnd() === open.fence) open = null
-    at += line.length + 1
-  }
-  return open === null ? text : text.slice(0, open.at)
 }
 
 /**
@@ -152,12 +143,11 @@ function contextBody(input: { markdown: string; children: readonly IndexNode[]; 
 }
 
 /**
- * La partie d'un Contexte (E05-S12, AC-1 à AC-5) : sa tête — en-tête, ligne de faits, connecteurs —, jamais
- * coupée par la taille nominale, puis le corps de son Contexte (`body`), ou la ligne qui dit qu'il n'a pas
- * été lu (`notLoaded`), ou rien (absent, jamais publié, illisible, vide). Le corps seul est borné à la taille
- * nominale (H30) : coupé à la dernière ligne qui tient, jamais dans un bloc clôturé ; coupé, ou ses listes
- * arrêtées à 20 lignes (N20), il finit par le pointeur vers `read` et la partie compte `cut`. `path` au
- * rapport seulement quand le corps est servi (AC-4).
+ * La partie d'un Contexte (E05-S12, AC-1 à AC-4) : sa tête — en-tête, ligne de faits, connecteurs —, puis le
+ * corps de son Contexte (`body`), ou la ligne qui dit qu'il n'a pas été lu (`notLoaded`), ou rien (absent,
+ * jamais publié, illisible, vide). Le corps est servi entier : seul le plafond de `renderContext` le coupe
+ * (E11-S03, AC-b1, AC-b4). Ses listes arrêtées à 20 lignes (N20), il finit par le pointeur qui le dit (AC-b2)
+ * et la partie compte `cut`. `path` au rapport seulement quand le corps est servi (AC-4).
  */
 function partBlock(entry: ContextPath, facts: PartFacts, prefix: string, content: { body?: ContextBody; notLoaded?: boolean }): ContextBlock {
   const head = [headerOf(entry), ...entry.facts(facts)].join("\n")
@@ -165,10 +155,9 @@ function partBlock(entry: ContextPath, facts: PartFacts, prefix: string, content
   const { body } = content
   if (content.notLoaded && entry.path) return { ...part, text: `${head}\n${CONTEXT_INDEX.notLoaded}${prefix}_read {"path": "${entry.path}"}.` }
   if (!body || body.text === "" || !entry.path) return { ...part, text: head }
-  if (!body.listsCut && body.text.length <= entry.size) return { ...part, text: `${head}\n${body.text}`, path: entry.path }
-  const pointer = `${CONTEXT_INDEX.rest} ${prefix}_read {"path": "${entry.path}"}.`
-  const kept = beforeOpenFence(linesThatFit(body.text, entry.size - pointer.length - 1)).trimEnd()
-  return { ...part, text: [head, ...(kept ? [kept] : []), pointer].join("\n"), path: entry.path, cut: true }
+  if (!body.listsCut) return { ...part, text: `${head}\n${body.text}`, path: entry.path }
+  const pointer = `${CONTEXT_INDEX.listsStopped}${CONTEXT_LIST_MAX} entries are listed. ${readRest(prefix, entry.path)}`
+  return { ...part, text: `${head}\n${body.text}\n${pointer}`, path: entry.path, cut: true }
 }
 
 /**
@@ -273,8 +262,7 @@ function renderContextNode(node: ContextNode, reads: ContextReads): ContextBody 
  * (AC13).
  */
 export async function contextBodies(db: PlatformDb, identity: Identity): Promise<Map<string, ContextBody>> {
-  const expected = contextPaths(identity).flatMap((entry) => (entry.path ? [entry.path] : []))
-  const nodes = await readableContexts(db, identity, expected)
+  const nodes = await readableContexts(db, identity, expectedContextPaths(identity))
   if (nodes.length === 0) return new Map()
   const ids = nodes.map((node) => node.id)
   const [blockRows, childRows, links] = await contextRows(db, identity, ids)

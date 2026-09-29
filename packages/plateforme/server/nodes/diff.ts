@@ -26,6 +26,14 @@ function sameRevisedContent(a: DocBlock, b: DocBlock): boolean {
   return sameContent(a, b) && (a.key ?? null) === (b.key ?? null)
 }
 
+/**
+ * Deux états publiés au même contenu servi (E11-S03, AC-a4, H28) : mêmes blocs dans le même ordre, comparés
+ * par type, texte, données et clé ; ni id, ni position, ni révision de bloc, ni provenance.
+ */
+export function samePublishedContent(before: readonly DocBlock[], after: readonly DocBlock[]): boolean {
+  return before.length === after.length && before.every((block, index) => sameRevisedContent(block, after[index]))
+}
+
 export type BlockChange<B extends DocBlock> = { kind: "added" | "changed" | "moved"; block: B }
 
 /**

@@ -56,47 +56,9 @@
 /* Lecture seule n'est pas désactivé : le texte reste lisible ; cette règle couvre le temps d'un enregistrement. */
 .oto-block-field[readonly] { color: var(--mute); }
 
-/* ── la puce d'un bloc liste, pendant de `.oto-reader-list` (même retrait, disque `--faint`) : un seul `<textarea>` pour tout le bloc, la puce est dessinée par boîte de ligne (une tuile de fond haute de `1lh`) ; une ligne repliée reçoit aussi sa puce, écart cosmétique assumé. */
+/* ── le retrait d'un bloc liste, pendant de `.oto-reader-list` : les repères (puce, numéro) y sont posés par la copie des éléments (`.oto-block-copie`, `editeur.css`), un par élément, jamais par ligne de champ. */
 .oto-block-field[data-kind="list"] {
   padding-inline-start: calc(var(--space-2) + var(--space-4));
-  background-image: radial-gradient(circle, var(--faint) 2px, transparent 2.5px);
-  background-origin: border-box;
-  background-position: var(--space-2) calc(var(--space-1) + 1px);
-  background-size: var(--space-4) 1lh;
-  background-repeat: repeat-y;
-}
-
-/* ── la liste numérotée : aucune image de fond ne sait compter, c'est le composant qui dessine la colonne de numéros ; le fond se tait (`background-image: none`, rien d'autre), sinon disque et chiffres se recouvriraient. */
-.oto-block-field[data-kind="list"][data-ordered] {
-  background-image: none;
-}
-
-/* ── la colonne de numéros, `aria-hidden` (le nom du champ dit « liste numérotée ») : posée dans le retrait déjà réservé, jamais dans un retrait de plus, et décalée comme le disque ; une ligne repliée décale les numéros suivants, écart cosmétique assumé. */
-.oto-block-numbers {
-  position: absolute;
-  inset-inline-start: 0;
-  inset-block-start: 0;
-  inline-size: var(--space-4);
-  padding-block-start: calc(var(--space-1) + 1px);
-  /* Une grille : chaque rangée fait exactement une boîte de ligne, un empilement de `<span>` dériverait ligne après ligne. */
-  display: grid;
-  grid-auto-rows: 1lh;
-  font-size: var(--fs-sm);
-  line-height: var(--lh-relaxed);
-  text-align: end;
-  padding-inline-end: var(--space-1);
-  /* Le champ passe dessous : la colonne est décorative, un clic pose le caret dans le texte. */
-  pointer-events: none;
-  user-select: none;
-}
-
-/* Le numéro rythme, il ne parle pas, comme le disque et le `::marker` ; `tabular-nums` garde 9 et 10 à l'aplomb, `line-height: 1` laisse la grille décider de la hauteur. */
-.oto-block-numbers > span {
-  align-self: center;
-  color: var(--faint);
-  font-size: 0.85em;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
 }
 
 /* ── le titre d'un bloc, même silhouette qu'en lecture (`--fs-lg` gras) : sans cette règle, choisir « Titre » ne changeait rien à l'écran ; pas de marge de relief, la gouttière s'aligne sur la première ligne. */
@@ -165,7 +127,6 @@
 
 /* `--card` et non `--oto-bg`, qui dirait « Oto a produit ça » et attribuerait le bloc à la machine. */
 .oto-block-row[data-state="moving"] > .oto-block-field {
-  /* `background-color` et non `background`, qui effacerait la puce dessinée en fond sur un bloc liste. */
   background-color: var(--card);
   border-color: var(--island-bd);
 }

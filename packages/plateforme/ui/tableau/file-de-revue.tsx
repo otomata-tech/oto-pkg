@@ -43,15 +43,16 @@ const SOURCE: TableColumn = { name: "source", type: "url" }
 
 /**
  * La preuve d'une valeur sur la fiche (fiche D99, M54, P3) : son commentaire et son lien, la raison d'un
- * `verified_empty`, ou « sans preuve » pour une valeur écrite par un assistant qui n'en porte pas ; rien
- * pour une valeur importée ou décidée par une personne sans commentaire. Sans elle, une valeur sans preuve
- * (défaut P1) ne se voit pas au moment de la décider.
+ * `verified_empty`, ou « sans preuve » pour une valeur écrite par un assistant qui n'en porte pas dans un
+ * tableau qui l'exige (`proof`, fiche D133 ; E11-S01, AC-f7) ; rien pour une valeur importée ou décidée par
+ * une personne sans commentaire. Sans elle, une valeur sans preuve (défaut P1) ne se voit pas au moment de
+ * la décider.
  */
-function PreuveDeLaValeur({ provenance, raisonDuVide }: { provenance: ProvenanceLue | undefined; raisonDuVide: string | undefined }) {
+function PreuveDeLaValeur({ provenance, raisonDuVide, exigee }: { provenance: ProvenanceLue | undefined; raisonDuVide: string | undefined; exigee: boolean }) {
   const commentaire = raisonDuVide ?? provenance?.comment
   const lien = provenance?.link
   if (commentaire === undefined && lien === undefined) {
-    return provenance?.origin === "agent" ? <span className="text-mute"> ({FICHE.sansPreuve})</span> : null
+    return exigee && provenance?.origin === "agent" ? <span className="text-mute"> ({FICHE.sansPreuve})</span> : null
   }
   return (
     <span className="text-mute">
@@ -82,7 +83,7 @@ function ValeursDeLaLigne({ entete, ligne }: { entete: TableHeader; ligne: Table
           <span key={colonne.name}>
             {rang > 0 && " · "}
             <span className="font-medium">{colonne.name}</span> <Cellule colonne={colonne} valeur={valeur} raisonDuVide={raisonDuVide} />
-            {aPreuve && <PreuveDeLaValeur provenance={ligne.provenance?.[colonne.name]} raisonDuVide={raisonDuVide} />}
+            {aPreuve && <PreuveDeLaValeur provenance={ligne.provenance?.[colonne.name]} raisonDuVide={raisonDuVide} exigee={entete.proof === true} />}
           </span>
         )
       })}

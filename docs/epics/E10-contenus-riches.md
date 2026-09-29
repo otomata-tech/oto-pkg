@@ -59,5 +59,5 @@ additive (ADR-011 § 2) : `simple_table` (un tableau dans une page, distinct du 
 | ~~E10-S03~~ | Fusionnée dans E10-S02 (fiche D137) | — | — | — |
 | ~~E10-S05~~ | Fusionnée dans E10-S02 (fiche D137) | — | — | — |
 
-Livraison avec l'epic E11 dans une seule version du paquet, 1.0.1, avec un seul fichier de
-migration (fiches D131, D124) : `.method/sprint/status.md § Contenus riches et retours de la démo`.
+Livraison avec l'epic E11 dans une seule version du paquet, 1.1.0, avec un seul fichier de
+migration `<horodatage>_v1_1_0.sql` (fiches D131, D145, D124) : `.method/sprint/status.md § Contenus riches et retours de la démo`.

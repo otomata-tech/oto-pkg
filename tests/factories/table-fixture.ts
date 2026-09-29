@@ -33,6 +33,8 @@ export const PROSPECTS_HEADER = {
   key: "entreprise",
   lifecycle: { column: "statut", states: STATES, working: "en cours", review: { state: "à revoir", approve: "qualifié", reject: "écarté" } },
   closed: false,
+  // La preuve exigée (fiche D133, HN-E11S01-13) : les tests de M53 et d'HN-M53-10 gardent leurs refus.
+  proof: true,
 }
 
 export const PROSPECTS = {

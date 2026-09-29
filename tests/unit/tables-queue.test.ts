@@ -290,4 +290,46 @@ describe.skipIf(!sqlConfigured)(portable("work queue on a real database"), { tim
       expect(after.text).toBe("Atelier 2 released → « à traiter » (revision 4).")
     })
   })
+
+  describe("E11-S01: host and worker, decisions by the assistant", () => {
+    const HOST = "claude-ai@0.1.0"
+    const decided = { origin: "agent", by: PEOPLE.claire.id, ctx: CTX, at: expect.stringMatching(/Z$/), host: HOST, worker: "claude-claire" }
+
+    async function withHost(fn: CatalogFunction, identity: Identity, args: Record<string, unknown>, simulated: DbSpy): Promise<FunctionOutput> {
+      return runFunction(fn, { db: await clientOf(ref, identity, simulated), identity, ctx: CTX, origin: "https://acme.test", host: HOST }, { table: PROSPECTS.path, ...args })
+    }
+
+    /** La revue des prospects confiée aussi à l'assistant, le temps d'un cas (`agents_may_decide`, AC-e1). */
+    async function lettingAgentsDecide(run: () => Promise<void>): Promise<void> {
+      const id = ref.nodeId(PROSPECTS.path)
+      await seed.admin`update platform.nodes set meta = jsonb_set(meta, '{lifecycle,review,agents_may_decide}', 'true'::jsonb) where id = ${id}`
+      try {
+        await run()
+      } finally {
+        await seed.admin`update platform.nodes set meta = meta #- '{lifecycle,review,agents_may_decide}' where id = ${id}`
+      }
+    }
+
+    it("should store the host and the worker in the provenance of the state that table.claim and table.release set (AC-d2, AC-d3)", async () => {
+      const simulated = await fixture.database()
+      await withHost(tableClaim, CLAIRE, { worker: "claude-claire", filter: { entreprise: "Atelier 2" } }, simulated)
+      expect((await fixture.row("Atelier 2"))?.provenance).toHaveProperty("statut", { ...decided, claim_revision: 2 })
+      await withHost(tableRelease, CLAIRE, { key: "Atelier 2", worker: "claude-claire", state: "à revoir" }, simulated)
+      expect((await fixture.row("Atelier 2"))?.provenance).toHaveProperty("statut", decided)
+    })
+
+    it("should let an assistant set a decision with table.release or table.write on a table that allows it, traced with origin agent (AC-e2)", async () => {
+      await lettingAgentsDecide(async () => {
+        const simulated = await fixture.database(withMairie())
+        const released = await withHost(tableRelease, CLAIRE, { key: "Mairie de Valbrune", worker: "claude-claire", state: "qualifié" }, simulated)
+        expect(released.text).toBe("Mairie de Valbrune released → « qualifié » (revision 5).")
+        expect((await fixture.row("Mairie de Valbrune"))?.provenance).toHaveProperty("statut", decided)
+        // Nue, comme tout état permis : la colonne d'état n'a pas de preuve.
+        await call(tableWrite, LEA, { rows: [{ key: "Boulangerie Fournier", set: { statut: "écarté" } }] }, simulated)
+        const fournier = await fixture.row("Boulangerie Fournier")
+        expect(fournier?.data).toHaveProperty("statut", "écarté")
+        expect(fournier?.provenance).toHaveProperty("statut", { origin: "agent", by: PEOPLE.lea.id, ctx: CTX, at: expect.stringMatching(/Z$/) })
+      })
+    })
+  })
 })

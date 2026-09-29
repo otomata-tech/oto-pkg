@@ -5,15 +5,16 @@
 // de journal sont prouvés sans base (`tests/unit/api-equipes-routes.test.ts`), la ligne écrite sur la
 // vraie base par `api-invitations.test.ts`, l'équipe et le chemin rendus par les services dans
 // `equipes-services.test.ts` et `regles-services.test.ts` : la création d'équipe, les règles et le
-// refus d'un membre simple, redits ici, sont retirés (M11b, revue d'E05-S03 et liste d'E01-S07). Marqué
-// Supabase : la porte vérifie des jetons de Supabase Auth ; depuis E01-S10 f2, les relectures passent par
-// la connexion d'administration, plus par PostgREST.
+// refus d'un membre simple, redits ici, sont retirés (M11b, revue d'E05-S03 et liste d'E01-S07). Suite
+// portable (E11-S14) : personnes sans compte, jetons signés localement que la porte vérifie par
+// `verifyToken` (`tests/helpers/session-locale.ts`) ; relectures par la connexion d'administration.
 import { randomUUID } from "crypto"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import { teamSlug } from "@otomata_tech/oto_platform/server"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type ReferenceOrg, type TestUser } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type SqlReferenceOrg, type SqlUser, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -28,16 +29,14 @@ const USER_AGENT = "api-equipes-test"
 type Caller = "ada" | "claire" | "lea" | "bea" | "sam"
 type Task = () => Promise<void>
 
-const configured = supabaseConfigured && sqlConfigured
-
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? "platform API teams, members, rules and platform access" : `platform API teams (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable("platform API teams, members, rules and platform access"), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
-    let o: ReferenceOrg
-    let staff: TestUser
+    let o: SqlReferenceOrg
+    let staff: SqlUser
     const tokens = new Map<Caller, string>()
 
     function request(method: string, path: string, body?: unknown) {
@@ -52,7 +51,7 @@ describe.skipIf(!configured || privatePending)(
     async function call(caller: Caller, method: string, path: string, body?: unknown) {
       const tasks: Task[] = []
       const accessToken = tokens.get(caller) ?? null
-      const response = await handlePlateforme(request(method, path, body), { accessToken, host: o.host, defer: (task) => tasks.push(task) })
+      const response = await handlePlateforme(request(method, path, body), { accessToken, host: o.host, verifyToken: fx.verifyToken, defer: (task) => tasks.push(task) })
       for (const task of tasks) await task()
       return { status: response.status, body: await response.json() }
     }
@@ -63,7 +62,7 @@ describe.skipIf(!configured || privatePending)(
         where org_id = ${o.org.id} and tool = ${tool} and target = ${target}`
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       o = await fx.buildReferenceOrg()
       staff = await fx.createUser({ fullName: "Sam Staff" })

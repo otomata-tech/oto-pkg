@@ -10,8 +10,7 @@
 // contenu cité en encart (`EmbedCard`, rangé ailleurs), un type inconnu jamais effacé (E05-S09, partie c1).
 // Retiré : la marque d'origine par `Symbol` (le texte d'un bloc est toujours lu en balisage, M15).
 //
-// E05-S10 : un seul niveau de titre, un `<h2>` quel que soit le niveau écrit (AC-a5) ; une adresse web est un
-// lien, l'adresse entière au survol, ouvert dans un nouvel onglet (AC-a8).
+// E05-S10 : une adresse web est un lien, l'adresse entière au survol, ouvert dans un nouvel onglet (AC-a8).
 //
 // E05-S11 (retour 11, fiche D107) : une page citée se lit par son titre dans la phrase (`titreDuLien`) ; parmi
 // les cibles que l'écran connaît (`cibles`), une page invisible ou à la corbeille se lit en texte, sans lien,
@@ -19,11 +18,18 @@
 //
 // M64 : les liens sortants lus après la page (`lecture`) ne suspendent que le titre de chaque lien, jamais le
 // texte autour : un repli qui recopiait le document le servait deux fois pendant le flux, ancres comprises.
+//
+// E10-S04 : un titre prend la balise de son niveau (AC-b3, remplace E05-S10 AC-a5), une liste ses sous-listes
+// (AC-b1) ; tableau simple, séparateur et repli (AC-a1 à AC-a3) ; barré et saut de ligne en ligne (AC-c1).
 import { Suspense, use, type ReactNode } from "react"
+import { LIST_DEPTH_MAX, simpleTableOf } from "../../schemas/blocks"
+import { fencedParts } from "../../schemas/link-syntax"
+import { isRecord } from "../../schemas/tables"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
 import { EmbedCard } from "../ds/react/embed-card"
+import { LinkedContent } from "../ds/react/linked-content"
 import { ReaderHeading, ReaderList, ReaderParagraph } from "../ds/react/reader"
 import { texteDUnAppel } from "../procedure/libelles"
 import { cibleDe, estUnTableau, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
@@ -45,13 +51,23 @@ type Liens = { Lien: LienDUnBloc; hrefDuChemin: (chemin: string) => string; cibl
 
 type RenduProps = Liens & { bloc: BlocARendre }
 
-type EnLigneProps = Liens & { texte: string }
+/** `numeroter` : chaque lien rendu porte son rang dans `liensDuTexte` (`data-lien`), que l'éditeur lit au clic (E11-S06, AC-b2). */
+type EnLigneProps = Liens & { texte: string; numeroter?: boolean }
+
+/** Le rang du prochain lien rendu d'un texte, compté dans l'ordre du texte, comme `liensDuTexte`. */
+type Compteur = { rang: number }
+
+const BALISES_DE_TITRE = ["h2", "h3", "h4", "h5", "h6"] as const
 
 /**
- * Un titre est un `<h2>`, quel que soit son niveau écrit (E05-S10, AC-a5 : un seul niveau, « Titre ») : le
- * titre du nœud est le seul `<h1>` (AC4, AC14).
+ * La balise d'un titre de niveau N (E10-S04, AC-b3, qui remplace E05-S10 AC-a5) : `h(N+1)`, le titre du nœud
+ * étant le seul `<h1>` (AC4, AC14) ; sous un titre de même niveau que le sien (`base` `"h3"`, un Contexte dans
+ * un îlot de réglages, E05-S11 AC-24), `h(N+2)` ; bornée à `h6`. Un niveau illisible vaut 1.
  */
-export const BALISE_DE_TITRE = "h2"
+export function baliseDuTitre(niveau: unknown, base: "h2" | "h3" = "h2"): (typeof BALISES_DE_TITRE)[number] {
+  const lu = typeof niveau === "number" && Number.isInteger(niveau) && niveau >= 1 ? niveau : 1
+  return BALISES_DE_TITRE[Math.min(BALISES_DE_TITRE.length - 1, lu - 1 + (base === "h3" ? 1 : 0))]
+}
 
 /** L'écart d'un bloc lu que le lecteur ne pose pas lui-même (code, image, cases), au rythme de ses paragraphes. */
 const APRES = "mb-3.5"
@@ -60,15 +76,15 @@ const APRES = "mb-3.5"
  * Une adresse web (AC-a8) : un lien vers un autre site, ouvert dans un nouvel onglet, sans l'adresse de la page
  * qui le porte (`noreferrer`) ; son libellé raccourci, qui le nomme, l'adresse entière au survol (`title`).
  */
-export function AdresseWeb({ adresse, libelle, className = LIEN }: { adresse: string; libelle: string; className?: string }) {
+export function AdresseWeb({ adresse, libelle, className = LIEN, rang }: { adresse: string; libelle: string; className?: string; rang?: number }) {
   return (
-    <a href={adresse} title={adresse} target="_blank" rel="noopener noreferrer nofollow" className={className}>
+    <a href={adresse} title={adresse} target="_blank" rel="noopener noreferrer nofollow" className={className} data-lien={rang}>
       {libelle}
     </a>
   )
 }
 
-type LienInterneProps = Liens & { lien: Extract<Segment, { genre: "lien" }> }
+type LienInterneProps = Liens & { lien: Extract<Segment, { genre: "lien" }>; rang?: number }
 
 /**
  * Une page citée (AC-26, AC-27) : son titre, lien vers sa place ; sans page visible qui y réponde, son titre en
@@ -88,29 +104,32 @@ function LienLu({ lecture, ...props }: LienInterneProps & { lecture: Promise<Res
   return <LienDesCibles {...props} cibles={ciblesLues(props.cibles, use(lecture))} />
 }
 
-function LienDesCibles({ lien, Lien, hrefDuChemin, cibles }: Omit<LienInterneProps, "lecture">) {
+function LienDesCibles({ lien, Lien, hrefDuChemin, cibles, rang }: Omit<LienInterneProps, "lecture">) {
   const titre = titreDuLien(lien, cibles)
   const cible = cibleDe(cibles, lien.chemin)
   if (cible === null) return titre
   const chemin = cible?.chemin ?? lien.chemin
   const ancre = lien.reference === null ? "" : `#${encodeURIComponent(lien.reference)}`
   return (
-    <Lien href={`${hrefDuChemin(chemin)}${ancre}`} className={LIEN}>
+    <Lien href={`${hrefDuChemin(chemin)}${ancre}`} className={LIEN} data-lien={rang}>
       {titre}
     </Lien>
   )
 }
 
-/** Des segments en éléments : un lien ou du code peuvent être en gras ou en italique. */
-function rendre(segments: readonly Segment[], liens: Liens): ReactNode[] {
+/** Des segments en éléments : un lien ou du code peuvent être en gras ou en italique ; `compteur`, les liens numérotés. */
+function rendre(segments: readonly Segment[], liens: Liens, compteur?: Compteur): ReactNode[] {
   return segments.map((segment, rang) => {
     // Un segment n'a pas d'identité : son rang dans un texte dont l'identité est ailleurs.
-    if (segment.genre === "lien") return <LienInterne key={rang} lien={segment} {...liens} />
-    if (segment.genre === "web") return <AdresseWeb key={rang} adresse={segment.adresse} libelle={segment.libelle} />
+    if (segment.genre === "lien") return <LienInterne key={rang} lien={segment} {...liens} rang={compteur ? compteur.rang++ : undefined} />
+    if (segment.genre === "web") return <AdresseWeb key={rang} adresse={segment.adresse} libelle={segment.libelle} rang={compteur ? compteur.rang++ : undefined} />
     // `oto-mono`, le rôle « mono en ligne » du design system ; `oto-code` est un bloc.
     if (segment.genre === "code") return <code key={rang} className="oto-mono">{segment.texte}</code>
-    if (segment.genre === "gras") return <strong key={rang}>{rendre(segment.contenu, liens)}</strong>
-    if (segment.genre === "italique") return <em key={rang}>{rendre(segment.contenu, liens)}</em>
+    if (segment.genre === "gras") return <strong key={rang}>{rendre(segment.contenu, liens, compteur)}</strong>
+    if (segment.genre === "italique") return <em key={rang}>{rendre(segment.contenu, liens, compteur)}</em>
+    // E10-S04 (AC-c1) : le barré, et le saut de ligne écrit `<br>`, rendus par React, jamais en HTML injecté.
+    if (segment.genre === "barre") return <s key={rang}>{rendre(segment.contenu, liens, compteur)}</s>
+    if (segment.genre === "saut") return <br key={rang} />
     return segment.texte
   })
 }
@@ -119,8 +138,8 @@ function rendre(segments: readonly Segment[], liens: Liens): ReactNode[] {
  * Le texte en ligne d'un bloc (AC5) : `<code>`, `<strong>`, `<em>` et les liens, le reste en texte. L'éditeur
  * le rend aussi sur le champ d'un bloc au repos (E05-S11, AC-26).
  */
-export function EnLigne({ texte, ...liens }: EnLigneProps): ReactNode {
-  return rendre(segmentsEnLigne(texte), liens)
+export function EnLigne({ texte, numeroter = false, ...liens }: EnLigneProps): ReactNode {
+  return rendre(segmentsEnLigne(texte), liens, numeroter ? { rang: 0 } : undefined)
 }
 
 const chaine = (valeur: unknown): string => (typeof valeur === "string" ? valeur : "")
@@ -129,19 +148,97 @@ function elements(data: Record<string, unknown>): unknown[] {
   return Array.isArray(data.items) ? data.items : []
 }
 
-function Liste({ bloc, ...liens }: RenduProps) {
-  const numerotee = bloc.data.ordered === true
-  const debut = numerotee && typeof bloc.data.start === "number" ? bloc.data.start : undefined
+type ListeProps = Liens & { donnees: Record<string, unknown>; id?: string; niveau: number }
+
+/**
+ * Une liste, sous-listes comprises (E10-S04, AC-b1) : des `ul` et `ol` imbriqués, chacun sa numérotation ; un
+ * élément est une chaîne, ou son texte et sa sous-liste (`children`), lue jusqu'au troisième niveau.
+ */
+function Liste({ donnees, id, niveau, ...liens }: ListeProps) {
+  const numerotee = donnees.ordered === true
+  const debut = numerotee && typeof donnees.start === "number" ? donnees.start : undefined
   return (
-    <ReaderList as={numerotee ? "ol" : "ul"} id={bloc.ref} start={debut}>
-      {elements(bloc.data)
-        .map(chaine)
-        .map((item, rang) => (
+    <ReaderList as={numerotee ? "ol" : "ul"} id={id} start={debut}>
+      {elements(donnees).map((item, rang) => {
+        const texte = isRecord(item) ? chaine(item.text) : chaine(item)
+        const enfants = isRecord(item) && isRecord(item.children) && niveau < LIST_DEPTH_MAX ? item.children : null
+        return (
+          // Un élément n'a pas d'identité : son rang dans une liste dont l'identité est ailleurs.
           <li key={rang}>
-            <EnLigne texte={item} {...liens} />
+            <EnLigne texte={texte} {...liens} />
+            {enfants && <Liste donnees={enfants} niveau={niveau + 1} {...liens} />}
           </li>
-        ))}
+        )
+      })}
     </ReaderList>
+  )
+}
+
+/** Un alignement de colonne (E10-S04, AC-a1) : celui du tableau du design system, `start` par défaut. */
+function alignementDe(valeur: unknown): "center" | "end" | undefined {
+  return valeur === "center" ? "center" : valeur === "right" ? "end" : undefined
+}
+
+/**
+ * Un tableau simple (E10-S04, AC-a1) : le balisage et les classes de `TableauFixe` (`ui/equipes/tableau-fixe.tsx`),
+ * en-têtes `scope="col"`, alignement par colonne ; il défile dans son bloc (`oto-table-wrap`), jamais la page.
+ * Rendu aussi par le serveur : ni le `Table` client du design system, ni `TableauFixe`, dont les clés sont les
+ * en-têtes (un en-tête markdown peut se répéter).
+ */
+function TableauSimple({ bloc, ...liens }: RenduProps) {
+  const { columns: colonnes, rows: rangees, align } = simpleTableOf(bloc.data)
+  const alignements = (align ?? []).map(alignementDe)
+  // Une cellule n'a pas d'identité : son rang dans une rangée, et la rangée le sien, dans un bloc qui a la sienne.
+  return (
+    <div id={bloc.ref} className={`oto-table-wrap ${APRES}`}>
+      <table className="oto-table" data-responsive="scroll">
+        <thead>
+          <tr>
+            {colonnes.map((colonne, rang) => (
+              <th key={rang} scope="col" data-align={alignements[rang]}>
+                <span className="oto-th-cell">
+                  <span className="oto-th-in">
+                    <EnLigne texte={colonne} {...liens} />
+                  </span>
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rangees.map((cellules, ligne) => (
+            <tr key={ligne}>
+              {colonnes.map((_, rang) => (
+                <td key={rang} data-align={alignements[rang]}>
+                  <EnLigne texte={cellules[rang] ?? ""} {...liens} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/**
+ * Un repli (E10-S04, AC-a3) : `LinkedContent`, `<details>` natif fermé, son résumé en titre ; le corps comme
+ * un encart, texte en ligne et sauts de ligne gardés, chaque clôture de code en bloc préformaté.
+ */
+function Repli({ bloc, ...liens }: RenduProps) {
+  return (
+    <LinkedContent id={bloc.ref} className={APRES} title={<EnLigne texte={chaine(bloc.data.summary)} {...liens} />}>
+      {fencedParts(bloc.text ?? "").map((partie, rang) =>
+        // Une partie n'a pas d'identité : son rang dans un corps dont l'identité est ailleurs.
+        partie.code ? (
+          <Preformate key={rang} legende={partie.language ? `Code · ${partie.language}` : "Code"} texte={partie.text} />
+        ) : (
+          <p key={rang} className="whitespace-pre-line text-sm text-ink">
+            <EnLigne texte={partie.text} {...liens} />
+          </p>
+        ),
+      )}
+    </LinkedContent>
   )
 }
 
@@ -230,22 +327,28 @@ function Paragraphe({ bloc, ...liens }: RenduProps) {
  * Un bloc rendu par son type (AC4) ; un type inconnu affiche son texte, sinon le dit, jamais rien.
  * `rendu` : un bloc `reference` rendu en place par la page serveur (vue, carte ou avis, E07-S03),
  * sous l'ancre du bloc ; sans lui, `ReferenceEnLien`.
- * `baliseDeTitre` : la balise d'un titre rendu sous un titre de même niveau que le sien, un Contexte montré
- * dans un îlot de réglages (E05-S11, AC-24) ; sans elle, `BALISE_DE_TITRE`.
+ * `baliseDeTitre` : la balise d'un titre de niveau 1 rendu sous un titre de même niveau que le sien, un Contexte
+ * montré dans un îlot de réglages (E05-S11, AC-24) ; sans elle, `h2` (`baliseDuTitre`).
  */
 export function RenduDUnBloc(props: RenduProps & { rendu?: ReactNode; baliseDeTitre?: "h3" }): ReactNode {
   const { bloc, rendu, baliseDeTitre, ...liens } = props
   switch (bloc.type) {
     case "heading":
       return (
-        <ReaderHeading as={baliseDeTitre ?? BALISE_DE_TITRE} id={bloc.ref}>
+        <ReaderHeading as={baliseDuTitre(bloc.data.level, baliseDeTitre)} id={bloc.ref}>
           <EnLigne texte={bloc.text ?? ""} {...liens} />
         </ReaderHeading>
       )
     case "paragraph":
       return <Paragraphe {...props} />
     case "list":
-      return <Liste {...props} />
+      return <Liste donnees={bloc.data} id={bloc.ref} niveau={1} {...liens} />
+    case "simple_table":
+      return <TableauSimple {...props} />
+    case "divider":
+      return <hr id={bloc.ref} className="oto-separator" data-orientation="horizontal" />
+    case "toggle":
+      return <Repli {...props} />
     case "checklist":
       return <Cases {...props} />
     case "code": {

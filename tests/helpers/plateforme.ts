@@ -461,7 +461,8 @@ export function platformSeeds(sql: AdminSql, accountOf: (userId: string) => Prom
    */
   async function seedCtxJournal(org: { id: string }, user: { id: string }, lines: JournalLineInput[]): Promise<string> {
     const code = ctxCode()
-    await sql`insert into platform.ctx (code, org_id, user_id, rules_version) values (${code}, ${org.id}, ${user.id}, ${await rulesVersion(org.id)})`
+    // `contexts` vide : aucun Contexte gardé, le code n'est jamais périmé (E11-S03).
+    await sql`insert into platform.ctx (code, org_id, user_id, rules_version, contexts) values (${code}, ${org.id}, ${user.id}, ${await rulesVersion(org.id)}, ${sql.json({})})`
     if (lines.length === 0) return code
     const start = Date.now() - lines.length * 1000
     const rows = lines.map((line, index) => ({

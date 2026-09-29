@@ -35,7 +35,7 @@ graph TB
 | Écran du paquet (mutation) | API du paquet | `/api/plateforme/<ressource>`, même origine |
 | Lecteur anonyme | Page publique d'un lien de partage | `/p/<jeton>`, sans session (ADR-013) |
 | Services du paquet | Schéma `platform` | SQL au nom de l'appelant vérifié, sous RLS d'isolation (ADR-012 § 1) |
-| Services du paquet | Service connecteurs | V2 : MCP de serveur à serveur, secret du compte en en-tête (ADR-007) |
+| Services du paquet | API des tiers (CRM, mail, ERP) | V2 : connecteurs TypeScript du paquet, secret du compte lu dans le coffre (ADR-019) |
 
 **Trois cas de client, un seul code.**
 
@@ -77,7 +77,6 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 | pnpm | 12.x (workspace) | Application de base + `packages/plateforme` |
 | Vitest, Testing Library, Playwright | — | Tests unitaires, d'intégration, de bout en bout |
 | Renovate, npmjs.com (public) | — | Mises à jour des applications hôtes (ADR-006, ADR-010) |
-| Au choix de son équipe | — | Service connecteurs (V2, autre dépôt, ADR-007) |
 
 ## 3. Structure
 
@@ -120,7 +119,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 Dépendances entre faces :
 - `ui/` → `schemas/` seulement ; il reçoit ses données par props et appelle `api/` par HTTP ;
 - `api/` et `mcp/` → `server/` et `schemas/` ;
-- `server/` → la base, et en V2 le service connecteurs ; `server/` n'importe ni `mcp/` ni `api/` :
+- `server/` → la base, et en V2 les API des tiers (`server/connectors/`) ; `server/` n'importe ni `mcp/` ni `api/` :
   ce qu'ils partagent vit dans `schemas/` ou `server/` ;
 - `migrations/` n'est importé par personne.
 
@@ -428,7 +427,7 @@ choix ne changent pas sans ADR.
   en France (ADR-005, ADR-012).
 - Schéma `platform` : SQL additif, retrait en deux temps, écriture par les services seulement,
   mises à jour par version et pull request Renovate (ADR-006).
-- Connecteurs par un service sans état, joint comme un serveur MCP, secret en en-tête, autre dépôt (ADR-007).
+- Connecteurs écrits en TypeScript dans le paquet (`server/connectors/`), exécutés par le serveur de l'hôte (ADR-019).
 - Écrans copiés d'`oto-frontend`, sans routeur imposé, sur le jeu de tokens d'`oto-frontend` sous
   `CoquilleOto` ; `ui/` n'importe jamais `server/`, `migrations/` ni un client de base (ADR-008).
 - Transport MCP sans état ; texte seul dans la conversation (ADR-009).
@@ -459,7 +458,7 @@ fournisseur d'emails ; la stratégie de cache ; le déploiement de notre applica
 - confirmation en deux temps ;
 - un connecteur simulé, `mail`, déclaré comme tel.
 
-**V2** : service connecteurs sur `oto-core` et connecteurs tiers réels ; comptes tiers et coffre ;
+**V2** : connecteurs tiers réels dans le paquet (ADR-019) ; comptes tiers et coffre ;
 écran Connecteurs ; sondes et alertes ; registre central des versions ; jetons de service hachés ;
 relance des devis réelle ; widgets dans la conversation.
 

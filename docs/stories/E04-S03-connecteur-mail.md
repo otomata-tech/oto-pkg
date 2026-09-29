@@ -14,6 +14,8 @@
 
 ## Contexte
 
+**ADR-019 (fiche D129, 2026-09-29)** : les connecteurs s'écrivent en TypeScript dans le paquet ; aucun service connecteurs séparé. Ce qui suit, écrit pour un service distant, se relit à l'ouverture de la V2.
+
 **V2 (passe de raffinage du 2026-09-23).** En V1, `mail.create_draft` et `mail.send_draft`
 existent déjà en simulé (E04-S01, `sim_outbox`, compte en mode `simule`), avec les mêmes contrats.
 Cette story branche l'exécution réelle pour les comptes `reel` et `sandbox`, par le service

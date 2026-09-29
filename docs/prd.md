@@ -435,8 +435,7 @@ origine) ; l'activation par organisation, posée par l'équipe plateforme ; les 
 suit les droits. Cent connecteurs ne changent rien pour le modèle : `context` dit ceux de l'équipe
 en une ligne, `find` cherche une fonction, `read` sert un contrat. En V1, le catalogue porte les
 fonctions des tableaux, les fonctions métier de l'ERP hôte et un `mail` simulé, déclaré comme tel ;
-les connecteurs réels et leur coffre viennent en V2, par un service connecteurs écrit dans un autre
-dépôt (ADR-007).
+les connecteurs réels et leur coffre viennent en V2, écrits en TypeScript dans le paquet (ADR-019).
 
 **Le connecteur admin.** Un second point d'entrée, réservé à l'équipe plateforme, sur les services
 du tableau de bord : séparé, parce qu'un admin est souvent aussi utilisateur et qu'un rôle retiré ne
@@ -464,7 +463,7 @@ L'organisation visée est un argument explicite ; une opération destructive pas
 
 | ID | Catégorie | Exigence | Cible | État |
 |---|---|---|---|---|
-| NFR-ADMIN-01 | Sécurité | Le secret d'un compte ne revient jamais vers un écran, le modèle ou le journal ; il ne voyage que vers le service connecteurs, en en-tête | Test sur chaque chemin | Livrée pour la V1, qui n'a aucun secret de compte ; le coffre : V2 |
+| NFR-ADMIN-01 | Sécurité | Le secret d'un compte ne revient jamais vers un écran, le modèle ou le journal ; il ne sert qu'à l'appel du tiers, depuis le serveur de l'hôte | Test sur chaque chemin | Livrée pour la V1, qui n'a aucun secret de compte ; le coffre : V2 |
 | NFR-ADMIN-02 | Isolation | Dans la cellule partagée, une organisation ne lit ni n'écrit aucune ligne d'une autre, par aucune porte | Test par table et de bout en bout | Livrée |
 
 ### 5.6 Routine
@@ -537,14 +536,14 @@ du compte écrite, mode des comptes servi, confirmation en deux temps, `mail` si
 
 **Hors périmètre** : toute IA côté serveur, tout embedding, toute entité « projet » ; une vue du paquet intégrée en cadre dans un ERP
 existant (les en-têtes l'interdisent aujourd'hui, à rouvrir par ADR) ; les notifications du serveur
-vers l'host (transport sans état) ; le service connecteurs lui-même, qui vit dans un autre dépôt ; ce
+vers l'host (transport sans état) ; ce
 qu'Oto fait et qui ne revient pas (`docs/architecture.md § 10`).
 
 ## 7. Hypothèses et risques
 
 **Hypothèses**
-- Le service connecteurs de la V2 expose un MCP standard (`tools/list`, `tools/call`) et reçoit le
-  secret du compte en en-tête ; sa bibliothèque porte le CRM et le mail (ADR-007).
+- Les connecteurs de la V2 s'écrivent en TypeScript dans le paquet et portent le CRM et le mail ;
+  le secret du compte vient du coffre du paquet (ADR-019).
 - Un émetteur OIDC tiers (Logto, Keycloak) offre aux trois hosts un OAuth 2.1 qu'ils savent joindre,
   sans façade : prouvé en local sur Keycloak, pas encore sur claude.ai et ChatGPT.
 

@@ -10,6 +10,14 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-29] — Connecteurs dans le paquet (ADR-019)
+
+**Quoi :** ADR-019 : les connecteurs réels s'écrivent en TypeScript dans le paquet (`server/connectors/`), sans service connecteurs séparé ; ADR-007 § 1, § 2 et § 4 remplacés ; fiche D129 ; architecture, PRD (NFR-ADMIN-01 comprise) et stories E04-S02, E04-S03, E04-S05 alignés.
+
+**Pourquoi :** décision de JB à la reprise des connecteurs.
+
+**Fichiers :** `docs/decisions/ADR-019-connecteurs-dans-le-paquet.md`, `docs/decisions/ADR-007-*.md`, `docs/decisions/fiche-decisions.md`, `docs/architecture.md`, `docs/prd.md`, `docs/stories/E04-S0{2,3,5}-*.md`.
+
 ## [2026-09-28] — E05-S13 : retours du soir de JB
 
 **Quoi :** A : l'encart du Contexte de Tout le monde dans Organisation liste ses contenus liés ; vue Contexte et encart sans tailles ni états ; parties en lecture seule en cartes et en français ; « À quoi sert cette page » en deux phrases par portée. B : un seul nom d'organisation, plus de domaines (écran et texte servi) ; Usage caché, Retours réservés à l'équipe plateforme, Journal dans les réglages ; « Suppr. définitivement le » ; le titre d'une section du rail la plie ; « Déplacer » retiré de l'en-tête ; « Commencer à écrire ». M (migration `20260929090000`) : Équipes & accès sans « Règles d'accès » ni « Accès plateforme » ; plusieurs responsables par équipe ; équipe par défaut retirée des écrans et des services (colonne vidée, retirée en 1.1) ; résumés des Contextes au modèle de JB. E : les campagnes Playwright tournent sur une organisation jetable, plus sur Démo.

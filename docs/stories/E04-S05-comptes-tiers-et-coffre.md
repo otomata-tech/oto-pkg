@@ -16,6 +16,8 @@
 
 ## Contexte
 
+**ADR-019 (fiche D129, 2026-09-29)** : les connecteurs s'écrivent en TypeScript dans le paquet ; aucun service connecteurs séparé. Ce qui suit, écrit pour un service distant, se relit à l'ouverture de la V2.
+
 Partie « comptes tiers et coffre » de l'ancienne E04-S01, passée en V2 le 2026-09-23 (passe de
 raffinage). La V1 ne crée que des comptes en mode `simule`, sans secret (H85).
 

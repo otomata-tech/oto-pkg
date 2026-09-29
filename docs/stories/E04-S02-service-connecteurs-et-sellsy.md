@@ -14,6 +14,8 @@
 
 ## Contexte
 
+**ADR-019 (fiche D129, 2026-09-29)** : les connecteurs s'écrivent en TypeScript dans le paquet ; aucun service connecteurs séparé. Ce qui suit, écrit pour un service distant, se relit à l'ouverture de la V2.
+
 **V2 (passe de raffinage du 2026-09-23).** La V1 prépare le branchement sans rien casser
 (`docs/architecture.md § 9`) : catalogue avec origine et classe, chaîne de résolution du compte,
 `accounts.mode`, confirmation en deux temps, `mail` simulé (E04-S01). Cette story ajoute la

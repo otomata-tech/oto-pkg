@@ -3,7 +3,7 @@
 | Champ | Valeur |
 |-------|--------|
 | **Date** | 2026-09-23 |
-| **Statut** | Accepté |
+| **Statut** | Accepté ; § 1, § 2 et § 4 remplacés par ADR-019 (fiche D129, 2026-09-29) |
 | **Décideur(s)** | JB |
 
 ## Contexte

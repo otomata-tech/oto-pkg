@@ -154,7 +154,27 @@ pnpm dev                     # l'application de base sur http://localhost:3000
 ```
 
 La CI (`.github/workflows/ci.yml`) contrôle les migrations, construit l'application de base et fait
-tourner la suite sur un Postgres nu. Une version se publie par un tag `v<version>` (`publish.yml`).
+tourner la suite sur un Postgres nu.
+
+## Publier une version
+
+Un changement se fait ici (retours produit compris), se commite sur `main`, puis sort par une version.
+
+1. Chaque changement visible d'un assistant ou d'un hôte a sa ligne sous `## Unreleased` de
+   `packages/plateforme/CHANGELOG.md` (format en tête du fichier, vérifié par les tests).
+2. Choisir le numéro : correctif `x.y.Z` (aucune migration, aucun export changé), mineure `x.Y.0`
+   (ajout, migration additive) ; une majeure demande un ADR (le paquet n'ajoute que, ADR-006).
+3. Commit de version : `"version"` de `packages/plateforme/package.json`, `## Unreleased` renommé en
+   `## <version> — <AAAA-MM-JJ>` sous un `## Unreleased` vide ; `pnpm verify`, commit, push sur
+   `main`, CI verte.
+4. `git tag -a v<version> -m "@otomata_tech/oto_platform <version>"` puis
+   `git push origin v<version>` : `publish.yml` contrôle les secrets de l'arbre, les migrations,
+   l'accord du tag, de la version et du `CHANGELOG.md`, puis publie avec provenance. Seul JB pousse
+   un tag, ou l'agent avec son accord.
+5. Vérifier : `npm view @otomata_tech/oto_platform@<version> version`.
+6. Dans chaque application (oto-saas) : la pull request Renovate (§ Mises à jour par Renovate du
+   README du paquet), ou à la main `pnpm add @otomata_tech/oto_platform@<version> -E`, puis
+   `pnpm migrations:sync`, les migrations appliquées à sa base, et le déploiement.
 
 ## Licence
 

@@ -153,8 +153,8 @@ utilisateurs : `docs/pilote/guide-installation.md`.
 ```mermaid
 graph LR
     A[Invitation] --> B[Connexion web]
-    B --> C[Brancher un assistant :<br/>adresse, nom, guide par host]
-    C --> D[Ajout du connecteur<br/>dans Claude ou ChatGPT]
+    B --> C[Brancher mon Claude, ChatGPT ou Mistral :<br/>adresse, nom, guide par host]
+    C --> D[Ajout du connecteur<br/>dans Claude, ChatGPT ou Mistral]
     D --> E[401 + découverte<br/>RFC 9728]
     E --> F[Enregistrement dynamique,<br/>connexion, consentement]
     F --> G[Premier context]
@@ -165,14 +165,14 @@ graph LR
 | Connexion, mot de passe oublié | oto-frontend | Email et mot de passe, lien magique, Google et Microsoft ; thème de l'organisation de l'adresse ; « Données hébergées en France ». Avec un émetteur OIDC, la page de l'émetteur |
 | Aucune organisation | Description | Le nom et l'email de l'admin à qui demander |
 | Consentement OAuth | Description | Client, compte, organisation, à sa marque ; avertit un non-membre que l'assistant aura accès au compte entier |
-| Brancher un assistant | oto-frontend | Adresse, nom recommandé, phrase de préférences, guide par host, prompts d'exemple, dernières connexions |
+| Brancher mon Claude, ChatGPT ou Mistral | oto-frontend | Guide par host en onglets (claude.ai, ChatGPT, Mistral, Claude Code) : adresse, nom recommandé, phrase de préférences, prompts d'exemple ; dernières connexions. En fenêtre depuis l'accueil et sur `/connect` |
 
 | ID | Exigence | Priorité | État |
 |---|---|---|---|
 | FR-CONN-01 | Connexion web par email et mot de passe ou lien magique ; un compte ne se crée que sur une invitation en attente ; une personne sans appartenance voit à qui demander. Avec un émetteur OIDC, l'invitation part par un email de la plateforme, au service d'envoi de l'hôte | Must | Livrée |
 | FR-CONN-02 | Connexion des assistants en OAuth 2.1 : découverte sur un 401, enregistrement dynamique et consentement par le serveur d'autorisation de l'hôte, jeton vérifié à chaque appel, jamais de mode anonyme (détail : `docs/architecture.md § 6`) | Must | Livrée |
 | FR-CONN-03 | L'organisation vient de l'adresse appelée, jamais du jeton (avec Supabase Auth, le jeton n'est lié à aucune ressource) ; l'appartenance est revérifiée à chaque appel : retirer un membre coupe son accès dès l'appel suivant, révoquer un assistant coupe au rafraîchissement du jeton (une heure) | Must | Livrée |
-| FR-CONN-04 | Page « Brancher un assistant » : adresse du serveur, guide par host, nom recommandé, phrase de préférences, prompts d'exemple des procédures publiées de la personne, état de ses connexions ; les métadonnées OAuth y renvoient | Should | Livrée |
+| FR-CONN-04 | Page « Brancher mon Claude, ChatGPT ou Mistral », aussi en fenêtre depuis l'accueil : guide par host (claude.ai, ChatGPT, Mistral, Claude Code) avec adresse du serveur, nom recommandé, phrase de préférences, demandes à essayer tirées de ses procédures les plus utilisées, état de ses connexions ; les métadonnées OAuth y renvoient | Should | Livrée |
 | FR-CONN-05 | Google et Microsoft, pour les seules personnes invitées ; SAML sur exigence d'un client, réglé chez l'émetteur de l'hôte (ADR-004) | Could | Livrée pour Google et Microsoft ; SAML : V2, à la première exigence |
 
 | ID | Catégorie | Exigence | Cible | État |
@@ -248,7 +248,10 @@ le titre et le résumé (qui porte les façons de demander la procédure, enrich
 journal), plus des bonus d'équipe et d'usage. Les étapes ne sont servies que si le meilleur candidat
 passe le seuil et distance nettement le deuxième (0,65 et 0,1 au départ, réglables par
 organisation) ; sinon, les candidats et une consigne : pour une action, demander laquelle lancer ;
-pour une question de données (« combien », « lesquels »), chercher et répondre. Les candidats
+pour une question de données (« combien », « lesquels »), chercher et répondre, puis proposer les
+candidats en choix ; pour une question « comment » ou une demande polie, proposer les candidats en
+choix et ne lancer que celui choisi. Toujours tous les candidats montrés, jamais le premier seul
+(ADR-003 § 2). Les candidats
 suivants restent visibles, et `call` garde la main : une mauvaise reconnaissance ne déclenche
 jamais plus que ce que l'utilisateur confirme.
 
@@ -389,11 +392,11 @@ n'est jamais indexée ; un lien désactivé ou inconnu rend
 | FR-CONC-04 | Les nouveautés de l'organisation (pages et procédures publiées, connecteurs activés) apparaissent dans `context` à la conversation suivante ; le bloc est omis quand rien n'a changé depuis une conversation du jour même ; la publication d'un Contexte invalide les codes `ctx` en cours. Aucune note de version de la plateforme n'y figure | Should | Livrée ; les notes de version de la plateforme : Retirées (elles n'aidaient pas la demande de l'utilisateur) |
 | FR-CONC-05 | Tableaux (ci-dessus) : création et évolution du schéma par `write` ; six fonctions derrière `call` (`table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`), dont le contrat dit la forme de la preuve et l'ordre de réservation ; revue humaine à l'écran | Must | Livrée |
 | FR-CONC-06 | Liens `[[chemin]]` et `[[chemin#clé]]` extraits des blocs publiés avec leur bloc source, indexés sortants et entrants, servis par l'en-tête de `read` et par « Contenus liés » ; un déplacement ou un renommage laisse l'ancien chemin en alias | Could | Livrée |
-| FR-CONC-07 | Import et export sans type de contenu nouveau : un markdown collé ou un `.md` déposé devient les blocs d'une page (mode tolérant à l'écran, strict pour `write`), une page s'exporte en `.md` ; un CSV devient un tableau typé (types et clé déduits, modifiables), un tableau s'exporte en CSV ; `table.import` derrière `call` ; un tableau simple se convertit en tableau de données (E10-S01) | Should | Prévue |
-| FR-CONC-08 | Images et fichiers déposés dans une page, stockés derrière un port S3 configuré par l'hôte (ADR-016), lus sous les droits du nœud, par lien public compris ; l'assistant en lit le nom et le texte alternatif (E10-S02) | Should | Prévue |
-| FR-CONC-09 | Bloc `html` : une page HTML (un artefact généré par Claude Code) déposée par l'écran ou par `write`, exécutée isolée, sans accès à l'hôte (ADR-017) ; servie aussi par lien public, sous une bannière (E10-S03) | Could | Prévue |
+| FR-CONC-07 | Import et export sans type de contenu nouveau : un markdown collé ou un `.md` importé devient les blocs d'une page (mode tolérant à l'écran, strict pour `write` ; lâché dans une page, au choix inséré ou joint comme fichier), une page s'exporte en `.md` ; un CSV devient un tableau typé (types et clé déduits, modifiables), un tableau s'exporte en CSV ; `table.import` derrière `call` ; un tableau simple se convertit en tableau de données (E10-S01) | Should | Prévue |
+| FR-CONC-08 | Images et fichiers déposés dans une page, stockés derrière un port S3 configuré par l'hôte (ADR-016), lus sous les droits du nœud, par lien public compris ; une image se rend dans la page, un autre fichier est une carte avec « Télécharger » et, pour `html`, `md`, `pdf`, `txt`, `csv`, « Voir » dans un nouvel onglet ; l'assistant en lit le nom, le texte alternatif et le texte d'un fichier texte (`read {file}`) (E10-S02) | Should | Prévue |
+| FR-CONC-09 | Fichier HTML : une page HTML (un artefact généré par Claude Code) jointe à une page comme tout fichier, vue par « Voir » dans un nouvel onglet, exécutée isolée, sans accès à l'hôte (ADR-017) ; vue aussi par lien public, sous une bannière (E10-S02) | Could | Prévue |
 | FR-CONC-10 | Une page affiche le markdown d'un assistant sans balisage visible : tableau simple (`simple_table`, distinct du nœud tableau), séparateur, repli (`<details>`), listes imbriquées sur trois niveaux, titres `##` à `######` (cinq niveaux), barré, échappements, `<br>`, marques imbriquées ; aller-retour `read` / `write` gardé (E10-S04) ; l'éditeur les écrit par le choix du « + » et de `/` (E10-S06) | Should | Prévue |
-| FR-CONC-11 | Un assistant qui a déjà un fichier (Claude Code) le dépose sans le réécrire : `upload.link` derrière `call` rend un lien à usage unique (15 min, 1 Mo, lié à la personne et à la destination), l'assistant y envoie le `.html`, le `.md` ou le CSV par `curl`, le service revérifie les droits à l'envoi (E10-S05) | Should | Prévue |
+| FR-CONC-11 | Un assistant qui a déjà un fichier (Claude Code) le dépose sans le réécrire : `upload.link` derrière `call` rend un lien à usage unique (15 min, 1 Mo, lié à la personne et à la destination), l'assistant y envoie un fichier à joindre, un `.md` ou un CSV par `curl` (sans shell : adresse publique téléchargée par le serveur, sinon formulaire de dépôt), le service revérifie les droits à l'envoi (E10-S02) | Should | Prévue |
 | FR-CONC-12 | Organiser l'arbre depuis l'écran (ci-dessus) : création sans modale, glisser-déposer, Déplacer avec son impact, Dupliquer (« <titre> (copie) », sous-contenus et lignes compris, sans les règles explicites), corbeille de 30 jours ; le chemin suit le titre, le premier libre s'il est pris ; sous un Contexte se rangent d'autres contenus | Must | Livrée |
 | FR-CONC-13 | Partage public d'un contenu par lien (ci-dessus, ADR-013) | Should | Livrée |
 

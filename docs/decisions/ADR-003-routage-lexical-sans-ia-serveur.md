@@ -23,12 +23,17 @@ entité « projet » (`_project` sur chaque appel) que le banc a jugée coûteus
    d'une équipe de la personne, procédure qu'elle a utilisée dans les trente derniers jours. Score
    ramené entre 0 et 1. **Aucun embedding, aucun dictionnaire de vocabulaire** (ADR-011 § 7).
    `find` cherche aussi dans le contenu publié des nœuds (ADR-011 § 4) et, en dernier recours,
-   corrige une faute de frappe par le lexique des mots de l'organisation.
+   corrige une faute de frappe par le lexique des mots de l'organisation. `context` corrige aussi
+   une faute de frappe par le lexique.
 2. **Seuil et écart** : les étapes complètes ne sont servies que si le meilleur candidat dépasse
    le seuil et distance nettement le deuxième (0,65 et 0,1 par défaut, les valeurs calibrées sur la
    maquette, 132 phrases) ; sinon les candidats avec score, et une consigne qui dépend de la
-   demande : pour une question de données, chercher avec `find`, `read` ou `table.rows` et
-   répondre ; pour une action, demander laquelle exécuter. Jamais une devinette. Les candidats
+   demande : pour une action, demander laquelle exécuter ; pour une question de données, chercher
+   avec `find`, `read` ou `table.rows` et répondre, puis proposer les candidats en choix ; pour une
+   question « comment » ou une demande polie, proposer les candidats en choix et n'exécuter que
+   celui que la personne choisit. Toujours tous les candidats montrés, jamais le premier seul
+   (amendement E11-S04, validé par le responsable d'Oto : sans étapes servies, une question de
+   données propose aussi les candidates). Jamais une devinette. Les candidats
    suivants restent visibles même quand une procédure est servie. **Seuil et écart se règlent par
    organisation** (`orgs.settings.routing`), sur le jeu de phrases de test, pour 95 % au moins de
    bonnes reconnaissances.

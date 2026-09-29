@@ -191,7 +191,7 @@ erDiagram
 | `journal` | Chaque appel | `ctx`, `user_id`, `team_id`, `account_id`, `method`, `tool`, `target`, `args` (2 ko, secrets masqués), `args_chars`, `result_chars`, `is_error`, `error`, `duration_ms`, `host`, `user_agent` |
 | `admin_journal` | Journal du MCP admin, à part | comme `journal` sans `team_id`, `org_id` facultatif, plus `op` |
 | `feedback` | Signalement | `number` (par organisation, affiché `FB-0001`), `user_id`, `ctx`, `type` (`friction` · `gap` · `error`), `target`, `text` (≤ 4 000), `state` (`open` · `acknowledged` · `declined` · `resolved`), `resolution` (exigée pour `declined`), `handled_by`, `handled_at` |
-| `lexicon` | Mots du contenu d'une organisation, pour corriger une faute de `find` (dérivée : jamais exportée, se recalcule) | `word` (clé avec `org_id`, 4 à 40 lettres) ; tenue par déclencheurs ; lue et écrite par les seules fonctions du paquet |
+| `lexicon` | Mots du contenu d'une organisation, pour corriger une faute de `find` et du routage de `context` (dérivée : jamais exportée, se recalcule) | `word` (clé avec `org_id`, 4 à 40 lettres) ; tenue par déclencheurs ; lue et écrite par les seules fonctions du paquet |
 
 V2 : le catalogue des fonctions des connecteurs distants ; les jetons de service hachés ; le coffre
 des comptes.
@@ -222,9 +222,9 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `public_node_by_token(org, token, path)` | Lecture publique bornée au jeton et à l'organisation de l'adresse (`anon` seul, ADR-013) : dernière version publiée, enfants si le lien les couvre, dans la limite de ce que l'auteur du lien lit à cet instant (`node_level_of`) ; lignes publiées d'un tableau, 500 au plus ; null pour tout le reste |
 | `norm(text)`, `norm_words(text)`, configuration `platform.fr` | Normalisation sans accent, mots `[a-z0-9]`, plein texte français |
 | `block_search_text(type, text, data, key)` | Texte cherchable d'un bloc, source de `blocks.search_tsv` |
-| `route_candidates(org, query, kind, limit)` | Composantes du score de routage sur le titre et le résumé, présélection par index, niveau de lecture appliqué avant la coupe ; le service redécide (ADR-003) |
-| `search_content(org, query, kinds, limit)` | Recherche de `find` : titre, puis résumé, puis blocs publiés, lignes comprises, hors corbeille ; d'abord le nœud qui couvre la plus grande part des termes ; rend nœud, bloc, clé, colonne et extrait (jusqu'à la fin du bloc quand il en reste au plus 8 mots) ; une faute se corrige par le lexique en dernier recours |
-| `lexicon_words(text)`, `lexicon_sync()`, `lexicon_rebuild(org)` | Mots d'un texte ; déclencheur qui les ajoute ; reconstruction du lexique d'une organisation (outillage) |
+| `route_candidates(org, query, kind, limit)` | Composantes du score de routage sur le titre et le résumé : chaque formulation du résumé cherchée à part (`s_phrase`), mots pesés par leur rareté parmi les candidates lisibles, titre compté à part (`lexical_title`), demande corrigée par `lexicon_fix` en plus de la demande telle quelle ; présélection par index, niveau de lecture et corbeille appliqués avant la coupe ; le service redécide (ADR-003) |
+| `search_content(org, query, kinds, limit)` | Recherche de `find` : titre, puis résumé, puis blocs publiés, lignes comprises, hors corbeille ; d'abord le nœud qui couvre la plus grande part des termes ; rend nœud, bloc, clé, colonne et extrait (jusqu'à la fin du bloc quand il en reste au plus 8 mots) ; une faute se corrige par le lexique (`lexicon_fix`) en dernier recours ; la corbeille est exclue avant la coupe |
+| `lexicon_words(text)`, `lexicon_sync()`, `lexicon_rebuild(org)`, `lexicon_fix(org, word)` | Mots d'un texte ; déclencheur qui les ajoute ; reconstruction du lexique d'une organisation (outillage) ; la correction d'un mot par le lexique, écrite une fois pour `search_content` et `route_candidates`, exécutable par aucun rôle client |
 | `update_my_profile(org, patch)` | La personne écrit son prénom, son nom (80 caractères chacun, `name` recomposé), sa langue et sa couleur |
 | `forget_user(user)` | Oublie une personne (outillage) : ses lignes, ses espaces personnels, ses `identities`, les auteurs mis à nul, le lexique reconstruit ; refus tant qu'un nœud d'un autre propriétaire est rangé sous les siens |
 | `applied_migrations()` | Migrations appliquées, pour `admin_cell` (équipe plateforme) |
@@ -279,7 +279,7 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `access.ts`, `access-levels.ts`, `access-facts.ts` | Niveaux calculés en TypeScript (calcul pur) sur l'identité, les ancêtres du nœud et les règles, lus par lots ; lots `nodeLevels` et `accountLevels` ; messages de refus « à qui demander » ; décision d'un changement de propriétaire | tous les services |
 | `invitations.ts`, `members.ts`, `mail.ts` | Inviter, accepter, retirer, fiche de la personne ; lien magique en mode Supabase, email de la plateforme au SMTP de l'hôte en mode OIDC | API, écrans, MCP admin |
 | `teams.ts`, `rules.ts`, `directory.ts` | Équipes, responsables, règles d'accès d'un nœud ou d'un compte (personne, équipe, organisation), annuaire | API, écrans, MCP admin |
-| `oauth.ts`, `connect.ts` | Mode Supabase : consentement OAuth (client, compte, organisation par `resource`, MCP admin nommé) ; page « Brancher un assistant » : adresse du serveur, noms recommandés, dernières connexions, prompts d'exemple | hôte, écrans |
+| `oauth.ts`, `connect.ts` | Mode Supabase : consentement OAuth (client, compte, organisation par `resource`, MCP admin nommé) ; page « Brancher mon Claude, ChatGPT ou Mistral » : adresse du serveur, noms recommandés, dernières connexions, prompts d'exemple | hôte, écrans |
 | `ctx.ts`, `journal.ts` | Émission et garde du `ctx` ; écriture du journal, pour le MCP et les mutations de l'API | MCP, API |
 | `context/` | Moteur de blocs de `context` : `code` (règles « How this workspace works » et langue de réponse), procédure servie, une partie par Contexte (Tout le monde, Privé, chaque équipe) ouverte par sa ligne de faits (organisation, personne, équipe, connecteurs de l'équipe par défaut) puis le Contexte, les contenus rangés dessous et ses pages liées, nouveautés, procédures utiles, « Recent content » ; budget de 20 000 caractères ; `BlockReport.head` | MCP, écrans (aperçu) |
 | `routing.ts`, `find.ts` | Score, décision au seuil de l'organisation, consigne des candidats ; recherche de `find` | MCP, écrans |
@@ -437,8 +437,8 @@ choix ne changent pas sans ADR.
   RLS réduite à l'isolation par organisation (ADR-012) ; un lecteur anonyme ne lit que par une
   fonction bornée au jeton (ADR-013).
 - Fichiers derrière un troisième port, un stockage d'objets compatible S3 configuré par l'hôte ;
-  les octets jamais en base (ADR-016). Un bloc `html` s'exécute isolé, origine opaque, sans accès
-  à l'hôte (ADR-017). La seule porte sans session qui écrit est le ticket d'envoi (ADR-018, proposé).
+  les octets jamais en base (ADR-016). Un fichier HTML ne se voit que dans un iframe isolé, origine
+  opaque, sans accès à l'hôte (ADR-017). La seule porte sans session qui écrit est le ticket d'envoi (ADR-018, proposé).
 
 **Code** : les quatre invariants de `CLAUDE.md § Invariants techniques` (Server Components par
 défaut, Server Actions pour les mutations de l'hôte, un schéma Zod par donnée, RLS sur toute table

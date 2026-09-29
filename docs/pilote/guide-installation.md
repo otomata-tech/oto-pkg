@@ -1,36 +1,48 @@
 # Brancher votre assistant
 
-> Guide des utilisateurs du pilote. `<Nom>` est le nom de connecteur que recommande la page
-> `/connect` de votre organisation, `<adresse>` l'adresse du serveur qu'elle fait copier. Les écrans
-> des assistants changent souvent : si un libellé diffère, cherchez son équivalent.
+> Guide des utilisateurs du pilote. `<Nom>` est le nom de connecteur que recommande le guide de
+> branchement de votre organisation, `<nom>` son nom court, sans espace, `<adresse>` l'adresse du
+> serveur qu'il fait copier. Les écrans des assistants changent souvent : si un libellé diffère,
+> cherchez son équivalent.
 
 ## Avant de commencer
 
 1. Ouvrez le lien d'invitation reçu par email et connectez-vous une fois à l'application.
-2. Ouvrez la page `/connect` de l'application (« Brancher un assistant ») : elle donne l'adresse du
-   serveur, le nom du connecteur et les commandes de Claude Code, à copier. Une adresse par
-   organisation : si vous travaillez pour plusieurs organisations, ajoutez un connecteur pour chacune.
+2. Ouvrez le guide de branchement : bouton « Brancher » de l'accueil, ou « Brancher mon Claude,
+   ChatGPT ou Mistral » dans le menu du compte (page `/connect`). Un onglet par assistant (claude.ai,
+   ChatGPT, Mistral, Claude Code) donne ses étapes, le lien vers sa page des connecteurs et les
+   valeurs à copier. Une adresse par organisation : si vous travaillez pour plusieurs organisations,
+   ajoutez un connecteur pour chacune.
 
 ## claude.ai et Claude Desktop
 
-1. Paramètres → Connecteurs → « Ajouter un connecteur personnalisé ».
+1. Paramètres → Connecteurs, puis ajoutez un connecteur personnalisé. Le connecteur servira aussi
+   dans Claude Desktop et l'application mobile.
 2. Nom : `<Nom>` ; adresse : `<adresse>`. Gardez ce nom : c'est lui que l'assistant voit.
-3. « Se connecter » : connectez-vous avec votre compte de l'application, puis autorisez l'accès.
-4. Sur la fiche du connecteur, menu ⋯ → « Actualiser la liste d'outils ».
-5. Rechargez la page, attendez quelques secondes, puis ouvrez une nouvelle conversation.
-6. Au premier appel de chaque outil qui la demande, claude.ai veut votre autorisation : choisissez
-   « Toujours autoriser ».
+3. Connectez-vous avec votre compte de l'application, puis cliquez sur « Autoriser ».
+4. Ajoutez la phrase de préférences (voir « Phrase de préférences » plus bas).
+5. Ouvrez une nouvelle conversation ; si le connecteur n'apparaît pas, rechargez la page. Au premier
+   appel de chaque outil qui la demande, claude.ai veut votre autorisation : choisissez « Toujours
+   autoriser ».
 
 ## ChatGPT
 
-1. Paramètres → Connecteurs : activez le mode développeur.
-2. « Créer » un connecteur : nom `<Nom>`, adresse `<adresse>`, authentification OAuth.
-3. Connectez-vous avec votre compte de l'application, puis autorisez l'accès.
-4. Sur la fiche du connecteur, cliquez sur « Actualiser » : sans ce geste, aucun outil n'apparaît.
-5. Dans une conversation, écrivez `@<Nom>` au premier usage.
+1. Paramètres → Applications → Paramètres avancés : activez le mode développeur (absent de l'offre
+   gratuite).
+2. Créez une application : nom `<Nom>`, adresse `<adresse>`, authentification OAuth.
+3. Connectez-vous avec votre compte de l'application, puis cliquez sur « Autoriser ».
+4. Sur la fiche de l'application, cliquez sur « Actualiser » : sans ce geste, aucun outil n'apparaît.
+5. Dans une nouvelle conversation, choisissez « Mode développeur » puis `<Nom>` dans le menu +.
 
-Aucune phrase à ajouter dans ChatGPT. Si plusieurs comptes sont liés au même connecteur, ChatGPT
-utilise le compte principal.
+Aucune phrase à ajouter dans ChatGPT.
+
+## Mistral Le Chat
+
+1. Connecteurs → « Ajouter un connecteur », onglet « Connecteur MCP personnalisé ».
+2. Nom : `<nom>` (Le Chat refuse les espaces dans un nom) ; adresse : `<adresse>`.
+3. Cliquez sur « Connecter », connectez-vous avec votre compte de l'application, puis cliquez sur
+   « Autoriser ».
+4. Ouvrez une nouvelle conversation.
 
 ## Claude Code
 
@@ -40,7 +52,7 @@ claude mcp login <nom>
 ```
 
 Lancez les deux commandes dans le dossier où vous ouvrirez Claude Code : sans `--scope`, le serveur
-n'est enregistré que pour ce dossier. `<nom>` est le nom court que `/connect` donne pour Claude Code,
+n'est enregistré que pour ce dossier. `<nom>` est le nom court que l'onglet Claude Code du guide donne,
 sans accent. La seconde commande, dans
 un terminal interactif, ouvre le navigateur pour la connexion et l'autorisation. Ouvrez ensuite une
 nouvelle session : la commande `/mcp` montre l'état du serveur.
@@ -55,7 +67,7 @@ préférences personnelles de claude.ai (Paramètres → Profil → préférence
 N'y ajoutez rien d'autre, en particulier pas « si rien ne correspond, dis-le au lieu de deviner » :
 l'assistant ne répondrait plus aux questions sur vos données. Vous avez plusieurs connecteurs
 d'organisation ? N'ajoutez pas la phrase : elle attirerait vers `<Nom>` les demandes destinées aux
-autres. Aucune phrase dans ChatGPT ni dans Claude Code.
+autres. Aucune phrase dans ChatGPT, Le Chat ni Claude Code.
 
 ## Quand nous annonçons une mise à jour
 
@@ -82,7 +94,7 @@ traiter. », l'assistant :
 Il ne contacte personne et ne décide pas. La décision reste humaine : dans l'écran du tableau,
 section « À revoir », chaque fiche s'approuve ou se refuse. Pour que l'assistant en tienne compte,
 cliquez sur « Copier pour la conversation » et collez le résumé dans la conversation. D'autres
-demandes à essayer figurent sur `/connect`, section « À essayer ».
+demandes à essayer figurent à la dernière étape de chaque onglet du guide de branchement.
 
 ## Signaler un problème
 

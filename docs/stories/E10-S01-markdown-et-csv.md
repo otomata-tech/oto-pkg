@@ -67,8 +67,8 @@ Ce qui existe au 2026-09-28 :
 - `table.import` derrière `call`.
 
 ### OUT
-- Garder le fichier d'origine après un import : E10-S02 (« Joindre le fichier »).
-- Import d'un fichier volumineux par un assistant sans le réécrire : E10-S05 (`upload.link`).
+- Joindre un `.md` ou un `.csv` au lieu de l'importer : E10-S02 (AC-b5, choix au dépôt).
+- Import d'un fichier volumineux par un assistant sans le réécrire : E10-S02 lot f (`upload.link`).
 - Import de fichiers Excel (`.xlsx`) : hors V1 (epic E10, OUT).
 - Export en flux de plus de 5 000 lignes : plus tard (HN-E10S01-7).
 - Déduction du type `enum` : jamais (HN-E10S01-3), il se choisit dans le dialogue.
@@ -94,7 +94,7 @@ pour mot ; un refus d'écran se teste par son code.
     « Ce texte dépasse 40 000 caractères : importez-le comme fichier .md » (`too_large` côté
     service, `OP_TEXT_MAX`, `server/nodes/ops.ts` l. 65).
 - [ ] **AC-a2 — Mode tolérant.** **Given** un markdown qui contient une construction que le mode
-  strict refuse **When** il arrive en mode tolérant (collage, import par l'écran, dépôt d'E10-S05)
+  strict refuse **When** il arrive en mode tolérant (collage, import par l'écran, dépôt par lien d'E10-S02)
   **Then** rien n'est refusé, et chaque construction suit ce tableau :
 
   | Refus du mode strict | En mode tolérant |
@@ -325,7 +325,7 @@ lu par `schemas/tables.ts` l. 246.
 ### Fichiers à créer
 - `schemas/` : `csv.ts`.
 - `server/` : `tables/import.ts` (fonction `table.import`, et `importRows`, le service que
-  partagent l'API, la conversion et E10-S05 ; la borne de 40 000 caractères est dans le schéma
+  partagent l'API, la conversion et le dépôt par lien d'E10-S02 ; la borne de 40 000 caractères est dans le schéma
   d'arguments, pas dans le service) ; `nodes/export.ts` et `tables/export.ts`.
 - `ui/` : `coque/import-de-fichier.tsx` (dialogue `.md` et `.csv`, zone de dépôt doublée d'un
   `<input type="file">`), `api/telecharger.ts` (fichier depuis `{filename, content}`).
@@ -420,7 +420,7 @@ lu par `schemas/tables.ts` l. 246.
 ### Doublons
 - Dépôt de fichier : `rg -n "onDrop|dataTransfer" C:/apps/oto-platform/packages/plateforme/ui` →
   `ui/coque/arbre-du-rail.tsx` l. 103-116 seulement, glisser d'un nœud. Verdict : créer
-  `import-de-fichier.tsx`, que réutiliseront E10-S02 et E10-S03.
+  `import-de-fichier.tsx`, que réutilisera E10-S02.
 - CSV et déduction : `rg -n -w -i "csv" C:/apps/oto-platform/packages/plateforme` et
   `rg -n "inferTable|inferColumn|guessType|detectType" C:/apps/oto-platform/packages/plateforme`
   → aucun résultat. Verdict : créer `schemas/csv.ts`.
@@ -443,7 +443,7 @@ lu par `schemas/tables.ts` l. 246.
 - Partage public, corbeille, transfert d'organisation, suite d'isolation : aucune table ni colonne
   nouvelle, donc rien à ajouter à `TABLES` ni à `donnees.ts`. Une adresse tenue par un nœud de la
   corbeille est traitée comme par le « + » du rail.
-- `write` reste strict. E10-S05 appelle `importRows` et le mode tolérant.
+- `write` reste strict. Le dépôt par lien d'E10-S02 appelle `importRows` et le mode tolérant.
 
 ### Refacto
 - Écarté : déplacer `parseMarkdown` dans `schemas/` pour convertir dans le navigateur. Il importe
@@ -453,7 +453,7 @@ lu par `schemas/tables.ts` l. 246.
 ## Hypothèses
 
 - **HN-E10S01-1** : le fichier se lit dans le navigateur, sans stockage. Un import ne garde donc
-  pas le fichier d'origine (source : simple ; E10-S02 ajoute « Joindre le fichier »).
+  pas le fichier d'origine (source : simple ; E10-S02 propose de joindre le fichier au lieu de l'importer, AC-b5).
 - **HN-E10S01-2** : un CSV importé en tableau **nouveau**, et la conversion d'AC-b7, exigent la
   gestion du parent : l'en-tête est publié, puis les lignes sont écrites. Sinon `forbidden`
   (source : `meta.ts` l. 237, `publish.ts` l. 105 ; option recommandée → fiche D120, ouverte).

@@ -183,7 +183,7 @@ service les filtre, et qu'il refuse une écriture interdite sans envoyer la requ
 service ce filtre ou ce refus fait échouer ce test (ADR-012 § 3).
 
 **Porte sans session qui écrit.** Il n'y en a qu'une : `POST /api/plateforme/uploads/<jeton>`
-(ADR-018, E10-S05). Le ticket prouve **qui** et **où**, jamais le droit : l'appartenance et chaque
+(ADR-018, E10-S02 lot f). Le ticket prouve **qui** et **où**, jamais le droit : l'appartenance et chaque
 droit se relisent à l'envoi, comme sous une session. **Vérifiable :** un test retire le droit entre
 le lien et l'envoi, et l'envoi échoue sans rien écrire. Une autre route sans jeton de l'émetteur qui
 écrit est un défaut de revue.

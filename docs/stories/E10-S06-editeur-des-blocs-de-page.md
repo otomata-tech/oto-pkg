@@ -11,7 +11,7 @@
 | **Référence UI** | N/A : menus et champs de l'éditeur existant (`ui/noeud/editeur/`), menu du design system (`DropdownMenu`, `ui/ds/react/overlays.tsx`), liste sous le champ de « @ » (`editeur/citer.tsx`) |
 | **Conventions** | forms, portage, a11y, state, testing |
 | **Estimation** | L : deux lots séquentiels dans un seul worktree (a choix, séparateur, préfixes, niveaux de liste M ; b tableau simple et repli M) |
-| **Vague** | E10, après 1.0.0 ; après E10-S04 et E10-S01 (ordre : E10-S04, E10-S01, E10-S06, E10-S02, E10-S03, E10-S05) |
+| **Vague** | E10, après 1.0.0 ; après E10-S04 et E10-S01 (ordre : E10-S04, E10-S01, E10-S06, E10-S02) |
 | **Dépend de** | E10-S04 (types `simple_table`, `divider`, `toggle`, listes `{text, children}`, niveaux 1 à 5, lecture sans perte d'AC-b2) ; E10-S01 AC-a1 (collage dans `champ-de-bloc.tsx`, qu'AC-b3 étend) |
 | **Porteuse de migration** | Non |
 
@@ -44,7 +44,7 @@ dans la liste de « @ » (`champ-de-bloc.tsx`).
 ## Hors périmètre
 
 - Image et Fichier dans le groupe « Insérer » : E10-S02 (seulement si le stockage est configuré).
-- HTML : jamais dans le choix ; un artefact est une page créée depuis le rail (E10-S03 AC4, D116).
+- HTML : aucun bloc ; un `.html` se joint par « Fichier » (E10-S02, D116, D137).
 - Collage de markdown et mode tolérant : E10-S01.
 - Convertir un tableau simple en tableau de données : E10-S01 (C3).
 - Plusieurs niveaux de « Titre » au menu : écarté par JB (D115 A).

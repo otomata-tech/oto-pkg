@@ -2,7 +2,7 @@
 
 > Les epics de la V1 sont livrés ; le contenu livré est décrit dans `docs/prd.md` et
 > `docs/architecture.md`. Restent en backlog les stories V2 de `docs/stories/`, et ce qui est
-> ouvert dans `.method/sprint/status.md`. L'epic E10, ouvert, garde son fichier.
+> ouvert dans `.method/sprint/status.md`. Les epics E10 et E11, ouverts, gardent leur fichier.
 
 | ID | Titre | V1 | Backlog V2 |
 |----|-------|----|------------|
@@ -16,3 +16,4 @@
 | E08 | Administration et exploitation | ✅ Livré | E08-S08 sondes et alertes, E08-S10 registre central des versions |
 | E09 | Cellule partagée, marque et sous-domaines | ✅ Livré | — |
 | E10 | Contenus riches : import, fichiers, images, HTML | 🟢 Ready, après la V1 (`E10-contenus-riches.md`, ADR-016 à ADR-018) | — |
+| E11 | Retours de la démo : tableaux, contexte, routage, écrans, éditeur, adresses en anglais | 🟢 Ready, avec E10 en 1.0.1 (`E11-retours-de-la-demo.md`, fiches D131, D132) | — |

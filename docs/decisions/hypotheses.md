@@ -369,7 +369,7 @@
 
 | Id | Règle |
 |---|---|
-| N1 | Une phrase est une question de données si, rognée, elle finit par « ? » ou commence par un interrogatif (`INTERROGATIVE` de `server/routing.ts`) suivi d'une frontière de mot ; « est-ce qu' » compte, apostrophe typographique comprise. |
+| N1 | Une phrase est une question de données si, rognée, elle finit par « ? » ou commence par un interrogatif (`INTERROGATIVE` de `server/routing.ts`) suivi d'une frontière de mot ; « est-ce qu' » compte, apostrophe typographique comprise ; une phrase ouverte par « comment » ou par une formule de demande n'en est pas une (`requestKind`, HN-E11S04-12). |
 | N2 | Un bloc de `context` peut porter un `fallback` : il n'est jamais coupé, son `fallback` le remplace s'il ne tient pas, et l'assemblage continue ; la procédure servie y met un pointeur vers `read`. |
 | N3 | `orgs.settings.routing` se lit clé par clé : une valeur absente, non numérique ou hors de [0, 1] reprend son défaut (seuil 0,65 ; écart 0,1). |
 | N4 | La phrase reprise dans la ligne du routage est coupée à 200 caractères (`MAX_TARGET_CHARS`), comme la cible du journal. |
@@ -930,6 +930,47 @@
 | HN-E09S05-9 | Portée plateforme : `p` lit les lignes de B dans `platform_grants` et `admin_journal`, et écrit à son nom dans le journal admin de B (policy d'insertion sans appartenance) ; la suite l'attend, puis retire la ligne. |
 | HN-E09S05-12 | Sur un clone de B, une erreur de contrainte (check, clé étrangère, unicité, non-nul) est une fuite ; 42501, 23503 d'un parent invisible et 23514 d'un Contexte à l'équipe invisible sont des refus ; toute autre erreur fait échouer. |
 | HN-E09S05-20 | Le clone d'une insertion porte l'appelant dans les colonnes comparées à `auth.uid()` (`user_id`, `created_by`, `invited_by`, `granted_by`, `activated_by`) et l'état d'une création (`feedback` ouvert, `sim_outbox` brouillon). |
+
+### E11-S04 — Routage des procédures : questions « comment », égalités, formulations du résumé, fautes de frappe
+
+| Id | Règle |
+|---|---|
+| HN-E11S04-1 | Les résumés du jeu « todo » (`tests/integration/fixtures/todo-routing.cases.ts`) sont reconstitués : ils reproduisent les égalités et les scores bas du rapport de tests sur le code d'avant. |
+| HN-E11S04-2 | Seuil 0,65 et écart 0,1 inchangés ; seuls les poids du mélange se recalibrent, sans ADR (`docs/architecture.md`, « Flexible sans ADR »). |
+| HN-E11S04-3 | Le routage tente toujours la correction, en plus de la demande telle quelle (pas en dernier recours comme `find`) ; mots de 5 à 40 lettres, seuil 0,3, sans l'exception du dernier mot. |
+| HN-E11S04-4 | La correction par le lexique s'écrit une fois, dans `platform.lexicon_fix` (forme du mot, absence du lexique, mot le plus proche) ; `search_content` l'appelle et garde en ligne son exception du dernier mot, cherché par préfixe. |
+| HN-E11S04-5 | Les poids des mots rares se comptent sur les candidates lisibles de l'appel, jamais sur toute l'organisation : un nœud illisible ne change aucun score. |
+| HN-E11S04-6 | Sans étapes servies, une question (`data`, `how`) ou une demande polie (`request`) ne suit aucune procédure d'elle-même : la consigne dit de répondre ou de chercher sans modifier de données, puis de proposer en choix toutes les candidates montrées (`CANDIDATES_SHOWN`, 3), jamais la première seule ; même ligne sous le seuil et à moins de l'écart. |
+| HN-E11S04-7 | Une question « comment » servie reçoit les étapes et « explain these steps, and run them only if the user asks » (ADR-003 § 4). |
+| HN-E11S04-8 | Aucun champ nouveau dans `structuredContent` : `data_question` vaut `false` pour `how` et `request`. |
+| HN-E11S04-9 | `route_candidates` et `search_content` excluent la corbeille (`deleted_at is null`) avant leur coupe ; le service garde `nodeLevels` après la fonction. |
+| HN-E11S04-10 | Aucune branche de présélection pour une formulation contenue dans la demande : ses mots sont des lexèmes de la demande, que la branche plein texte trouve. |
+| HN-E11S04-11 | La story livre son propre fichier de migration ; le pilote le réunit dans la migration unique de 1.0.1 (fiches D131, D124). |
+| HN-E11S04-12 | Les formules de demande (`REQUEST_FORMULAS` de `server/routing.ts`) forment une liste fermée écrite dans le code, comme les interrogatifs. |
+| HN-E11S04-13 | Le seuil de la correction est la clause `set pg_trgm.similarity_threshold = '0.3'` de `lexicon_fix`, sans paramètre : ses deux appelants corrigent à 0,3. |
+| HN-E11S04-14 | Quand des étapes sont servies, la ligne du routage ne change pas, sauf la phrase `how` ; les autres candidates y sont déjà listées. |
+| HN-E11S04-15 | Une seule candidate de score ≥ 0,30 : la consigne n'en propose qu'une ; aucune procédure sous `SHOW_THRESHOLD` n'est ajoutée pour atteindre trois. |
+| HN-E11S04-16 | `WEIGHTS` = texte 0,25, formulation 0,30, lexèmes 0,45 (dans les lexèmes, 0,75 titre et résumé, 0,25 titre seul) : le seul point d'une grille au pas de 0,05 qui tient le jeu « todo » sans baisser Acme ni le pilote. |
+| HN-E11S04-17 | Le seuil de présélection sans lexème commun reste 0,43 (HN-E01S13-5), recalculé sur les poids nouveaux. |
+| HN-E11S04-18 | `lexical_title` lit `to_tsvector('platform.fr', norm_words(title))`, la normalisation qu'emploient déjà les lexèmes du nœud. |
+| HN-E11S04-19 | Rareté et correction : `df` compte un lexème porté tel quel ou par sa correction ; la demande corrigée entre par des branches `union`, qui gardent les index de la présélection. |
+| HN-E11S04-20 | La migration redit les privilèges de `search_content` recréée (`revoke … from public`, `grant … to authenticated`) : `check:migrations` exige la révocation de toute fonction créée. |
+| HN-E11S04-21 | Le retour arrière de la migration est écrit en commentaire, jamais exécuté depuis le paquet (précédent E05-S13). |
+| HN-E11S04-22 | Les doublures de `route_candidates` de `tests/unit/routing.test.ts` dérivent `s_phrase` du texte et `lexical_title` des lexèmes : le mélange y vaut l'ancien, et les tests de filtres, bonus et coupes gardent leurs scores. |
+| HN-E11S04-23 | `isDataQuestion` reste exporté (`requestKind(phrase) === "data"`), sans appelant de production : ses tests gardent leur verdict. |
+
+### E11-S09 — Brancher mon Claude, ChatGPT ou Mistral : un guide par onglet, dans une grande fenêtre et sur /connect
+
+| Id | Règle |
+|---|---|
+| HN-E11S09-1 | Le nom est « Brancher mon Claude, ChatGPT ou Mistral » : le produit s'appelle ChatGPT, « GPT » est le modèle. |
+| HN-E11S09-2 | Quatre onglets, Claude Code en dernier ; le guide s'ouvre sur la famille de la connexion la plus récente, sinon claude.ai. |
+| HN-E11S09-3 | L'étape 1 de claude.ai garde « Paramètres → Connecteurs », que le lien direct atteint de toute façon ; les libellés de menu de ChatGPT et de Le Chat se relisent au banc, le dev corrige un libellé, pas la structure des étapes. |
+| HN-E11S09-4 | « Rechargez la page » est une note de la dernière étape de claude.ai ; les notes « Une adresse par organisation » et « compte principal » de ChatGPT sont retirées ; Mistral n'a pas de phrase de préférences (non mesurée). |
+| HN-E11S09-5 | Les demandes à essayer viennent de `usefulProcedures` sur les deux écrans, trois au plus, complétées par les exemples génériques. |
+| HN-E11S09-6 | La famille « Mistral » au journal n'existe qu'après le relevé de la signature `initialize` de Le Chat au banc ; d'ici là, `hostFamily` ne la connaît pas. |
+| HN-E11S09-7 | La fenêtre de l'accueil n'a plus de lien « Guides d'installation » ; `/connect` reste au menu du compte et dans les métadonnées OAuth. |
+| HN-E11S09-8 | Le lien direct de ChatGPT reste `https://chatgpt.com/#settings/Connectors`, non vérifié : l'aide d'OpenAI nomme d'autres chemins (« Settings → Security and login », `chatgpt.com/plugins`) ; relu au banc. |
 
 ### Tâches de suite
 

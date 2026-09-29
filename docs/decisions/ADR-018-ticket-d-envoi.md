@@ -3,13 +3,14 @@
 | Champ | Valeur |
 |-------|--------|
 | **Date** | 2026-09-28 |
-| **Statut** | Proposé (principe : JB, 2026-09-28, fiche D117 ; mise en œuvre : E10-S05, à valider à sa revue) |
+| **Statut** | Proposé (principe : JB, 2026-09-28, fiche D117 ; mise en œuvre : E10-S02 lot f, à valider à sa revue) |
 | **Décideur(s)** | JB (le lien à usage unique) ; le pilote (la porte) |
 
 ## Contexte
 
-Claude Code doit pouvoir déposer un fichier qu'il a déjà (un `.html`, un `.md`, un CSV) sans le
-réécrire dans un appel MCP (fiche D117, E10-S05). La commande `curl` qu'il lance n'a ni session
+Claude Code doit pouvoir déposer un fichier qu'il a déjà (un fichier à joindre à une page, un
+`.md` à importer en page, un CSV à importer en tableau) sans le réécrire dans un appel MCP (fiches
+D117, D137 ; E10-S02 lot f). La commande `curl` qu'il lance n'a ni session
 ni jeton de l'émetteur.
 
 Or toute porte du paquet vérifie aujourd'hui un jeton (ADR-012 ; `CLAUDE.md § Projet`, garde de
@@ -33,8 +34,10 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
    ticket, puis relit l'appartenance et les droits comme pour toute requête
    (`security-patterns.md § Droits dans le service`). Un membre retiré ou un droit perdu entre le
    lien et l'envoi fait échouer l'envoi.
+   Un fichier à joindre est envoyé par le serveur au stockage d'ADR-016, par l'URL présignée du
+   port, sous les contrôles d'une demande d'envoi (type, taille, quota).
 5. **Refus avant consommation** : une requête qui porte un en-tête `Origin` (un navigateur, ou un
-   artefact HTML qui connaîtrait le jeton), une forme de jeton invalide, un corps trop gros. Ces
+   fichier HTML vu dans la visionneuse qui connaîtrait le jeton), une forme de jeton invalide, un corps trop gros. Ces
    refus ne consomment pas le ticket.
 6. **Canal qui reste ouvert** : quiconque voit le lien dans les 15 minutes (conversation partagée,
    journaux d'un outil ou d'un proxy) peut écrire une fois, à la destination prévue, au nom de la
@@ -46,7 +49,7 @@ vaut sur chaque porte, **sauf** cette route, où le ticket en tient lieu.
 7. **Téléchargement d'une adresse fournie** (fiche D130, proposé) : pour un assistant sans shell,
    `upload.link` accepte une adresse `https` publique que le serveur télécharge. C'est la seule
    requête du paquet vers une adresse choisie par un appelant : schéma, port et adresse résolue sont
-   contrôlés avant la requête et à chaque redirection (E10-S05 W2), la taille et le délai bornés.
+   contrôlés avant la requête et à chaque redirection (E10-S02 AC-f13), la taille et le délai bornés.
 8. **Formulaire de dépôt** (fiche D130, proposé) : si le téléchargement échoue, le ticket se consomme
    depuis une page de la plateforme, sous la session web de la personne du ticket, par une route à
    session distincte de la porte sans session (§ 5 garde son refus des requêtes à `Origin`).
@@ -66,8 +69,8 @@ vaut sur chaque porte, **sauf** cette route, où le ticket en tient lieu.
 
 ### Neutres
 
-- Les assistants sans shell (Claude ou ChatGPT dans le navigateur) n'en profitent pas : le dépôt se
-  fait à l'écran.
+- Les assistants sans shell (Claude ou ChatGPT dans le navigateur) passent par le téléchargement
+  d'une adresse fournie ou par le formulaire de dépôt (§ 7, § 8).
 
 ## Alternatives considérées
 

@@ -65,11 +65,13 @@ Postgres (`bytea`) et contre Supabase Storage.
    la disposition sont fixés **dans l'URL signée** (`response-content-type`,
    `response-content-disposition`), jamais lus de l'objet :
    - une image matricielle (`png`, `jpeg`, `gif`, `webp`) se sert `inline` ;
-   - un PDF se sert `inline` seulement pour « Aperçu » ;
-   - tout le reste se sert en `attachment`, `svg` compris.
+   - un PDF se sert `inline`, et un `txt` ou un `csv` `inline` en `text/plain; charset=utf-8`,
+     seulement pour « Voir » ;
+   - tout le reste se sert en `attachment`, `svg`, `html` et `md` compris.
 
-   Aucun fichier déposé n'est jamais servi en `text/html` depuis l'origine de l'hôte
-   (`uploads-patterns.md § Validation`).
+   Un fichier `html` ne se voit que par la route isolée d'ADR-017, qui le lit par le serveur ; un
+   `.md` par la visionneuse, qui le rend en blocs. Aucun autre fichier déposé n'est servi en
+   `text/html` depuis l'origine de l'hôte (`uploads-patterns.md § Validation`).
 6. **Un fichier vit aussi longtemps que son nœud.** Retirer le bloc qui le montre ne le supprime
    pas : un instantané de `node_versions` peut encore le citer. La purge de la corbeille (30 jours,
    E05-S10) supprime les objets des nœuds purgés, après le commit. **Dupliquer** une page copie ses

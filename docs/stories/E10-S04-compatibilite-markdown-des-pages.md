@@ -11,7 +11,7 @@
 | **Référence UI** | N/A : style du paquet (`ui/noeud/rendu-des-blocs.tsx`, classes `oto-table`, `oto-linked`, `oto-separator` de `ui/ds/`) |
 | **Conventions** | database, forms, security, portage, a11y, state, mcp, testing |
 | **Estimation** | L : trois lots séquentiels dans un seul worktree (a nouveaux blocs M, b listes imbriquées et titres M, c texte en ligne S) |
-| **Vague** | E10, après 1.0.0 ; première des stories E10 (ordre : E10-S04, E10-S01, E10-S06, E10-S02, E10-S03, E10-S05) |
+| **Vague** | E10, après 1.0.0 ; première des stories E10 (ordre : E10-S04, E10-S01, E10-S06, E10-S02) |
 | **Dépend de** | M67 (lecteur tolérant : un hôte en retard ne perd aucun bloc nouveau, `.method/sprint/status.md § Contenus riches`) ; E05-S11 (lots a à e et h fusionnés : `modele.ts`, `rendu-des-blocs.tsx`, `corps-du-noeud.tsx` ; son lot f, listes de choix, ne touche aucun fichier de cette story) |
 | **Porteuse de migration** | **Oui** (Ⓜ) : `blocks_type_check` et `blocks_shape_check` élargis, `block_search_text` |
 
@@ -367,7 +367,7 @@ Une migration additive, aucune table ni colonne :
   dans la page.
 - **Schéma** : Ⓜ, deux contraintes et une fonction. Elle s'applique et fusionne avant les autres
   (`.method/sprint/vagues.md § Base de test et migrations`).
-- E10-S01, E10-S06, E10-S02 et E10-S03 touchent `markdown-parse.ts`, `blocks.ts`,
+- E10-S01, E10-S06 et E10-S02 touchent `markdown-parse.ts`, `blocks.ts`,
   `blocks-render.ts` ou `rendu-des-blocs.tsx` : elles passent après cette story.
 
 ### Refacto

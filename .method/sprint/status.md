@@ -12,9 +12,9 @@ Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣
 | E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | ✅ `@otomata_tech/oto_platform` 1.0.0 publié avec provenance (2026-09-29) ; oto-pkg public, oto-saas privé |
 | E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | ✅ fusionné, bout en bout vert, Démo vidée |
 
-## Contenus riches (epic E10, après le tag `v1.0.0`)
+## Contenus riches et retours de la démo (epics E10 et E11, après le tag `v1.0.0`)
 
-Fiches D111 à D124, ADR-016 à ADR-018. Les six stories modifient les mêmes fichiers de blocs
+Fiches D111 à D124, D131 à D134, D137, ADR-016 à ADR-018. Les quatre stories modifient les mêmes fichiers de blocs
 (`schemas/blocks.ts`, `schemas/blocks-render.ts`, `server/nodes/markdown-parse.ts`,
 `ui/noeud/rendu-des-blocs.tsx`, l'éditeur) : elles passent l'une après l'autre, dans cet ordre.
 
@@ -23,25 +23,42 @@ Fiches D111 à D124, ADR-016 à ADR-018. Les six stories modifient les mêmes fi
 | 1 | E10-S04 | Compatibilité markdown des pages : tableau simple, séparateur, repli, listes imbriquées, titres à cinq niveaux, texte en ligne (mode strict) | L | Ⓜ | E05-S11, M67 | 🟢 Ready |
 | 2 | E10-S01 | Markdown et CSV : coller, importer, exporter ; mode tolérant ; `table.import` ; « Convertir en tableau de données » | L | | E10-S04, E07-S04 | 🟢 Ready |
 | 3 | E10-S06 | Éditeur des blocs de page : choix du « + » et de `/`, tableau simple, séparateur, repli, `Tab` dans les listes, préfixes de titre | L | | E10-S04, E10-S01 | 🟢 Ready |
-| 4 | E10-S02 | Fichiers et images : port S3 (ADR-016), téléversement, bloc `file`, copie à la duplication | L | Ⓜ | E10-S04, E10-S01, E10-S06 | 🟢 Ready (action JB avant la campagne visuelle) |
-| 5 | E10-S03 | Bloc `html` : artefacts isolés (ADR-017), page à un seul bloc, lien public, `read {block}` | L | Ⓜ | E10-S04, E10-S01, E10-S06, E10-S02 | 🟢 Ready |
-| 6 | E10-S05 | Dépôt par lien à usage unique : `upload.link` et `curl` (ADR-018) | M | Ⓜ | E10-S01, E10-S03 | 🟢 Ready |
+| 4 | E10-S02 | Fichiers : port S3 (ADR-016), bloc `file`, images, « Voir » (HTML isolé, ADR-017), `read {file}`, dépôt par lien (`upload.link`, ADR-018) ; absorbe E10-S03 et E10-S05 (D137) | XL | Ⓜ | E10-S04, E10-S01, E10-S06 | 🟢 Ready (action JB avant la campagne visuelle) |
 
-- **Livraison** : une seule version, 1.1.0, pour les six (fiche D123), sans drapeau ; chez l'hôte, la
-  version mineure se relit avant fusion (fiche D121). Le tag part quand les six sont fusionnées, dans
-  le dépôt du paquet. Avant lui, `renovate/preset.json` et le README du paquet ne laissent
-  fusionner seules que les versions correctives (le preset fusionne encore les mineures).
+Retours de la démo (epic E11, fiches D131 à D136, rapport de tests FB-0001 à FB-0010, retours
+d'écran du 2026-09-29). Neuf stories, longues à dessein. Deux stories en cours ne touchent jamais le
+même fichier source (`vagues.md § Parallélisme`), ni un fichier d'une story E10 en cours : l'ordre
+suit la matrice des fichiers communs, et la mémoire du poste ne laisse qu'un créneau aux commandes
+lourdes.
+
+| Vague | ID | Titre | Est. | Ⓜ | Dépend de | Statut |
+|-------|----|-------|------|---|-----------|--------|
+| 1 | E11-S04 | Routage des procédures : trois candidates proposées, égalités, formulations, fautes de frappe (routage et `find`, M58) | L | Ⓜ | — | ✅ approuvée, fusionnée sur main (non commitée) |
+| 1 | E11-S09 | Brancher mon Claude, ChatGPT ou Mistral : un guide par onglet, grande fenêtre et `/connect` | M | | — | ✅ approuvée, fusionnée sur main (non commitée) ; AC-15 en attente (banc Le Chat) |
+| 2 | E11-S03 | Contexte et conversations : invalidation ciblée des ctx, plafond seul et coupe dite, déplacer et compléter une liste | L | Ⓜ | E11-S04 (fichiers communs) ; lot c : E10-S04 | 🟢 Ready |
+| 2 | E11-S10 | Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu | L | Ⓜ | E11-S09 (accueil) ; E10-S01 (`ui/coque/`) | 🟢 Ready |
+| 3 | E11-S01 | Tableaux : créer sans écraser, colonne stricte, recherche par mots, révision et auteur, revue par l'agent, preuve par tableau, réglages à l'écran | L | | E10-S01 (fichiers des tableaux) ; lot g après E11-S02 | 🟢 Ready (lots a à f en vague 3, lot g en vague 4 après S02) |
+| 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | 🟢 Ready |
+| 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | 🟢 Ready |
+| 5 | E11-S06 | Éditeur : une puce par élément de liste, modifier un lien dans un panneau | M | | E10-S04, E10-S06 | 🟢 Ready |
+| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | 🔵 In progress (lot a, worktree `e11-s14`) |
+| 6 | E11-S07 | Adresses en anglais : routes, paramètres, ancres, préfixe d'API | L | | toutes les autres | 🟢 Ready (cassante) |
+
+- **Livraison** : une seule version, 1.0.1, pour les quatre stories d'E10 et les neuf d'E11 (fiche
+  D131), sans drapeau ni alias d'anciennes adresses. Le tag part quand toutes sont fusionnées, dans
+  le dépôt du paquet. Version corrective : le preset Renovate la fusionne seule chez l'hôte si la CI
+  est verte ; la PR de l'hôte se relit à la main (adresses renommées, migration).
 - **`### Hosts` du `CHANGELOG.md` du paquet** : une seule migration (D124), à copier par
   `oto-platform migrations sync` puis à appliquer ; titres de niveau 2 et 3 un cran plus bas ; cinq
   variables `PLATFORM_STORAGE_*`, facultatives (sans elles, fichiers désactivés ; bucket privé et
   CORS : README) ; `X-Frame-Options` et `Referrer-Policy` globaux exclus des deux routes HTML ;
-  liste d'outils à rafraîchir dans les hosts (champ `block` de `read`, D119).
+  liste d'outils à rafraîchir dans les hosts (champ `file` de `read`, D119).
 - **Migrations** : une Ⓜ appliquée à la fois au projet de test, dans l'ordre de ses horodatages,
-  toutes additives ; avant le tag `v1.1.0`, le pilote réunit les quatre (S04, S02, S03, S05) en un
-  seul fichier `<horodatage>_v1_1_0.sql` au contenu identique, puis répare l'historique du projet de
-  test (D124).
+  toutes additives ; avant le tag `v1.0.1`, le pilote réunit celles d'E10 (S04, S02) et
+  d'E11 (S02, S03, S04, S10) en un seul fichier `<horodatage>_v1_0_1.sql` au contenu identique, puis
+  répare l'historique du projet de test (D124).
 - **CI du paquet** : un service MinIO dans le job d'intégration (adaptateur S3 réel : SigV4, `copy`,
-  URL signées) ; le test d'isolation du HTML (E10-S03) en Playwright.
+  URL signées) ; le test d'isolation du HTML (E10-S02) en Playwright.
 
 ## Stories V2 (marquées, non planifiées)
 
@@ -73,7 +90,6 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M52 | Restes de la reprise des écrans : export de `recentDocuments` par `./server` (contenus récents de l'accueil), `connexionsDe` en double entre `/` et `/connect`, lien d'évitement `#main-content` qui vise le `<main>` du contenu, `/auth/confirmer` au `Button` du design system, aides des specs e2e à factoriser. |
 | M56 | Deux `table.write` qui prennent les mêmes lignes dans des ordres contraires peuvent s'interbloquer : écrire les lignes d'un appel dans un ordre commun. |
 | M57 | `check:framework` refuse tout caractère invisible ou combinant écrit tel quel (catégories Cf, Co, Zl, Zp, marques combinantes isolées) dans `packages/`, `src/`, `tests/`, `scripts/`, avec son test. |
-| M58 | `search_content` et `route_candidates` excluent la corbeille en SQL avant la coupe à 50 lignes. |
 | M60 | Mesurer `prepare: true` de `server/sql.ts` sur Supavisor en mode transaction (40 → 22 ms par requête mesurés sur le pooler) ; les quatre lectures de `personInOrg` (`server/identity.ts`) en une instruction ; `lireLesEquipes` au lieu de `listTeams` dans `equipes`, `journal`, `admin/usage`, `admin/connecteurs`. |
 | M61 | Une seule copie d'`aplatir` (`ui/arbre/depuis-l-arbre.ts`, `ui/noeud/sous-pages.tsx`) ; code mort `AIDE_DU_RESUME` et prop `aideDuResume` ; `ProcedureDuNoeud` et `ApercuDUnePhrase` sans appelant ; commentaire de `tests/e2e/e05s10b.spec.ts` (Démo n'a qu'un membre). |
 | M62 | Suites de la base de test locale : ménage des bases `test_agent_*` du Postgres du poste. |
@@ -93,6 +109,6 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | Après la ligne de base V1 | `supabase migration repair` sur le projet du premier client, par la procédure de `packages/plateforme/migrations/README.md` (notre projet est réparé). |
 | Sur le poste | Désactiver le service Windows `postgresql-x64-16`, inutilisé par la base de test locale. |
 | Avant la campagne visuelle d'E10-S02 | Bucket du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3), règles CORS et variables `PLATFORM_STORAGE_*`. |
-| Après la fusion des six stories d'E10 | Tag `v1.1.0` (après la fusion de leurs migrations) ; dans le dépôt SaaS, Renovate réglé pour ne fusionner seules que les versions correctives (fiche D121). |
+| Après la fusion des stories d'E10 et d'E11 | Tag `v1.0.1` (après la fusion de leurs migrations, D131) ; dans le dépôt SaaS, relire à la main la PR Renovate de cette version (adresses renommées) et renommer les routes de l'hôte. |
 | Avant le premier client | Remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (inscriptions, connexions et vérifications 30, rafraîchissements 150, par 5 minutes et par IP). |
 | Au premier client | Test d'installation réel du paquet publié dans l'ERP du premier client ; chaque écart devient une story ; réglages d'Auth par `pnpm auth:settings`, `platform` retiré du Data API par `pnpm data-api:close`. |

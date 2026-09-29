@@ -37,7 +37,7 @@ const fileSchema = z.object({
 **`file.type` vient du client : il est falsifiable.** Pour un contenu sensible, vérifier les
 magic bytes côté serveur, ou servir le fichier avec `Content-Disposition: attachment` et un
 `Content-Type` forcé. Ne jamais servir un upload utilisateur en `text/html` depuis le domaine
-de l'application. Seule exception : le bloc `html` d'ADR-017, servi par ses deux routes avec la CSP
+de l'application. Seule exception : le fichier HTML d'ADR-017, servi par ses deux routes avec la CSP
 `sandbox` (sans `allow-same-origin`) et le refus hors iframe par `Sec-Fetch-Dest`.
 
 ## Nommage du chemin

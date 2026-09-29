@@ -10,6 +10,42 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-29] — E11 : cadrage des retours de la démo (dix stories, D131 à D136)
+
+**Quoi :** Nouvelle epic E11 « Retours de la démo » : dix stories longues (S01 tableaux, S02 publication directe et brouillons, S03 contexte et ctx, S04 routage, S05 écrans d'un contenu, S06 éditeur, S07 adresses en anglais, S09 branchement, S10 rail et espaces, S14 harnais de test sans Supabase), ordre en vagues selon les fichiers communs. E10 et E11 sortent ensemble en 1.0.1 (D131, remplace D123) ; arbitrages des retours (D132), preuve par tableau (D133), plafond unique de `context` (D134), publication directe (D135), écrans (D136).
+
+**Pourquoi :** rapport de tests d'un assistant sur l'organisation Démo (FB-0001 à FB-0010) et retours d'écran du responsable d'Oto, du 2026-09-29.
+
+**Fichiers :** `docs/epics/E11-retours-de-la-demo.md`, `docs/epics/_index.md`, `docs/epics/E10-contenus-riches.md`, `docs/stories/E11-*.md`, `docs/decisions/fiche-decisions.md`, `.method/sprint/status.md`.
+
+## [2026-09-29] — Fichiers : le HTML devient un fichier joint, E10-S03 et E10-S05 fusionnées dans E10-S02 (D137)
+
+**Quoi :** Un fichier HTML est un fichier joint à une page, sans rendu dans la page ; « Voir » (icône œil) ouvre dans un nouvel onglet un `html` isolé (ADR-017, déplacé du bloc vers la visionneuse), un `.md` en blocs, un PDF, un `txt` ou un `csv`. Plus de bloc `html`, de page artefact, de clôture ` ```html-artifact ` ni de `read {block}` : `read {file}` sert le texte d'un fichier texte joint (D119). Un `.md` ou un `.csv` lâché dans une page propose d'insérer ou de joindre. `upload.link` prend `file` (joindre) au lieu de `html`. Une seule story, E10-S02, XL en six lots.
+
+**Pourquoi :** décision de JB du 2026-09-29 sur le modèle des fichiers.
+
+**Fichiers :** `docs/stories/E10-S02-fichiers-et-images.md` (réécrite), `docs/stories/{E10-S03,E10-S05}-*.md` (supprimées), ADR-016 § 5, ADR-017, ADR-018, `fiche-decisions.md` (D111, D112, D116, D119, D130, D137), `docs/prd.md` (FR-CONC-07 à 09, 11), `docs/architecture.md`, `docs/epics/E10-contenus-riches.md`, `.method/sprint/status.md`, `uploads-patterns.md § Validation`, `security-patterns.md`, renvois d'E10-S01, S04, S06 et d'E11-S02, S03, S05, S07.
+
+## [2026-09-29] — E11-S04 : routage des procédures (formulations, mots rares, fautes de frappe, questions « comment », M58)
+
+**Quoi :** `route_candidates` cherche chaque formulation du résumé (`s_phrase`), pèse les mots de la demande par leur rareté parmi les candidates lisibles, compte le titre à part (`lexical_title`), corrige les fautes par le lexique et exclut la corbeille avant la coupe. La correction s'écrit une fois, dans `platform.lexicon_fix`, que `search_content` appelle aussi ; `search_content` exclut la corbeille avant sa coupe (M58), seul effet sur `find`. Le service mélange trois parts (`WEIGHTS` 0,25 / 0,30 / 0,45) et distingue le genre de la demande (`requestKind` : `how`, `request`, `data`, `action`) : sans étapes servies, une question, une question « comment » ou une demande polie propose en choix toutes les candidates montrées, jamais la première seule. Jeu « todo » rejoué sans host ; Acme : paraphrases servies 29 → 30 sur 53, formulations 20/20, précision 100 % ; pilote : paraphrases 4 sur 13, inchangé.
+
+**Pourquoi :** FB-0004, rapport de tests d'un assistant sur la todo de Démo (égalités, « crée le projet X » et fautes de frappe non servis) ; retour du responsable d'Oto sur E03-S02 : toujours proposer les candidates (ADR-003 § 2 amendé).
+
+**Problèmes :** « Prospects. » (QP-I5) n'est plus servie sur Démo (0,635, 0,805 avant) : mesure sans attente de test, dite dans les golden queries. Suites propres à Supabase sautées en local, à rejouer sur le projet (org-transfer, portabilite-schema, pilot-qualification, mcp-core, isolation, feedback-prompts).
+
+**Fichiers :** `packages/plateforme/migrations/20260929140000_route_candidates_formulations.sql` (et sa copie `supabase/migrations/`), `packages/plateforme/server/{routing.ts,context/index.ts,context/blocks/code.ts,database.ts}`, `tests/integration/{route-candidates-index,routing,search-content}.test.ts`, `tests/integration/fixtures/todo-routing.cases.ts`, `tests/unit/{routing,context-blocks,e05s13-lignes-servies}.test.ts`, `tests/sql/route-candidates-plan.sql` ; ADR-003, `docs/prd.md`, `docs/architecture.md`, `docs/mcp-golden-queries.md`, `packages/plateforme/migrations/README.md`, registre, `status.md` (M58 soldée).
+
+## [2026-09-29] — E11-S09 : « Brancher mon Claude, ChatGPT ou Mistral »
+
+**Quoi :** un guide de branchement à quatre onglets (claude.ai, ChatGPT, Mistral, Claude Code), étapes réécrites, lien vers la page des connecteurs de chaque assistant, trois demandes à essayer tirées des procédures les plus utilisées ; monté dans une fenêtre `lg` de l'accueil (la carte ne montre plus l'adresse) et sur `/connect`, qui ne garde que le guide et « Vos connexions ». Nouveau nom au menu du compte, dans la palette et au premier jour. Primitive `Tabs` portée d'oto-frontend ; `adresseDe` partagée par les deux pages de l'hôte.
+
+**Pourquoi :** retour du responsable d'Oto sur l'hôte de démo : « Brancher un assistant » à revoir sur l'ergonomie.
+
+**Problèmes :** AC-15 (famille « Mistral » au journal) en attente de la signature `initialize` de Le Chat, relevée au banc ; lien direct de ChatGPT non vérifié.
+
+**Fichiers :** `packages/plateforme/ui/{ds/react/tabs.tsx,connexion/guide-de-branchement.tsx,connexion/libelles.ts,connexion/ecran-connexion.tsx,accueil/*,coque/libelles.ts}`, `packages/plateforme/server/prompts.ts`, `src/lib/plateforme/connexion.ts`, `src/app/(dashboard)/{page.tsx,connect/page.tsx}`, `tests/integration/components/guide-de-branchement.test.tsx` et les suites de l'accueil, de `/connect` et du rail, `tests/e2e/{accueil,connect}.spec.ts` ; `docs/prd.md` (FR-CONN-04), `docs/architecture.md`, `docs/pilote/guide-installation.md`, `portage-ecrans.md § 0`, registre.
+
 ## [2026-09-29] — Méthode après la coupe ; dépôt pour les hosts sans shell (D130)
 
 **Quoi :** Les documents de méthode citent l'hôte sous la forme « oto-saas : `<chemin>` » ; les deux renvois à `src/hooks/**` retirés ; `CLAUDE.md § Projet` nomme les connecteurs du paquet (ADR-019). D130 : E10-S05 s'étend aux hosts sans shell (téléchargement d'une adresse publique, sinon formulaire de dépôt), ADR-018 § 7 et § 8 proposés.

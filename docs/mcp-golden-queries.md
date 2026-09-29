@@ -34,8 +34,8 @@
 | # | Prompt | Attendu au journal |
 |---|--------|--------------------|
 | I1 (V2) | Qui n'a toujours pas répondu à nos propositions commerciales ? | `acme_context` : étapes de `ventes/relance_devis` servies, ou candidats avec consigne de demander ; puis `sellsy.list_estimates` ou une question ; aucun brouillon, aucun envoi |
-| I2 | Combien coûte une pré-étude chez nous ? | `acme_context` (aucune étape ; consigne « question ») → `acme_find` « pré-étude » (extrait du bloc de `conseil/grille_tarifaire_2026` : « Pré-étude : 1 500 € HT ») → réponse chiffrée, `acme_read` facultatif ; aucune question sur la procédure (E03-S02) |
-| I3 | Combien de prospects avons-nous à Valbrune, et lesquels ? | `acme_context` (aucune étape, consigne « question ») → `acme_find` (lignes de `ventes/suivi_prospects` et leur colonne) et/ou `acme_read ventes/suivi_prospects` → `acme_call table.rows` avec `filter: {ville: "Valbrune"}` ; la réponse donne `total` et les lignes servies ; aucune question sur la procédure (E03-S02, E07-S01) |
+| I2 | Combien coûte une pré-étude chez nous ? | `acme_context` (aucune étape ; consigne « question ») → `acme_find` « pré-étude » (extrait du bloc de `conseil/grille_tarifaire_2026` : « Pré-étude : 1 500 € HT ») → réponse chiffrée, `acme_read` facultatif ; quand `context` montre des candidates : la réponse, puis les candidates proposées en choix, aucune exécution sans choix (E11-S04, HN-E11S04-6) ; sans candidate, aucune question sur la procédure (E03-S02) |
+| I3 | Combien de prospects avons-nous à Valbrune, et lesquels ? | `acme_context` (aucune étape, consigne « question ») → `acme_find` (lignes de `ventes/suivi_prospects` et leur colonne) et/ou `acme_read ventes/suivi_prospects` → `acme_call table.rows` avec `filter: {ville: "Valbrune"}` ; la réponse donne `total` et les lignes servies ; quand `context` montre des candidates : la réponse, puis les candidates proposées en choix, aucune exécution sans choix (E11-S04, HN-E11S04-6) ; sans candidate, aucune question sur la procédure (E03-S02, E07-S01) |
 
 ## Négatifs (ne doivent PAS déclencher nos tools)
 
@@ -77,7 +77,7 @@ Delta : exploitation).
 |---|--------|--------------------|
 | R1 | Relance les devis qui n'ont pas eu de réponse. | `acme_context` sert `ventes/relance_devis` (étapes, score ≥ seuil, écart ≥ 0,1), autres candidats listés → première étape de la procédure |
 | R2 | Prospects. | `acme_context` : aucune étape, candidats et consigne « Ask the user which one to run » → question à l'utilisateur ; aucun `acme_call` |
-| R3 | Quels prospects sont encore à traiter ? | `acme_context` : aucune étape, consigne « It is a question… » → `acme_read ventes/suivi_prospects` ou `acme_find` → `acme_call table.rows` filtré sur `statut` ; aucune question sur la procédure (preuve 11) |
+| R3 | Quels prospects sont encore à traiter ? | `acme_context` : aucune étape, consigne « It is a question… » → `acme_read ventes/suivi_prospects` ou `acme_find` → `acme_call table.rows` filtré sur `statut` ; la réponse, puis les candidates proposées en choix (« then offer the user all the candidates above as choices ») ; aucune exécution sans choix (E11-S04, HN-E11S04-6 ; remplace « aucune question sur la procédure », preuve 11) |
 | F1 | Quelle fonction crée un brouillon d'email ? | `acme_context` → `acme_find` (sans type ou `type: function`) : `mail.create_draft` en tête → réponse ; aucun `acme_call` |
 | F2 | On a une page sur les délais de livraison ? | `acme_context` → `acme_find` → « No match », ou des extraits sans rapport (repli en OU : « délai moyen » d'une synthèse du support) → « aucune page sur les délais de livraison » dit à l'utilisateur, sans invention |
 | F4 | Où sont les quatre blocs de la grille ? | `acme_context` → `acme_find` « quatre blocs » : servi tel quel quand la demande est trouvée ; sinon, la passe de dernier recours peut corriger « quatre » en « quand » (HN-E01S13-1) : un résultat sans rapport se signale ici (revue d'E01-S13) |
@@ -184,6 +184,8 @@ Delta : exploitation).
 
 Rejeu sans host (E06-S01, AC4, 2026-09-25 ; membre de Ventes, bonus d'équipe, sans usage ; seuil 0,65) : QP-D1 0,78 servie ; QP-D3 (titre) 1,00 servie ; QP-D2 0,58 et QP-I1 0,51 en premier candidat, non servies ; QP-I2 0,63 (0,66 avec l'usage : servie) ; QP-I3 0,41 ; QP-I4 0,73 servie ; QP-I5 0,81 servie ; QP-V1 0,53 (0,56) ; QP-N1 0,33 ; QP-N2 0,32. Paraphrases servies : 4 sur 13.
 
+Rejeu après E11-S04 (2026-09-29, mêmes conditions) : paraphrases servies 4 sur 13, inchangé ; QP-D2 0,58 ; QP-I5 0,635, non servie (0,805 avant). Ce dernier score est une mesure sans attente : aucun test n'exige QP-I5 servie. Acme au même rejeu : paraphrases servies 29 → 30 sur 53, formulations 20 sur 20, précision 100 %, ambiguës servies 2 → 1 sur 6, premier candidat juste 95,6 % → 97,8 %.
+
 | # | Prompt | Attendu au journal |
 |---|--------|--------------------|
 | QP-D1 | Qualifie les prospects à traiter. | `demo_context` (cible `ventes/qualifier_prospects`, étapes servies) → `demo_call table.schema` → `demo_call table.claim` (`worker` `qualification`, `limit` 3) → `demo_find` et/ou `demo_read` (`ventes/notes_salon_2026`, `conseil/grille_tarifaire`) → `demo_call table.write` (3 lignes ; `set` avec `comment` ou `link`, `verified_empty` avec raison ; aucun `null`) → `demo_call table.release` × 3 vers « à revoir » → résumé d'une ligne par prospect. Aucun `mail.*`. Au plus un refus, suivi de sa correction |
@@ -193,10 +195,28 @@ Rejeu sans host (E06-S01, AC4, 2026-09-25 ; membre de Ventes, bonus d'équipe, s
 | QP-I2 | Il reste combien de prospects à qualifier ? | Question de données, limite mesurée (plus de voisine, P37) : `demo_context` peut servir les étapes avec les bonus d'équipe et d'usage ; attendu quand même : `demo_call table.rows` avec `{"filter": {"statut": "à traiter"}}` ou `demo_call table.aggregate` par `statut` → nombre juste (7 sur l'état initial) ; aucun `claim`, aucun `write` |
 | QP-I3 | Combien de fiches attendent la revue ? | `demo_context` sans étape servie → `demo_call table.rows` avec `{"filter": {"statut": "à revoir"}}` ou `table.aggregate` → nombre juste (3 sur l'état initial) ; aucune écriture |
 | QP-I4 | Où en est la qualification de nos prospects ? | Question de données, limite mesurée (ancienne voisine, P37) : `demo_context` sert les étapes (ses deux lexèmes sont ceux du titre et du résumé) ; attendu quand même : `demo_call table.aggregate` par `statut` ou `demo_call table.rows` → répartition juste (7 à traiter, 3 à revoir sur l'état initial) ; aucun `claim`, aucun `write` |
-| QP-I5 | Prospects. | Demande d'un seul mot (fiche D9, option A) : `demo_context` sert les étapes (aucun deuxième candidat) → le modèle annonce ce qu'il va faire et combien de prospects (étape 1) et demande l'accord avant `table.claim` ; sans accord, aucun `claim`, aucun `write` |
+| QP-I5 | Prospects. | Demande d'un seul mot (fiche D9, option A) : depuis E11-S04 (0,635, sous le seuil), `demo_context` sans étape servie, candidates et consigne « Ask the user which one to run » → question à l'utilisateur ; après son choix, le modèle annonce ce qu'il va faire et combien de prospects (étape 1) et demande l'accord avant `table.claim` ; sans accord, aucun `claim`, aucun `write` |
 | QP-V1 | Relance les prospects à traiter. | Demande proche d'une procédure absente (plus de voisine stockée, P37 ; ni le titre ni le résumé ne portent « à traiter ») : `demo_context` sans étape servie → le modèle dit qu'aucune procédure de relance n'existe, ou demande ; aucun `claim`, aucun `mail.*` |
 | QP-N1 | Aide-moi à qualifier mon équipe de football pour la finale. | Aucun appel `demo_*` |
 | QP-N2 | Complète cette phrase : « Le chat est sur le… ». | Aucun appel `demo_*` |
+
+### Routage de la todo — E11-S04 (organisation Démo, `demo_`)
+
+Jouée sur Démo quand la todo y est (quatre procédures : « Ajouter une tâche », « Voir mes tâches »,
+« Mettre à jour une tâche », « Créer un nouveau projet »).
+
+Rejeu sans host (E11-S04, AC-c1, 2026-09-29 ; organisation jetable, sans bonus d'équipe ni d'usage ; seuil 0,65 ; `tests/integration/fixtures/todo-routing.cases.ts`) : TD1 0,67 servie ; TD2 0,72 servie ; TD3 0,65 servie (0,653, marge mince) ; TD6 0,72 servie ; TD5 non servie, « Ajouter une tâche » en tête à 0,60 ; TD4 non servie, « Voir mes tâches » montrée à 0,31 ; TD7 0,78 servie ; TDN1 et « Quelle heure est-il ? » jamais servies.
+
+| # | Prompt | Attendu au journal |
+|---|--------|--------------------|
+| TD1 | Passe la 1 en fait. | `demo_context` sert « Mettre à jour une tâche » → l'écriture de la tâche 1 |
+| TD2 | Ma todo. | `demo_context` sert « Voir mes tâches » ; aucune écriture |
+| TD3 | Crée le projet Alpha. | `demo_context` sert « Créer un nouveau projet » |
+| TD4 | Qu'est-ce que j'ai à faire aujourd'hui ? | `demo_context` sans étape servie, consigne « It is a question… » → `demo_find`, `demo_read` ou `demo_call table.rows` → la réponse, puis les candidates proposées en choix, « Voir mes tâches » parmi elles ; aucune écriture |
+| TD5 | Note que je dois relancer la Boulangerie des Tilleuls demain. | `demo_context` sans étape servie, « Ajouter une tâche » en tête des candidates, consigne « Ask the user which one to run » → la personne choisit ; aucun `mail.*` |
+| TD6 | Créé une tâcje pour essayer. | `demo_context` sert « Ajouter une tâche » (faute corrigée par le lexique) |
+| TD7 | Comment je crée un projet ? | `demo_context` sert « Créer un nouveau projet » avec « It asks how: explain these steps » → explication tirée des étapes ; aucune écriture sans accord |
+| TDN1 | Supprime le projet Alpha. | Rien de servi ; le modèle dit qu'aucune procédure ne le fait, ou demande ; aucune écriture |
 
 ## Connecteur admin (`/api/mcp-admin`, compte Claude de l'équipe plateforme) — E08-S02, E08-S06
 

@@ -28,6 +28,7 @@ import { recordFeedback } from "../server/feedback"
 import { find } from "../server/find"
 import type { Identity, IdentityOrg } from "../server/identity"
 import { clip, journalError, loggedArgs, type JournalEntry } from "../server/journal"
+import { isJsonObject } from "../server/json"
 import { readNode } from "../server/nodes/read"
 import { writeNode } from "../server/nodes/write"
 import { getPrompt, listPrompts, type ProcedurePrompt, unknownPromptMessage } from "../server/prompts"
@@ -181,6 +182,9 @@ async function runTool(
       account_id: output.accountId ?? null,
       result_chars: result.content[0].text.length,
     })
+    // Ce qu'une fonction a fait, en clé réservée des arguments, après leur masquage et leur coupe (E11-S02,
+    // AC-h2, HN-E11S02-16) : le fil de l'accueil le relit.
+    if (output.outcome && isJsonObject(entry.args)) entry.args = { ...entry.args, _outcome: output.outcome }
     return result
   } catch (error) {
     const failure = failureOf(error, deps.org.prefix)

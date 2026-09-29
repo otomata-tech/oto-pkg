@@ -156,7 +156,7 @@ describe.skipIf(!sqlConfigured)(portable("reference blocks on a real database"),
       const rewrite = targets()
       addBlocks(rewrite, "ventes/prepa", "published", PREPA.map((block, index) => ({ ...block, id: ids[index] })))
       await content(rewrite)
-      await writeNode(await ref.db("lea"), lea, { path: "ventes/prepa", base_revision: 1, ops: [{ op: "replace_section", section: "Annexe", text: body }] }, { kind: "agent", ctx: null })
+      await writeNode(await ref.db("lea"), lea, { path: "ventes/prepa", base_revision: 1, ops: [{ op: "replace_section", section: "Annexe", text: body }], publish: false }, { kind: "agent", ctx: null })
       expect(await kept("draft")).toEqual(await kept("published"))
 
       // La forme `context` (E03-S08 la branche) : la ligne seule.
@@ -181,7 +181,7 @@ describe.skipIf(!sqlConfigured)(portable("reference blocks on a real database"),
       const published = await writeNode(await ref.db("claire"), who("claire"), { path: "ventes/pub", base_revision: 1, publish: true }, { kind: "agent", ctx: null })
       expect(published.text).toBe(
         [
-          "Published ventes/pub revision 2 (2 sections, 6 blocks).",
+          "Published ventes/pub revision 2 (2 sections, 6 blocks). Next write: base_revision 2.",
           "Warnings:",
           "- reference block before the first heading: conseil/y does not exist (yet)",
           "- reference block in « Annexe »: conseil/x does not exist (yet)",

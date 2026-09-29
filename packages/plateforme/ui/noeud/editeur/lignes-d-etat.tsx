@@ -1,7 +1,7 @@
 "use client"
 
 // Ce que l'éditeur dit de ses écritures (E05-S02, AC10, AC12, AC15, AC18 ; E05-S09, partie c1) : la ligne
-// d'état, montée vide au premier rendu (« Enregistrement… », « Brouillon enregistré. ») ; la ligne
+// d'état, montée vide au premier rendu (« Enregistrement… », « Enregistré. ») ; la ligne
 // d'annonce, « Bloc supprimé. » et « Annuler » pendant dix secondes ; l'alerte d'un refus, près du texte,
 // avec ce qu'on peut y faire. Sans elles, un geste partirait sans que personne ne sache s'il est arrivé.
 //
@@ -47,10 +47,10 @@ function useReussites(): { occupee: boolean; arretee: boolean; reussites: number
 
 /**
  * L'indication d'enregistrement d'un document (AC-1, AC-2) : « Enregistrement… » tant que la file écrit, puis
- * « Enregistré. » (« Brouillon enregistré. » au niveau écriture, qui ne publie pas) pendant 5 s ; montée vide,
+ * « Enregistré. » pendant 5 s, à tout niveau d'écriture (E11-S02, AC-c2 : écrire publie) ; montée vide,
  * en haut à droite de la carte qui la contient (`position: relative`). Un échec garde son alerte, et elle se tait.
  */
-export function IndicationDEnregistrement({ niveau }: { niveau: 2 | 3 }) {
+export function IndicationDEnregistrement() {
   const { occupee, arretee, reussites } = useReussites()
   const [eteinte, setEteinte] = useState(0)
   useEffect(() => {
@@ -58,8 +58,7 @@ export function IndicationDEnregistrement({ niveau }: { niveau: 2 | 3 }) {
     const minuteur = setTimeout(() => setEteinte(reussites), DUREE_D_ENREGISTRE_MS)
     return () => clearTimeout(minuteur)
   }, [reussites])
-  const enregistre = niveau === 3 ? PUBLICATION_SEULE.enregistre : EDITEUR.enregistre
-  const texte = arretee ? "" : occupee ? EDITEUR.enregistrement : reussites > eteinte ? enregistre : ""
+  const texte = arretee ? "" : occupee ? EDITEUR.enregistrement : reussites > eteinte ? PUBLICATION_SEULE.enregistre : ""
   return (
     <p role="status" aria-busy={occupee && !arretee} className="oto-caption oto-indication-d-enregistrement">
       {texte}

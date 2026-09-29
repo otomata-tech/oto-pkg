@@ -2,10 +2,10 @@
 // lues d'un CSV, écrites dans un tableau existant, ou dans un tableau que l'import crée et publie. Un service, deux
 // portes (`mcp-patterns.md § 1`) : `table.import` derrière `call`, adaptateur fin en fin de fichier, et `POST
 // /api/plateforme/tables/import` (l'écran, un lot de 500 lignes par requête, et la conversion d'un tableau
-// simple) ; E10-S05 l'appellera aussi. Les droits se décident avant toute requête sur les lignes : la gestion du
-// parent pour une création (l'en-tête est publié, D120, HN-E10S01-2), l'écriture du tableau sinon ; puis tout le
-// lot est contrôlé (`checkImport`, que l'écran a déjà joué), puis écrit en une transaction, tout ou rien, fusionné
-// sur la clé comme `table.write` : une valeur égale à la valeur rangée est ignorée, une valeur nouvelle porte la
+// simple) ; E10-S05 l'appellera aussi. Les droits se décident avant toute requête sur les lignes : l'écriture du
+// parent pour une création, comme `writeNode` (écrire publie, fiche D135 ; l'en-tête est publié, D120),
+// l'écriture du tableau sinon ; puis tout le lot est contrôlé (`checkImport`, que l'écran a déjà joué), puis
+// écrit en une transaction, tout ou rien, fusionné sur la clé comme `table.write` : une valeur égale à la valeur rangée est ignorée, une valeur nouvelle porte la
 // provenance `import` et son commentaire, qui tient lieu de preuve (D100). Sans lui, un CSV ne devient un tableau
 // que ligne à ligne, par `table.write`.
 import {
@@ -118,7 +118,7 @@ function meanwhile(lot: Lot, row: { line: number; rowKey: string }, what: "was c
 
 /**
  * Une création (AC-b3, AC-c1, D120) : le chemin libre (un nœud, visible ou non, ou l'ancien chemin d'un autre :
- * `conflict`, N31), le parent visible, sa gestion ; sinon le refus dit à qui demander. Rien n'est lu ni écrit
+ * `conflict`, N31), le parent visible, son écriture (E11-S02, comme `writeNode`) ; sinon le refus dit à qui demander. Rien n'est lu ni écrit
  * des lignes avant.
  */
 async function requireCreation(context: ImportContext, path: string): Promise<void> {
@@ -127,10 +127,10 @@ async function requireCreation(context: ImportContext, path: string): Promise<vo
   const parentAt = parentPath(path) ?? ROOT_PATH
   const parent = await findNode(db, identity, parentAt)
   if (!parent) throw new PlatformError("not_found", `Cannot create ${path}: its parent ${parentAt} does not exist.`)
-  if (parent.level >= ACCESS_LEVELS.manage) return
+  if (parent.level >= ACCESS_LEVELS.write) return
   const owner = await ownerOf(db, parent.node.id)
   const who = owner ? await describeOwner(db, identity, owner) : "its managers"
-  throw new PlatformError("forbidden", reservedTo("publish", `a new table under ${parentAt}`, who))
+  throw new PlatformError("forbidden", reservedTo("write", `under ${parentAt}`, who))
 }
 
 /**
@@ -354,7 +354,7 @@ export const tableImport = defineFunction({
   class: "write",
   origin: "paquet",
   description:
-    "Imports the rows of a CSV into a table, matched on its key; with create, creates and publishes the table first. A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line. Each piece is checked whole, then written whole or not at all: a row whose key exists is updated, a value equal to the stored one is ignored, and every new value carries the provenance import with the file name, which stands as its proof. With create, the types are read from the values (bool, number, date, datetime, email, url, else text) and the key is the first column whose values are all present and distinct, unless you pass key; it needs the manage level on the parent. Columns the table does not have are ignored and listed.",
+    "Imports the rows of a CSV into a table, matched on its key; with create, creates and publishes the table first. A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line. Each piece is checked whole, then written whole or not at all: a row whose key exists is updated, a value equal to the stored one is ignored, and every new value carries the provenance import with the file name, which stands as its proof. With create, the types are read from the values (bool, number, date, datetime, email, url, else text) and the key is the first column whose values are all present and distinct, unless you pass key; it needs the write level on the parent. Columns the table does not have are ignored and listed.",
   schema: tableImportArgsSchema,
   examples: [
     {
@@ -371,7 +371,7 @@ export const tableImport = defineFunction({
     `More than ${formatCount(IMPORT_CSV_MAX)} characters or ${formatCount(IMPORT_ROWS_MAX)} lines: ${PIECES}`,
     `More than ${formatCount(IMPORT_COLUMNS_MAX)} columns: ${BOUND_ADVICE.columns} A cell of more than ${formatCount(IMPORT_CELL_MAX)} characters: ${BOUND_ADVICE.cell}`,
     "create on a path already taken; an unknown table without create: the refusal lists the tables you can read.",
-    "create without the manage level on the parent, or no write level on the table: the refusal says whom to ask.",
+    "create without the write level on the parent, or no write level on the table: the refusal says whom to ask.",
     "A new key in a closed table, a required column missing on a new row, a row claimed by someone else: nothing is written.",
   ],
   next: ["table.rows", "table.write", "table.import"],

@@ -13,9 +13,11 @@ import {
   listNodeRules,
   listTrash,
   moveImpact,
+  moveNode,
   nodeLinks,
   placeNode,
   publishNode,
+  readNode,
   resolveIdentity,
   restoreNode,
   setGeneralAccess,
@@ -302,11 +304,50 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
       expect(renamed.text).toContain("Renamed: now at ventes/grille_2027; the old path ventes/grille still leads here.")
       expect((await findNode(claire.db, claire.identity, "ventes/grille"))?.node.path).toBe("ventes/grille_2027")
       // Un titre laissé en brouillon ne déplace rien : l'adresse suit à la publication (celle d'`admin_node publish`).
-      const draft = await writeNode(claire.db, claire.identity, { path: "ventes/grille_2027", base_revision: 2, title: "Grille 2028" }, agent)
+      const draft = await writeNode(claire.db, claire.identity, { path: "ventes/grille_2027", base_revision: 2, title: "Grille 2028", publish: false }, agent)
       expect(draft.data).not.toHaveProperty("renamed_from")
       const found = await findNode(claire.db, claire.identity, "ventes/grille_2027")
       if (!found) throw new Error("ventes/grille_2027 not found")
       expect((await publishNode(claire.db, claire.identity, found.node, { baseRevision: 2 })).renamed).toEqual({ from: "ventes/grille_2027", to: "ventes/grille_2028" })
+    })
+
+    // E11-S02 (AC-a3, HN-E11S02-18) : le chemin suit le titre au niveau écriture, par le même mécanisme qu'un
+    // renommage par la gestion ; l'ancien chemin mène toujours au nœud, en lecture comme en écriture ; déplacer
+    // reste à la gestion.
+    it("should let a writer publish a new title, the path following it, the old path still leading to the node", async () => {
+      const lea = as("lea")
+      await writeNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea", title: "Sans titre", summary: "À compléter." }, { kind: "human" })
+      const renamed = await writeNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea", base_revision: 1, title: "Tarifs Léa 2026" }, { kind: "human" })
+      expect(renamed.data).toMatchObject({ path: "ventes/tarifs_lea_2026", renamed_from: "ventes/sans_titre_lea", status: "published", revision: 2 })
+      expect(renamed.text.split("\n").at(-1)).toBe("Renamed: now at ventes/tarifs_lea_2026; the old path ventes/sans_titre_lea still leads here.")
+      const [alias] = await fx.admin<{ path: string }[]>`select old_path as path from platform.node_aliases where org_id = ${o.org.id} and old_path = 'ventes/sans_titre_lea'`
+      expect(alias).toEqual({ path: "ventes/sans_titre_lea" })
+      // Lu par l'ancien chemin : la ligne « moved to » en tête ; écrit par lui : le nœud modifié, et publié.
+      const read = await readNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea" })
+      expect(read.text.split("\n")[0]).toMatch(/^ventes\/sans_titre_lea moved to ventes\/tarifs_lea_2026 on \d{4}-\d{2}-\d{2}: use the new path\.$/)
+      expect(read.data).toMatchObject({ moved_from: "ventes/sans_titre_lea" })
+      const written = await writeNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea", base_revision: 2, ops: [{ op: "add_section", section: "Grille", text: "Tarif A." }] }, { kind: "agent", ctx: null })
+      expect(written.text.split("\n")[0]).toMatch(/^ventes\/sans_titre_lea moved to ventes\/tarifs_lea_2026 on /)
+      expect(written.data).toMatchObject({ moved_from: "ventes/sans_titre_lea", status: "published", revision: 3 })
+      // Déplacer reste à la gestion : Léa est refusée.
+      await expect(moveNode(lea.db, lea.identity, { path: "ventes/tarifs_lea_2026", new_path: "ventes/ailleurs" })).rejects.toMatchObject({ code: "forbidden" })
+    })
+
+    it("should publish a new title but keep the path when the writer cannot write under the parent, and log it (HN-E11S02-18)", async () => {
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined)
+      const lea = as("lea")
+      // Un dossier que Léa lit seulement, une page dessous qu'elle écrit (règles propres à Léa).
+      const dossier = await page("ventes/lecture_seule")
+      await fx.addRule({ orgId: o.org.id, nodeId: dossier, userId: o.people.lea.id, level: "read" })
+      const child = await page("ventes/lecture_seule/note")
+      await fx.addRule({ orgId: o.org.id, nodeId: child, userId: o.people.lea.id, level: "write" })
+      const found = await findNode(lea.db, lea.identity, "ventes/lecture_seule/note")
+      if (!found) throw new Error("ventes/lecture_seule/note not found")
+      const published = await writeNode(lea.db, lea.identity, { path: "ventes/lecture_seule/note", base_revision: found.node.revision, title: "Note publiée" }, { kind: "human" })
+      expect(published.data).toMatchObject({ path: "ventes/lecture_seule/note", status: "published", revision: found.node.revision + 1 })
+      expect(published.data).not.toHaveProperty("renamed_from")
+      expect(loggedText(logged)).toContain("[platform] followTitle: path kept")
+      logged.mockRestore()
     })
 
     // E01-S12 partie c (HN-E01S12c-11) : un contenu à la corbeille garde son chemin ; six « Sans titre » à la
@@ -350,7 +391,8 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
           { kind: "human" },
         )
       await untitled("ventes/projet/sans_titre", "procedure")
-      const renamed = await writeNode(claire.db, claire.identity, { path: "ventes/projet/sans_titre", base_revision: 0, title: "Procédure 1", publish: true }, { kind: "human" })
+      // Créée publiée depuis E11-S02 (AC-c1) : révision 1.
+      const renamed = await writeNode(claire.db, claire.identity, { path: "ventes/projet/sans_titre", base_revision: 1, title: "Procédure 1", publish: true }, { kind: "human" })
       expect(renamed.data).toMatchObject({ path: "ventes/projet/procedure_1", renamed_from: "ventes/projet/sans_titre" })
       const procedureRow = () => fx.admin<{ kind: string; revision: number }[]>`select kind, revision from platform.nodes where org_id = ${o.org.id} and path = 'ventes/projet/procedure_1'`
       const procedure = [...(await procedureRow())]

@@ -37,7 +37,9 @@ const PATH = "ventes/relance_test"
 const PROCEDURE: ContentNode = { path: PATH, kind: "procedure", title: "Relance de test", summary: "Relance les prospects de test." }
 const DRAFT_ARGS = { to: "<email du contact>", subject: "Suite à notre échange", body: "<texte>" }
 /** La consigne qui clôt un refus, au préfixe de l'organisation (jetable sur la base réelle). */
-const footer = (prefix: string) => `Fix them with ${prefix}_write (ops on the sections), then publish again. Format and rules: ${prefix}_read {"path": "write.procedure"}.`
+// La dernière ligne dit comment écrire en plusieurs appels, `write` publiant par défaut (E11-S02, AC-b2).
+const footer = (prefix: string) =>
+  `Fix them with ${prefix}_write (ops on the sections), then publish again. Format and rules: ${prefix}_read {"path": "write.procedure"}.\nWriting it in several calls? Pass publish: false until the last one.`
 /** Une procédure de P au chemin d'une de O : une lecture qui oublierait l'organisation la listerait. */
 const OTHER_PROCEDURE = "other:node:proc"
 /** Les tables qu'une publication écrit. */
@@ -285,7 +287,7 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
         calls[3],
       ])
       const claire = await write("claire", { path: PATH, base_revision: 0, publish: true })
-      expect(claire.result?.text).toBe(`Published ${PATH} revision 1 (3 sections, 12 blocks).`)
+      expect(claire.result?.text).toBe(`Published ${PATH} revision 1 (3 sections, 12 blocks). Next write: base_revision 1.`)
       expect(ref.readable(publishCalls(claire.calls).map(publishArgs))).toEqual([{ node: nodeId(PATH), baseRevision: 0, stamp: instant(CONTENT_AT), links: [] }])
       expect(await nodeRow(PATH)).toMatchObject({ kind: "procedure", meta: {}, status: "published", revision: 1 })
       const [version] = await seed.admin<{ node_id: string; revision: number; kind: string; blocks: Record<string, unknown>[] }[]>`
@@ -324,7 +326,7 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
       await ref.openDraft(PATH, { kind: "page" })
       await ref.addBlocks(PATH, "draft", [heading("Étapes"), callBlock("x.unknown")])
       const leaving = await write("claire", { path: PATH, base_revision: 1, publish: true })
-      expect(leaving.result?.text).toBe(`Published ${PATH} revision 2 (1 section, 2 blocks).`)
+      expect(leaving.result?.text).toBe(`Published ${PATH} revision 2 (1 section, 2 blocks). Next write: base_revision 2.`)
       expect(await nodeRow(PATH)).toMatchObject({ kind: "page", meta: {} })
     })
 

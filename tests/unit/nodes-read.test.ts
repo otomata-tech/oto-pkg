@@ -112,7 +112,7 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
           `path: ventes/modele_relance · page · published · revision 2 · updated ${DAY}`,
           "summary: Le modèle d'email de relance d'un devis, à personnaliser.",
           "owner: team Ventes (lead: Claire Morel)",
-          "access: write (drafts; publishing is reserved to team Ventes (lead: Claire Morel))",
+          "access: write (write and publish; sharing, moving and deleting are reserved to team Ventes (lead: Claire Morel))",
           "parent: ventes — Ventes",
           "children: none",
           "links in: none",
@@ -165,7 +165,7 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       expect(draftReads(marc.calls)).toEqual([])
 
       await content(base())
-      expect((await read("lea", { path: "private/lea" })).text).toContain("owner: you (personal)\naccess: manage (drafts and publishing)\n")
+      expect((await read("lea", { path: "private/lea" })).text).toContain("owner: you (personal)\naccess: manage (write and publish, share, move, delete)\n")
       // Partagé par une règle sous l'espace de Claire, qu'Ada ne voit pas (D5) : le titre du parent serait une fuite (N56).
       await content(base([], [{ node: "private/claire/notes", user: "ada", level: "read" }]))
       const notes = await read("ada", { path: "private/claire/notes" })
@@ -372,7 +372,8 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       await content(tables)
       const lea = await read("lea", { path: MODELE.path, draft: true })
       expect(lea.text).toContain(`children: none\nlinks in: none\nlinks out: none\ndraft: pending on revision 2 (saved ${DAY})\npending title: Relance d'un devis\n\n## Objet\n\nMadame, Monsieur,\n\n`)
-      expect(lea.text.endsWith('To edit: acme_write {"path": "ventes/modele_relance", "base_revision": 2, "ops": [...]}.')).toBe(true)
+      // Dès le niveau écriture, qui publie (E11-S02, AC-b4) : le pied dit comment publier le brouillon.
+      expect(lea.text.endsWith('To edit: acme_write {"path": "ventes/modele_relance", "base_revision": 2, "ops": [...]}.\nPublish it with acme_write {"path": "ventes/modele_relance", "base_revision": 2, "publish": true}.')).toBe(true)
       const claire = await read("claire", { path: MODELE.path, draft: true })
       expect(claire.text.endsWith('\nPublish it with acme_write {"path": "ventes/modele_relance", "base_revision": 2, "publish": true}.')).toBe(true)
       expect((await read("lea", { path: MODELE.path, draft: true, since_revision: 2 })).text).toContain(
@@ -526,7 +527,7 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
 
     it("should let an administrator read a node of a team, with the manage level (AC18)", async () => {
       await content(base())
-      expect((await read("ada", { path: "ventes/devis" })).text).toContain("\naccess: manage (drafts and publishing)\n")
+      expect((await read("ada", { path: "ventes/devis" })).text).toContain("\naccess: manage (write and publish, share, move, delete)\n")
     })
   })
 })

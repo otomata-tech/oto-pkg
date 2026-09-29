@@ -248,7 +248,9 @@ export async function checkProcedureBlocks(db: PlatformDb, identity: Identity, b
 
 /**
  * Le refus d'une publication (AC2, AC3, N5) : tous les problèmes, 20 listés puis leur nombre, et
- * `details.refusals` complet pour l'écran ; servi en texte seul par le MCP (`formatError`).
+ * `details.refusals` complet pour l'écran ; servi en texte seul par le MCP (`formatError`). La dernière
+ * ligne dit comment écrire une procédure en plusieurs appels, `write` publiant par défaut (E11-S02,
+ * AC-b2, N28).
  */
 export function procedurePublicationError(path: string, refusals: readonly ProcedureRefusal[], prefix: string): PlatformError {
   // `boundedList` borne la liste (`mcp-patterns.md § 4`) ; sa ligne de compte, seule ligne sans « - »,
@@ -261,6 +263,7 @@ export function procedurePublicationError(path: string, refusals: readonly Proce
     `Publication of ${path} refused: ${formatCount(refusals.length)} problem(s). The draft is kept; nothing was published.`,
     problems,
     `Fix them with ${prefix}_write (ops on the sections), then publish again. Format and rules: ${prefix}_read {"path": "write.procedure"}.`,
+    "Writing it in several calls? Pass publish: false until the last one.",
   ].join("\n")
   return new PlatformError("invalid_arguments", message, { refusals: [...refusals] })
 }

@@ -9,7 +9,7 @@
 // servi, le refus « reserved » d'un tableau invisible (→ inconnu, H68). Repris d'Oto
 // (`datastore/validation.py` l. 43-155) : une règle par type, un nombre refuse un booléen ; retiré :
 // `"42"` accepté pour un nombre (refusé ici, AC3), la valeur hors options écartée en silence.
-import type { CellValue, TableColumn, TableHeader } from "../../schemas"
+import { keyValue, rowCells, type CellValue, type TableColumn, type TableHeader } from "../../schemas"
 import { ACCESS_LEVELS, nodeLevels, type AccessLevel } from "../access"
 import type { PlatformDb } from "../db"
 import { boundedList, inTransaction, PlatformError, READ_PAGE_ROWS } from "../errors"
@@ -18,7 +18,7 @@ import { cut } from "../journal"
 import { charCount, formatCount } from "../nodes/document"
 import { findNode, type NodeRow } from "../nodes/lookup"
 import { COLUMN_TEXT_MAX, instantOf, isEmail, isRecord, isValidDate, maxLengthOf } from "../../schemas/tables"
-import { keyColumn, parseTableHeader } from "./header"
+import { parseTableHeader } from "./header"
 
 // La règle d'une date, d'une date et heure et de la longueur d'une colonne vivent dans `schemas/tables.ts`, que
 // l'adresse de l'écran (E07-S03) et la lecture d'un CSV (E10-S01) lisent aussi ; les services la lisent toujours ici.
@@ -98,34 +98,9 @@ export type RowBlock = {
   lease_until: string | null
 }
 
-/** Une valeur de `data` servie : scalaire tel quel, tout autre JSON en texte (hors type) ; `null` : pas de valeur. */
-function cellValue(raw: unknown): CellValue | undefined {
-  if (raw === null || raw === undefined) return undefined
-  if (typeof raw === "string" || typeof raw === "boolean") return raw
-  if (typeof raw === "number") return Number.isFinite(raw) ? raw : String(raw)
-  return JSON.stringify(raw)
-}
-
-/** La clé dans le type de la colonne clé (AC7) : un nombre pour une clé `number` écrite en décimal. */
-export function keyValue(key: string, header: TableHeader): string | number {
-  if (keyColumn(header).type !== "number" || !/^-?\d+(\.\d+)?$/.test(key)) return key
-  const number = Number(key)
-  return Number.isFinite(number) ? number : key
-}
-
-/**
- * Les cellules d'une ligne (N16) : les seules colonnes déclarées qui ont une valeur dans `data` ; la
- * colonne clé porte la clé du bloc. Une clé de `data` hors en-tête et un `null` rangé ne comptent pas.
- */
-export function rowCells(row: Pick<RowBlock, "key" | "data">, header: TableHeader): Map<string, CellValue> {
-  const data = isRecord(row.data) ? row.data : {}
-  const cells = new Map<string, CellValue>()
-  for (const column of header.columns) {
-    const value = column.name === header.key ? keyValue(row.key, header) : cellValue(data[column.name])
-    if (value !== undefined) cells.set(column.name, value)
-  }
-  return cells
-}
+// Les cellules d'une ligne et sa clé typée vivent dans `schemas/csv.ts`, que la page publique lit aussi (E11-S05,
+// portage-ecrans.md § 6) ; les services les lisent toujours ici.
+export { keyValue, rowCells }
 
 // ------------------------------------------------------------------------------- Chargement (AC4)
 

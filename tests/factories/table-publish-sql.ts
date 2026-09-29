@@ -48,10 +48,15 @@ export async function freshTable(
 
 const AGENT: WriteOrigin = { kind: "agent", ctx: "7K3Q-M2XA" }
 
-/** `write` de `person` : son résultat ou son refus, et les requêtes parties (`hooks` : course ou panne jouée). */
+/**
+ * `write` de `person` : son résultat ou son refus, et les requêtes parties (`hooks` : course ou panne jouée).
+ * `write` publiant par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde le brouillon
+ * (`publish: false`), comme avant ; le défaut se teste en passant `publish: undefined`.
+ */
 export async function writeAs(ref: ReferenceOrgSql, person: Person, input: Record<string, unknown>, hooks: DbHooks = {}) {
   const { db, calls } = spyDb(await ref.db(person), hooks)
-  const outcome = await writeNode(db, acmeIdentity(ref, person), input, AGENT).then(
+  const body = "publish" in input ? input : { ...input, publish: false }
+  const outcome = await writeNode(db, acmeIdentity(ref, person), body, AGENT).then(
     (result) => ({ result, error: null }),
     (error: unknown) => ({ result: null, error }),
   )

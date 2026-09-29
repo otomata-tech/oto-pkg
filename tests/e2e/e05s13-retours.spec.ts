@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 import { avecLaBase, clientAuth, compteDuStaff } from "./fixtures/base"
 import { AUTRE_EQUIPE, CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
-import { attendre, capturer, ouvrirLeRail, seConnecterSurLEspace } from "./fixtures/noeud"
+import { attendre, capturer, ouvrirAQuoiSert, ouvrirLeRail, seConnecterSurLEspace } from "./fixtures/noeud"
 
 // Les retours du soir de JB (E05-S13, AC-29), en contrôle visuel connecté sur l'organisation de la campagne
 // (`espace.ts`), en clair puis en sombre, à 375 et 1 280 px : le menu de l'entreprise range Journal dans les
@@ -118,7 +118,7 @@ test.describe("E05-S13 : les retours du soir", () => {
 
         // AC-13, AC-17, AC-20 : le Contexte de l'équipe, ses deux encarts, et aucun « Déplacer » en tête.
         await page.goto(`${ESPACE.adresse}/n/${CHEMINS.contexteDeLEquipe}`)
-        const aQuoiSert = page.getByRole("note", { name: "À quoi sert cette page" })
+        const aQuoiSert = await ouvrirAQuoiSert(page)
         await attendre(aQuoiSert.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
         await expect(aQuoiSert.getByText("Vous l'écrivez comme n'importe quelle page.")).toBeVisible()
         await expect(aQuoiSert.getByText("Reçu par")).toHaveCount(0)
@@ -133,12 +133,12 @@ test.describe("E05-S13 : les retours du soir", () => {
 
         // AC-17 : la phrase de Tout le monde et celle de Privé.
         await page.goto(`${ESPACE.adresse}/n/contexte`)
-        await attendre(page.getByRole("note", { name: "À quoi sert cette page" }).getByText(/^Ce que les assistants de tous les membres de .+ lisent à chaque conversation\.$/)).toBeVisible()
+        await attendre((await ouvrirAQuoiSert(page)).getByText(/^Ce que les assistants de tous les membres de .+ lisent à chaque conversation\.$/)).toBeVisible()
         rail = await ouvrirLeRail(page, largeur)
         const prive = await rail.locator('a[href^="/n/private/"][href$="/contexte"]').first().getAttribute("href")
         if (largeur < 768) await page.keyboard.press("Escape")
         await page.goto(`${ESPACE.adresse}${prive ?? ""}`)
-        await attendre(page.getByRole("note", { name: "À quoi sert cette page" }).getByText("Ce que votre assistant lit à chaque conversation ; vous seul le recevez.", { exact: true })).toBeVisible()
+        await attendre((await ouvrirAQuoiSert(page)).getByText("Ce que votre assistant lit à chaque conversation ; vous seul le recevez.", { exact: true })).toBeVisible()
 
         // AC-20 : ni une page, ni une procédure, ni un tableau n'ont « Déplacer » en tête.
         for (const chemin of [CHEMINS.grilleTarifaire, CHEMINS.procedure, CHEMINS.tableau]) {

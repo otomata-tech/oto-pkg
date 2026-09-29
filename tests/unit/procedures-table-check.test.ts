@@ -84,6 +84,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing a procedure that releases r
         `Publication of ${PATH} refused: 1 problem(s). The draft is kept; nothing was published.`,
         `- ${problem}`,
         'Fix them with acme_write (ops on the sections), then publish again. Format and rules: acme_read {"path": "write.procedure"}.',
+        "Writing it in several calls? Pass publish: false until the last one.",
       ].join("\n"),
       details: { refusals: [{ kind: "check_failed", section: "Étapes", block: 1, step: 5, block_id: callId, function: "table.release", message: problem }] },
     })
@@ -92,7 +93,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing a procedure that releases r
     // Le bloc `call` corrigé dans le brouillon : « à revoir ».
     await seed.admin`update platform.blocks set data = jsonb_set(data, '{args,state}', to_jsonb(${"à revoir"}::text)) where id = ${callId} and state = 'draft'`
     const published = await writeNode(spied.db, claire, { path: PATH, base_revision: 1, publish: true }, { kind: "agent", ctx: null })
-    expect(published.text).toBe(`Published ${PATH} revision 2 (1 section, 4 blocks).`)
+    expect(published.text).toBe(`Published ${PATH} revision 2 (1 section, 4 blocks). Next write: base_revision 2.`)
     expect(publishCalls(spied.calls)).toHaveLength(1)
     const [node] = await seed.admin<{ revision: number }[]>`select revision from platform.nodes where id = ${ref.nodeId(PATH)}`
     expect(node).toMatchObject({ revision: 2 })

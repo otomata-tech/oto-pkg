@@ -829,6 +829,27 @@ publié par `writeNode` (lot g compris).
 - **HN-E11S01-26** (implémentation) : `table.release` range toujours le `worker` de l'appel dans la
   provenance de l'état ; sa description et sa ligne de refus disent l'exception d'un tableau qui laisse
   l'assistant décider (AC-d3, AC-e4).
+- **HN-E11S01-27** (implémentation) : une bascule part avec le tampon courant du brouillon (`tampon: true`
+  de la file d'opérations, `draft_stamp` posé seulement si un brouillon existe), comme la publication de
+  la page : sans lui, un brouillon ouvert (titre ou résumé en cours) ferait refuser la publication de
+  l'en-tête (source : `file-d-operations.tsx` l. 6-9 et 198 ; HN-E11S01-18).
+- **HN-E11S01-28** (implémentation) : un refus ne relit pas la page ; l'interrupteur revient à l'état
+  publié lu, l'arrêt de la file est levé (`remplacerLArret(null)`) pour qu'un geste suivant reparte, et
+  la relecture reste à la personne (« Rechargez la page », AC-g5) (source : AC-g5 ; le même traitement
+  que `publication.tsx` et `en-tete-modifiable.tsx`).
+- **HN-E11S01-29** (implémentation) : décocher « L'assistant peut décider la revue » publie
+  `agents_may_decide: false` explicite, plutôt que retirer la clé ; les deux se lisent faux
+  (HN-E11S01-22) et le corps suit la lettre d'AC-g3 (« seul review.agents_may_decide change »).
+- **HN-E11S01-30** (implémentation) : un nœud `table` dont `vue.meta` ne passe pas `tableHeaderSchema`
+  n'a pas de bouton « Réglages » : sans en-tête lu, aucun état publié à montrer ni corps à envoyer
+  (source : `ecran-de-noeud.tsx`, `safeParse` de `vue.meta`).
+- **HN-E11S01-31** (implémentation) : l'annonce dit « Fermé : activée. », au féminin comme les deux
+  autres, selon la lettre d'AC-g3 (« de même avec l'intitulé des deux autres ») : l'accord porte sur
+  l'option, pas sur l'intitulé (source : AC-g3 ; `OPTIONS.annonce`, `ui/tableau/libelles.ts`).
+- **HN-E11S01-32** (implémentation) : l'intitulé et l'aide prennent leurs couleurs des classes du
+  design system, `oto-choice` (`--ink`) et `oto-choice-desc` (`--mute`), et non des classes
+  `text-ink` et `text-mute` nommées par AC-g7 : même rendu dans les deux thèmes, et le balisage de
+  `Commutateur` reste celui d'AC-g9 (source : `ui/ds/components/css/choice.css` l. 12 et 26).
 
 ## Actions JB
 
@@ -910,8 +931,8 @@ publié par `writeNode` (lot g compris).
 
 ### Écarts avec la référence UI
 
-Lots a à f : aucun (la file de revue ne montre « sans preuve » que sur un tableau `proof: true`, AC-f7). Lot g
-non livré.
+Lots a à f : aucun (la file de revue ne montre « sans preuve » que sur un tableau `proof: true`, AC-f7). Lot g :
+aucun ; les couleurs de l'intitulé et de l'aide viennent d'`oto-choice` (HN-E11S01-32).
 
 ### Écarts avec l'architecture
 
@@ -924,13 +945,17 @@ métriques) suivent.
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
 | `queryWords` | `packages/plateforme/schemas/tables.ts` | Mots de `q` (AC-c1) : une seule règle pour le refus du schéma, `table.rows`, la grille et les vues ; exporté par `./schemas` |
+| `Switch` | `packages/plateforme/ui/ds/react/switch.tsx` | Interrupteur du design system extrait de `Commutateur` (AC-g9) : intitulé, description, `checked`, `disabled`, `onChange`, `ref` vers l'`<input>` ; sert le partage sur le web et les réglages d'un tableau |
+| `OptionsDuTableau` | `packages/plateforme/ui/tableau/options-du-tableau.tsx` | « Réglages » et son popover « Réglages du tableau » (AC-g1 à AC-g7) : trois interrupteurs publiés un geste à la fois par la file d'opérations de la page |
 
 ### Notes
 
 - Lots a à f livrés dans le worktree `e11-s01`, revue approuvée, fusionnés sur `main` sans commit (commit
-  commun à venir) ; lot g après E11-S02.
-- Hypothèses d'implémentation HN-E11S01-22 à 26, reportées dans `docs/decisions/hypotheses.md` avec les
-  amendements de P10, N9 (E07-S02), H92, H94, H96, HN-M53-5 et HN-M53-10.
+  commun à venir). Lot g livré après E11-S02, revue approuvée, fusionné sur `main` de même : bouton
+  « Réglages » et panneau « Réglages du tableau » au niveau écriture, `Switch` extrait du partage sur le web.
+- Hypothèses HN-E11S01-16 à 21 (cadrage du lot g) et d'implémentation HN-E11S01-22 à 32, reportées dans
+  `docs/decisions/hypotheses.md` avec les amendements de P10, N9 (E07-S02), H92, H94, H96, HN-M53-5 et
+  HN-M53-10.
 - Tableaux existants : `proof: false` après la mise à jour ; le tableau de la Démo repose `proof: true` au
   prochain `pnpm demo:seed` (AC-f8).
 - Golden queries T9 (`create_only`) et T10 (`q` par mots) ajoutées.

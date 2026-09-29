@@ -9,6 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { PlatformDb } from "../../../packages/plateforme/server/db"
 import { withAnonSession, type Tx } from "../../../packages/plateforme/server/sql"
+import { DISCARD_DRAFT_VERSION, pendingMigrations } from "../../helpers/pending-migrations"
 import { SKIP_REASON, supabaseConfigured } from "../../helpers/plateforme"
 import { SQL_SKIP_REASON, sqlConfigured } from "../../helpers/sql"
 import { MARKERS, preparer, type Isolation, type Row, type Who } from "./donnees"
@@ -17,6 +18,8 @@ const SETUP_TIMEOUT = 300_000
 const NETWORK_TIMEOUT = 120_000
 const configured = supabaseConfigured && sqlConfigured
 const SUITE = "isolation of the content: blocks and search"
+/** `discard_draft` (E11-S02) pas encore appliquée au projet : son refus ne se joue pas (`database-patterns.md § Règles`). */
+const discardPending = (await pendingMigrations()).includes(DISCARD_DRAFT_VERSION)
 
 /** Les marqueurs de B cherchés (AC12) : un titre, un mot d'un bloc publié, la clé d'une ligne. */
 const QUERIES = { title: "ZZ Marqueur", block: MARKERS.page.word, row: MARKERS.row.key } as const
@@ -94,6 +97,9 @@ describe.skipIf(!configured)(
         deletions,
         openDraft: await codeOf(db.tx((sql) => sql`select * from platform.open_draft(${page})`)),
         publish: await codeOf(db.tx((sql) => sql`select platform.publish_node(${page}, 1, null::jsonb)`)),
+        // E11-S02 (AC-h4) : abandonner le brouillon d'un nœud de B, refusé par la fonction elle-même ; sauté tant
+        // que sa migration manque au projet (`database-patterns.md § Règles`).
+        ...(discardPending ? {} : { discard: await codeOf(db.tx((sql) => sql`select platform.discard_draft(${page}, null::timestamptz)`)) }),
       }
     }
 
@@ -108,6 +114,7 @@ describe.skipIf(!configured)(
         deletions: ["0 rows", "0 rows", "0 rows"],
         openDraft: "42501",
         publish: "42501",
+        ...(discardPending ? {} : { discard: "42501" }),
       }
       expect({ a: await attempts("a"), p: await attempts("p") }).toEqual({ a: refused, p: refused })
       // Blocs, ligne du tableau, brouillon (`node_drafts`) et historique (`node_versions`) de B : identiques.

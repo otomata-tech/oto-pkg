@@ -4,6 +4,7 @@
 // envoie, et pour l'API, qui le valide ; les types de sortie sont ceux que rendent les services. Sans ce
 // fichier, chaque route validerait son corps à sa façon.
 import * as z from "zod/v4"
+import type { Language } from "./brand"
 import { nodePathSchema } from "./nodes"
 import { ACCESS_LEVEL_NAMES } from "./rules"
 
@@ -11,6 +12,16 @@ import { ACCESS_LEVEL_NAMES } from "./rules"
 export const nodePathBodySchema = z.strictObject({ path: nodePathSchema })
 
 export type NodePathBody = z.infer<typeof nodePathBodySchema>
+
+/**
+ * L'entrée de `node.discard_draft` et de `node.trash` derrière `call` (E11-S02, AC-d1, AC-e1) : le nœud par
+ * son chemin, décrit pour le contrat que `read` sert (`mcp-patterns.md § 3`).
+ */
+export const nodePathArgsSchema = z.strictObject({
+  path: nodePathSchema.describe("Path of the page, procedure, Contexte or table, e.g. ventes/salons."),
+})
+
+export type NodePathArgs = z.infer<typeof nodePathArgsSchema>
 
 /**
  * `POST nodes/position` (AC-b9) : le nœud se range juste après son frère `after`, en tête avec `null`.
@@ -118,9 +129,15 @@ export type PublicBlock = {
 }
 
 /**
+ * Les lignes d'un tableau que sert une page publique, au plus : la borne de `public_node_by_token`
+ * (`migrations/20260928100000_platform_base_v1.sql`), que la page dit (E11-S05, AC-d1 ; portage § 6).
+ */
+export const PUBLIC_TABLE_ROWS_MAX = 500
+
+/**
  * Un tableau d'une page publique (E01-S12 partie c, décision de JB du 2026-09-28) : ses colonnes, nom et
- * type ; ses lignes publiées, triées par clé, 500 au plus (`truncated` au-delà) : la clé et les valeurs des
- * colonnes déclarées, ni provenance, ni réservation, ni auteur.
+ * type ; ses lignes publiées, triées par clé, `PUBLIC_TABLE_ROWS_MAX` au plus (`truncated` au-delà) : la clé et
+ * les valeurs des colonnes déclarées, ni provenance, ni réservation, ni auteur.
  */
 export type PublicTable = {
   columns: { name: string; type: string }[]
@@ -143,9 +160,14 @@ export type PublicNodeView = {
   table: PublicTable | null
   children: { path: string; title: string; kind: string }[]
   links: { path: string; to: string }[]
+  /**
+   * La langue de l'organisation (`organisationLanguage`) : le séparateur et la décimale du `.csv` que la page
+   * compose (E11-S05, AC-d3, HN-E11S05-11) ; ADR-013 § 4, une donnée de l'organisation, pas du nœud.
+   */
+  language: Language
 }
 
-/** Les liens d'un nœud pour « Contenus liés » (AC-b6) : champs de `read` (`links_out`, `links_in`, leurs totaux). */
+/** Les liens d'un nœud pour ses encarts « Cite » et « Cité dans » (E11-S05, AC-e1) : champs de `read` (`links_out`, `links_in`, leurs totaux). */
 export type NodeLinksView = {
   links_out: { path: string; key?: string; title?: string; status: "ok" | "missing" | "moved"; moved_to?: string; key_found?: boolean }[]
   links_in: { path: string; title: string }[]

@@ -12,7 +12,8 @@ import type { PlatformDb } from "../db"
 import { databaseFailure, inTransaction } from "../errors"
 import type { Tx } from "../sql"
 import type { RowBlock } from "./meta"
-import { leaseEnd } from "./rows"
+import { utcClock } from "./output"
+import { FORMER_MEMBER, leaseEnd } from "./rows"
 
 /** Un bloc `row` publié, avec son identifiant et l'instant de sa dernière écriture. */
 export type StoredRow = RowBlock & { id: string; updated_at: string }
@@ -76,6 +77,20 @@ export async function rowsByKey(db: PlatformDb, nodeId: string, keys: readonly s
 export function leaseActive(row: RowBlock, now: number): boolean {
   const until = leaseEnd(row)
   return until !== null && until > now
+}
+
+/**
+ * Une ligne sous le bail actif d'une autre personne (AC18, AC-f4) : `table.write` et `table.delete_rows` la
+ * refusent ; un bail expiré ou tenu par l'appelant ne bloque pas. `claimed_by_user` fait foi, pas le libellé (N4).
+ */
+export function heldByOther(row: RowBlock, userId: string, now: number): boolean {
+  return leaseActive(row, now) && row.claimed_by_user !== userId
+}
+
+/** « claimed by Claire Morel (worker claude-claire) until 14:05 UTC » : le début du refus d'une ligne tenue ; qui la tient, ou `FORMER_MEMBER`. */
+export function claimedBySentence(row: RowBlock, names: ReadonlyMap<string, string>): string {
+  const holder = (row.claimed_by_user ? names.get(row.claimed_by_user) : undefined) ?? FORMER_MEMBER
+  return `claimed by ${holder} (worker ${row.claimed_by}) until ${utcClock(row.lease_until ?? "")}`
 }
 
 /**

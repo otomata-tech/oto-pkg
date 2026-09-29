@@ -7,9 +7,14 @@
 // Porté d'oto-frontend (`corps-tableau.tsx`, `render` d'une colonne) : une clé absente est une cellule
 // vide, pas une erreur. Retiré : le `Popover` (→ `<details>` natif, sans JavaScript), le contrat de
 // colonne en infobulle.
+//
+// E11-S05 (AC-a1, AC-a2) : plus de triangle natif ; un chevron suit la valeur, montré au survol de la cellule, au
+// focus et ouvert (`table.css`) ; le détail ouvert est en gris, sous la valeur.
 import type { ReactNode } from "react"
+import { CaretDown } from "@phosphor-icons/react/dist/ssr/CaretDown"
 import type { CellValue, TableColumn, TableRowRead } from "../../schemas"
 import { FOCUS, LIEN } from "../components/classes"
+import { Icon } from "../ds/react/icon"
 import { dateEtHeureLisibles, dateLisible } from "../format/dates"
 import { nombreLisible } from "../format/nombres"
 import { PROVENANCE, TEXTES_DE_CELLULE } from "./libelles"
@@ -33,9 +38,12 @@ export function valeurDe(ligne: TableRowRead, colonne: TableColumn, cle: string)
   return Object.hasOwn(ligne.set, colonne.name) ? ligne.set[colonne.name] : colonne.name === cle ? ligne.key : undefined
 }
 
-function LienExterne({ href, children }: { href: string; children: string }) {
+/** Un lien du détail ouvert : gris comme le détail, souligné comme tout lien (AC-a2). */
+const LIEN_DU_DETAIL = `rounded-sm text-mute underline underline-offset-2 ${FOCUS}`
+
+function LienExterne({ href, children, className = LIEN }: { href: string; children: string; className?: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={LIEN}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
       {children}
     </a>
   )
@@ -57,10 +65,12 @@ function DetailDeProvenance({ colonne, provenance, raison, lien }: DetailProps) 
   const { comment, link, imported } = provenance
   return (
     // La table du design system ne coupe pas ses lignes (`white-space: nowrap`) : le repli ouvert, lui, va à la ligne.
-    <div className="mt-1 min-w-64 space-y-0.5 whitespace-normal text-xs text-ink">
+    <div className="mt-1 min-w-64 space-y-0.5 whitespace-normal text-xs text-mute">
       {lien && (
         <p>
-          <LienExterne href={lien}>{TEXTES_DE_CELLULE.ouvrirLeLien}</LienExterne>
+          <LienExterne href={lien} className={LIEN_DU_DETAIL}>
+            {TEXTES_DE_CELLULE.ouvrirLeLien}
+          </LienExterne>
         </p>
       )}
       <p>{origine(provenance, raison)}</p>
@@ -69,7 +79,13 @@ function DetailDeProvenance({ colonne, provenance, raison, lien }: DetailProps) 
       {link && (
         <p>
           {PROVENANCE.preuve}
-          {EXTERNE.test(link) ? <LienExterne href={link}>{link}</LienExterne> : link}
+          {EXTERNE.test(link) ? (
+            <LienExterne href={link} className={LIEN_DU_DETAIL}>
+              {link}
+            </LienExterne>
+          ) : (
+            link
+          )}
         </p>
       )}
       {imported && <p>{PROVENANCE.importee(valeurLisible(colonne, imported.value), dateLisible(imported.at))}</p>}
@@ -98,8 +114,11 @@ export function contenuDeCellule({ colonne, valeur, raisonDuVide, provenance }: 
   // Avec une provenance, la valeur ouvre le repli ; une URL s'y ouvre par son propre lien : un lien dans un
   // `<summary>` y serait un contrôle dans un contrôle.
   return (
-    <details>
-      <summary className={`cursor-pointer rounded-sm ${FOCUS}`}>{texte}</summary>
+    <details className="oto-cell-detail">
+      <summary className={`cursor-pointer rounded-sm text-ink ${FOCUS}`}>
+        {texte}
+        <Icon as={CaretDown} size="xs" className="oto-cell-chevron" />
+      </summary>
       <DetailDeProvenance colonne={colonne} provenance={provenance} raison={raisonDuVide} lien={lien} />
     </details>
   )

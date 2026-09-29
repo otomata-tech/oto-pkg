@@ -8,7 +8,7 @@
 // Toute lecture est linéaire (`security-patterns.md § Validation des inputs`) : un parcours à la main pour le
 // CSV, des expressions ancrées dont chaque caractère n'a qu'une lecture pour les cellules.
 import { slugOf } from "./nodes"
-import type { CellValue } from "./tables"
+import { isRecord, type CellValue } from "./tables"
 
 /** Les séparateurs lus, dans l'ordre qui départage une égalité (AC-b1). */
 export const CSV_SEPARATORS = [";", "\t", ","] as const
@@ -191,4 +191,43 @@ export function toCsv(columns: readonly { name: string }[], rows: readonly Reado
   const header = columns.map((column) => quoted(column.name, separator)).join(separator)
   const lines = rows.map((row) => columns.map((column) => written(row.get(column.name), language, separator)).join(separator))
   return `\uFEFF${[header, ...lines].join("\r\n")}\r\n`
+}
+
+// ------------------------------------------------------------------------------- Cellules d'une ligne
+
+/**
+ * Ce que la lecture d'une ligne demande d'un en-tête : la colonne clé et les colonnes, nom et type ; un en-tête
+ * publié (`TableHeader`) comme le tableau d'une page publique (`PublicTable`, clé lue dans `meta`).
+ */
+export type RowShape = { key: string | null; columns: readonly { name: string; type: string }[] }
+
+/** Une valeur de `data` servie : scalaire tel quel, tout autre JSON en texte (hors type) ; `null` : pas de valeur. */
+function cellValue(raw: unknown): CellValue | undefined {
+  if (raw === null || raw === undefined) return undefined
+  if (typeof raw === "string" || typeof raw === "boolean") return raw
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : String(raw)
+  return JSON.stringify(raw)
+}
+
+/** La clé dans le type de la colonne clé (AC7) : un nombre pour une clé `number` écrite en décimal. */
+export function keyValue(key: string, header: RowShape): string | number {
+  if (header.columns.find((column) => column.name === header.key)?.type !== "number" || !/^-?\d+(\.\d+)?$/.test(key)) return key
+  const number = Number(key)
+  return Number.isFinite(number) ? number : key
+}
+
+/**
+ * Les cellules d'une ligne (N16) : les seules colonnes déclarées qui ont une valeur dans `data` ; la
+ * colonne clé porte la clé du bloc. Une clé de `data` hors en-tête et un `null` rangé ne comptent pas.
+ * Partagées par les services (`server/tables/meta.ts` les réexporte) et la page publique : un même tableau
+ * s'exporte à l'identique, connecté ou par un lien (E11-S05, AC-d1).
+ */
+export function rowCells(row: { key: string; data: unknown }, header: RowShape): Map<string, CellValue> {
+  const data = isRecord(row.data) ? row.data : {}
+  const cells = new Map<string, CellValue>()
+  for (const column of header.columns) {
+    const value = column.name === header.key ? keyValue(row.key, header) : cellValue(data[column.name])
+    if (value !== undefined) cells.set(column.name, value)
+  }
+  return cells
 }

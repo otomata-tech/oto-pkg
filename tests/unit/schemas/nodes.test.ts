@@ -74,7 +74,7 @@ const E03_S01: Record<"read" | "write", Json> = {
         propertyNames: { type: "string" },
         additionalProperties: {},
       },
-      publish: { description: "true: publish after applying ops; publishing needs the manage level (default false: draft only).", type: "boolean" },
+      publish: { description: "false: save a draft without publishing it (default true: the write is published at once).", type: "boolean" },
     },
     required: ["ctx", "path"],
   },

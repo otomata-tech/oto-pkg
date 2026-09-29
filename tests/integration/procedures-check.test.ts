@@ -48,6 +48,8 @@ function stored(inputs: BlockInput[]): DocBlock[] {
 
 const unknown = (name: string) => `unknown function « ${name} »; acme_find with type function lists the functions`
 const FOOTER = 'Fix them with acme_write (ops on the sections), then publish again. Format and rules: acme_read {"path": "write.procedure"}.'
+/** La dernière ligne d'un refus : `write` publie par défaut (E11-S02, AC-b2, N28). */
+const SEVERAL = "Writing it in several calls? Pass publish: false until the last one."
 
 describe.skipIf(!sqlConfigured)(
   sqlConfigured ? "checkProcedureBlocks on a real database, portable" : `checkProcedureBlocks on a real database, portable (${SQL_SKIP_REASON})`,
@@ -149,6 +151,7 @@ describe.skipIf(!sqlConfigured)(
             `- section « Étapes », call block 1 (step 2): ${unknown("mail.send")}`,
             '- section « Étapes », call block 2 (step 4): mail.create_draft argument « to »: Invalid email address (got "claire")',
             FOOTER,
+            SEVERAL,
           ].join("\n"),
         })
         expect(error.details).toEqual({ refusals })
@@ -164,7 +167,7 @@ describe.skipIf(!sqlConfigured)(
         const lines = error.message.split("\n")
         const line = (name: string, rank: number) => `section « Étapes », call block ${rank}: ${unknown(name)}`
         expect(lines[0]).toBe("Publication of ventes/relance_test refused: 25 problem(s). The draft is kept; nothing was published.")
-        expect(lines.slice(1)).toEqual([...names.slice(0, 20).map((name, index) => `- ${line(name, index + 1)}`), "- … and 5 more.", FOOTER])
+        expect(lines.slice(1)).toEqual([...names.slice(0, 20).map((name, index) => `- ${line(name, index + 1)}`), "- … and 5 more.", FOOTER, SEVERAL])
         expect(error.details).toEqual({
           refusals: names.map((name, index) => ({
             kind: "unknown_function",

@@ -47,9 +47,14 @@ export const CREATION = {
   sansTitre: "Sans titre",
   /**
    * Le résumé d'un nœud neuf, selon son genre (E05-S11, retour 21, AC-e21) : le service en exige un (1 à 200
-   * caractères) ; il se réécrit en place (HN-E05S10b-2).
+   * caractères) ; il se réécrit en place (HN-E05S10b-2). Celui d'une procédure dit comment l'écrire, le routage le
+   * lisant avec le titre (E11-S05, AC-f3 ; ADR-003 § 1).
    */
-  resumeParDefaut: { page: "Résumé de la page à compléter.", table: "Résumé du tableau à compléter.", procedure: "Résumé de la procédure à compléter." },
+  resumeParDefaut: {
+    page: "Résumé de la page à compléter.",
+    table: "Résumé du tableau à compléter.",
+    procedure: "Résumé à compléter : dites ce que fait la procédure et comment on la demande, avec les mots de l'équipe. L'assistant la choisit sur ce résumé et sur le titre.",
+  },
   /** La colonne clé d'un tableau neuf, sa seule colonne (texte). */
   cle: "nom",
   enCours: "Création…",
@@ -193,7 +198,7 @@ export const IMPORT = {
   resumeDuTableau: (nom: string, lignes: string) => `Importé de ${nom} (${lignes} lignes)`,
   aucuneAdresse: "Les adresses tirées de ce nom de fichier sont toutes prises à cet endroit : renommez le fichier.",
   refus: {
-    forbidden: "Créer un tableau ici demande la gestion de cet endroit : demandez-la à ses responsables, ou importez ailleurs.",
+    forbidden: "Créer un tableau ici demande l'écriture de cet endroit : demandez-la à ses responsables, ou importez ailleurs.",
     too_large: "Ce fichier dépasse une limite de la page ou du tableau (taille, nombre de blocs ou de lignes).",
   },
 } as const

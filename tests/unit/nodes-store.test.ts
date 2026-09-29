@@ -65,7 +65,8 @@ describe.skipIf(!sqlConfigured)(portable("shared draft and concurrency per block
 
   async function write(person: Person, ops: Record<string, unknown>[], extra: { hook?: SpyHook; title?: string } = {}) {
     const spied = spyDb(await ref.db(person), extra.hook)
-    const input = { path: "ventes/devis", base_revision: 1, ops, ...(extra.title ? { title: extra.title } : {}) }
+    // `write` publie par défaut (E11-S02, AC-b1) : ces cas regardent le brouillon.
+    const input = { path: "ventes/devis", base_revision: 1, ops, ...(extra.title ? { title: extra.title } : {}), publish: false }
     const outcome = await writeNode(spied.db, who(person), input, { kind: "agent", ctx: null }).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),

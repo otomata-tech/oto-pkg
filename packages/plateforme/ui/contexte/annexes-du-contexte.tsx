@@ -14,12 +14,15 @@
 // équipe, Perso), jamais le nom d'un collègue ; la seconde note, ce qui est servi, dont oto-frontend avait
 // retiré la jauge. Retiré : le périmètre lu dans la coquille, la ligne « Comment » (« déposé dans les
 // instructions du serveur MCP », architecture § 10), l'aide servie (`help`).
+//
+// E11-S05 (AC-e2) : « À quoi sert cette page » devient un repli fermé à l'arrivée, du même dessin que les encarts
+// « Cité dans », « Cite » et « Sous-pages » (`LinkedContent`), nommé par son titre ; le texte ne change pas.
 import { Info } from "@phosphor-icons/react/dist/ssr/Info"
 import type { Resultat } from "../api/resultat"
 import { PERSO } from "../arbre/depuis-l-arbre"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { AnimatedIcon } from "../ds/react/icon"
-import { NotePanel } from "../ds/react/note-panel"
+import { LinkedContent } from "../ds/react/linked-content"
 import { ApercuDuContexte, type DonneesDeLApercu } from "./apercu-du-contexte"
 import { ANNEXES, aQuoiSert, porteeDe, type EquipesNommees, type Portee } from "./libelles"
 
@@ -52,10 +55,11 @@ export function AnnexesDuContexte({ cheminCourant, handle, apercu, equipes, href
   const portee = porteeOuverte(cheminCourant, equipes, handle)
   return (
     <>
-      <NotePanel title={ANNEXES.titre} icon={<AnimatedIcon as={Info} size="xs" />}>
+      {/* Un `<details>` a le rôle `group` sans nom propre : il prend celui de son titre. */}
+      <LinkedContent aria-label={ANNEXES.titre} title={ANNEXES.titre} icon={<AnimatedIcon as={Info} size="xs" />}>
         <p>{aQuoiSert(portee)}</p>
         <p>{ANNEXES.ecriture}</p>
-      </NotePanel>
+      </LinkedContent>
       <ApercuDuContexte apercu={apercu} cheminCourant={cheminCourant} equipes={equipes} hrefDuContexteServi={hrefDuContexteServi} ici={ici} Lien={Lien} />
     </>
   )

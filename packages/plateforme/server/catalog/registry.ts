@@ -8,8 +8,11 @@
 import * as z from "zod/v4"
 import { normalizeTitle } from "../../schemas"
 import { mailCreateDraft, mailSendDraft } from "../connectors/simulated/mail"
+import { nodeDiscardDraft } from "../nodes/discard"
+import { nodeTrash } from "../nodes/trash"
 import { tableAggregate } from "../tables/aggregate"
 import { tableClaim } from "../tables/claim"
+import { tableDeleteRows } from "../tables/delete-rows"
 import { tableImport } from "../tables/import"
 import { tableRelease } from "../tables/release"
 import { tableRows } from "../tables/rows"
@@ -23,10 +26,25 @@ export const NATIVE_CONNECTOR = "table"
 
 /**
  * Catalogue de la V1 (H80) : `mail` simulé (E04-S01), lecture des tableaux (E07-S01), écriture et file
- * de travail (E07-S02), import d'un CSV (E10-S01) ; ERP (E08-S05) s'y ajoute.
+ * de travail (E07-S02), import d'un CSV (E10-S01), suppression de lignes, abandon d'un brouillon et
+ * corbeille (E11-S02, connecteur natif `node`) ; ERP (E08-S05) s'y ajoute.
  */
 export function catalogFunctions(): CatalogFunction[] {
-  return [mailCreateDraft, mailSendDraft, tableSchema, tableRows, tableAggregate, tableWrite, tableClaim, tableRelease, tableImport, ...erpFunctions()]
+  return [
+    mailCreateDraft,
+    mailSendDraft,
+    tableSchema,
+    tableRows,
+    tableAggregate,
+    tableWrite,
+    tableClaim,
+    tableRelease,
+    tableImport,
+    tableDeleteRows,
+    nodeDiscardDraft,
+    nodeTrash,
+    ...erpFunctions(),
+  ]
 }
 
 /**

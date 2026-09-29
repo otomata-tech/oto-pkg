@@ -6,18 +6,22 @@
 // relecture en apporte de nouveaux, s'il n'a ni champ modifié, ni bloc neuf pas encore parti, ni écriture en
 // attente, ni conflit ; sinon il garde les siens. E05-S10 (AC-a6) : il participe à la publication seule, à
 // qui il envoie son texte en attente et dit ce qui la retient. Sans lui, pas d'édition.
+// E11-S05 (AC-g1, AC-g2) : une page sans bloc a son Texte vide, qui prend le focus à l'ouverture quand le titre est
+// déjà écrit ; ce Texte, pas encore parti, ne retient pas une relecture.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { BlockView } from "../../../schemas"
 import { actionsDeLEditeur, aEnvoyer } from "./actions"
 import { useFileDOperations } from "./file-d-operations"
-import { rangeesDepuis, type BlocEdite, type Focus, type Rangee } from "./modele"
+import type { BlocEdite, Focus, Rangee } from "./modele"
+import { estLaPageVide, modeleDeLaPage } from "./page-vide"
 import { useEnvois, type Identite } from "./use-envois"
 
 /** 1 200 ms sans frappe : le différé d'oto-frontend (`use-autosave.ts`), appliqué au bloc (HN-E05S08-1). */
 const DIFFERE_MS = 1_200
 
+/** Les blocs partis, par rangée : un bloc servi ; jamais le Texte d'une page vide, qui n'a pas d'`id` et part en insertion. */
 function fixesDe(modele: readonly Rangee[]): Map<string, BlocEdite> {
-  return new Map(modele.map((rangee) => [rangee.cle, rangee.bloc]))
+  return new Map(modele.flatMap((rangee) => (rangee.bloc.id === undefined ? [] : [[rangee.cle, rangee.bloc] as const])))
 }
 
 function identitesDe(modele: readonly Rangee[]): Map<string, Identite> {
@@ -35,16 +39,18 @@ function avecErreur(erreurs: Readonly<Record<string, string>>, cle: string, mess
 type Parametres = {
   blocs: readonly BlockView[]
   revisionServie: number
+  /** Le Texte d'une page vide prend le focus à l'ouverture (AC-g2) ; sinon le titre le garde. */
+  focusALOuverture?: boolean
 }
 
-export function useEditeur({ blocs, revisionServie }: Parametres) {
+export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: Parametres) {
   const file = useFileDOperations()
-  const [modele, setModele] = useState<Rangee[]>(() => rangeesDepuis(blocs))
+  const [modele, setModele] = useState<Rangee[]>(() => modeleDeLaPage(blocs))
   const modeleLu = useRef(modele)
   const fixes = useRef(fixesDe(modele))
   const ids = useRef(identitesDe(modele))
   const [erreurs, setErreurs] = useState<Readonly<Record<string, string>>>({})
-  const [focus, setFocus] = useState<Focus | null>(null)
+  const [focus, setFocus] = useState<Focus | null>(() => (focusALOuverture && estLaPageVide(modele) ? { cle: modele[0].cle, curseur: 0 } : null))
   const racine = useRef<HTMLDivElement>(null)
   const blocsVus = useRef(blocs)
   const differe = useRef<{ cle: string; minuteur: ReturnType<typeof setTimeout> } | null>(null)
@@ -107,13 +113,14 @@ export function useEditeur({ blocs, revisionServie }: Parametres) {
   // Un champ modifié pas encore parti (AC5) : la publication l'attend, et quitter l'onglet demande confirmation.
   const modifies = modele.some((rangee) => aEnvoyer(rangee, fixes.current.get(rangee.cle)))
   const occupe = file.occupee || envois.conflit !== null || envois.attente || modifies
-  // Un bloc neuf pas encore parti, vide compris, n'est pas dans les blocs servis : une relecture ne l'efface pas.
-  const neufs = modele.some((rangee) => !fixes.current.has(rangee.cle))
+  // Un bloc neuf pas encore parti, vide compris, n'est pas dans les blocs servis : une relecture ne l'efface pas ; sauf
+  // le Texte d'une page vide, que les blocs relus remplacent (AC-g1).
+  const neufs = !estLaPageVide(modele) && modele.some((rangee) => !fixes.current.has(rangee.cle))
   useEffect(() => {
     if (blocs === blocsVus.current) return
     blocsVus.current = blocs
     if (occupe || neufs) return
-    const suivant = rangeesDepuis(blocs, modeleLu.current)
+    const suivant = modeleDeLaPage(blocs, modeleLu.current)
     fixes.current = fixesDe(suivant)
     ids.current = identitesDe(suivant)
     changerModele(suivant)
@@ -142,7 +149,8 @@ export function useEditeur({ blocs, revisionServie }: Parametres) {
     return () => window.removeEventListener("beforeunload", retenir)
   }, [aProteger])
 
-  // Les blocs du modèle : les refus d'une publication y trouvent la référence d'un bloc fautif (E05-S04, AC7).
-  const blocsDuModele = modele.map((rangee) => rangee.bloc)
+  // Les blocs du modèle : les refus d'une publication y trouvent la référence d'un bloc fautif (E05-S04, AC7). Le Texte
+  // d'une page vide n'est pas du brouillon (HN-E11S05-19) : sans lui, un Contexte vide demande confirmation (AC11).
+  const blocsDuModele = estLaPageVide(modele) ? [] : modele.map((rangee) => rangee.bloc)
   return { racine, modele, blocs: blocsDuModele, erreurs, envois, actions }
 }

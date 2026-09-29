@@ -32,6 +32,9 @@ export type MoveResult = { text: string; moves: Move[]; target: string; teamId: 
 /** Ce que le service a décidé : le nœud, sa destination et son nouveau parent. */
 type Plan = { node: NodeRow; parent: NodeRow; newPath: string }
 
+/** Un déplacement demandé (gestion) ou le chemin qui suit un titre publié (écriture, E11-S02). */
+type MoveAction = "move" | "rename"
+
 const PRIVATE = "private"
 
 function invalid(message: string): PlatformError {
@@ -125,14 +128,18 @@ async function destinationParent(db: PlatformDb, identity: Identity, node: NodeR
   return parent.node
 }
 
-/** Les contrôles de l'AC9 après le format des chemins, dans son ordre, sans rien écrire ; rend ce qui est décidé. */
-async function decide(db: PlatformDb, identity: Identity, request: MoveNodeInput): Promise<Plan> {
+/**
+ * Les contrôles de l'AC9 après le format des chemins, dans son ordre, sans rien écrire ; rend ce qui est
+ * décidé. `action` : `move` exige la gestion, `rename` (le chemin qui suit un titre publié) l'écriture
+ * (E11-S02, HN-E11S02-18).
+ */
+async function decide(db: PlatformDb, identity: Identity, request: MoveNodeInput, action: MoveAction): Promise<Plan> {
   const found = await findNode(db, identity, request.path)
   if (!found) throw unknownNode(request.path, identity.org.prefix)
   const { node } = found
   if (request.new_path === node.path) throw invalid(`new_path is already the path of ${node.path}.`)
   await refuseStructure(db, identity, node)
-  if (found.level < ACCESS_LEVELS.manage) await requireNodeLevel(db, identity, { id: node.id, path: node.path }, "move")
+  if (found.level < ACCESS_LEVELS.manage) await requireNodeLevel(db, identity, { id: node.id, path: node.path }, action)
   if (request.new_path.startsWith(`${node.path}/`)) throw underItself(node, request.new_path)
   const parent = await destinationParent(db, identity, node, request.new_path)
   // Fiche D18 B (M26) : un nœud qui devient personnel par ce déplacement n'est plus réservé à
@@ -173,11 +180,11 @@ function treeChanging(identity: Identity): PlatformError {
  * `42501` : les règles d'accès, sans nommer personne, N25 ; le reste : l'arbre a bougé ou le refuse).
  * Jamais le message de la base.
  */
-async function refusal(db: PlatformDb, identity: Identity, request: MoveNodeInput, failure: { plan: Plan; error: { code?: string } }): Promise<PlatformError> {
+async function refusal(db: PlatformDb, identity: Identity, request: MoveNodeInput, failure: { plan: Plan; action: MoveAction; error: { code?: string } }): Promise<PlatformError> {
   const { plan } = failure
   const { code } = failure.error
   console.error("[platform] move: refused by the database", code)
-  const redecided = await decide(db, identity, request).then(
+  const redecided = await decide(db, identity, request, failure.action).then(
     () => null,
     (error: unknown) => error,
   )
@@ -198,7 +205,8 @@ async function refusal(db: PlatformDb, identity: Identity, request: MoveNodeInpu
  * déclencheurs de la base, dans la même. L'`updated_at` lu repasse par un texte : une `Date` perdrait
  * ses microsecondes, et la garde le compare à l'égalité.
  */
-async function applyMove(db: PlatformDb, identity: Identity, request: MoveNodeInput, plan: Plan): Promise<void> {
+async function applyMove(db: PlatformDb, identity: Identity, request: MoveNodeInput, decided: { plan: Plan; action: MoveAction }): Promise<void> {
+  const { plan } = decided
   for (let attempt = 1; ; attempt++) {
     const { rows, error } = await db
       .tx((sql) => sql<{ id: string }[]>`
@@ -218,7 +226,7 @@ async function applyMove(db: PlatformDb, identity: Identity, request: MoveNodeIn
       const revision = (await currentRevision(db, plan.node.id)) ?? plan.node.revision
       throw new PlatformError("stale_revision", `${plan.node.path} changed while it was being moved: read it again, then retry.`, { revision })
     }
-    if (error.code !== "40P01") throw await refusal(db, identity, request, { plan, error })
+    if (error.code !== "40P01") throw await refusal(db, identity, request, { ...decided, error })
     if (attempt > 1) throw treeChanging(identity)
   }
 }
@@ -250,16 +258,17 @@ function movedText(plan: Plan, moves: readonly Move[]): string {
  * Déplace un nœud et son sous-arbre (AC6, AC9) : `input` validé par `moveNodeSchema` (chemins H51),
  * `path` résolu par `findNode` (alias compris), chaque refus de l'AC9 décidé avant la mise à jour ;
  * rend le texte, les déplacements des nœuds que la personne lit, et la cible du journal (le nouveau
- * chemin). Aucun alias écrit ici : la base les inscrit (P13).
+ * chemin). Aucun alias écrit ici : la base les inscrit (P13). `action` : `rename` pour le chemin qui suit
+ * un titre publié (`rename.ts`), au niveau écriture (E11-S02).
  */
-export async function moveNode(db: PlatformDb, identity: Identity, input: unknown): Promise<MoveResult> {
+export async function moveNode(db: PlatformDb, identity: Identity, input: unknown, action: MoveAction = "move"): Promise<MoveResult> {
   const parsed = moveNodeSchema.safeParse(input)
   if (!parsed.success) throw invalidInput(parsed.error)
   const request = parsed.data
   refuseUnderRoot(request.new_path)
-  const plan = await decide(db, identity, request)
+  const plan = await decide(db, identity, request, action)
   const named = await visibleSubtree(db, identity, plan.node)
-  await applyMove(db, identity, request, plan)
+  await applyMove(db, identity, request, { plan, action })
   const paths = await currentPaths(db, identity, named.map((row) => row.id))
   const moves = named.flatMap((row) => {
     const to = paths.get(row.id)

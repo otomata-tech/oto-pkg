@@ -35,7 +35,7 @@ const writeProcedure: Contract = {
     description: [
       `A procedure is a node of kind procedure, read and written like a page: a title, a summary of 1 to 200 characters that says what it does and how people ask for it (${p}_context matches requests on the title and the summary), then blocks: headings, paragraphs, lists, callouts, and call blocks that hold the exact calls to make.`,
       `Recommended: a heading « Étapes » followed by numbered steps, each step that calls a function followed by its call block; headings « Quand l'utiliser » and « Règles » when useful. No section is required: call blocks are checked wherever they are.`,
-      `A procedure has no header (header is for tables only). Create it with kind "procedure", a title and a summary; publish it with publish: true (manage level). Publishing checks every block first and, if anything is wrong, lists every problem at once with where its block is: the draft is kept and nothing is published.`,
+      `A procedure has no header (header is for tables only). Create it with kind "procedure", a title and a summary; each write publishes it. Publishing checks every block first and, if anything is wrong, lists every problem at once with where its block is: the draft is kept and nothing is published. Writing it in several calls: pass publish: false until the last one.`,
     ],
     parts: [
       {
@@ -92,7 +92,7 @@ const writeTable: Contract = {
     summary: `the header of ${p}_write for a table (not a function; nothing to call).`,
     description: [
       `A table is a node of kind table: its header declares the typed columns, the key column whose value addresses each row, the work queue of the rows (lifecycle), whether new rows can be created (closed) and whether each new value needs its proof (proof). Create it with ${p}_write, kind "table", a title, a summary and header; change it with ${p}_write, base_revision and header. Its rows are written with ${p}_call table.write, never with ${p}_write.`,
-      "header holds changes, never the whole header: what it does not name stays as it is. The draft keeps the complete target header, checked at every write; publish: true (manage level) applies it after checking the rows already there.",
+      "header holds changes, never the whole header: what it does not name stays as it is. The draft keeps the complete target header, checked at every write; publishing (the default) applies it after checking the rows already there.",
       // E10-S01 (AC-c2) : un fichier donné par la personne, ce qu'il devient.
       "A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line.",
       "A markdown file the user gives you becomes a page with write: its first # heading is the title, the rest goes in the text.",
@@ -109,28 +109,29 @@ const writeTable: Contract = {
           "5. The type of a column changes only while it holds no value; otherwise add a new column of the new type, copy the values, then remove the old one. A new type drops the attributes it does not take (options, max_length) unless they are given again.",
           "6. The key changes only while the table has no row; otherwise create a new table keyed by the new column and copy the rows.",
           "7. A header change never rewrites a row: making a column required, removing an option or shortening max_length only warns, with the number of rows concerned and sample keys.",
-          '8. Removing a column that holds values takes two steps: publishing answers needs_confirmation with the rows it would erase; ask the user, and only after their explicit agreement call again with header {"confirm_remove": true} and publish: true. confirm_remove only applies with publish: true and is never saved; 2,000 rows at most are erased per publication.',
+          '8. Removing a column that holds values takes two steps: publishing answers needs_confirmation with the rows it would erase; ask the user, and only after their explicit agreement call again with header {"confirm_remove": true}. confirm_remove only applies when the write publishes and is never saved; 2,000 rows at most are erased per publication.',
           "9. Header changes that check the rows work on tables of 5,000 rows at most.",
+          `10. A header refused on publish stays in the draft, and every later header write starts from it. To go back to the published header, discard the draft: ${p}_call node.discard_draft {"path": "<path>"}.`,
         ],
       },
     ],
     examples: [
       "Create a table:",
-      `${p}_write {"path": "ventes/salons", "kind": "table", "title": "Salons professionnels", "summary": "Les salons où l'équipe Ventes expose ou prospecte.", "header": {"columns": [{"name": "nom", "type": "text", "required": true, "max_length": 200}, {"name": "ville", "type": "text"}, {"name": "date", "type": "date"}, {"name": "statut", "type": "enum", "options": ["à contacter", "en cours", "à revoir", "inscrit", "écarté"]}], "key": "nom", "lifecycle": {"column": "statut", "states": ["à contacter", "en cours", "à revoir", "inscrit", "écarté"], "working": "en cours", "review": {"state": "à revoir", "approve": "inscrit", "reject": "écarté"}}}, "publish": true}`,
+      `${p}_write {"path": "ventes/salons", "kind": "table", "title": "Salons professionnels", "summary": "Les salons où l'équipe Ventes expose ou prospecte.", "header": {"columns": [{"name": "nom", "type": "text", "required": true, "max_length": 200}, {"name": "ville", "type": "text"}, {"name": "date", "type": "date"}, {"name": "statut", "type": "enum", "options": ["à contacter", "en cours", "à revoir", "inscrit", "écarté"]}], "key": "nom", "lifecycle": {"column": "statut", "states": ["à contacter", "en cours", "à revoir", "inscrit", "écarté"], "working": "en cours", "review": {"state": "à revoir", "approve": "inscrit", "reject": "écarté"}}}}`,
       "Add a column:",
-      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"columns": [{"name": "secteur", "type": "text"}]}, "publish": true}`,
+      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"columns": [{"name": "secteur", "type": "text"}]}}`,
       "Remove a column in two steps (the second call only after the user agreed to erase its values):",
-      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"remove_columns": ["notes"]}, "publish": true}`,
-      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"confirm_remove": true}, "publish": true}`,
+      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"remove_columns": ["notes"]}}`,
+      `${p}_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"confirm_remove": true}}`,
     ],
     refusals: [
       "On create: no header, a new column without type, an unknown key or type, or a header the checks refuse (key missing or of type enum, states different from the options…); the refusal lists the problems found and nothing is written.",
       "A column with rename, new_name, renamed_to or old_name: columns cannot be renamed.",
-      "On write: remove_columns naming an unknown column or the key, a name both in columns and remove_columns, a column named twice in columns, confirm_remove without publish: true, an unknown key; nothing is written.",
-      "On publish: a type change on a column that holds values (conflict); the draft is kept.",
-      "On publish: removing a column that holds values without confirm_remove (needs_confirmation, with the rows it would erase); the draft is kept.",
-      "On publish: more than 2,000 rows to erase, or changes that check the rows of a table of more than 5,000 rows (too_large); the draft is kept.",
-      "On publish: a key change on a table that has rows (conflict); the draft is kept.",
+      "On write: remove_columns naming an unknown column or the key, a name both in columns and remove_columns, a column named twice in columns, confirm_remove with publish: false, an unknown key; nothing is written.",
+      "On publish: a type change on a column that holds values (conflict); the draft is kept (discard it with node.discard_draft).",
+      "On publish: removing a column that holds values without confirm_remove (needs_confirmation, with the rows it would erase); the draft is kept (discard it with node.discard_draft).",
+      "On publish: more than 2,000 rows to erase, or changes that check the rows of a table of more than 5,000 rows (too_large); the draft is kept (discard it with node.discard_draft).",
+      "On publish: a key change on a table that has rows (conflict); the draft is kept (discard it with node.discard_draft).",
     ],
   }),
 }

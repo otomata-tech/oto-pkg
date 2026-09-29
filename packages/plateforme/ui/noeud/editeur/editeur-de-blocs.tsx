@@ -3,55 +3,50 @@
 // L'éditeur de blocs d'une page (E05-S02 ; E05-S08, AC1 à AC7 ; E05-S09, partie c1), au niveau écriture :
 // chaque bloc écrit est un champ toujours monté (fiche D21 B), son texte part par la file en opérations par
 // bloc quand le focus le quitte, sur ⌘S ou après 1 200 ms sans frappe, et chaque geste de structure part
-// tout de suite. Il porte le bandeau du brouillon, la publication, les lignes d'état et le conflit au bloc.
+// tout de suite. Il porte la publication, les lignes d'état et le conflit au bloc (plus de bandeau du
+// brouillon depuis E11-S02, AC-c3).
 // Il reçoit des données et du `ReactNode` déjà rendu, jamais une fonction (AC22). Sans lui, pas d'édition.
 //
 // Porté d'oto-frontend (`components/editor/block-editor.tsx`). Repris : l'orchestration (modèle local,
 // focus posé impérativement, clavier, différé), les champs toujours montés, le corps de lecture du design
-// system (`Reader`), l'état vide (`EmptyState`,
-// « Commencer à écrire »), « Bloc supprimé. » et « Annuler ». Retiré : l'écriture du corps entier (→
+// system (`Reader`), « Bloc supprimé. » et « Annuler ». Retiré : l'écriture du corps entier (→
 // opérations par bloc), la synchronisation par comparaison de corps (`memeCorps`).
 //
 // Son genre (E05-S04) va à la publication : un Contexte confirme sa publication vide et dit la recharge des
 // conversations (AC11). Une procédure s'écrit comme une page (M59, fiche D104).
 //
-// E05-S10 : au niveau gestion, la publication part seule (AC-a6) ; la poignée ouvre le menu du bloc (AC-a2)
+// E05-S10 : la publication part seule (AC-a6), dès le niveau écriture depuis E11-S02 (AC-c2) ; la poignée ouvre le menu du bloc (AC-a2)
 // et se glisse-dépose (AC-a3, `glisser.ts`, le `useDragBlock` d'oto-frontend).
 //
 // E05-S11 : l'indication d'enregistrement est en haut à droite de la carte (AC-1) ; un bloc au repos lit ses
 // liens dans la phrase, par le titre des pages citées (AC-26, `cibles`, `liens`) ; tout le texte d'un bloc
 // sélectionné ouvre le menu de sa poignée, sans prendre le focus (AC-28).
+//
+// E11-S05 (AC-g1, AC-g2) : plus d'état vide ni de « Commencer à écrire » ; une page sans bloc a un Texte vide, créé
+// sur le poste, dont le champ porte l'invite, et qui prend le focus à l'ouverture quand le titre est écrit.
 import { useState, type ReactNode } from "react"
-import { Plus } from "@phosphor-icons/react/dist/csr/Plus"
 import type { BlockView, NodeKind } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
-import { EmptyState } from "../../ds/react/empty-state"
-import { AnimatedIcon } from "../../ds/react/icon"
-import { Button } from "../../ds/react/primitives"
 import { Reader } from "../../ds/react/reader"
 import type { CiblesDesLiens } from "../en-ligne"
-import { EDITEUR, PAGE_VIDE } from "../libelles"
-import { BandeauDuBrouillon, Publication } from "../publication"
-import { ContexteDesGestes, useGestes } from "./gestes"
+import { EDITEUR } from "../libelles"
+import { Publication } from "../publication"
+import { ContexteDesGestes } from "./gestes"
 import { useGlisser } from "./glisser"
 import { AlerteDEdition, IndicationDEnregistrement, LigneDAnnonce } from "./lignes-d-etat"
 import type { Rangee } from "./modele"
+import { estLaPageVide } from "./page-vide"
 import type { LiensDesBlocs } from "./champ-de-bloc"
 import { RangeeDeBloc } from "./rangee-de-bloc"
 import type { Conflit } from "./use-envois"
 import { useEditeur } from "./use-editeur"
 
 type EditeurDeBlocsProps = {
-  niveau: 2 | 3
   /** Les blocs servis : ceux du brouillon s'il existe, sinon ceux de la version publiée. */
   blocs: BlockView[]
   /** La révision publiée servie par la lecture du nœud. */
   revisionServie: number
-  /** Au niveau écriture, à qui revient la publication (AC8). */
-  phraseDePublication: string
   prefixeDesPages: string
-  /** « Voir la version publiée », lien de l'hôte déjà rendu (AC9). */
-  lienVersionPubliee: ReactNode
   /** Les blocs `reference` rendus en place par la page serveur, par `id` de bloc (E07-S03, AC16) ; sans rendu, `ReferenceEnLien`. */
   referencesRendues?: Readonly<Record<string, ReactNode>>
   /** Le genre du nœud (E05-S04) ; absent, une page. */
@@ -60,6 +55,8 @@ type EditeurDeBlocsProps = {
   cibles?: CiblesDesLiens
   /** Les champs de `read` sur le nœud (ses liens sortants), lus par l'hôte après la page. */
   liens?: Promise<Resultat<Record<string, unknown>>>
+  /** Une page vide dont le titre est écrit : son Texte prend le focus à l'ouverture (AC-g2). */
+  focusALOuverture?: boolean
 }
 
 type RangeesProps = {
@@ -74,8 +71,9 @@ type RangeesProps = {
   referencesRendues?: Readonly<Record<string, ReactNode>>
 }
 
-/** Les rangées, une par bloc, rendues par leur clé de rendu, jamais par leur rang. */
+/** Les rangées, une par bloc, rendues par leur clé de rendu, jamais par leur rang ; le Texte d'une page vide porte l'invite. */
 function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues }: RangeesProps) {
+  const invite = estLaPageVide(modele) ? EDITEUR.invite : undefined
   return modele.map((rangee, rang) => (
     <RangeeDeBloc
       key={rangee.cle}
@@ -90,28 +88,14 @@ function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, reference
       conflit={conflit?.cle === rangee.cle ? conflit : null}
       liens={liens}
       rendu={rangee.bloc.id === undefined ? undefined : referencesRendues?.[rangee.bloc.id]}
+      invite={invite}
     />
   ))
 }
 
-/** Une page sans bloc (AC7, AC11) : la phrase, et le seul chemin pour commencer à écrire (une rangée porte le « + »). */
-function PageVide() {
-  const gestes = useGestes()
-  return (
-    <EmptyState
-      title={PAGE_VIDE}
-      action={
-        <Button variant="secondary" size="sm" iconStart={<AnimatedIcon as={Plus} size="xs" />} onClick={gestes.insererEnTete}>
-          {EDITEUR.premierBloc}
-        </Button>
-      }
-    />
-  )
-}
-
 export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
-  const { niveau, blocs, revisionServie, phraseDePublication, lienVersionPubliee, referencesRendues, genre = "page" } = props
-  const editeur = useEditeur({ blocs, revisionServie })
+  const { blocs, revisionServie, referencesRendues, genre = "page" } = props
+  const editeur = useEditeur({ blocs, revisionServie, focusALOuverture: props.focusALOuverture })
   const { envois } = editeur
   const glisser = useGlisser({ racine: editeur.racine, glisser: editeur.actions.glisserDUnRang, deposer: editeur.actions.deposer })
   const [menuOuvert, setMenuOuvert] = useState<string | null>(null)
@@ -121,25 +105,20 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
   return (
     <ContexteDesGestes.Provider value={{ ...editeur.actions, poignee: glisser.poignee, selectionner, fermerLeMenu: () => setMenuOuvert(null) }}>
       <Reader ref={editeur.racine}>
-        <IndicationDEnregistrement niveau={niveau} />
+        <IndicationDEnregistrement />
         <div className="mb-3.5 flex flex-col gap-2">
-          <BandeauDuBrouillon lien={lienVersionPubliee} niveau={niveau} />
-          <Publication niveau={niveau} phrase={phraseDePublication} genre={genre} blocs={editeur.blocs} />
+          <Publication genre={genre} blocs={editeur.blocs} />
           <AlerteDEdition alerte={envois.alerte} />
         </div>
-        {editeur.modele.length === 0 ? (
-          <PageVide />
-        ) : (
-          <Rangees
-            modele={editeur.modele}
-            tenue={glisser.enCours}
-            menuOuvert={menuOuvert}
-            erreurs={editeur.erreurs}
-            conflit={envois.conflit}
-            liens={liens}
-            referencesRendues={referencesRendues}
-          />
-        )}
+        <Rangees
+          modele={editeur.modele}
+          tenue={glisser.enCours}
+          menuOuvert={menuOuvert}
+          erreurs={editeur.erreurs}
+          conflit={envois.conflit}
+          liens={liens}
+          referencesRendues={referencesRendues}
+        />
         <LigneDAnnonce annonce={envois.annonce} />
       </Reader>
     </ContexteDesGestes.Provider>

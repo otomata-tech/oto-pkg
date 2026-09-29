@@ -28,7 +28,6 @@ export type Gestes = {
   citer: (cle: string, texte: string, curseur: number) => void
   /** Le choix du « + » (E10-S06, AC-a1) : le bloc choisi après celui-ci ; un séparateur part tout de suite. */
   inserer: (cle: string, choix: Choix) => void
-  insererEnTete: () => void
   /** « / » (E10-S06, AC-a2) : le Texte devient le bloc choisi ; `colle`, le tableau d'un tableur collé (AC-b3). */
   remplacerParChoix: (cle: string, choix: Choix, colle?: Tableau) => void
   /** Un tableau ou un repli écrit dans ses champs (E10-S06, AC-b1, AC-b4) : il part comme un texte tapé. */

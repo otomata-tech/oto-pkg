@@ -4,13 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { NodeView, TreeNode } from "@otomata_tech/oto_platform/schemas"
 import { ContexteDeLHote, EcranDeNoeud, EcranDeNoeudChargement } from "@otomata_tech/oto_platform/ui"
 import { cheminsCites } from "../../../packages/plateforme/ui/noeud/corps-du-noeud"
-import { avecCle, bloc, ID, PAGE, vueDuNoeud } from "../../helpers/noeud"
+import { avecCle, bloc, ID, PAGE, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 // L'écran d'un nœud (E05-S02 : AC1 à AC9, AC14, AC17, AC19 ; E05-S09, partie c1 : porté d'oto-frontend ;
 // E05-S10, partie b : AC-a7, AC-b4, AC-b6), rendu comme la page de l'hôte le monte : lectures en
 // `resultat`, lien de l'hôte marqué, adresse d'un chemin ; la navigation du fil passe par l'hôte
 // (`ContexteDeLHote`), espionnée. Le panneau « Partager » a son fichier (`e05s10b-partage.test.tsx`). E05-S11 :
-// « Contenus liés » en trois rubriques (AC-29), le titre d'un Contexte (AC-17), une page citée par son titre (AC-26, AC-27).
+// le titre d'un Contexte (AC-17), une page citée par son titre (AC-26, AC-27). E11-S05 : « Cité dans », « Cite » et
+// « Sous-pages » en encarts (lot e), « Télécharger » (lot c), le résumé d'une procédure seule (lot f), la page vide (lot g).
 
 type EcranDeNoeudProps = ComponentProps<typeof EcranDeNoeud>
 
@@ -70,7 +71,7 @@ const ancre = (racine: HTMLElement, id: string) => racine.querySelector(`[id="${
 const brouillon = (blocs = PAGE, baseRevision = 4): NodeView["draft"] => ({ baseRevision, savedAt: "2026-09-24T10:00:00Z", draftStamp: "2026-09-24T10:00:00.000000+00:00", blocks: blocs, title: null, summary: null, kind: null, meta: null })
 
 describe("EcranDeNoeud, en-tête (AC2 ; AC-a2)", () => {
-  it("should show the header of the design system, without any tree in the content: trail, glyph and title, summary, meta and owner", () => {
+  it("should show the header of the design system, without any tree in the content: trail, glyph and title, meta and owner, no summary for a page", () => {
     rendre()
     // L'arbre ne vit plus que dans le rail (AC-a2) : le contenu n'en rend aucun.
     expect(screen.queryByRole("navigation", { name: "Arbre des connaissances" })).toBeNull()
@@ -81,7 +82,8 @@ describe("EcranDeNoeud, en-tête (AC2 ; AC-a2)", () => {
     const titre = screen.getByRole("heading", { level: 1 })
     expect(titre).toHaveTextContent("Modèle de relance")
     expect(titre).toHaveClass("oto-page-title")
-    expect(screen.getByText("Relancer un devis resté sans réponse.")).toBeInTheDocument()
+    // Le résumé d'une page ne se montre pas (E11-S05, AC-f1).
+    expect(screen.queryByText("Relancer un devis resté sans réponse.")).toBeNull()
     expect(screen.getByText("modifiée il y a 3 jours, par Claire Morel").closest("p")).toHaveClass("oto-screen-header-meta")
     // Le document est un îlot nommé par son titre, au corps de lecture du design system.
     expect(screen.getByRole("region", { name: "Modèle de relance" })).toHaveClass("oto-island")
@@ -149,16 +151,18 @@ describe("EcranDeNoeud, la ligne sous le titre (E05-S10, AC-a7)", () => {
     expect(await screen.findByRole("tooltip")).toBeInTheDocument()
     cleanup()
 
-    // Un tableau jamais publié : l'accord au masculin, l'état et ses lignes dans l'infobulle.
+    // Un tableau jamais publié : l'accord au masculin, l'état et ses lignes dans l'infobulle, sans le mot
+    // « brouillon » (E11-S02, AC-c4).
     rendre({ noeud: { data: vueDuNoeud({ kind: "table", status: "draft", revision: 0, blocks: [], rowsTotal: 12, updatedByName: null }) } })
     const tableau = screen.getByText("modifié il y a 3 jours")
     act(() => tableau.focus())
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("TypeTableauÉtatBrouillonRévisionjamais publiéLignes12 lignesPropriétaireéquipe Ventes (responsable : Claire Morel)")
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("TypeTableauÉtatNon publiéRévisionaucuneLignes12 lignesPropriétaireéquipe Ventes (responsable : Claire Morel)")
   })
 })
 
-describe("EcranDeNoeud, contenus liés et blocs (AC4 ; E05-S10, AC-b6)", () => {
+describe("EcranDeNoeud, encarts et blocs (AC4 ; E11-S05, lot e)", () => {
   const ENFANT = { path: "ventes/modele_relance/exemple", title: "Exemple", summary: "Un cas réel.", kind: "procedure" as const, status: "published" as const }
+  const NOTE = { path: "ventes/modele_relance/note", title: "Note", summary: "Un résumé de page.", kind: "page" as const, status: "published" as const }
   const LIENS = {
     links_out: [
       { path: "ventes/grille", key: "tarifs", title: "Grille", status: "ok" },
@@ -170,69 +174,99 @@ describe("EcranDeNoeud, contenus liés et blocs (AC4 ; E05-S10, AC-b6)", () => {
     links_in: [{ path: "conseil/guide", title: "Guide du conseil" }],
     links_in_total: 1,
   }
-  const repli = () => {
-    const details = screen.getByText("Contenus liés").closest("details")
-    if (!details) throw new Error("repli Contenus liés absent")
-    return details
+  /** Les encarts rendus, dans l'ordre du document : le texte de leur `summary` (titre et total). */
+  const encarts = (racine: ParentNode = document) => Array.from(racine.querySelectorAll("details.oto-linked")).map((repli) => repli.querySelector("summary")?.textContent)
+  const encart = (titre: string) => {
+    const repli = screen.getByText(titre, { selector: "strong" }).closest("details")
+    if (!repli) throw new Error(`encart ${titre} absent`)
+    return repli
   }
 
-  it("should fold « Contenus liés (N) » above the content, outside the card of blocks, with its sub-pages, what it mentions and what mentions it (E05-S11, AC-29)", async () => {
+  it("should put « Cité dans », « Cite » and « Sous-pages » in the right column, in this order, folded, each with its total (AC-e1, AC-f2)", async () => {
     await act(async () => {
-      rendre({ noeud: { data: vueDuNoeud({ children: [ENFANT], childrenTotal: 1 }) }, liens: Promise.resolve({ data: LIENS }) })
+      rendre({ noeud: { data: vueDuNoeud({ children: [ENFANT, NOTE], childrenTotal: 2 }) }, liens: Promise.resolve({ data: LIENS }) })
     })
-    // Le bandeau est hors de l'îlot du document, dans la même colonne ; son résumé compte les trois rubriques.
-    await waitFor(() => expect(repli().querySelector("summary")).toHaveTextContent("Contenus liés51 procédure · 3 mentionnés · mentionné dans 1 contenu"))
-    const bandeau = repli()
-    expect(bandeau).not.toHaveAttribute("open")
-    expect(bandeau.closest(".oto-island")).toBeNull()
-    const ilot = screen.getByRole("region", { name: "Modèle de relance" })
-    expect(bandeau.parentElement).toBe(ilot.parentElement)
-    expect(bandeau.compareDocumentPosition(ilot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    await waitFor(() => expect(encarts()).toEqual(["Cité dans1", "Cite3", "Sous-pages2"]))
+    const colonne = document.querySelector(".oto-two-columns-aside")
+    if (!colonne) throw new Error("colonne de droite absente")
+    expect(encarts(colonne)).toHaveLength(3)
+    expect(Array.from(colonne.querySelectorAll("details")).some((repli) => repli.hasAttribute("open"))).toBe(false)
+    // Le document est dans la colonne principale d'un `TwoColumns main="document"`.
+    expect(screen.getByRole("region", { name: "Modèle de relance" }).closest(".oto-two-columns-main")?.parentElement).toHaveAttribute("data-main", "document")
+    expect(screen.queryByText("Contenus liés")).toBeNull()
+    expect(screen.queryByText(/Mentionn/)).toBeNull()
 
-    const sousPages = within(within(bandeau).getByRole("list", { name: "Sous-pages" }))
-    expect(sousPages.getByRole("link", { name: /^Exemple/ })).toHaveAttribute("href", "/n/ventes/modele_relance/exemple")
-    expect(sousPages.getByRole("link", { name: /^Exemple/ })).toHaveTextContent("ExempleProcédure · Un cas réel.")
-    const mentionnes = within(within(bandeau).getByRole("list", { name: "Mentionnés" }))
+    const sousPages = within(within(encart("Sous-pages")).getByRole("list", { name: "Sous-pages" }))
+    // Le résumé d'une procédure seule (AC-f2) : une page dessous ne dit que sa nature.
+    expect(sousPages.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([
+      ["ExempleProcédure · Un cas réel.", "/n/ventes/modele_relance/exemple"],
+      ["NotePage", "/n/ventes/modele_relance/note"],
+    ])
+    const cite = within(within(encart("Cite")).getByRole("list", { name: "Cite" }))
     // Deux ancres d'un même contenu : une ligne ; un contenu rangé ailleurs mène à sa nouvelle place ; sans cible, un texte.
-    expect(mentionnes.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([
+    expect(cite.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([
       ["Grille", "/n/ventes/grille"],
       ["Nouveaudéplacé vers conseil/nouveau", "/n/conseil/nouveau"],
     ])
-    expect(mentionnes.getByText("ventes/perdu").closest("li")).toHaveAttribute("data-broken")
-    expect(mentionnes.getByText("sans cible")).toBeInTheDocument()
-    const mentionneDans = within(within(bandeau).getByRole("list", { name: "Mentionné dans" }))
-    expect(mentionneDans.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([["Guide du conseil", "/n/conseil/guide"]])
+    expect(cite.getByText("ventes/perdu").closest("li")).toHaveAttribute("data-broken")
+    expect(cite.getByText("sans cible")).toBeInTheDocument()
+    const citeDans = within(within(encart("Cité dans")).getByRole("list", { name: "Cité dans" }))
+    expect(citeDans.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([["Guide du conseil", "/n/conseil/guide"]])
   })
 
-  it("should leave out each empty section of « Contenus liés » (E05-S11, AC-29)", async () => {
+  it("should leave out an encart whose total is 0, count what the service did not serve, and keep the right column empty when nothing is linked (AC-e1, HN-E11S05-13)", async () => {
     await act(async () => {
       rendre({ liens: Promise.resolve({ data: { links_out: [], links_out_total: 0, links_in: [{ path: "conseil/guide", title: "Guide du conseil" }], links_in_total: 1 } }) })
     })
-    await waitFor(() => expect(repli().querySelector("summary")).toHaveTextContent("Contenus liés1mentionné dans 1 contenu"))
-    expect(within(repli()).getAllByRole("list").map((liste) => liste.getAttribute("aria-label"))).toEqual(["Mentionné dans"])
-  })
-
-  it("should count what the service did not serve, say a failed read of the links, and fold nothing when nothing is linked", async () => {
-    // Le service ne sert que les premiers nœuds dessous : le nombre est le total.
-    rendre({ noeud: { data: vueDuNoeud({ children: [ENFANT], childrenTotal: 60 }) } })
-    expect(repli().querySelector("summary")).toHaveTextContent("Contenus liés601 procédure")
-    expect(within(repli()).getByText("et 59 autres")).toBeInTheDocument()
-    // Sans les liens de l'hôte, ni « Mentionnés » ni « Mentionné dans ».
-    expect(within(repli()).getAllByRole("list").map((liste) => liste.getAttribute("aria-label"))).toEqual(["Sous-pages"])
+    await waitFor(() => expect(encarts()).toEqual(["Cité dans1"]))
     cleanup()
 
-    await act(async () => {
-      rendre({ liens: Promise.resolve({ error: "Une erreur est survenue. Réessayez." }) })
-    })
-    await waitFor(() => expect(within(repli()).getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez."))
-    expect(within(repli()).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance")
+    // Le service ne sert que les premiers nœuds dessous : le nombre est le total.
+    rendre({ noeud: { data: vueDuNoeud({ children: [ENFANT], childrenTotal: 60 }) } })
+    expect(encarts()).toEqual(["Sous-pages60"])
+    expect(within(encart("Sous-pages")).getByText("et 59 autres")).toBeInTheDocument()
     cleanup()
 
     await act(async () => {
       rendre({ liens: Promise.resolve({ data: { links_out: [], links_out_total: 0, links_in: [], links_in_total: 0 } }) })
     })
     expect(screen.getByRole("region", { name: "Modèle de relance" })).toBeInTheDocument()
-    expect(screen.queryByText("Contenus liés")).toBeNull()
+    expect(encarts()).toEqual([])
+    // La colonne garde sa piste : le document ne bouge pas quand les liens arrivent.
+    expect(document.querySelector(".oto-two-columns-aside")).not.toBeNull()
+  })
+
+  it("should say « Lecture des liens… » while the links are read, then their failure with « Réessayer », even without a sub-page (AC-e4)", async () => {
+    let servir: (lu: { error: string }) => void = () => {}
+    const liens = new Promise<{ error: string }>((resolve) => (servir = resolve))
+    await act(async () => {
+      rendre({ liens })
+    })
+    expect(screen.getByRole("status")).toHaveTextContent("Lecture des liens…")
+    await act(async () => {
+      servir({ error: "Une erreur est survenue. Réessayez." })
+    })
+    const colonne = within(document.querySelector<HTMLElement>(".oto-two-columns-aside") ?? document.body)
+    await waitFor(() => expect(colonne.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez."))
+    expect(colonne.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance")
+    expect(screen.queryByText("Lecture des liens…")).toBeNull()
+  })
+
+  it("should put the encarts of a table on a line above its grid, which keeps the full width (AC-e3)", async () => {
+    await act(async () => {
+      rendre({
+        noeud: { data: vueDuNoeud({ kind: "table", blocks: [], children: [NOTE], childrenTotal: 1 }) },
+        liens: Promise.resolve({ data: LIENS }),
+        complement: <p>La grille du tableau</p>,
+      })
+    })
+    await waitFor(() => expect(encarts()).toEqual(["Cité dans1", "Cite3", "Sous-pages1"]))
+    expect(document.querySelector(".oto-two-columns")).toBeNull()
+    const ligne = encart("Cité dans").parentElement
+    expect(ligne).toBe(encart("Sous-pages").parentElement)
+    expect(ligne?.compareDocumentPosition(screen.getByText("La grille du tableau")) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    const cadre = screen.getByText("La grille du tableau").closest(".oto-content-max")
+    expect(cadre).not.toHaveAttribute("data-width")
   })
 
   it("should render each block by its type, in order, with its reference as anchor, its inline text marked and no HTML injected", () => {
@@ -390,13 +424,16 @@ describe("EcranDeNoeud, états (AC6, AC7)", () => {
     expect(fil().getByText("ventes")).toBeInTheDocument()
     cleanup()
 
+    // Lue, une page vide le dit (E11-S05, AC-g3) ; écrite, l'éditeur montre un Texte vide et son invite (AC-g1).
     rendre({ noeud: { data: vueDuNoeud({ blocks: [] }) } })
     expect(screen.getByText("Cette page n'a pas encore de contenu.")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Commencer à écrire" })).toBeNull()
+    expect(screen.queryByRole("textbox")).toBeNull()
     cleanup()
 
     rendre({ noeud: { data: vueDuNoeud({ blocks: [], level: 2 }) } })
-    expect(screen.getByRole("button", { name: "Commencer à écrire" })).toBeInTheDocument()
+    expect(screen.queryByText("Cette page n'a pas encore de contenu.")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Commencer à écrire" })).toBeNull()
+    expect(screen.getByRole("textbox", { name: /^Modifier ce texte/ })).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
     cleanup()
 
     rendre({ noeud: { data: vueDuNoeud({ kind: "table", blocks: [], level: 2 }) }, complement: <p>La grille du tableau</p> })
@@ -414,21 +451,27 @@ describe("EcranDeNoeud, contrôles selon le niveau (AC8, AC20)", () => {
   })
 
   // « Déplacer » a quitté l'en-tête (E05-S13, AC-20) : `tests/integration/components/e05s13-coque.test.tsx`.
-  it("should give a writer the block controls and the title and summary in place, and say who publishes; a manager publishes without a button, a table's draft included", () => {
+  it("should give a writer the block controls, the title in place, the summary of a procedure only, and the publication without a button, as a manager, a table's draft included (E11-S02, AC-c2)", () => {
     rendre({ noeud: { data: vueDuNoeud({ level: 2 }) } })
     expect(screen.getByRole("button", { name: "Ajouter un bloc après — Objet de la relance" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Actions sur ce bloc — Objet de la relance" })).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })).toHaveValue("Objet de la relance")
-    // Le titre et le résumé s'écrivent en place (E05-S10, AC-a1) : le titre dans le `<h1>`, le résumé à sa place.
+    // Le titre s'écrit en place (E05-S10, AC-a1), dans le `<h1>` ; le résumé d'une page, ni lu ni écrit (E11-S05, AC-f1).
     expect(screen.getByRole("textbox", { name: "Titre" })).toHaveValue("Modèle de relance")
     expect(screen.getByRole("textbox", { name: "Titre" }).closest("h1")).not.toBeNull()
-    expect(screen.getByRole("textbox", { name: "Résumé" })).toHaveValue("Relancer un devis resté sans réponse.")
-    expect(screen.getByText("La publication revient au responsable de l'équipe Ventes (Claire Morel) ou à un administrateur.")).toBeInTheDocument()
+    expect(screen.queryByRole("textbox", { name: "Résumé" })).toBeNull()
+    // Écrire publie (E11-S02, AC-c2) : la publication seule, sans phrase « La publication revient… ».
+    expect(screen.getByRole("group", { name: "Publication" })).toBeInTheDocument()
+    expect(screen.queryByText(/La publication revient/)).toBeNull()
     expect(screen.queryByRole("button", { name: "Publier" })).toBeNull()
     cleanup()
 
-    rendre({ noeud: { data: vueDuNoeud({ level: 2, path: "conseil/tarifs", owner: { kind: "org" } }) } })
-    expect(screen.getByText("La publication revient aux administrateurs de Démo.")).toBeInTheDocument()
+    // Une procédure : son résumé, en champ dès l'écriture, lu au niveau lecture (AC-f1).
+    rendre({ noeud: { data: vueDuNoeud({ kind: "procedure", level: 2 }) } })
+    expect(screen.getByRole("textbox", { name: "Résumé" })).toHaveValue("Relancer un devis resté sans réponse.")
+    cleanup()
+    rendre({ noeud: { data: vueDuNoeud({ kind: "procedure" }) } })
+    expect(screen.getByText("Relancer un devis resté sans réponse.")).toBeInTheDocument()
     cleanup()
 
     // Au niveau gestion, aucun bouton « Publier » ni phrase : la publication part seule (E05-S10, AC-a6).
@@ -438,17 +481,19 @@ describe("EcranDeNoeud, contrôles selon le niveau (AC8, AC20)", () => {
     expect(screen.queryByText(/^La publication revient/)).toBeNull()
     cleanup()
 
-    // Un tableau n'a pas d'éditeur de blocs, mais son brouillon se voit et se publie (AC9, AC17), son en-tête écrit en place (AC-a10).
-    rendre({ noeud: { data: vueDuNoeud({ kind: "table", blocks: [], level: 3, draft: brouillon([]) }) }, complement: <p>La grille du tableau</p> })
-    expect(screen.getByText("Brouillon non publié — ouvert sur la révision 4.")).toBeInTheDocument()
+    // Un tableau n'a pas d'éditeur de blocs, mais son brouillon se publie (AC9, AC17), son en-tête écrit en place
+    // (AC-a10), sans bandeau (E11-S02, AC-c3), au niveau écriture comme à la gestion.
+    rendre({ noeud: { data: vueDuNoeud({ kind: "table", blocks: [], level: 2, draft: brouillon([]) }) }, complement: <p>La grille du tableau</p> })
+    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
     expect(screen.getByRole("group", { name: "Publication" })).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: "Titre" })).toBeInTheDocument()
-    expect(screen.getByRole("textbox", { name: "Résumé" })).toBeInTheDocument()
+    expect(screen.queryByRole("textbox", { name: "Résumé" })).toBeNull()
     expect(screen.queryByRole("button", { name: /^Actions sur ce bloc/ })).toBeNull()
   })
 
-  it("should open a node just created from the rail with its title field focused and selected, and no other node (E05-S10, AC-b3)", async () => {
-    rendre({ noeud: { data: vueDuNoeud({ level: 3, title: "Sans titre", summary: "À compléter.", status: "draft", revision: 0, blocks: [] }) } })
+  it("should open a node just created from the rail with its title field focused and selected, and no other node (E05-S10, AC-b3 ; E11-S02, AC-c5)", async () => {
+    // Créé publié par « + » (révision 1) : reconnu à son titre seul (HN-E11S02-29).
+    rendre({ noeud: { data: vueDuNoeud({ level: 2, title: "Sans titre", summary: "À compléter.", revision: 1, blocks: [] }) } })
     const titre = screen.getByRole("textbox", { name: "Titre" })
     await waitFor(() => expect(document.activeElement).toBe(titre))
     // Sélectionné entier : la première frappe remplace « Sans titre ».
@@ -456,40 +501,59 @@ describe("EcranDeNoeud, contrôles selon le niveau (AC8, AC20)", () => {
     expect(titre).toHaveProperty("selectionEnd", "Sans titre".length)
     cleanup()
 
-    // Déjà publié, ou déjà nommé : le focus reste où il est.
-    for (const surcharge of [{ title: "Sans titre", revision: 4 }, { title: "Modèle de relance", status: "draft" as const, revision: 0 }]) {
+    // Déjà nommé, publié ou non : le focus reste où il est.
+    for (const surcharge of [{ title: "Modèle de relance" }, { title: "Modèle de relance", status: "draft" as const, revision: 0 }]) {
       rendre({ noeud: { data: vueDuNoeud({ level: 3, ...surcharge }) } })
       expect(document.activeElement).toBe(document.body)
       cleanup()
     }
   })
+
+  it("should take a new node from its title to its empty Texte with Entrée, and open an empty page with a title in its Texte (E11-S05, AC-g2)", async () => {
+    simulerLAPI()
+    rendre({ noeud: { data: vueDuNoeud({ level: 2, title: "Sans titre", blocks: [] }) } })
+    const titre = screen.getByRole("textbox", { name: "Titre" })
+    await waitFor(() => expect(document.activeElement).toBe(titre))
+    fireEvent.change(titre, { target: { value: "Relances de novembre" } })
+    fireEvent.keyDown(titre, { key: "Enter" })
+    const texte = screen.getByRole("textbox", { name: /^Modifier ce texte/ })
+    await waitFor(() => expect(document.activeElement).toBe(texte))
+    cleanup()
+    vi.unstubAllGlobals()
+
+    rendre({ noeud: { data: vueDuNoeud({ level: 2, blocks: [] }) } })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: /^Modifier ce texte/ })))
+  })
 })
 
-describe("EcranDeNoeud, brouillon (AC9)", () => {
-  it("should show a writer the draft under its banner, and the published version on ?version=publiee; a reader sees neither", () => {
+describe("EcranDeNoeud, brouillon (AC9 ; E11-S02, AC-c3)", () => {
+  it("should show the pending draft without banner, notice or link, at every writing level, and the published version on ?version=publiee; a reader sees neither", () => {
     const blocsDuBrouillon = [bloc(ID.objet, "paragraph", "Texte du brouillon")]
-    rendre({ noeud: { data: vueDuNoeud({ level: 2, draft: brouillon(blocsDuBrouillon) }) } })
-    expect(screen.getByText("Brouillon non publié — ouvert sur la révision 4.")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Voir la version publiée" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=publiee")
-    expect(screen.getByDisplayValue("Texte du brouillon")).toBeInTheDocument()
-    expect(screen.queryByText("Objet de la relance")).toBeNull()
-    cleanup()
+    // Un brouillon laissé par un assistant (`publish: false`) ou refusé : rien ne le signale ; la frappe suivante le publie.
+    for (const level of [2, 3] as const) {
+      rendre({ noeud: { data: vueDuNoeud({ level, draft: brouillon(blocsDuBrouillon) }) } })
+      expect(screen.queryByText(/Brouillon non publié|^Brouillon/)).toBeNull()
+      expect(screen.queryByRole("link", { name: "Voir la version publiée" })).toBeNull()
+      expect(screen.getByDisplayValue("Texte du brouillon")).toBeInTheDocument()
+      expect(screen.queryByText("Objet de la relance")).toBeNull()
+      cleanup()
+    }
 
-    // La version publiée se lit, comme pour un lecteur : aucun champ (E05-S08, AC1).
+    // La version publiée se lit, comme pour un lecteur : aucun champ (E05-S08, AC1) ; l'adresse reste (HN-E11S02-25).
     rendre({ noeud: { data: vueDuNoeud({ level: 2, draft: brouillon(blocsDuBrouillon) }) }, versionPubliee: true })
     expect(screen.getByText("Version publiée (révision 4).")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Revenir au brouillon" })).toHaveAttribute("href", "/n/ventes/modele_relance")
+    expect(screen.getByRole("link", { name: "Revenir aux modifications en attente" })).toHaveAttribute("href", "/n/ventes/modele_relance")
     expect(screen.getByText("Objet de la relance")).toBeInTheDocument()
     expect(screen.queryByRole("textbox")).toBeNull()
     cleanup()
 
     rendre({ noeud: { data: vueDuNoeud({ level: 2, status: "draft", revision: 0, blocks: [], draft: brouillon(blocsDuBrouillon, 0) }) } })
-    expect(screen.getByText("Brouillon non publié — cette page n'a jamais été publiée.")).toBeInTheDocument()
+    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
     cleanup()
 
     rendre({ versionPubliee: true })
     expect(screen.queryByText(/^Brouillon non publié|^Version publiée/)).toBeNull()
-    expect(screen.queryByRole("link", { name: "Revenir au brouillon" })).toBeNull()
+    expect(screen.queryByRole("link", { name: "Revenir aux modifications en attente" })).toBeNull()
   })
 })
 
@@ -561,5 +625,124 @@ describe("EcranDeNoeud, accès et partage (AC19 ; E05-S10, AC-b5)", () => {
     expect(panneau.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
     expect(panneau.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=publiee")
     expect(panneau.queryByRole("combobox")).toBeNull()
+  })
+})
+
+describe("EcranDeNoeud, réglages d'un tableau (E11-S01, AC-g1, AC-g6)", () => {
+  const ENTETE = { columns: [{ name: "entreprise", type: "text" }], key: "entreprise" }
+  const tableau = (surcharge: Partial<NodeView> = {}) => vueDuNoeud({ kind: "table", blocks: [], meta: ENTETE, ...surcharge })
+  const partage: EcranDeNoeudProps["partage"] = {
+    regles: { data: { path: "ventes/modele_relance", title: "Modèle de relance", owner: { kind: "team", teamName: "Ventes" }, viewerLevel: 3, rules: [] } },
+    sujets: { data: { equipes: [], personnes: [] } },
+    gestionAccordable: false,
+    moi: null,
+  }
+  const reglages = () => screen.queryByRole("button", { name: "Réglages" })
+
+  it("should put « Réglages » after « Télécharger en .csv » and before « Partager · <espace> » for a table read at the write or manage level, and open « Réglages du tableau »", () => {
+    for (const level of [2, 3] as const) {
+      rendre({ noeud: { data: tableau({ level }) }, partage, complement: <p>La grille du tableau</p> })
+      const bouton = screen.getByRole("button", { name: "Réglages" })
+      const telecharger = screen.getByRole("button", { name: "Télécharger en .csv" })
+      const partager = screen.getByRole("button", { name: "Partager · Ventes" })
+      expect(bouton.closest(".oto-screen-header-access")).toBe(partager.closest(".oto-screen-header-access"))
+      expect(telecharger.closest(".oto-screen-header-access")).toBe(partager.closest(".oto-screen-header-access"))
+      expect(telecharger.compareDocumentPosition(bouton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(bouton.compareDocumentPosition(partager) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      fireEvent.click(bouton)
+      expect(screen.getByRole("dialog", { name: "Réglages du tableau" })).toBeInTheDocument()
+      cleanup()
+    }
+  })
+
+  it("should give no « Réglages » to a reader, on ?version=publiee, or to a page, a procedure or a Contexte", () => {
+    rendre({ noeud: { data: tableau({ level: 1 }) }, partage })
+    expect(reglages()).toBeNull()
+    cleanup()
+    rendre({ noeud: { data: tableau({ level: 2 }) }, partage, versionPubliee: true })
+    expect(reglages()).toBeNull()
+    cleanup()
+    for (const kind of ["page", "procedure", "context"] as const) {
+      rendre({ noeud: { data: vueDuNoeud({ kind, level: 2, meta: ENTETE }) }, partage })
+      expect(reglages()).toBeNull()
+      cleanup()
+    }
+  })
+
+  it("should block the panel on a pending header in the draft, and not on a draft of the title or the summary only (AC-g6)", () => {
+    const attente = "Un changement de l'en-tête attend en brouillon. Demandez à l'assistant de le publier ou de l'abandonner, puis rechargez la page."
+    const draft = brouillon([])
+    rendre({ noeud: { data: tableau({ level: 2, draft: draft && { ...draft, meta: { ...ENTETE, closed: true } } }) } })
+    fireEvent.click(screen.getByRole("button", { name: "Réglages" }))
+    expect(screen.getByText(attente)).toBeInTheDocument()
+    // L'état publié, et non celui du brouillon : « Fermé » reste décoché.
+    expect(screen.getByRole("switch", { name: "Fermé" })).not.toBeChecked()
+    for (const un of screen.getAllByRole("switch")) expect(un).toBeDisabled()
+    cleanup()
+
+    rendre({ noeud: { data: tableau({ level: 2, draft: draft && { ...draft, title: "Suivi des prospects 2026" } }) } })
+    fireEvent.click(screen.getByRole("button", { name: "Réglages" }))
+    expect(screen.queryByText(attente)).toBeNull()
+    for (const un of screen.getAllByRole("switch")) expect(un).toBeEnabled()
+  })
+})
+
+// E11-S05 (lot c ; HN-E11S05-8, HN-E11S05-9) : le fichier publié, par les routes d'export d'E10-S01.
+describe("EcranDeNoeud, télécharger (E11-S05, AC-c1 to AC-c3)", () => {
+  const partage: EcranDeNoeudProps["partage"] = {
+    regles: { data: { path: "ventes/modele_relance", title: "Modèle de relance", owner: { kind: "team", teamName: "Ventes" }, viewerLevel: 1, rules: [] } },
+    sujets: { data: { equipes: [], personnes: [] } },
+    gestionAccordable: false,
+    moi: null,
+  }
+  const commandes = () => Array.from(document.querySelectorAll(".oto-screen-header-access button")).map((bouton) => bouton.textContent)
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it("should offer « Télécharger en .md » for a page, a procedure or a Contexte and « Télécharger en .csv » for a table, before « Partager », none for a node never published (AC-c1)", () => {
+    for (const [kind, libelle] of [["page", "Télécharger en .md"], ["procedure", "Télécharger en .md"], ["context", "Télécharger en .md"], ["table", "Télécharger en .csv"]] as const) {
+      rendre({ noeud: { data: vueDuNoeud({ kind, blocks: [] }) }, partage })
+      expect(commandes()).toEqual([libelle, "Partager · Ventes"])
+      cleanup()
+    }
+    // Sans panneau de partage, le bouton est seul ; jamais publié, aucun bouton (HN-E11S05-9).
+    rendre()
+    expect(commandes()).toEqual(["Télécharger en .md"])
+    cleanup()
+    rendre({ noeud: { data: vueDuNoeud({ status: "draft", revision: 0, level: 2 }) }, partage })
+    expect(commandes()).toEqual(["Partager · Ventes"])
+  })
+
+  it("should download the published file of the export route, the button disabled meanwhile, and say a refusal in an alert without any file (AC-c2, AC-c3)", async () => {
+    let repondre: (reponse: Response) => void = () => {}
+    const requetes = vi.fn<typeof fetch>(() => new Promise<Response>((resolve) => (repondre = resolve)))
+    vi.stubGlobal("fetch", requetes)
+    const creer = vi.fn(() => "blob:fichier")
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: creer, revokeObjectURL: vi.fn() }))
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined)
+    rendre({ noeud: { data: vueDuNoeud({ kind: "table", blocks: [] }) } })
+    const bouton = screen.getByRole("button", { name: "Télécharger en .csv" })
+
+    fireEvent.click(bouton)
+    expect(requetes).toHaveBeenCalledWith("/api/plateforme/tables/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
+    await waitFor(() => expect(bouton).toBeDisabled())
+    await act(async () => {
+      repondre(new Response(JSON.stringify({ data: { filename: "modele_relance.csv", content: "nom\r\n" } }), { status: 200 }))
+    })
+    await waitFor(() => expect(clic).toHaveBeenCalledTimes(1))
+    expect(creer).toHaveBeenCalledWith(expect.objectContaining({ type: "text/csv;charset=utf-8" }))
+    expect(bouton).not.toBeDisabled()
+    cleanup()
+
+    // Un refus : sa phrase sous l'en-tête, aucun fichier.
+    requetes.mockResolvedValue(new Response(JSON.stringify({ error: { code: "too_large", message: "Too many rows." } }), { status: 422 }))
+    rendre()
+    fireEvent.click(screen.getByRole("button", { name: "Télécharger en .md" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ce tableau a trop de lignes pour un export : filtrez-le, ou demandez à un assistant de le lire par pages.")
+    expect(requetes).toHaveBeenLastCalledWith("/api/plateforme/nodes/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
+    expect(clic).toHaveBeenCalledTimes(1)
   })
 })

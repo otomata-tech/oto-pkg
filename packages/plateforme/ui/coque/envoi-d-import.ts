@@ -105,7 +105,7 @@ export type Refus = ErreurPlateforme | "adresses"
 
 /**
  * Une page tirée d'un `.md` (AC-a3) : titre, résumé et morceaux de `readPageMarkdown`, en opérations `insert_after`
- * sans bloc, du dernier morceau au premier (l'ordre du fichier, en une seule requête), en mode tolérant ; un brouillon.
+ * sans bloc, du dernier morceau au premier (l'ordre du fichier, en une seule requête), en mode tolérant ; publiée (écrire publie, E11-S02).
  */
 export async function importerUnePage(fichier: { nom: string; texte: string }, adresses: readonly string[]): Promise<{ chemin: string; conserves: number } | { refus: Refus }> {
   const page = readPageMarkdown(fichier.texte, fichier.nom)

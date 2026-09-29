@@ -34,7 +34,7 @@ function contextes(level: 1 | 3): DonneesDuContexteServi["contextes"] {
 function monterLaVue(suite: string, level: 1 | 3) {
   render(
     <ContexteServi
-      donnees={{ apercu: apercu(suite), contextes: contextes(level), equipes: [], nomOrganisation: "Démo" }}
+      donnees={{ apercu: apercu(suite), contextes: contextes(level), equipes: [] }}
       Lien={LienDeTest}
       prefixeDesPages="/n/"
       ici="/context"

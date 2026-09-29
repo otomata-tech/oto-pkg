@@ -151,6 +151,11 @@ Sur une action qui peut échouer souvent, un état de chargement franc est moins
 serveur : un double-clic rapide ou un retry réseau peut exécuter l'action deux fois. Pour une
 création facturable ou non réversible, voir `security-patterns.md § Idempotence`.
 
+Un contrôle qu'une règle métier bloque (panneau verrouillé, brouillon en attente) se garde aussi
+dans son gestionnaire, pas seulement par `disabled` : React déclenche `onChange` sur une case
+désactivée qui reçoit un clic programmé. **Vérifiable :** le test du blocage clique le contrôle
+désactivé et affirme qu'aucune requête ne part.
+
 ## Règles
 
 - Un schema = un formulaire = une action. Le schema vit dans `src/lib/schemas/`.

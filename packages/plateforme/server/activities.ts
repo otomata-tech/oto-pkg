@@ -35,12 +35,17 @@ const SCREEN_GESTURES: Readonly<Record<string, ActivityVerb | "write">> = {
   "POST tables/review": "reviewed",
 }
 
-/** Les outils des assistants lus : l'écriture, l'appel d'une fonction (`table.write` seul), le routage de `context`. */
+/**
+ * Les outils des assistants lus : l'écriture, l'appel d'une fonction (`table.write` ; `node.trash` et
+ * `table.delete_rows` confirmés, E11-S02), le routage de `context`.
+ */
 const ASSISTANT_TOOLS = ["write", "call", "context"] as const
 
 /**
  * Une ligne telle que la requête la rend (AC-17) : ses colonnes, et des arguments seulement ce qui classe
  * (`publish` vrai, `base_revision` présent, arguments coupés, `kind`, tableau d'un `table.write`), bornés.
+ * E11-S02 (AC-h3) : `confirm` vrai d'un `call`, chemin de ses arguments, et lignes à revoir supprimées
+ * (`args._outcome.review`, un entier, sinon nul) ; facultatifs pour les lignes écrites à la main.
  */
 export type ActivityRow = {
   id: number
@@ -55,10 +60,16 @@ export type ActivityRow = {
   truncated: boolean
   kind: string | null
   table: string | null
+  confirmed?: boolean
+  path?: string | null
+  review?: number | null
 }
 
-/** Un geste classé, avant la relecture du contenu : son chemin tel que le lecteur le voit, et la nature que disent les arguments. */
-export type Gesture = { id: number; at: string; userId: string | null; ctx: string | null; verb: ActivityVerb; path: string; kind: NodeKind | null }
+/**
+ * Un geste classé, avant la relecture du contenu : son chemin tel que le lecteur le voit, et la nature que disent
+ * les arguments ; `inReview`, les lignes à revoir d'une suppression de lignes (E11-S02, AC-h3).
+ */
+export type Gesture = { id: number; at: string; userId: string | null; ctx: string | null; verb: ActivityVerb; path: string; kind: NodeKind | null; inReview?: number }
 
 const nodeKind = (value: string | null | undefined): NodeKind | null => NODE_KINDS.find((kind) => kind === value) ?? null
 
@@ -67,6 +78,18 @@ function writeVerb(row: ActivityRow): ActivityVerb {
   if (row.truncated) return "edited"
   if (row.publish) return "published"
   return row.revised ? "edited" : "created"
+}
+
+/**
+ * Un `call` qui est un geste sur un contenu : `table.write`, et l'exécution confirmée de `node.trash` et de
+ * `table.delete_rows` (E11-S02, AC-h3) ; un récapitulatif sans `confirm` et `node.discard_draft` n'y sont pas.
+ */
+function callVerbAndPath(row: ActivityRow): { verb: ActivityVerb; path: string | null } | null {
+  if (row.target === "table.write") return { verb: "wrote_rows", path: row.table }
+  if (row.confirmed !== true) return null
+  if (row.target === "node.trash") return { verb: "trashed", path: row.path ?? null }
+  if (row.target === "table.delete_rows") return { verb: "deleted_rows", path: row.table }
+  return null
 }
 
 /** Le verbe et le chemin d'une ligne, sinon `null` : une ligne qui n'est pas un geste sur un contenu. */
@@ -80,7 +103,7 @@ function verbAndPath(row: ActivityRow, prefix: string): { verb: ActivityVerb; pa
   const tool = bareTool(row.tool, prefix)
   if (tool === "write") return { verb: writeVerb(row), path: row.target }
   // Le chemin du tableau est dans les arguments ; illisible (arguments coupés), la ligne est omise (HN-E05S12-15).
-  if (tool === "call") return row.target === "table.write" ? { verb: "wrote_rows", path: row.table } : null
+  if (tool === "call") return callVerbAndPath(row)
   // Une procédure lancée : confirmée à la relecture, si la cible est une procédure que la personne lit.
   if (tool === "context") return { verb: "ran", path: row.target }
   return null
@@ -99,14 +122,15 @@ export function classifyRow(row: ActivityRow, reader: JournalReader, prefix: str
   // espace personnel ailleurs que dans la cible, et la requête ne les relit pas entiers (AC-17) ; plus strict que
   // `hidesContent` du journal, qui les lit (HB-E05S12-10).
   const kind = row.user_id === reader.userId ? nodeKind(row.kind) : null
-  return { id: row.id, at: row.ts, userId: row.user_id, ctx: row.ctx, verb: found.verb, path, kind }
+  const inReview = found.verb === "deleted_rows" && row.review ? { inReview: row.review } : {}
+  return { id: row.id, at: row.ts, userId: row.user_id, ctx: row.ctx, verb: found.verb, path, kind, ...inReview }
 }
 
 /** Ce que la relecture sait d'un chemin : le nœud que la personne lit, ou la nature d'un nœud à la corbeille qu'elle lisait. */
 export type Resolution = { node?: TargetNode; trashedKind?: NodeKind }
 
 /** La nature que le verbe dit à coup sûr : des lignes s'écrivent dans un tableau, une procédure se lance. */
-const VERB_KINDS: Partial<Record<ActivityVerb, NodeKind>> = { wrote_rows: "table", reviewed: "table", ran: "procedure" }
+const VERB_KINDS: Partial<Record<ActivityVerb, NodeKind>> = { wrote_rows: "table", reviewed: "table", ran: "procedure", deleted_rows: "table" }
 
 /** L'activité d'un geste relu (AC-13, AC-15), sinon `null` : une cible de `context` qui n'est pas une procédure lue n'est pas lancée. */
 function activityOf(gesture: Gesture, resolution: Resolution | undefined, names: ReadonlyMap<string, string>): Activity | null {
@@ -123,13 +147,15 @@ function activityOf(gesture: Gesture, resolution: Resolution | undefined, names:
     title: node?.title ?? null,
     count: 1,
     ctx: gesture.verb === "ran" ? gesture.ctx : null,
+    ...(gesture.inReview ? { inReview: gesture.inReview } : {}),
   }
 }
 
 /**
  * Les activités des gestes, les plus récents d'abord (AC-13, AC-14) : même personne, même contenu (le nœud
  * relu, sinon le chemin), même verbe, moins d'une heure entre deux gestes → une activité, à l'heure du plus
- * récent, avec leur nombre ; `limit` activités au plus.
+ * récent, avec leur nombre, et la somme de leurs lignes à revoir supprimées (E11-S02, AC-h3) ; `limit`
+ * activités au plus.
  */
 export function groupGestures(gestures: readonly Gesture[], resolutions: ReadonlyMap<string, Resolution>, names: ReadonlyMap<string, string>, limit: number): Activity[] {
   const activities: Activity[] = []
@@ -143,6 +169,7 @@ export function groupGestures(gestures: readonly Gesture[], resolutions: Readonl
     const group = open.get(key)
     if (group && Math.abs(group.oldest - at) < ACTIVITY_GROUP_MS) {
       group.activity.count += 1
+      if (activity.inReview) group.activity.inReview = (group.activity.inReview ?? 0) + activity.inReview
       group.oldest = at
       continue
     }
@@ -167,7 +194,11 @@ async function scanRows(db: PlatformDb, identity: Identity, since: Date): Promis
              coalesce(j.args ? 'base_revision', false) as revised,
              coalesce(j.args ? '_truncated', false) as truncated,
              left(j.args ->> 'kind', 20) as kind,
-             left(j.args -> 'arguments' ->> 'table', 200) as "table") r) as row
+             left(j.args -> 'arguments' ->> 'table', 200) as "table",
+             coalesce((j.args -> 'confirm') = 'true'::jsonb, false) as confirmed,
+             left(j.args -> 'arguments' ->> 'path', 1000) as path,
+             case when jsonb_typeof(j.args -> '_outcome' -> 'review') = 'number' and (j.args -> '_outcome' ->> 'review') ~ '^[0-9]{1,9}$'
+                  then (j.args -> '_outcome' ->> 'review')::int end as review) r) as row
     from platform.journal j
     where j.org_id = ${identity.org.id} ${inScope(sql, journalScope(identity))}
       and j.ts >= ${since} and not j.is_error and j.target is not null

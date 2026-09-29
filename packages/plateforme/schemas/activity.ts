@@ -6,9 +6,10 @@ import type { NodeKind } from "./nodes"
 
 /**
  * Ce qui est arrivé à un contenu (HN-E05S12-15) : créé, modifié, publié, déplacé, dupliqué, mis à la
- * corbeille, restauré ; lignes écrites dans un tableau (`table.write`), décision de revue ; procédure lancée.
+ * corbeille, restauré ; lignes écrites dans un tableau (`table.write`), décision de revue ; procédure lancée ;
+ * lignes supprimées d'un tableau (`table.delete_rows`, E11-S02, HN-E11S02-11).
  */
-export const ACTIVITY_VERBS = ["created", "edited", "published", "moved", "duplicated", "trashed", "restored", "wrote_rows", "reviewed", "ran"] as const
+export const ACTIVITY_VERBS = ["created", "edited", "published", "moved", "duplicated", "trashed", "restored", "wrote_rows", "reviewed", "ran", "deleted_rows"] as const
 
 export type ActivityVerb = (typeof ACTIVITY_VERBS)[number]
 
@@ -41,6 +42,8 @@ export type Activity = {
   title: string | null
   count: number
   ctx: string | null
+  /** Lignes à revoir parmi les lignes supprimées (`deleted_rows`), sommées sur le groupe (E11-S02, AC-h3) ; absent sans elles. */
+  inReview?: number
 }
 
 /** Les activités de la période, la plus récente d'abord ; `truncated` : la période compte plus de lignes que la lecture n'en prend. */

@@ -184,7 +184,7 @@ export const writeNodeSchema = z.object({
   publish: z
     .boolean()
     .optional()
-    .describe("true: publish after applying ops; publishing needs the manage level (default false: draft only)."),
+    .describe("false: save a draft without publishing it (default true: the write is published at once)."),
 })
 
 export type WriteNodeInput = z.infer<typeof writeNodeSchema>

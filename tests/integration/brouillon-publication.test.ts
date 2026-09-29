@@ -227,6 +227,16 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       )
     })
 
+    // E11-S02 (AC-a4) : aucune règle de niveau en base ; le service décide qui publie (ADR-012 § 3).
+    it("should let a writer's session publish, the base reading no level", async () => {
+      const page = await publishedPage(1)
+      await openDraft("lea", page)
+      await insertBlock("lea", { node_id: page, state: "draft", position: 5000, type: "paragraph", text: "Écrit par Léa.", created_by: o.people.lea.id })
+      expect(await publish("lea", page, 1)).toBe(2)
+      expect(await nodeRow(page)).toMatchObject({ status: "published", revision: 2, updated_by: o.people.lea.id })
+      expect(await hasDraft(page)).toBe(false)
+    })
+
     it("should publish a never-published page at revision 1", async () => {
       const page = await fx.createNode(o.org.id, { parentId: o.nodes.ventes, path: `ventes/neuve_${hex(3)}`, title: "Neuve" })
       await openDraft("claire", page)

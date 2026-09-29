@@ -35,11 +35,11 @@ lourdes.
 | 1 | E11-S09 | Brancher mon Claude, ChatGPT ou Mistral : un guide par onglet, grande fenêtre et `/connect` | M | | — | ✅ approuvée, fusionnée sur main (non commitée) ; AC-15 en attente (banc Le Chat) |
 | 2 | E11-S03 | Contexte et conversations : invalidation ciblée des ctx, plafond seul et coupe dite, déplacer et compléter une liste | L | Ⓜ | E11-S04 (fichiers communs) ; lot c : E10-S04 | ✅ approuvée, fusionnée sur main (commit commun à venir) ; Ⓜ `20260929180000_ctx_contexts.sql` à appliquer au projet de test (action JB) |
 | 2 | E11-S10 | Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu | L | Ⓜ | E11-S09 (accueil) ; E10-S01 (`ui/coque/`) | ✅ approuvée, fusionnée sur main avec S04 et S09 (commit à venir) ; AC-a0 : relevé de diagnostic sur Démo par le responsable d'Oto |
-| 3 | E11-S01 | Tableaux : créer sans écraser, colonne stricte, recherche par mots, révision et auteur, revue par l'agent, preuve par tableau, réglages à l'écran | L | | E10-S01 (fichiers des tableaux) ; lot g après E11-S02 | ✅ lots a à f approuvés, fusionnés sur main (commit commun à venir) ; lot g 🟢 Ready, en vague 4 après S02 |
-| 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | 🟢 Ready |
-| 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | 🟢 Ready |
+| 3 | E11-S01 | Tableaux : créer sans écraser, colonne stricte, recherche par mots, révision et auteur, revue par l'agent, preuve par tableau, réglages à l'écran | L | | E10-S01 (fichiers des tableaux) ; lot g après E11-S02 | ✅ lots a à f approuvés, fusionnés sur main (commit commun à venir) ; lot g ✅ approuvé, fusionné sur main (commit à venir) |
+| 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | ✅ approuvée, fusionnée sur main (commit à venir) ; Ⓜ `20260929190000_discard_draft.sql` à appliquer au projet de test (action JB) |
+| 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | ✅ approuvée, fusionnée sur main (commit à venir) |
 | 5 | E11-S06 | Éditeur : une puce par élément de liste, modifier un lien dans un panneau | M | | E10-S04, E10-S06 | ✅ approuvée, fusionnée sur main (commit commun à venir) |
-| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | ✅ lot a approuvé, fusionné sur main (commit commun à venir) ; lot b 🟢 Ready (après E11-S03 et E11-S10, fusionnées), lot c après E10-S02 |
+| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | ✅ lots a et b approuvés, fusionnés sur main (commit commun à venir) ; lot c après E10-S02 |
 | 6 | E11-S07 | Adresses en anglais : routes, paramètres, ancres, préfixe d'API | L | | toutes les autres | 🟢 Ready (cassante) |
 
 - **Livraison** : une seule version, 1.1.0, pour les quatre stories d'E10 et les neuf d'E11 (fiches
@@ -107,6 +107,8 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M83 | E10-S01 : le cas « dashes under text » de `tests/unit/nodes-parse-tolerant.test.ts` (textes hostiles, moins d'une seconde) s'approche de sa borne de temps sous charge : le stabiliser. |
 | M84 | `choix-de-bloc.tsx` (E10-S06) l. 52, 57, 76-84 : reprendre `useOptionActive` d'E11-S06 (`ui/noeud/editeur/citer.tsx`), l'aide commune du clavier d'une liste d'options. |
 | M85 | Un mode sans Supabase pour `org:export`, `org:import`, `test:cleanup` et `oauth:clients` (hors périmètre d'E11-S14) : leurs suites restent gardées par le projet (`tests/unit/gardes-supabase.test.ts`). |
+| M90 | E11-S02 : `server/tables/import.ts:188` : reprendre `heldByOther` de `row-store.ts` (troisième copie du prédicat). |
+| M91 | E11-S02 : `ui/noeud/en-tete-modifiable.tsx` l. 10-11 : le commentaire dit encore qu'un nœud neuf est « jamais publié » ; `FileDOperations` : `brouillon` et `ecrit` de l'instantané sans lecteur ; `EN_TETE.enregistre`, `EN_TETE.aRenvoyer` morts. |
 
 ## Actions réservées à JB
 
@@ -115,7 +117,7 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | Fin de la V1 (D126) | oto-saas se déploie chez Scaleway (responsable du déploiement, `docs/deploiement.md § 3` d'oto-saas) ; le projet Vercel reste sur l'archive jusque-là. Désactiver le service Windows `postgresql-x64-16` du poste. |
 | Après la ligne de base V1 | `supabase migration repair` sur le projet du premier client, par la procédure de `packages/plateforme/migrations/README.md` (notre projet est réparé). |
 | Sur le poste | Désactiver le service Windows `postgresql-x64-16`, inutilisé par la base de test locale. |
-| Après la fusion d'E10-S04, E10-S01, E10-S06, E11-S03, E11-S14 a et E11-S01 a à f | Appliquer la migration `20260929170000_platform_page_markdown.sql` au projet Supabase de test, puis `20260929180000_ctx_contexts.sql` (E11-S03), dans cet ordre ; puis jouer `tests/integration/mcp-read-write.test.ts` et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
+| Après la fusion d'E10-S04, E10-S01, E10-S06, E11-S03, E11-S14 a et b, E11-S01, E11-S02 et E11-S05 | Appliquer la migration `20260929170000_platform_page_markdown.sql` au projet Supabase de test, puis `20260929180000_ctx_contexts.sql` (E11-S03) et `20260929190000_discard_draft.sql` (E11-S02), dans cet ordre ; puis jouer `tests/integration/mcp-read-write.test.ts` et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
 | Avant la campagne visuelle d'E10-S02 | Bucket du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3), règles CORS et variables `PLATFORM_STORAGE_*`. |
 | Après la fusion des stories d'E10 et d'E11 | Tag `v1.1.0` (après la fusion de leurs migrations, D131, D145) ; dans le dépôt SaaS, relire à la main la PR Renovate de cette version (adresses renommées) et renommer les routes de l'hôte. |
 | Avant le premier client | Remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (inscriptions, connexions et vérifications 30, rafraîchissements 150, par 5 minutes et par IP). |

@@ -2,7 +2,7 @@
 // création d'un nœud, la provenance d'un bloc écrit selon la porte, le texte et les données de la
 // réponse (références des blocs neufs connues après leur écriture). Fichier à part de `write.ts` pour la
 // borne de 300 lignes (`coding-standards.md § Complexité`).
-import { ACCESS_LEVELS, reservedTo, type AccessLevel } from "../access"
+import type { AccessLevel } from "../access"
 import type { PlatformDb } from "../db"
 import { boundedList, fromDatabaseError, isUniqueViolation, PlatformError } from "../errors"
 import type { Identity } from "../identity"
@@ -94,8 +94,6 @@ type ResultInput = {
   edit: { node: NodeRow; level: AccessLevel; created: boolean }
   saved: Saved | null
   published: PublishResult | null
-  /** À qui demander de publier (niveau 2), la partie « à qui » d'`access.ts` (H68). */
-  publisher: string | null
   teamId: string | null
 }
 
@@ -103,10 +101,14 @@ function publishedLines(input: ResultInput, published: PublishResult): string[] 
   const { node } = input.edit
   const prefix = input.identity.org.prefix
   const counts = `${published.sections} ${plural(published.sections, "section")}, ${published.blocks} ${plural(published.blocks, "block")}`
-  // Un tableau dit ce que sa publication a changé à son en-tête (E07-S04, AC1, AC8).
+  // Un tableau dit ce que sa publication a changé à son en-tête (E07-S04, AC1, AC8). La révision de la
+  // prochaine écriture suit : `write` publiant par défaut, l'assistant la reprend (E11-S02, HN-E11S02-27).
   const table = published.table?.summary ? `: ${published.table.summary}` : ""
+  const next = `Next write: base_revision ${published.revision}.`
   return [
-    node.kind === "table" ? `Published ${node.path} revision ${published.revision}${table}.` : `Published ${node.path} revision ${published.revision} (${counts}).`,
+    node.kind === "table"
+      ? `Published ${node.path} revision ${published.revision}${table}. ${next}`
+      : `Published ${node.path} revision ${published.revision} (${counts}). ${next}`,
     // Seules les conversations qui ont reçu ce Contexte périment (E11-S03, AC-a7), celle-ci comprise si c'est le cas.
     ...(published.rulesChanged
       ? [`Context ${node.path} changed: every conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool, this one included if it was.`]
@@ -118,7 +120,7 @@ function publishedLines(input: ResultInput, published: PublishResult): string[] 
 
 /**
  * La réponse de `write` (AC19, AC25, AC27, AC29) : ce que le brouillon a reçu, puis la publication ou
- * qui publie ; en champs, les blocs écrits de chaque opération (`id`, référence, révision ; 20 au plus)
+ * comment publier (dès le niveau écriture, E11-S02) ; en champs, les blocs écrits de chaque opération (`id`, référence, révision ; 20 au plus)
  * et le tampon du brouillon (AC37).
  */
 export function savedResult(input: ResultInput): ToolOutput {
@@ -144,8 +146,7 @@ export function savedResult(input: ResultInput): ToolOutput {
     }
   }
   if (published) lines.push(...publishedLines(input, published))
-  else if (edit.level >= ACCESS_LEVELS.manage) lines.push(`Publish it with ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "publish": true}.`)
-  else lines.push(reservedTo("publish", node.path, input.publisher ?? "its managers"))
+  else lines.push(`Publish it with ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "publish": true}.`)
   const touched = (saved?.touched ?? []).map((one) => ({
     op: one.op,
     text: one.describe(refOf),

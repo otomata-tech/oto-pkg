@@ -199,7 +199,9 @@ class FileDEnvois {
     const reponse = await appelerPlateforme<ReponseDEcriture>({
       methode: "POST",
       ressource: "nodes",
-      corps: { path: this.chemin, base_revision: revisionEnvoyee, ...tampon, ...corps },
+      // Chaque écriture garde le brouillon ; seule la publication, qui suit les frappes, pose `publish: true`
+      // (E11-S02, AC-c2 : `write` publie par défaut, HN-E11S02-21).
+      corps: { path: this.chemin, base_revision: revisionEnvoyee, ...tampon, publish: false, ...corps },
       keepalive: envoi.keepalive,
     })
     this.enVol = false

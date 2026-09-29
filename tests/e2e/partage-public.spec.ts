@@ -9,7 +9,9 @@ import { CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 // publique s'ouvre sans session (AC-d2), sans les sous-contenus puis avec (AC-d3), un lien hors de portée en
 // texte (AC-d4), jamais indexée (AC-d6) ; le lien paraît dans l'administration (AC-d7) ; désactivé, il rend 404
 // (AC-d5). L'accès général d'une page de Ventes se montre sans être changé (AC-b13, le contenu n'est pas jetable).
-// Chaque passage désactive son lien. Une capture par étape, dans `test-results/`.
+// Chaque passage désactive son lien. Une capture par étape, dans `test-results/`. E11-S05 (lot d) : le visiteur
+// télécharge le `.md` de la page, et le `.csv` du tableau de l'équipe partagé le temps du passage, bâtis dans le
+// navigateur à partir de ce que la page a lu, sans requête au clic (AC-d1 à AC-d3).
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -70,6 +72,20 @@ async function desactiver(page: Page, espace: string): Promise<void> {
   await attendre(panneau.getByRole("switch", { name: /Partager sur le web/ })).not.toBeChecked()
 }
 
+/**
+ * « Télécharger en … » de la page publique (E11-S05, AC-d3) : le fichier part sans requête au clic, sinon celle de son
+ * adresse `blob:` ; rend son nom.
+ */
+async function telechargerSansRequete(lecteur: Page, libelle: string | RegExp): Promise<string> {
+  const requetes: string[] = []
+  const noter = (requete: { url: () => string }) => void requetes.push(requete.url())
+  lecteur.on("request", noter)
+  const [fichier] = await Promise.all([lecteur.waitForEvent("download"), lecteur.getByRole("button", { name: libelle }).click()])
+  lecteur.off("request", noter)
+  expect(requetes.filter((adresse) => !adresse.startsWith("blob:"))).toEqual([])
+  return fichier.suggestedFilename()
+}
+
 /** Une page ouverte sans session, dans un contexte neuf, au mode et à la largeur donnés. */
 async function sansSession(browser: Browser, mode: (typeof MODES)[number], largeur: number): Promise<Page> {
   const contexte = await browser.newContext({ colorScheme: mode, viewport: { width: largeur, height: 900 } })
@@ -110,6 +126,9 @@ test.describe("E05-S10 partie d : le partage public", () => {
         await expect(lecteur.getByRole("link", { name: "le dessous" })).toHaveCount(0)
         await expect(lecteur.getByRole("link", { name: "le Contexte de Tout le monde" })).toHaveCount(0)
         await expect(lecteur.getByRole("navigation", { name: "Dessous" })).toHaveCount(0)
+        // E11-S05 (AC-d2, AC-f2) : le `.md` de la page, et pas de résumé sous le titre d'une page.
+        expect(await telechargerSansRequete(lecteur, "Télécharger en .md")).toBe("e05s10d_partage.md")
+        await expect(lecteur.getByText("Page jetable du contrôle visuel d'E05-S10, partie d.")).toHaveCount(0)
         await capturer(lecteur, testInfo, `page-publique-${suffixe}`)
         expect((await lecteur.goto(`${adresse}/${enfant}`))?.status()).toBe(404)
         await expect(lecteur.getByRole("heading", { level: 1 })).toHaveText("Page introuvable")
@@ -145,6 +164,28 @@ test.describe("E05-S10 partie d : le partage public", () => {
         expect((await lecteur.goto(adresse))?.status()).toBe(404)
         await expect(lecteur.getByRole("heading", { level: 1 })).toHaveText("Page introuvable")
         await lecteur.context().close()
+      })
+
+      // E11-S05 (AC-d1) : le tableau de l'équipe, partagé le temps du passage, se télécharge en `.csv`.
+      test(`download the rows of a shared table as a visitor, then disable its link (${mode}, ${largeur} px)`, async ({ page, browser }, testInfo) => {
+        test.setTimeout(300_000)
+        await page.emulateMedia({ colorScheme: mode })
+        await page.setViewportSize({ width: largeur, height: 900 })
+        await seConnecterSurLEspace(page, { email, password })
+        await page.goto(`${ESPACE.adresse}/n/${CHEMINS.tableau}`)
+        const adresse = await creerLeLien(page, EQUIPE.nom)
+        await page.keyboard.press("Escape")
+        const lecteur = await sansSession(browser, mode, largeur)
+        try {
+          await lecteur.goto(adresse)
+          await attendre(lecteur.getByRole("table")).toBeVisible()
+          expect(await telechargerSansRequete(lecteur, /^Télécharger en \.csv/)).toBe(`${CHEMINS.tableau.split("/").at(-1)}.csv`)
+          await capturer(lecteur, testInfo, `tableau-public-${mode}-${largeur}`)
+        } finally {
+          await ouvrirLePartage(page, EQUIPE.nom)
+          await desactiver(page, EQUIPE.nom)
+          await lecteur.context().close()
+        }
       })
 
       test(`show the general access of a team page (${mode}, ${largeur} px)`, async ({ page }, testInfo) => {

@@ -99,8 +99,29 @@ describe("catalog (AC23)", () => {
       "table.claim",
       "table.release",
       "table.import",
+      "table.delete_rows",
+      "node.discard_draft",
+      "node.trash",
     ])
     expect(callExamples(catalogFunctions(), NONE)).toEqual(["table.rows"])
+  })
+
+  // E11-S02 (AC-h1, HN-E11S02-6) : les trois fonctions qui suppriment, en deux temps, natives, aux schémas stricts.
+  it("should serve node.discard_draft, node.trash and table.delete_rows as sensitive native functions with a summary and strict schemas", () => {
+    const deleting = ["node.discard_draft", "node.trash", "table.delete_rows"].map((name) => findFunction(catalogFunctions(), name))
+    expect(deleting.map((fn) => [fn?.name, fn?.class, fn?.origin, typeof fn?.summarize])).toEqual([
+      ["node.discard_draft", "sensitive", "paquet", "function"],
+      ["node.trash", "sensitive", "paquet", "function"],
+      ["table.delete_rows", "sensitive", "paquet", "function"],
+    ])
+    for (const fn of deleting) expect(fn?.schema.safeParse({ ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
+    expect(findFunction(catalogFunctions(), "table.delete_rows")?.schema.safeParse({ table: "ventes/salons", keys: [] }).success).toBe(false)
+    expect(findFunction(catalogFunctions(), "table.delete_rows")?.schema.safeParse({ table: "ventes/salons", keys: Array.from({ length: 51 }, (_, rank) => `K${rank}`) }).success).toBe(false)
+    // Recherchées par leurs mots (AC-h1), jamais proposées ni citées en exemple (H87).
+    for (const [query, name] of [["delete rows", "table.delete_rows"], ["trash", "node.trash"], ["discard draft", "node.discard_draft"]]) {
+      expect(searchFunctions(catalogFunctions(), query, 3).map((found) => found.fn.name), query).toContain(name)
+    }
+    expect(callExamples(catalogFunctions(), new Set(["node"]))).not.toContain("node.trash")
   })
 
   it("should serve table.schema, table.rows and table.aggregate as native read functions with strict schemas and closed contracts (E07-S01 AC19)", () => {

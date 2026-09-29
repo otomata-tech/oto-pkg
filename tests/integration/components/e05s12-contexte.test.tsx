@@ -96,7 +96,7 @@ const CONTEXTES: DonneesDuContexteServi["contextes"] = {
 function monterLaVue(donnees: Partial<DonneesDuContexteServi> = {}) {
   render(
     <ContexteServi
-      donnees={{ apercu: APERCU, contextes: CONTEXTES, equipes: EQUIPES, nomOrganisation: "Démo", ...donnees }}
+      donnees={{ apercu: APERCU, contextes: CONTEXTES, equipes: EQUIPES, ...donnees }}
       Lien={LienDeTest}
       prefixeDesPages="/n/"
       ici="/context"

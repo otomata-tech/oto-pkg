@@ -24,7 +24,7 @@ export const WORKSPACE_RULES = `${SERVED_RULES.title}
 - Every content has a path (e.g. <team>/<page>) and a kind: page (text in blocks), table (rows, through <p>_call table.rows, table.aggregate and table.write), procedure (steps to follow, each call in a call block) or context (the sections below: already served, read one only when it says it was cut).
 - Spaces: the organisation's contents sit at the root, a team's under its folder (<team>/...), yours under private/<handle>/, served to you only.
 - Access is set per content, for the organisation, a team or a person: read, write or manage. A refusal says who to ask: never work around it.
-- <p>_write saves a draft; publish: true makes it live. To edit, pass base_revision = the revision you read.
+- <p>_write publishes at once; publish: false keeps an unpublished draft. To edit, pass base_revision = the revision you read, or the one your last write returned.
 - A renamed or moved content keeps its old path: it still leads there.
 - In a text, [[path]] or [[path|title]] links to another content.
 - A function that sends, deletes or pays first returns a summary and does nothing: show it, get the user's explicit yes, then call again with confirm: true.

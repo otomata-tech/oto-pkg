@@ -10,6 +10,60 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-29] — Fusion du lot E11-S02, S05, S01 g, S14 b : deux corrections au verify
+
+**Quoi :** le Texte local d'une page vide (E11-S05) n'entre plus dans les blocs que l'éditeur rend à la publication : un Contexte vide redemande confirmation (`use-editeur.ts`) ; « Réglages du tableau » bloqué par un brouillon d'en-tête ne publie plus rien même si un clic atteint l'interrupteur désactivé (`options-du-tableau.tsx`). Cinq attentes de test mises à jour pour le lot (îlot client, connecteur natif `node`, `node_aliases.old_path`, règle posée sur le nœud réel, assertions d'AC-c2 replacées).
+
+**Pourquoi :** premier passage des tests écrits sans être lancés ; gardes écrites dans `portage-ecrans.md § 6` et `forms-patterns.md § Double soumission`.
+
+**Fichiers :** `packages/plateforme/ui/noeud/editeur/use-editeur.ts`, `packages/plateforme/ui/tableau/options-du-tableau.tsx`, 5 fichiers de test, deux conventions et leurs fiches.
+
+## [2026-09-29] — E11-S05 : écrans d'un contenu, encarts à droite, télécharger à côté de « Partager », page et tableau vides
+
+**Quoi :** Encarts « Cité dans », « Cite », « Sous-pages » (et « À quoi sert cette page » d'un Contexte) repliés dans la colonne de droite, en ligne au-dessus de la grille d'un tableau ; « Télécharger en .csv/.md » à gauche de « Réglages » et « Partager », et sur la page publique ; repère de repli des cellules au survol, lignes à revoir marquées et cycle expliqué ; résumé montré pour les seules procédures, nouveau résumé par défaut d'une procédure ; page vide écrite dans un Texte avec invite et focus ; vide d'un tableau nommé par l'assistant ; glyphe `Table`. Lecture des cellules (`cellValue`, `keyValue`, `rowCells`) commune à l'export connecté et public, dans `schemas/csv.ts`.
+
+**Pourquoi :** retours d'écran du responsable d'Oto (2026-09-29, fiche D136).
+
+**Problèmes :** fichier public composé au rendu serveur à partir de la vue lue et passé à l'îlot (aucune requête au clic ; AC-d3 disait « dans le navigateur ») ; `language` ajouté à la vue publique (donnée de marque, ADR-013 § 3) ; le modèle d'une page vide dans `page-vide.ts` (borne `max-lines` de `modele.ts`). Hypothèses HN-E11S05-23 à 29 d'implémentation.
+
+**Fichiers :** `packages/plateforme/ui/components/bouton-telecharger.tsx`, `ui/noeud/editeur/page-vide.ts` (nouveaux) ; `ui/noeud/{ecran-de-noeud,en-tete-du-noeud,en-tete-modifiable,sous-pages}.tsx`, `ui/noeud/libelles.ts`, `ui/noeud/editeur/{editeur-de-blocs,rangee-de-bloc,champ-de-bloc}.tsx`, `ui/noeud/editeur/{use-editeur,modele,actions,gestes}.ts`, `ui/tableau/{cellule,grille,file-de-revue,corps-tableau,tableau-du-noeud,carte-de-noeud}.tsx`, `ui/tableau/libelles.ts`, `ui/contexte/annexes-du-contexte.tsx`, `ui/coque/{arbre-du-rail,gestes-du-rail}.tsx`, `ui/coque/libelles.ts`, `ui/arbre/navigateur-d-arbre.tsx`, `ui/public/page-publique.tsx`, `ui/api/telecharger.ts`, `ui/ds/components/css/{table,editeur,product}.css`, `schemas/{csv,node-gestures,index}.ts`, `server/shares.ts`, `server/tables/meta.ts` ; hôte `src/app/(dashboard)/n/[...chemin]/page.tsx` ; tests (`e11s05-libelles`, `e11s05-ecrans.spec.ts`, écrans et pages adaptés) ; `packages/plateforme/CHANGELOG.md`, registre, `hypotheses.md`, `docs/prd.md`, `status.md`.
+
+## [2026-09-29] — E11-S01 (lot g) : réglages du tableau à l'écran
+
+**Quoi :** Bouton « Réglages » dans l'en-tête d'un tableau, dès le niveau écriture, entre « Télécharger » et « Partager » ; panneau « Réglages du tableau » à trois `Switch` (Preuve exigée, L'assistant peut décider la revue, Fermé), chacun publié en un geste par la file d'opérations de la page ; panneau bloqué quand un changement d'en-tête attend en brouillon. `Switch` extrait de `ui/public/partage-sur-le-web.tsx` dans `ui/ds/react/switch.tsx`, le partage sur le web inchangé.
+
+**Pourquoi :** décision du responsable d'Oto (2026-09-29) : régler un tableau sans passer par un assistant ; ouvert au niveau écriture par HN-E11S02-17.
+
+**Problèmes :** hypothèses d'implémentation HN-E11S01-27 à 32 (tampon du brouillon, refus sans relecture, `agents_may_decide: false` explicite, couleurs d'`oto-choice`).
+
+**Fichiers :** `packages/plateforme/ui/ds/react/switch.tsx`, `ui/tableau/options-du-tableau.tsx` (nouveaux) ; `ui/public/partage-sur-le-web.tsx`, `ui/noeud/{ecran-de-noeud,en-tete-du-noeud}.tsx`, `ui/tableau/libelles.ts` ; tests `options-du-tableau.test.tsx`, `ecran-de-noeud.test.tsx`, `tests/e2e/tableau.spec.ts` ; registre, `hypotheses.md`, `docs/prd.md`, `status.md`.
+
+## [2026-09-29] — E11-S02 : publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant
+
+**Quoi :**
+- Écrire publie (fiche D135) : `write` et `POST nodes` publient par défaut, `publish: false` garde un brouillon ; la ligne de publication dit « Next write: base_revision N. » ; le niveau écriture publie, en-tête d'un tableau publié compris, et le chemin suit le titre à ce niveau (l'ancien chemin reste un alias).
+- Écran : création publiée depuis le rail ; publication seule 3 s après la frappe dès le niveau écriture ; bandeau du brouillon, « Voir la version publiée » et « La publication revient… » retirés ; un en-tête de tableau refusé se dit sans « Réessayer » (`header_refused`).
+- Trois fonctions sensibles derrière `call`, connecteur natif `node` : `node.discard_draft` (Ⓜ `20260929190000_discard_draft.sql`, `platform.discard_draft`), `node.trash`, `table.delete_rows` ; les refus de publication d'un en-tête et le contrat `write.table` disent comment abandonner le brouillon.
+- Accueil : « a supprimé des lignes dans … », « , dont N à revoir » (clé `args._outcome` de la ligne de journal).
+- `table.import` avec `create` n'exige plus que l'écriture sur le parent (fiche D150, amende D120).
+- ADR-011 § 3 et ADR-002 § 1 amendés, H63 et N28 remplacées.
+
+**Pourquoi :** FB-0007, FB-0010 partie 3 (rapport de tests sur Démo) ; retour du responsable d'Oto sur les brouillons (fiche D135).
+
+**Problèmes :** tâches de suite M90 (troisième copie du prédicat de bail dans `import.ts`) et M91 (commentaire et libellés morts). La migration attend son application au projet de test (action JB).
+
+**Fichiers :** `packages/plateforme/migrations/20260929190000_discard_draft.sql` (et sa copie `supabase/migrations/`), `server/nodes/discard.ts`, `server/tables/delete-rows.ts` (nouveaux) ; `server/{access,activities,calls,database,procedures-check,tool-output}.ts`, `server/catalog/{contracts,define,registry}.ts`, `server/context/blocks/code.ts`, `server/nodes/{move,publish,read-body,read-format,rename,trash,write,write-result}.ts`, `server/tables/{evolution,evolution-checks,evolution-publish,import,row-store,write}.ts`, `schemas/{activity,node-gestures,nodes,table-write}.ts`, `mcp/{server,tools}.ts`, `ui/noeud/{publication,corps-du-noeud,en-tete-modifiable}.tsx`, `ui/noeud/libelles.ts`, `ui/noeud/editeur/{editeur-de-blocs,file-d-operations,lignes-d-etat}.tsx`, `ui/contexte/{contexte-servi,ecran-du-contexte}.tsx`, `ui/coque/{creation-dans-le-rail,import-de-fichier}.tsx`, `ui/coque/{envoi-d-import,libelles}.ts`, `ui/accueil/{fil-activite.tsx,libelles.ts}`, `ui/procedure/libelles.ts` ; hôte `src/app/(dashboard)/context/page.tsx` ; tests `e11s02-brouillons-et-suppression`, `e11s02-mcp` (nouveaux) et les doublures qui attendaient un brouillon par défaut ; `packages/plateforme/CHANGELOG.md`, ADR-002, ADR-011, `fiche-decisions.md` (D120, D150), `hypotheses.md` (H63, N28, HN-E10S01-21), registre, `docs/prd.md`, `docs/architecture.md`, `docs/mcp-golden-queries.md`, `status.md`.
+
+## [2026-09-29] — E11-S14 (lot b) : cinq suites de plus sur Postgres nu
+
+**Quoi :** `mcp-core`, `context-full`, `feedback-prompts`, `pilot-qualification` et le `describe` AC14 d'`org-transfer` passent sur Postgres nu, par `createLocalFixtures`, sans assertion changée ; leurs lignes sortent de `tests/unit/gardes-supabase.test.ts` (`org-transfer` y reste pour son `describe` principal). En base locale, 16 → 12 fichiers sautés en entier.
+
+**Pourquoi :** E11-S14, lot b, après la fusion d'E11-S03 et E11-S10 (mêmes fichiers).
+
+**Problèmes :** hypothèses HN-E11S14-8 (noms de `describe` « on a real database ») et 9 (`describe` principal d'`org-transfer` inchangé). Lot c (semis de l'isolation) après E10-S02.
+
+**Fichiers :** `tests/integration/{mcp-core,context-full,feedback-prompts,pilot-qualification,org-transfer}.test.ts`, `tests/unit/gardes-supabase.test.ts` ; `hypotheses.md`, `status.md`.
+
 ## [2026-09-29] — E11-S06 : éditeur, un repère par élément de liste et le panneau « Lien »
 
 **Quoi :** Une puce, un numéro ou une case par élément de liste, sur sa première ligne (plus de repère sur les lignes repliées) ; un lien se modifie dans le panneau « Lien » (libellé, page ou adresse web, Appliquer, Retirer, Ouvrir), ouvert par le curseur dans le lien, Alt+Entrée ou un clic au repos ; Ctrl/⌘-clic suit le lien. Le clavier d'une liste d'options est commun (`useOptionActive`) ; `choix-de-bloc.tsx` le reprendra (M84).

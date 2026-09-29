@@ -18,9 +18,9 @@ const CHARGE = "2026-09-24T09:00:00.000000+00:00"
 const rafraichir = vi.fn()
 let api: ReturnType<typeof simulerLAPI>
 
-type Lecture = { titre?: string; resume?: string; tampon?: string | null; niveau?: 2 | 3; aide?: string }
+type Lecture = { titre?: string; resume?: string; tampon?: string | null; aide?: string }
 
-function entete({ titre = "Modèle de relance", resume = "Relancer un devis resté sans réponse.", tampon = CHARGE, niveau = 2, aide }: Lecture) {
+function entete({ titre = "Modèle de relance", resume = "Relancer un devis resté sans réponse.", tampon = CHARGE, aide }: Lecture) {
   return (
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={tampon}>
@@ -28,7 +28,7 @@ function entete({ titre = "Modèle de relance", resume = "Relancer un devis rest
           <TitreModifiable titre={titre} revisionServie={4} tamponServi={tampon} />
         </h1>
         <ResumeModifiable resume={resume} revisionServie={4} tamponServi={tampon} aideDuResume={aide} />
-        <EditeurDeBlocs niveau={niveau} blocs={PAGE} revisionServie={4} phraseDePublication="" prefixeDesPages="/n/" lienVersionPubliee={null} />
+        <EditeurDeBlocs blocs={PAGE} revisionServie={4} prefixeDesPages="/n/" />
       </FileDOperations>
       <button type="button">Ailleurs</button>
     </ContexteDeRafraichissement.Provider>
@@ -83,7 +83,7 @@ describe("titre et résumé en place (AC-a1 ; AC16 d'E05-S02)", () => {
 
     ecrire(champTitre(), "Relance d'un devis")
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
-    expect(api.envoyes[1]).toEqual({ path: "ventes/modele_relance", base_revision: 4, draft_stamp: "2026-09-24T10:00:01.000000+00:00", title: "Relance d'un devis" })
+    expect(api.envoyes[1]).toEqual({ path: "ventes/modele_relance", base_revision: 4, draft_stamp: "2026-09-24T10:00:01.000000+00:00", publish: false, title: "Relance d'un devis" })
     expect(screen.queryByText("Le titre compte de 1 à 200 caractères.")).toBeNull()
     // Entrée enregistre le résumé sans quitter le champ, et n'y écrit pas de saut de ligne.
     act(() => champResume().focus())
@@ -133,7 +133,7 @@ describe("en-tête d'un tableau (AC-a10)", () => {
       <ContexteDeRafraichissement.Provider value={rafraichir}>
         <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
           <TitreModifiable titre="Suivi des prospects" revisionServie={4} tamponServi={null} />
-          <CorpsDuNoeud vue={tableau} niveauDEcriture={3} titre="Suivi des prospects" versionPubliee={false} nomOrganisation="Démo" Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} prefixeDesPages="/n/" />
+          <CorpsDuNoeud vue={tableau} niveauDEcriture={3} titre="Suivi des prospects" versionPubliee={false} Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} prefixeDesPages="/n/" />
         </FileDOperations>
       </ContexteDeRafraichissement.Provider>,
     )
@@ -142,7 +142,7 @@ describe("en-tête d'un tableau (AC-a10)", () => {
     act(() => champTitre().focus())
     fireEvent.change(champTitre(), { target: { value: "Suivi des prospects 2026" } })
     await act(() => vi.advanceTimersByTimeAsync(1_200))
-    expect(api.envoyes).toEqual([{ path: "ventes/modele_relance", base_revision: 4, title: "Suivi des prospects 2026" }])
+    expect(api.envoyes).toEqual([{ path: "ventes/modele_relance", base_revision: 4, publish: false, title: "Suivi des prospects 2026" }])
     await act(() => vi.advanceTimersByTimeAsync(1_799))
     expect(api.envoyes).toHaveLength(1)
     await act(() => vi.advanceTimersByTimeAsync(1))
@@ -158,7 +158,7 @@ describe("en-tête d'un tableau (AC-a10)", () => {
       <ContexteDeRafraichissement.Provider value={rafraichir}>
         <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
           <TitreModifiable titre="Suivi des prospects" revisionServie={4} tamponServi={null} />
-          <CorpsDuNoeud vue={tableau} niveauDEcriture={3} titre="Suivi des prospects" versionPubliee={false} nomOrganisation="Démo" Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} prefixeDesPages="/n/" />
+          <CorpsDuNoeud vue={tableau} niveauDEcriture={3} titre="Suivi des prospects" versionPubliee={false} Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} prefixeDesPages="/n/" />
         </FileDOperations>
       </ContexteDeRafraichissement.Provider>,
     )
@@ -167,8 +167,55 @@ describe("en-tête d'un tableau (AC-a10)", () => {
     unmount()
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes).toEqual([
-      { path: "ventes/modele_relance", base_revision: 4, title: "Suivi des prospects 2026" },
+      { path: "ventes/modele_relance", base_revision: 4, publish: false, title: "Suivi des prospects 2026" },
       { path: "ventes/modele_relance", base_revision: 4, draft_stamp: "2026-09-24T10:00:01.000000+00:00", publish: true },
     ])
+  })
+})
+
+describe("refus de l'en-tête d'un tableau à la publication (E11-S02, AC-g1)", () => {
+  /** Un tableau au niveau écriture : la publication seule y part aussi (AC-c2). */
+  function monterLeTableau() {
+    const tableau: NodeView = vueDuNoeud({ kind: "table", blocks: [], level: 2, title: "Suivi des prospects" })
+    render(
+      <ContexteDeRafraichissement.Provider value={rafraichir}>
+        <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
+          <TitreModifiable titre="Suivi des prospects" revisionServie={4} tamponServi={null} />
+          <CorpsDuNoeud vue={tableau} niveauDEcriture={2} titre="Suivi des prospects" versionPubliee={false} Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} prefixeDesPages="/n/" />
+        </FileDOperations>
+      </ContexteDeRafraichissement.Provider>,
+    )
+  }
+
+  /** Une frappe dans le titre, enregistrée ; `refus` joue la réponse de la publication qui suit, 3 s après. */
+  async function taperPuisPublier(texte: string, refus?: () => void) {
+    act(() => champTitre().focus())
+    fireEvent.change(champTitre(), { target: { value: texte } })
+    await act(() => vi.advanceTimersByTimeAsync(1_200))
+    refus?.()
+    await act(() => vi.advanceTimersByTimeAsync(1_800))
+  }
+
+  const phrase = "Ce changement d'en-tête est refusé : demandez à votre assistant d'abandonner le brouillon."
+
+  it("should say the refusal of a header in an alert without Réessayer, keep Réessayer for another conflict, and clear it once a publication passes", async () => {
+    monterLeTableau()
+    vi.useFakeTimers()
+    await taperPuisPublier("Suivi 2026", () => api.refuser("conflict", 409, { reason: "header_refused" }))
+    expect(api.envoyes.at(-1)).toMatchObject({ publish: true })
+    expect(screen.getByRole("alert")).toHaveTextContent(phrase)
+
+    expect(screen.queryByRole("button", { name: "Réessayer" })).toBeNull()
+    expect(screen.queryByText(/^Brouillon non publié/)).toBeNull()
+
+    // Un conflit sans cette raison garde son message et « Réessayer ».
+    await taperPuisPublier("Suivi 2027", () => api.refuser("conflict", 409))
+    expect(screen.queryByText(phrase)).toBeNull()
+    expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument()
+
+    // Une publication qui passe retire le refus.
+    await taperPuisPublier("Suivi 2028")
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Réessayer" })).toBeNull()
   })
 })

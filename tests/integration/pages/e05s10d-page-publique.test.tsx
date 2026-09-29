@@ -1,12 +1,13 @@
 // La page publique d'un lien de partage, `/p/<jeton>` et `/p/<jeton>/<chemin>` (E05-S10, AC-d2 à AC-d6 ;
 // ADR-013) : lue hors session par `readPublicNode` (simulé ici ; ses cas sur base réelle sont dans
 // `e05s10e-partage-public.test.ts`), rendue en lecture seule au thème de l'organisation de l'adresse, les liens
-// hors de portée en texte, le 404 indistinct, jamais indexée.
+// hors de portée en texte, le 404 indistinct, jamais indexée. E11-S05 (lot d, AC-f2) : le visiteur télécharge ce que
+// la page a lu, sans requête ; le résumé ne se montre que pour une procédure.
 import { headers } from "next/headers"
 import { notFound } from "next/navigation"
-import { cleanup, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { PublicNodeView, PublicTable } from "@otomata_tech/oto_platform/schemas"
+import { rowCells, toCsv, type PublicNodeView, type PublicTable } from "@otomata_tech/oto_platform/schemas"
 import { PlatformError, readPublicNode } from "@otomata_tech/oto_platform/server"
 import LienPublicIntrouvable from "@/app/p/[jeton]/[[...chemin]]/not-found"
 import PagePubliqueDuLien, { generateMetadata } from "@/app/p/[jeton]/[[...chemin]]/page"
@@ -43,6 +44,7 @@ const VUE: PublicNodeView = {
   table: null,
   children: [{ path: "ventes/tarifs/remises", title: "Remises", kind: "page" }],
   links: [{ path: "ventes/tarifs/remises", to: "ventes/tarifs/remises" }],
+  language: "fr",
 }
 
 const params = (chemin?: string[]) => ({ params: Promise.resolve({ jeton: JETON, ...(chemin ? { chemin } : {}) }) })
@@ -65,11 +67,10 @@ describe("/p/<jeton> public page (AC-d2, AC-d3, AC-d4)", () => {
     expect(readPublicNode).toHaveBeenCalledWith(HOTE, JETON, null)
     expect(container.querySelector(".oto")).toHaveAttribute("data-oto-theme", "ardoise")
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tarifs 2026")
-    expect(screen.getByText("Les prix publics de l'année.")).toBeInTheDocument()
     expect(screen.getByRole("heading", { level: 2, name: "Prix" })).toBeInTheDocument()
-    // Lecture seule : aucun champ, aucun bouton d'écriture.
+    // Lecture seule : aucun champ, aucun bouton d'écriture ; le seul bouton télécharge (E11-S05, AC-d2).
     expect(screen.queryByRole("textbox")).toBeNull()
-    expect(screen.queryByRole("button")).toBeNull()
+    expect(screen.getAllByRole("button").map((bouton) => bouton.textContent)).toEqual(["Télécharger en .md"])
   })
 
   it("should open the sub-contents by the same token, and write a link outside the share as plain text", async () => {
@@ -169,7 +170,7 @@ describe("/p/<jeton> table rows (D103)", () => {
     expect(screen.queryByText("brut")).toBeNull()
     expect(screen.queryByText(/ne s'affichent pas/)).toBeNull()
     expect(screen.queryByText(/500 premières lignes/)).toBeNull()
-    expect(screen.queryByRole("button")).toBeNull()
+    expect(screen.getAllByRole("button").map((bouton) => bouton.textContent)).toEqual(["Télécharger en .csv"])
     expect(screen.queryByRole("textbox")).toBeNull()
   })
 
@@ -182,11 +183,12 @@ describe("/p/<jeton> table rows (D103)", () => {
     expect(screen.queryByRole("link", { name: "javascript:alert(1)" })).toBeNull()
   })
 
-  it("should say when only the first 500 rows are shown", async () => {
+  it("should say when only the first 500 rows are shown, in the page and on its download (E11-S05, AC-d1)", async () => {
     vi.mocked(readPublicNode).mockResolvedValue({ ...TABLEAU, table: { ...TABLE, truncated: true } })
     render(await PagePubliqueDuLien(params()))
 
     expect(screen.getByText("Les 500 premières lignes, dans l'ordre de leur clé.")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Télécharger en .csv (500 premières lignes)" })).toBeInTheDocument()
   })
 
   it("should render no grid for a content that is not a table", async () => {
@@ -195,5 +197,106 @@ describe("/p/<jeton> table rows (D103)", () => {
 
     expect(screen.queryByRole("table")).toBeNull()
     expect(screen.getByText(/^Voir/)).toBeInTheDocument()
+  })
+})
+
+// E11-S05 (lot d ; HN-E11S05-10, HN-E11S05-11) : le fichier se bâtit dans le navigateur à partir de la vue lue.
+describe("/p/<jeton> download (E11-S05, AC-d1 to AC-d4, AC-f2)", () => {
+  /** Le fichier que la page donne : son nom, et ses octets lus sans décodage (le BOM compris). */
+  async function telecharge(): Promise<{ nom: string; octets: Uint8Array; texte: string; type: string }> {
+    const blobs: Blob[] = []
+    const noms: string[] = []
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => (blobs.push(blob), "blob:fichier")), revokeObjectURL: vi.fn() }))
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      noms.push(this.download)
+    })
+    const requetes = vi.fn()
+    vi.stubGlobal("fetch", requetes)
+    fireEvent.click(screen.getByRole("button", { name: /^Télécharger en/ }))
+    // Aucune requête au clic (AC-d3) : le fichier vient de la vue déjà lue.
+    expect(requetes).not.toHaveBeenCalled()
+    const [blob] = blobs
+    const octets = new Uint8Array(
+      await new Promise<ArrayBuffer>((resolve) => {
+        const lecteur = new FileReader()
+        lecteur.onload = () => resolve(lecteur.result as ArrayBuffer)
+        lecteur.readAsArrayBuffer(blob)
+      }),
+    )
+    return { nom: noms[0], octets, texte: new TextDecoder("utf-8", { ignoreBOM: true }).decode(octets), type: blob.type }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const TABLE: PublicTable = {
+    columns: [
+      { name: "ref", type: "text" },
+      { name: "nom", type: "text" },
+      { name: "montant", type: "number" },
+    ],
+    rows: [
+      { key: "a-01", cells: { nom: "=SOMME(A1)", montant: 12.5 } },
+      { key: "a-02", cells: { nom: "Atelier Sud", montant: null } },
+    ],
+    truncated: false,
+  }
+  const TABLEAU: PublicNodeView = { ...VUE, node: { ...VUE.node, path: "ventes/clients", title: "Clients", kind: "table", meta: { key: "ref" } }, blocks: [], children: [], links: [], table: TABLE }
+
+  it("should give the loaded rows as a .csv in the organisation's language, formulas neutralised, without a request (AC-d1, AC-d3, AC-d4)", async () => {
+    vi.mocked(readPublicNode).mockResolvedValue(TABLEAU)
+    render(await PagePubliqueDuLien(params()))
+    const fichier = await telecharge()
+
+    expect(fichier.nom).toBe("clients.csv")
+    expect(fichier.type).toBe("text/csv;charset=utf-8")
+    expect([...fichier.octets.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    expect(fichier.texte).toBe("\uFEFFref;nom;montant\r\na-01;'=SOMME(A1);12,5\r\na-02;Atelier Sud;\r\n")
+  })
+
+  it("should write a number key as the connected export does, never as a guarded text (AC-d1, portage-ecrans.md § 6)", async () => {
+    const colonnes = [
+      { name: "num", type: "number" },
+      { name: "montant", type: "number" },
+    ]
+    const lignes = [
+      { key: "-3", data: { montant: 1.5 } },
+      { key: "1.5", data: {} },
+    ]
+    vi.mocked(readPublicNode).mockResolvedValue({
+      ...TABLEAU,
+      node: { ...TABLEAU.node, meta: { key: "num" } },
+      table: { columns: colonnes, rows: lignes.map((ligne) => ({ key: ligne.key, cells: ligne.data })), truncated: false },
+    })
+    render(await PagePubliqueDuLien(params()))
+    const fichier = await telecharge()
+
+    // Ce que compose l'export connecté (`server/tables/export.ts`, `rowCells` puis `toCsv`) pour les mêmes lignes.
+    const connecte = toCsv(colonnes, lignes.map((ligne) => rowCells(ligne, { columns: colonnes, key: "num" })), "fr")
+    expect(fichier.texte).toBe(connecte)
+    expect(fichier.texte).toBe("﻿num;montant\r\n-3;1,5\r\n1,5;\r\n")
+  })
+
+  it("should give a page as a .md made of its title and its public blocks only (AC-d2, AC-d4)", async () => {
+    render(await PagePubliqueDuLien(params()))
+    const fichier = await telecharge()
+
+    expect(fichier.nom).toBe("tarifs.md")
+    expect(fichier.texte).toBe("# Tarifs 2026\n\n## Prix\n\nVoir [[ventes/tarifs/remises|les remises]] et [[ventes/marges|nos marges]].\n")
+    // Rien que ce que la vue sert déjà (canal « ouvert, déjà ouvert ») : ni résumé, ni référence de bloc.
+    expect(fichier.texte).not.toContain(VUE.node.summary)
+    expect(fichier.texte).not.toContain("ref:")
+  })
+
+  it("should show the summary of a procedure only (AC-f2)", async () => {
+    render(await PagePubliqueDuLien(params()))
+    expect(screen.queryByText("Les prix publics de l'année.")).toBeNull()
+    cleanup()
+
+    vi.mocked(readPublicNode).mockResolvedValue({ ...VUE, node: { ...VUE.node, kind: "procedure", summary: "Relancer un devis resté sans réponse." } })
+    render(await PagePubliqueDuLien(params()))
+    expect(screen.getByText("Relancer un devis resté sans réponse.")).toBeInTheDocument()
   })
 })

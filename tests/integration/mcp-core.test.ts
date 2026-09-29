@@ -1,15 +1,16 @@
 // @vitest-environment node
-// Les six outils sur le vrai projet (E03-S01 : AC5, AC10 à AC16, AC19 hors HTTP, AC22 ; les prompts
+// Les six outils sur une vraie base (E03-S01 : AC5, AC10 à AC16, AC19 hors HTTP, AC22 ; les prompts
 // d'AC24 sont remplacés par `feedback-prompts.test.ts`, E03-S05) : deux organisations et trois
 // personnes jetables (membre de A, membre de A et de B, membre de B seul),
 // des sessions MCP par InMemoryTransport câblées comme la route (`tests/helpers/mcp.ts`). Tout
 // passe au jeton de la personne, sous RLS ; la connexion d'administration ne sert qu'à poser et relire.
-// Marqué Supabase : la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, les
-// relectures passent par la connexion d'administration, plus par PostgREST.
+// Suite portable (E11-S14) : personnes sans compte, jetons signés localement
+// (`tests/helpers/session-locale.ts`) ; relectures par la connexion d'administration.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestOrg } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 import { buildTools } from "../../packages/plateforme/mcp/tools"
 import { callExamples, catalogFunctions } from "../../packages/plateforme/server/catalog/registry"
 import { workspaceRules } from "../../packages/plateforme/server/context/blocks/code"
@@ -47,14 +48,13 @@ type JournalRow = {
   user_agent: string | null
 }
 
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "MCP six tools on the cloud project"
+const SUITE = "MCP six tools on a real database"
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let orgA: Place
     let orgB: Place
@@ -63,7 +63,7 @@ describe.skipIf(!configured)(
 
     async function person(profile?: { name: string }): Promise<Person> {
       const user = await fx.createUser(profile ? { fullName: profile.name } : {})
-      const { accessToken } = await fx.signIn(user.email, user.password)
+      const { accessToken } = await fx.sessionFor(user)
       return { id: user.id, email: user.email, accessToken }
     }
 
@@ -84,7 +84,7 @@ describe.skipIf(!configured)(
         from platform.journal where org_id = ${orgA.id} and user_agent = ${userAgent} order by id`
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       orgA = await place({ domains: DOMAINS })
       orgB = await place()

@@ -95,8 +95,8 @@ function patchProblem(issue: z.core.$ZodIssue): string {
 
 /**
  * Le patch d'en-tête d'un appel `write` sur un tableau (AC4, AC5), `null` sans `header` : renommage
- * refusé, forme stricte de `tableHeaderPatchSchema`, `confirm_remove` admis avec `publish: true`
- * seulement. À la création (`created`), le refus de forme a le cadre de l'AC2 (« Invalid table header: …
+ * refusé, forme stricte de `tableHeaderPatchSchema`, `confirm_remove` refusé avec `publish: false`
+ * (E11-S02). À la création (`created`), le refus de forme a le cadre de l'AC2 (« Invalid table header: …
  * Contract: … », N1). Rien n'est écrit quand il lève.
  */
 export function readHeaderPatch(body: { header?: Record<string, unknown>; publish?: boolean }, prefix: string, created = false): TableHeaderPatch | null {
@@ -108,8 +108,9 @@ export function readHeaderPatch(body: { header?: Record<string, unknown>; publis
     const problems = parsed.error.issues.map(patchProblem)
     throw created ? invalidHeader(problems, prefix) : new PlatformError("invalid_arguments", boundedList(problems, "; "))
   }
-  if (parsed.data.confirm_remove !== undefined && body.publish !== true) {
-    throw new PlatformError("invalid_arguments", "confirm_remove only applies with publish: true.")
+  // `write` publie par défaut (E11-S02) : seul `publish: false` exclut la confirmation.
+  if (parsed.data.confirm_remove !== undefined && body.publish === false) {
+    throw new PlatformError("invalid_arguments", "confirm_remove only applies when the write publishes: remove publish: false.")
   }
   return parsed.data
 }

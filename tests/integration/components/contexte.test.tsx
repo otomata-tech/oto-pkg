@@ -12,7 +12,8 @@ import { bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 // de ce que l'agent va lire), la publication d'un Contexte. E05-S11 (AC-8 à AC-11) : « Ma fiche » quitte la
 // colonne ; l'encart se titre « Voici ce que votre agent va lire », sans texte servi replié, le total en
 // dernière ligne, chaque ligne un lien vers la vue « Contexte » de l'accueil. E11-S10 (lot g) : l'encart sans titre
-// visible ni « Règles Oto », ses lignes vers `/context` ; la publication sans phrase de recharge. `fetch` simulé pour
+// visible ni « Règles Oto », ses lignes vers `/context` ; la publication sans phrase de recharge. E11-S05 (AC-e2) :
+// « À quoi sert cette page » est un repli fermé à l'arrivée, en tête de la colonne de droite. `fetch` simulé pour
 // `POST /api/plateforme/nodes`, relecture espionnée.
 
 const rafraichir = vi.fn()
@@ -61,10 +62,12 @@ function monterLesAnnexes(props: Partial<AnnexesProps> = {}) {
   render(<ContexteDeRafraichissement.Provider value={rafraichir}>{annexes(props)}</ContexteDeRafraichissement.Provider>)
 }
 
-const note = () => within(screen.getByRole("note", { name: "À quoi sert cette page" }))
+/** « À quoi sert cette page » (E11-S05, AC-e2) : un `<details>`, rôle `group`, nommé par son titre. */
+const aQuoiSert = () => screen.getByRole("group", { name: "À quoi sert cette page" })
+const note = () => within(aQuoiSert())
 const apercu = () => within(screen.getByRole("note", { name: "Voici ce que votre agent va lire" }))
-/** Les phrases de « À quoi sert cette page » (E05-S13, AC-17) : ses paragraphes, après son titre. */
-const phrases = () => [...screen.getByRole("note", { name: "À quoi sert cette page" }).children].slice(1).map((enfant) => [enfant.tagName, enfant.className, enfant.textContent])
+/** Les phrases de « À quoi sert cette page » (E05-S13, AC-17) : les paragraphes de son corps replié. */
+const phrases = () => [...(aQuoiSert().querySelector(".oto-linked-body")?.children ?? [])].map((enfant) => [enfant.tagName, enfant.className, enfant.textContent])
 
 afterEach(() => {
   cleanup()
@@ -95,13 +98,19 @@ describe("écran d'un Contexte (AC10)", () => {
     expect(screen.getByText(/^modifié /)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Déplacer" })).toBeNull()
     expect(screen.queryByRole("button", { name: /supprimer la page/i })).toBeNull()
-    // Le document dans la colonne principale, les notes dans la colonne d'annexes (`TwoColumns main="document"`).
+    // Le document dans la colonne principale ; la colonne de droite commence par « À quoi sert cette page », fermé à
+    // l'arrivée, sans compte, son glyphe (E11-S05, AC-e2).
     expect(screen.getByRole("region", { name: "Contexte" }).closest(".oto-two-columns-main")).not.toBeNull()
-    expect(screen.getByRole("note", { name: "À quoi sert cette page" }).parentElement).toHaveClass("oto-two-columns-aside")
+    expect(aQuoiSert().parentElement).toHaveClass("oto-two-columns-aside")
+    expect(aQuoiSert().parentElement?.firstElementChild).toBe(aQuoiSert())
+    expect(aQuoiSert()).not.toHaveAttribute("open")
+    expect(aQuoiSert().querySelector("summary")?.textContent).toBe("À quoi sert cette page")
+    expect(aQuoiSert().querySelector(".oto-linked-count")).toBeNull()
+    expect(aQuoiSert().querySelector("summary .oto-icon")).not.toBeNull()
     // Une note porte le rôle `note` : aucun repère complémentaire dans la colonne d'annexes (M31 ; axe
     // `landmark-complementary-is-top-level`).
     expect(screen.getAllByRole("complementary").filter((repere) => repere.parentElement?.closest("aside, [role='complementary']"))).toEqual([])
-    // E05-S13 (AC-17) : deux phrases, dans un seul style (`.oto-note > p`), sans « Reçu par », recharge ni pied.
+    // E05-S13 (AC-17) : deux phrases, dans un seul style, sans « Reçu par », recharge ni pied.
     expect(phrases()).toEqual([
       ["P", "", "Ce que les assistants des membres de l'équipe Ventes lisent à chaque conversation."],
       ["P", "", "Vous l'écrivez comme n'importe quelle page."],
@@ -142,7 +151,7 @@ describe("publier un Contexte (AC11)", () => {
     return render(
       <ContexteDeRafraichissement.Provider value={rafraichir}>
         <FileDOperations chemin="ventes/contexte" revisionPubliee={4} tampon="2026-09-24T09:00:00.000000+00:00">
-          <EditeurDeBlocs niveau={3} blocs={blocs} revisionServie={4} phraseDePublication="" prefixeDesPages="/n/" lienVersionPubliee={null} genre={genre} />
+          <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" genre={genre} />
         </FileDOperations>
       </ContexteDeRafraichissement.Provider>,
     )

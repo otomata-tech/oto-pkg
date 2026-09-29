@@ -1,5 +1,5 @@
 // @vitest-environment node
-// `feedback` et prompts des procédures sur le projet Supabase d'oto-platform (E03-S05 : AC1, AC3, AC4,
+// `feedback` et prompts des procédures sur une vraie base (E03-S05 : AC1, AC3, AC4,
 // AC8, AC12, N4, N6, N8). Organisation et personnes jetables, sessions MCP par InMemoryTransport câblées
 // comme la route (`tests/helpers/mcp.ts`), procédures d'Acme semées par `seedNodes` (E03-S02). Tout
 // passe au jeton de la personne ; la clé secrète ne sert qu'à poser, vieillir et relire.
@@ -8,12 +8,14 @@
 // refusés : `tests/unit/mcp-server.test.ts`, `server-ctx.test.ts`, `mcp-core.test.ts`), AC7 (contrat :
 // `mcp-tools.test.ts`, `feedback.test.ts`), AC8 à AC11 hors de la liste de jb (niveau, borne de 20,
 // noms, prompt servi, refus, journal : `tests/unit/prompts.test.ts`, `mcp-server.test.ts`).
-// Marqué Supabase : la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, les
-// relectures et la mise en place passent par la connexion d'administration, le routage par la face SQL.
+// Suite portable (E11-S14) : personnes sans compte, jetons signés localement
+// (`tests/helpers/session-locale.ts`) ; relectures et mise en place par la connexion d'administration,
+// le routage par la face SQL.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type SeedNode, type TestOrg } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex, type SeedNode, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 import type { BlockInput } from "../../packages/plateforme/schemas"
 
 const NETWORK_TIMEOUT = 60_000
@@ -70,14 +72,13 @@ function ticketOf(answer: { result: object }): unknown {
 
 type Ticket = { id: string; org_id: string; user_id: string | null; ctx: string | null; type: string; target: string | null; text: string; state: string; number: number }
 
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "feedback and prompts of the procedures"
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let acme: Place
     // Rempli par `beforeAll`, qui précède chaque test.
@@ -116,7 +117,7 @@ describe.skipIf(!configured)(
     }
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       acme = await place("Acme Test")
       // L'arbre d'abord : dossiers d'équipe et Contextes naissent avec les équipes (P39).

@@ -48,8 +48,40 @@ describe("EcranDeNoeud, servi en flux pendant la lecture des liens (M64)", () =>
     servir({ data: { links_out: [{ path: "ventes/ancien", status: "moved", title: "Nouveau", moved_to: "conseil/nouveau" }], links_out_total: 1, links_in: [], links_in_total: 0 } })
     const html = await new Response(flux).text()
     expect(html.split(phrase).length - 1).toBe(attendues)
-    // Le titre lu arrive quand même, dans la phrase (le lien de « Contenus liés » porte son nom dans un `<span>`) :
+    // Le titre lu arrive quand même, dans la phrase (le lien de l'encart « Cite » porte son nom dans un `<span>`) :
     // la page déplacée, sous son nouveau titre, à sa nouvelle place.
     expect(html).toMatch(/<a [^>]*href="\/n\/conseil\/nouveau"[^>]*>Nouveau<\/a>/)
+  })
+})
+
+// E11-S05 (AC-e4) : « Sous-pages », connu avec le nœud, se rend hors du `<Suspense>` des liens, une seule fois dans le
+// flux ; à la place de « Cité dans » et « Cite », « Lecture des liens… » jusqu'à leur arrivée.
+describe("EcranDeNoeud, the encarts streamed while the links are read (E11-S05, AC-e4)", () => {
+  it("should stream « Sous-pages » once, outside the boundary of the links, and « Lecture des liens… » in their place", async () => {
+    let servir: (lu: { data: Record<string, unknown> }) => void = () => {}
+    const liens = new Promise<{ data: Record<string, unknown> }>((resolve) => (servir = resolve))
+    const enfant = { path: "ventes/modele_relance/cas_unique_de_relance", title: "Cas unique de relance", summary: "Un cas.", kind: "page" as const, status: "published" as const }
+    const flux = await renderToReadableStream(
+      <ContexteDeLHote.Provider value={{ Lien: "a", chemin: "", naviguer: () => {} }}>
+        <EcranDeNoeud
+          chemin="ventes/modele_relance"
+          noeud={{ data: vueDuNoeud({ children: [enfant], childrenTotal: 1 }) }}
+          arbre={{ data: { tree: [noeud("ventes", "Ventes")], truncated: false } }}
+          equipes={{ data: [{ slug: "ventes", name: "Ventes" }] }}
+          handle={null}
+          nomOrganisation="Démo"
+          versionPubliee={false}
+          Lien={LienDeTest}
+          hrefDuChemin={(chemin) => `/n/${chemin}`}
+          prefixeDesPages="/n/"
+          liens={liens}
+        />
+      </ContexteDeLHote.Provider>,
+    )
+    servir({ data: { links_out: [], links_out_total: 0, links_in: [{ path: "conseil/guide", title: "Guide du conseil" }], links_in_total: 1 } })
+    const html = await new Response(flux).text()
+    expect(html.split("Cas unique de relance").length - 1).toBe(1)
+    expect(html).toContain("Lecture des liens…")
+    expect(html).toContain("Guide du conseil")
   })
 })

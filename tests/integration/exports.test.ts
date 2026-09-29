@@ -60,7 +60,7 @@ describe.skipIf(!sqlConfigured)(portable("the exports of a page and of a table")
 
   it("should export a published page as its title, an empty line and its published blocks, without block references (AC-a5)", async () => {
     await write({ path: "ventes/cr_export", title: "Compte rendu", summary: "Le compte rendu.", ops: [{ op: "add_section", section: "Décisions", text: "- Relancer\n- Signer" }], publish: true })
-    await write({ path: "ventes/cr_export", base_revision: 1, ops: [{ op: "append", section: "Décisions", text: "Pas encore publié." }] })
+    await write({ path: "ventes/cr_export", base_revision: 1, ops: [{ op: "append", section: "Décisions", text: "Pas encore publié." }], publish: false })
     // Rendu entier : aucune ligne de journal, un export est une lecture (HN-E10S01-18).
     expect(await exported(nodesRoutes, "lea", "ventes/cr_export")).toEqual({
       status: 200,
@@ -69,7 +69,7 @@ describe.skipIf(!sqlConfigured)(portable("the exports of a page and of a table")
   })
 
   it("should refuse a page never published, a table, and a node the person cannot read (AC-a5)", async () => {
-    await write({ path: "ventes/cr_brouillon", title: "Brouillon", summary: "Jamais publié.", ops: [{ op: "add_section", section: "S", text: "t" }] })
+    await write({ path: "ventes/cr_brouillon", title: "Brouillon", summary: "Jamais publié.", ops: [{ op: "add_section", section: "S", text: "t" }], publish: false })
     expect(await exported(nodesRoutes, "claire", "ventes/cr_brouillon")).toMatchObject({ code: "invalid_arguments", message: "ventes/cr_brouillon has no published version" })
     expect(await exported(nodesRoutes, "lea", PROSPECTS.path)).toMatchObject({ code: "invalid_arguments", message: "ventes/suivi_prospects is a table: use tables/export" })
     expect(await exported(nodesRoutes, "lea", PERSONAL_TABLE)).toMatchObject({ code: "not_found", message: "Unknown path private/claire/notes." })

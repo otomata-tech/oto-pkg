@@ -143,7 +143,12 @@ const itemsDuMenu = () => menu().getAllByRole("menuitem").map((item) => item.tex
 
 /** Le corps d'une création sans dialogue (AC-b3) : « Sans titre », le résumé par défaut de son genre (AC-e21), et la colonne clé d'un tableau. */
 const NEUF = { title: "Sans titre" }
-const RESUMES = { page: "Résumé de la page à compléter.", table: "Résumé du tableau à compléter.", procedure: "Résumé de la procédure à compléter." }
+// E11-S05 (AC-f3) : le résumé par défaut d'une procédure dit comment l'écrire ; ceux d'une page et d'un tableau ne changent pas.
+const RESUMES = {
+  page: "Résumé de la page à compléter.",
+  table: "Résumé du tableau à compléter.",
+  procedure: "Résumé à compléter : dites ce que fait la procédure et comment on la demande, avec les mots de l'équipe. L'assistant la choisit sur ce résumé et sur le titre.",
+}
 const COLONNE_CLE = { header: { columns: [{ name: "nom", type: "text" }], key: "nom" } }
 
 /** La palette est un `<dialog>` toujours monté : elle est ouverte quand elle porte `open`. */

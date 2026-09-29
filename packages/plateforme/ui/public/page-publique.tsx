@@ -10,14 +10,21 @@
 // Repris de l'écran de nœud (`ecran-de-noeud.tsx`, `corps-du-noeud.tsx`) : la colonne de lecture
 // (`.oto-content-max[data-width="document"]`), l'en-tête d'écran, le document en îlot (`Reader`), la page
 // vide dite. Retiré : l'en-tête d'actions, le fil de l'arbre, « Contenus liés », tout ce qui écrit.
+//
+// E11-S05 : le visiteur télécharge ce que la page a lu (lot d, HN-E11S05-10), le `.csv` des lignes chargées d'un
+// tableau ou le `.md` d'une page, composés ici par les fonctions du service (`rowCells`, `toCsv`, `pageMarkdown`), sans requête
+// au clic ; le résumé ne se montre que pour une procédure (AC-f2).
 import type { ComponentProps, ReactNode } from "react"
 import { FileText } from "@phosphor-icons/react/dist/ssr/FileText"
-import type { CellValue, PublicNodeView, PublicTable, TableColumn } from "../../schemas"
+import { pageMarkdown, PUBLIC_TABLE_ROWS_MAX, rowCells, toCsv, type PublicNodeView, type PublicTable, type TableColumn } from "../../schemas"
 import type { Resultat } from "../api/resultat"
+import type { FichierRendu } from "../api/telecharger"
 import { natureDuGenre } from "../arbre/depuis-l-arbre"
+import { BoutonTelecharger } from "../components/bouton-telecharger"
 import { LIEN } from "../components/classes"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
 import { TableServeur } from "../components/table-serveur"
+import { EXPORTS } from "../coque/libelles"
 import { EmptyState } from "../ds/react/empty-state"
 import { Icon } from "../ds/react/icon"
 import { Island, IslandBody, IslandFoot } from "../ds/react/island"
@@ -25,10 +32,12 @@ import { Content, Desk } from "../ds/react/layout"
 import { Reader } from "../ds/react/reader"
 import { ScreenHeader } from "../ds/react/screen-header"
 import { dateLisible } from "../format/dates"
+import { nombreLisible } from "../format/nombres"
 import { LogoDOrganisation } from "../marque/logo-d-organisation"
 import type { MarqueDOrganisation } from "../marque/types"
 import { GlypheDeNature } from "../noeud/glyphes"
-import { PAGE_VIDE } from "../noeud/libelles"
+import { dernierSegment } from "../noeud/en-ligne"
+import { PAGE_VIDE, resumeMontre } from "../noeud/libelles"
 import { RenduDUnBloc } from "../noeud/rendu-des-blocs"
 import { Cellule } from "../tableau/cellule"
 import { GRILLE } from "../tableau/libelles"
@@ -40,7 +49,9 @@ export const PAGE_PUBLIQUE = {
   retour: (titre: string) => `Retour à ${titre}`,
   lectureSeule: "Page publiée en lecture seule par un lien de partage.",
   lignesDu: (titre: string) => `Lignes de ${titre}`,
-  tronque: "Les 500 premières lignes, dans l'ordre de leur clé.",
+  tronque: `Les ${nombreLisible(PUBLIC_TABLE_ROWS_MAX)} premières lignes, dans l'ordre de leur clé.`,
+  /** Le `.csv` d'un tableau coupé : il ne porte que les lignes que la page montre (AC-d1). */
+  csvTronque: `${EXPORTS.csv} (${nombreLisible(PUBLIC_TABLE_ROWS_MAX)} premières lignes)`,
   echec: "Cette page n'a pas pu être chargée",
   introuvable: "Page introuvable",
   introuvableDetail: "Ce lien n'existe pas ou n'est plus actif.",
@@ -133,16 +144,10 @@ function colonneLue(colonne: PublicTable["columns"][number]): TableColumn {
 }
 
 /**
- * La valeur d'une colonne dans une ligne servie (JSON brut) : un scalaire tel quel, `null` ou absente vide, le reste
- * en texte ; une propriété propre seulement (une colonne `constructor` ne lit pas le prototype).
+ * Les cellules d'une ligne servie, lues par `rowCells` comme celles d'une ligne connectée (portage-ecrans.md § 6) :
+ * la clé d'une colonne clé `number` en nombre ; la grille et le `.csv` les montrent comme l'écran et l'export.
  */
-function valeurLue(cellules: Record<string, unknown>, colonne: string): CellValue | undefined {
-  const valeur = Object.hasOwn(cellules, colonne) ? cellules[colonne] : undefined
-  if (valeur === null || valeur === undefined) return undefined
-  if (typeof valeur === "string" || typeof valeur === "boolean") return valeur
-  if (typeof valeur === "number") return Number.isFinite(valeur) ? valeur : String(valeur)
-  return JSON.stringify(valeur)
-}
+const cellulesDe = (ligne: PublicTable["rows"][number], table: PublicTable, cle: string | null) => rowCells({ key: ligne.key, data: ligne.cells }, { key: cle, columns: table.columns })
 
 type TableauPublicProps = { table: PublicTable; titre: string; cle: string | null }
 
@@ -162,22 +167,25 @@ function TableauPublic({ table, titre, cle }: TableauPublicProps) {
       ) : (
         <IslandBody flush>
           <TableServeur legende={PAGE_PUBLIQUE.lignesDu(titre)} colonnes={colonnes.map((colonne) => ({ entete: colonne.name, numerique: colonne.type === "number" }))}>
-            {table.rows.map((ligne) => (
-              <tr key={ligne.key}>
-                {colonnes.map((colonne) => {
-                  const cellule = <Cellule colonne={colonne} valeur={colonne.name === cle ? ligne.key : valeurLue(ligne.cells, colonne.name)} />
-                  return colonne.name === cle ? (
-                    <th key={colonne.name} scope="row">
-                      {cellule}
-                    </th>
-                  ) : (
-                    <td key={colonne.name} data-numeric={colonne.type === "number" ? "" : undefined}>
-                      {cellule}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
+            {table.rows.map((ligne) => {
+              const cellules = cellulesDe(ligne, table, cle)
+              return (
+                <tr key={ligne.key}>
+                  {colonnes.map((colonne) => {
+                    const cellule = <Cellule colonne={colonne} valeur={cellules.get(colonne.name)} />
+                    return colonne.name === cle ? (
+                      <th key={colonne.name} scope="row">
+                        {cellule}
+                      </th>
+                    ) : (
+                      <td key={colonne.name} data-numeric={colonne.type === "number" ? "" : undefined}>
+                        {cellule}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
           </TableServeur>
         </IslandBody>
       )}
@@ -188,6 +196,28 @@ function TableauPublic({ table, titre, cle }: TableauPublicProps) {
       )}
     </Island>
   )
+}
+
+/** La colonne clé d'un tableau servi (`meta.key`), ou `null`. */
+const cleDu = (vue: PublicNodeView): string | null => (typeof vue.node.meta.key === "string" ? vue.node.meta.key : null)
+
+/**
+ * Le `.csv` des lignes que la page a lues (AC-d1, AC-d3) : les colonnes dans l'ordre servi, la clé dans sa colonne,
+ * écrit par `toCsv` (BOM, séparateur et décimale de la langue de l'organisation, formules neutralisées).
+ */
+function csvDuTableau(vue: PublicNodeView, table: PublicTable): FichierRendu {
+  const cle = cleDu(vue)
+  const lignes = table.rows.map((ligne) => cellulesDe(ligne, table, cle))
+  return { filename: `${dernierSegment(vue.node.path)}.csv`, content: toCsv(table.columns, lignes, vue.language) }
+}
+
+/** Le fichier que la page donne (lot d) : le `.csv` d'un tableau, sinon le `.md` de ses blocs publics, comme l'export (E10-S01, AC-a5). */
+function Telechargement({ vue }: { vue: PublicNodeView }) {
+  if (vue.table) {
+    return <BoutonTelecharger format="csv" libelle={vue.table.truncated ? PAGE_PUBLIQUE.csvTronque : EXPORTS.csv} fichier={csvDuTableau(vue, vue.table)} />
+  }
+  const blocs = vue.blocks.filter((bloc) => bloc.type !== "row")
+  return <BoutonTelecharger format="md" libelle={EXPORTS.markdown} fichier={{ filename: `${dernierSegment(vue.node.path)}.md`, content: pageMarkdown(vue.node.title, blocs) }} />
 }
 
 function Contenu({ vue, adresse }: { vue: PublicNodeView; adresse: string }) {
@@ -206,10 +236,11 @@ function Contenu({ vue, adresse }: { vue: PublicNodeView; adresse: string }) {
         icon={<GlypheDeNature nature={natureDuGenre(vue.node.kind)} taille="sm" />}
         title={vue.node.title}
         meta={quand ? PAGE_PUBLIQUE.misAJour(quand) : undefined}
+        actions={<Telechargement vue={vue} />}
       />
-      <p className="text-ink">{vue.node.summary}</p>
+      {resumeMontre(vue.node.kind) && <p className="text-ink">{vue.node.summary}</p>}
       <Document vue={vue} adresse={adresse} />
-      {vue.table && <TableauPublic table={vue.table} titre={vue.node.title} cle={typeof vue.node.meta.key === "string" ? vue.node.meta.key : null} />}
+      {vue.table && <TableauPublic table={vue.table} titre={vue.node.title} cle={cleDu(vue)} />}
       <Dessous vue={vue} adresse={adresse} />
     </>
   )

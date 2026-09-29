@@ -49,12 +49,27 @@ describe("classifyRow: the verb of a journal line (AC-12, HN-E05S12-15)", () => 
     ["an assistant table.write", { method: "tools/call", tool: "acme_call", target: "table.write", table: "ventes/salons" }, "wrote_rows"],
     ["a table.write whose table could not be read", { method: "tools/call", tool: "acme_call", target: "table.write", table: null }, null],
     ["another function", { method: "tools/call", tool: "acme_call", target: "mail.create_draft", table: "ventes/salons" }, null],
+    // E11-S02 (AC-h3) : les exécutions confirmées de la corbeille et de la suppression de lignes ; ni le
+    // récapitulatif sans `confirm`, ni l'abandon d'un brouillon.
+    ["a confirmed node.trash", { method: "tools/call", tool: "acme_call", target: "node.trash", confirmed: true, path: "ventes/essai" }, "trashed"],
+    ["the summary of node.trash", { method: "tools/call", tool: "acme_call", target: "node.trash", confirmed: false, path: "ventes/essai" }, null],
+    ["a confirmed table.delete_rows", { method: "tools/call", tool: "acme_call", target: "table.delete_rows", confirmed: true, table: "ventes/salons" }, "deleted_rows"],
+    ["the summary of table.delete_rows", { method: "tools/call", tool: "acme_call", target: "table.delete_rows", table: "ventes/salons" }, null],
+    ["a confirmed node.discard_draft", { method: "tools/call", tool: "acme_call", target: "node.discard_draft", confirmed: true, path: "ventes/salons" }, null],
     ["a context routed to a path", { method: "tools/call", tool: "acme_context", target: "ventes/relance_devis", ctx: "K7M2-9QXR" }, "ran"],
     ["a context phrase", { method: "tools/call", tool: "acme_context", target: "relance les devis" }, null],
     ["a find", { method: "tools/call", tool: "acme_find", target: "ventes" }, null],
     ["a line of another method", { method: "initialize", tool: null }, null],
   ])("should classify %s", (_cas, surcharge, verb) => {
     expect(verbOf(surcharge)).toBe(verb)
+  })
+
+  it("should take the path of node.trash and the table of table.delete_rows from the arguments, and the rows to review of an execution (E11-S02, AC-h3)", () => {
+    const trashed = row({ method: "tools/call", tool: "acme_call", target: "node.trash", confirmed: true, path: "ventes/essai" })
+    expect(classifyRow(trashed, READER, PREFIX)).toMatchObject({ verb: "trashed", path: "ventes/essai" })
+    const deleted = row({ method: "tools/call", tool: "acme_call", target: "table.delete_rows", confirmed: true, table: "ventes/salons", review: 2 })
+    expect(classifyRow(deleted, READER, PREFIX)).toMatchObject({ verb: "deleted_rows", path: "ventes/salons", inReview: 2 })
+    expect(classifyRow({ ...deleted, review: null }, READER, PREFIX)).not.toHaveProperty("inReview")
   })
 
   it("should take the table of a table.write from its arguments, and the kind of a creation from its arguments", () => {
@@ -126,6 +141,17 @@ describe("groupGestures: one activity per person, content and verb within an hou
     ])
     const activities = group([gesture(2, "2026-09-26T10:00:00Z", { path: "ventes/tarifs_2026" }), gesture(1, "2026-09-26T09:30:00Z")], resolutions)
     expect(activities.map((activity) => [activity.path, activity.count])).toEqual([["ventes/tarifs_2026", 2]])
+  })
+
+  it("should sum the rows to review of grouped deletions of rows, and add none when none was (E11-S02, AC-h3)", () => {
+    const activities = group([
+      gesture(3, "2026-09-26T10:00:00Z", { verb: "deleted_rows", inReview: 2 }),
+      gesture(2, "2026-09-26T09:40:00Z", { verb: "deleted_rows" }),
+      gesture(1, "2026-09-26T09:20:00Z", { verb: "deleted_rows", inReview: 1 }),
+    ])
+    expect(activities.map(({ verb, count, inReview }) => [verb, count, inReview])).toEqual([["deleted_rows", 3, 3]])
+    const [none] = group([gesture(1, "2026-09-26T09:20:00Z", { verb: "deleted_rows" })])
+    expect(none).not.toHaveProperty("inReview")
   })
 
   it("should give at most the limit, newest first", () => {

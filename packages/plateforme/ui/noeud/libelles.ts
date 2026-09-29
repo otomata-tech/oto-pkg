@@ -27,26 +27,10 @@ export const ECRAN = {
   /** Le périmètre et le verbe qui dit qu'on peut le changer, en un seul bouton (oto-frontend). */
   partager: (espace: string) => `Partager · ${espace}`,
   panneauDePartage: (espace: string) => `Partager — ${espace}`,
-  voirLaVersionPubliee: "Voir la version publiée",
   versionPubliee: (revision: number) => `Version publiée (révision ${revision}).`,
-  revenirAuBrouillon: "Revenir au brouillon",
+  revenirAuxModifications: "Revenir aux modifications en attente",
   rangeAilleurs: "rangé ailleurs",
 } as const
-
-/** Le nom d'une nature dans un résumé compté (« 2 pages · 1 procédure »), au pluriel du français. */
-const NOMS_DE_NATURE: Record<NodeKind, { un: string; plusieurs: string }> = {
-  page: { un: "page", plusieurs: "pages" },
-  procedure: { un: "procédure", plusieurs: "procédures" },
-  context: { un: "contexte", plusieurs: "contextes" },
-  table: { un: "tableau", plusieurs: "tableaux" },
-}
-
-/** Le résumé compté d'une liste de nœuds, par nature, dans l'ordre d'apparition : calculé, jamais écrit à la main. */
-export function resumeCompte(genres: readonly NodeKind[]): string {
-  const comptes = new Map<NodeKind, number>()
-  for (const genre of genres) comptes.set(genre, (comptes.get(genre) ?? 0) + 1)
-  return [...comptes].map(([genre, nombre]) => `${nombre} ${nombre > 1 ? NOMS_DE_NATURE[genre].plusieurs : NOMS_DE_NATURE[genre].un}`).join(" · ")
-}
 
 /** Les formes qu'écrit l'écran (E05-S10, AC-a2 : un seul niveau de titre), leur libellé et le nom du champ ouvert (AC10). */
 export const FORMES = {
@@ -100,11 +84,13 @@ export const NIVEAUX_DE_LISTE = {
 
 /** Les phrases de l'éditeur (AC9 à AC15, AC18). */
 export const EDITEUR = {
-  // E05-S13 (AC-21) : le geste d'une page vide dit ce qu'on fait, pas ce qu'est un bloc.
-  premierBloc: "Commencer à écrire",
+  /**
+   * L'invite du Texte seul d'une page vide (E11-S05, AC-g1, HN-E11S05-22), mot pour mot : ce qu'on fait, et « @ » ;
+   * rien sur « / ».
+   */
+  invite: "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)",
   lectureSeule: "Ce bloc se modifie par votre assistant.",
   enregistrement: "Enregistrement…",
-  enregistre: "Brouillon enregistré.",
   supprime: "Bloc supprimé.",
   conflitAReglerDAbord: "Réglez d'abord le bloc en conflit.",
   refuse: "Vous n'avez pas le droit de modifier cette page. Votre texte est toujours là : copiez-le avant de quitter l'écran.",
@@ -114,15 +100,15 @@ export const EDITEUR = {
   pageChangee: "La page a changé pendant que vous écriviez : réessayez.",
   blocChange: "Ce bloc a changé pendant que vous écriviez. Votre texte n'a pas été enregistré : composez le texte final à partir de la version enregistrée.",
   blocEncoreChange: "Le bloc a encore changé.",
-  blocSupprimeAilleurs: "Ce bloc a été supprimé du brouillon pendant que vous écriviez.",
+  blocSupprimeAilleurs: "Ce bloc a été supprimé pendant que vous écriviez.",
   blocGarde: "Ce bloc a été modifié pendant que vous le supprimiez : il est gardé.",
   abandonner: "Abandonner votre texte et garder la version enregistrée ?",
   annulerLesModifications: "Annuler les modifications du bloc",
 } as const
 
-/** Les phrases de la publication (AC17) : son refus faute du niveau gestion. */
+/** Les phrases de la publication (AC17) : son refus faute du droit (E11-S02, AC-c4 : écrire publie). */
 export const PUBLICATION = {
-  refusee: "Vous n'avez pas le niveau gestion sur cette page.",
+  refusee: "Vous n'avez pas le droit de publier cette modification.",
 } as const
 
 /** Les phrases du titre et du résumé (AC16). */
@@ -140,16 +126,11 @@ export function genreDuNoeud(vue: Pick<NodeView, "kind" | "draft">): NodeKind {
 }
 
 /**
- * La phrase qui tient lieu de « Publier » au niveau écriture (AC8) : à qui revient la publication,
- * selon le propriétaire effectif (H63, H66 : l'administrateur gère partout sauf dans un espace personnel).
+ * Le résumé ne se montre, lu ou écrit, que pour une procédure, dont il porte la demande (E11-S05, AC-f1, AC-f2 ;
+ * HN-E11S05-15) : sous le titre, dans « Sous-pages », sur la carte d'un contenu cité et sur la page publique. Le
+ * résumé des autres genres reste servi à l'assistant.
  */
-export function phraseDePublication(proprietaire: NodeView["owner"], nomOrganisation: string): string {
-  if (proprietaire.kind === "team" && proprietaire.leadName) {
-    return `La publication revient au responsable de l'équipe ${proprietaire.teamName ?? ""} (${proprietaire.leadName}) ou à un administrateur.`
-  }
-  if (proprietaire.kind === "user") return `La publication revient à ${proprietaire.userName ?? "son propriétaire"}.`
-  return `La publication revient aux administrateurs de ${nomOrganisation}.`
-}
+export const resumeMontre = (genre: string): boolean => genre === "procedure"
 
 /** Les phrases du déplacement (AC20, AC21) ; tout autre refus prend le texte de `messageDErreur`. */
 export const DEPLACEMENT = {
@@ -184,15 +165,18 @@ export function modifieeDuNoeud(noeud: Pick<NodeView, "kind">, modifiee: { quand
 /** Les intitulés de l'infobulle de la ligne sous le titre (AC-a7). */
 export const INFOBULLE = { type: "Type", etat: "État", revision: "Révision", lignes: "Lignes", proprietaire: "Propriétaire" } as const
 
-/** Le type, l'état et la révision d'un nœud, puis ses lignes pour un tableau : les lignes de l'infobulle (AC-a7). */
+/**
+ * Le type, l'état et la révision d'un nœud, puis ses lignes pour un tableau : les lignes de l'infobulle (AC-a7) ;
+ * sans le mot « brouillon », qui ne se dit plus à l'écran (E11-S02, AC-c4).
+ */
 export function detailsDuNoeud(noeud: Pick<NodeView, "kind" | "status" | "revision" | "rowsTotal">): { intitule: string; valeur: string }[] {
   const e = AU_MASCULIN.has(noeud.kind) ? "" : "e"
   const publie = noeud.status === "published"
   const lignes = noeud.kind === "table" && noeud.rowsTotal !== undefined ? [{ intitule: INFOBULLE.lignes, valeur: nLignes(noeud.rowsTotal) }] : []
   return [
     { intitule: INFOBULLE.type, valeur: NATURES[noeud.kind] },
-    { intitule: INFOBULLE.etat, valeur: publie ? `Publié${e}` : "Brouillon" },
-    { intitule: INFOBULLE.revision, valeur: publie ? String(noeud.revision) : `jamais publié${e}` },
+    { intitule: INFOBULLE.etat, valeur: publie ? `Publié${e}` : `Non publié${e}` },
+    { intitule: INFOBULLE.revision, valeur: publie ? String(noeud.revision) : "aucune" },
     ...lignes,
   ]
 }
@@ -230,18 +214,15 @@ export const PARTAGE = {
   introuvable: INTROUVABLE,
 } as const
 
-/** Le bandeau « Contenus liés » (E05-S10, AC-b6) et ses trois rubriques (E05-S11, AC-29, fiche D107). */
-export const CONTENUS_LIES = {
-  titre: "Contenus liés",
+/** Les trois encarts d'un nœud (E11-S05, AC-e1, AC-e4), qui remplacent le bandeau « Contenus liés » (E05-S10, AC-b6). */
+export const ENCARTS = {
+  citeDans: "Cité dans",
+  cite: "Cite",
   sousPages: "Sous-pages",
-  mentionnes: "Mentionnés",
-  mentionneDans: "Mentionné dans",
+  chargement: "Lecture des liens…",
   sansCible: "sans cible",
   deplace: (vers: string) => `déplacé vers ${vers}`,
   autres: (nombre: number) => (nombre > 1 ? `et ${nombre} autres` : "et 1 autre"),
-  chargement: "Lecture des mentions…",
-  nMentionnes: (nombre: number) => (nombre > 1 ? `${nombre} mentionnés` : "1 mentionné"),
-  nMentionneDans: (nombre: number) => (nombre > 1 ? `mentionné dans ${nombre} contenus` : "mentionné dans 1 contenu"),
 } as const
 
 /** Le menu d'un bloc, ouvert par sa poignée (E05-S10, AC-a2). */
@@ -278,6 +259,8 @@ export const PUBLICATION_SEULE = {
   pageChangee: "La page a changé pendant que vous écriviez : votre texte est gardé, il sera publié à votre prochaine modification.",
   reessayer: "Réessayer",
   contexteVide: "Ce contexte est vide : il n'est pas publié tant que vous ne le confirmez pas.",
+  // E11-S02 (AC-g1) : le refus d'un en-tête de tableau ne se lève pas à l'écran ; l'assistant l'abandonne.
+  enTeteRefuse: "Ce changement d'en-tête est refusé : demandez à votre assistant d'abandonner le brouillon.",
 } as const
 
 /** « @ » dans un bloc (E05-S10, AC-a9) : la recherche des contenus à citer. */

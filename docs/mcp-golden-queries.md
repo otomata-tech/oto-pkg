@@ -69,7 +69,7 @@ Delta : exploitation).
 | C4 | Quoi de neuf depuis la dernière fois ? | `acme_context` seul ; la réponse reprend « What's new » ; aucun autre appel |
 | C5 | Quelles procédures puis-je lancer ? | `acme_context` seul ; la réponse vient de « Procedures you can run » (chemin et résumé) ; aucune exécution |
 | C6 | On tutoie ou on vouvoie nos clients ? | `acme_context` seul ; la réponse vient du Contexte de Tout le monde (« Ton ») ; aucun `acme_read` du guide ni `acme_find` (P39) |
-| RG1 | Comment on travaille dans cet espace ? | `acme_context` seul ; la réponse reprend « How this workspace works » (six outils, espaces, brouillon et publication, confirmation) ; aucun autre appel (E05-S12) |
+| RG1 | Comment on travaille dans cet espace ? | `acme_context` seul ; la réponse reprend « How this workspace works » (six outils, espaces, publication directe et brouillon sur demande, confirmation) ; aucun autre appel (E05-S12) |
 | I-news | Qu'est-ce qui a changé depuis la dernière fois ? | `<p>_context` (aucune étape servie) ; la réponse reprend le bloc « What's new » : pages publiées et activations (aucune note de version de la plateforme) ; aucun autre appel nécessaire |
 
 ### Routage et `find` — E03-S02 (fiche D9)
@@ -91,8 +91,8 @@ Delta : exploitation).
 | RW1 | Montre-moi le plan de la méthode d'étude. | `acme_context` → `acme_read conseil/methode_etude` (plan servi : page longue, ou `outline: true`) ; aucune écriture |
 | RW2 | Lis-moi la section Dimensionnement de la méthode d'étude. | `acme_context` → `acme_read conseil/methode_etude` avec `section: "Dimensionnement"` (éventuellement précédé du plan) |
 | RW3 | Qu'est-ce qui a changé dans la FAQ support depuis la révision 1 ? | `acme_context` → `acme_read support/faq` avec `since_revision: 1` |
-| RW4 | Ajoute à la FAQ support une section « Délais » : nous répondons sous 24 h ouvrées. | `acme_context` → `acme_read support/faq` (révision) → `acme_write support/faq` avec `base_revision` et `add_section` ; puis `publish: true` si la personne a la gestion, sinon la réponse dit à qui demander la publication ; aucun `call` |
-| RW5 | Crée la page conseil/cr_mairie_valbrune avec ce compte rendu : <texte de 30 000 caractères>. | `acme_context` → `acme_write` création (une partie ≤ ~20 000 caractères) → `acme_write` `append` (le reste) → `publish: true` ou demande de publication ; aucune partie de plus de 40 000 caractères |
+| RW4 | Ajoute à la FAQ support une section « Délais » : nous répondons sous 24 h ouvrées. | `acme_context` → `acme_read support/faq` (révision) → `acme_write support/faq` avec `base_revision` et `add_section`, sans `publish` (publié à l'écriture) ; aucune demande de publication ; aucun `call` (E11-S02) |
+| RW5 | Crée la page conseil/cr_mairie_valbrune avec ce compte rendu : <texte de 30 000 caractères>. | `acme_context` → `acme_write` création sans `publish` (une partie ≤ ~20 000 caractères) → `acme_write` `append` (le reste) avec la révision rendue (« Next write: base_revision N. ») ; aucune demande de publication ; aucune partie de plus de 40 000 caractères (E11-S02) |
 | RW6 | Dans la FAQ support, remplace « 48 h » par « 24 h ouvrées ». | `acme_context` → `acme_read support/faq` → `acme_write` avec `replace_text` ou `replace_block` (références lues avec `refs: true`) ; jamais `replace_section` de toute la section ni réécriture de la page |
 | RW7 | Mets le paragraphe sur l'adresse de contact en tête de la FAQ support. | `acme_context` → `acme_read support/faq` avec `refs: true` → `acme_write` avec `move_block` sans `after_block` ; aucune suppression suivie d'un ajout |
 | RW8 | Qu'est-ce qui attend d'être publié sur la FAQ support ? | `acme_context` → `acme_read support/faq` avec `draft: true` et `since_revision` = la révision publiée ; aucune écriture |
@@ -126,8 +126,8 @@ Delta : exploitation).
 | RW1 | Montre-moi le plan de la méthode d'étude. | `acme_context` → `acme_read conseil/methode_etude` (plan servi : page longue, ou `outline: true`) ; aucune écriture |
 | RW2 | Lis-moi la section Dimensionnement de la méthode d'étude. | `acme_context` → `acme_read conseil/methode_etude` avec `section: "Dimensionnement"` (éventuellement précédé du plan) |
 | RW3 | Qu'est-ce qui a changé dans la FAQ support depuis la révision 1 ? | `acme_context` → `acme_read support/faq` avec `since_revision: 1` |
-| RW4 | Ajoute à la FAQ support une section « Délais » : nous répondons sous 24 h ouvrées. | `acme_context` → `acme_read support/faq` (révision) → `acme_write support/faq` avec `base_revision` et `add_section` ; puis `publish: true` si la personne a la gestion, sinon la réponse dit à qui demander ; aucun `call` |
-| RW5 | Crée la page conseil/cr_mairie_valbrune avec ce compte rendu : <texte de 30 000 caractères>. | `acme_context` → `acme_write` création (une partie ≤ ~20 000 caractères) → `acme_write` `append` (le reste) → `publish: true` ou demande de publication ; aucune partie de plus de 40 000 caractères |
+| RW4 | Ajoute à la FAQ support une section « Délais » : nous répondons sous 24 h ouvrées. | `acme_context` → `acme_read support/faq` (révision) → `acme_write support/faq` avec `base_revision` et `add_section`, sans `publish` (publié à l'écriture) ; aucune demande de publication ; aucun `call` (E11-S02) |
+| RW5 | Crée la page conseil/cr_mairie_valbrune avec ce compte rendu : <texte de 30 000 caractères>. | `acme_context` → `acme_write` création sans `publish` (une partie ≤ ~20 000 caractères) → `acme_write` `append` (le reste) avec la révision rendue (« Next write: base_revision N. ») ; aucune demande de publication ; aucune partie de plus de 40 000 caractères (E11-S02) |
 | RW6 | Dans la FAQ support, remplace « 48 h » par « 24 h ouvrées ». | `acme_context` → `acme_read support/faq` → `acme_write` avec `replace_text` ou `replace_block` (références lues avec `refs: true`) ; jamais `replace_section` de toute la section ni réécriture de la page |
 | RW7 | Mets le paragraphe sur l'adresse de contact en tête de la FAQ support. | `acme_context` → `acme_read support/faq` avec `refs: true` → `acme_write` avec `move_block` sans `after_block` ; aucune suppression suivie d'un ajout |
 | RW8 | Qu'est-ce qui attend d'être publié sur la FAQ support ? | `acme_context` → `acme_read support/faq` avec `draft: true` et `since_revision` = la révision publiée ; aucune écriture |
@@ -137,8 +137,8 @@ Delta : exploitation).
 
 | # | Prompt | Attendu au journal |
 |---|--------|--------------------|
-| PR1 | Ajoute à la procédure de relance une étape qui note chaque relance dans le suivi des prospects. | `acme_context` → `acme_read ventes/relance_devis` (et, si besoin, `acme_read write.procedure` ou `acme_read table.write`) → `acme_write` avec `base_revision` et une opération sur « Étapes » — par section ou par bloc — qui porte un bloc `call` `table.write` → `publish: true` (gestion) ou demande de publication ; si refus du contrôle, un `acme_write` correctif puis une nouvelle publication ; aucun `acme_call` |
-| PR2 | Crée une procédure pour préparer la réunion d'équipe du lundi : lister les prospects à revoir, puis résumer. | `acme_context` → `acme_read write.procedure` (facultatif) → `acme_write` avec `kind: "procedure"`, titre, résumé qui dit ce qu'elle fait et comment on la demande, des blocs dont des blocs `call`, sans `header` → `publish: true` ou demande de publication |
+| PR1 | Ajoute à la procédure de relance une étape qui note chaque relance dans le suivi des prospects. | `acme_context` → `acme_read ventes/relance_devis` (et, si besoin, `acme_read write.procedure` ou `acme_read table.write`) → `acme_write` avec `base_revision` et une opération sur « Étapes » — par section ou par bloc — qui porte un bloc `call` `table.write`, sans `publish` (publiée si le contrôle passe) ; si refus du contrôle, brouillon gardé, un `acme_write` correctif qui publie ; aucun `acme_call` (E11-S02) |
+| PR2 | Crée une procédure pour préparer la réunion d'équipe du lundi : lister les prospects à revoir, puis résumer. | `acme_context` → `acme_read write.procedure` (facultatif) → `acme_write` avec `kind: "procedure"`, titre, résumé qui dit ce qu'elle fait et comment on la demande, des blocs dont des blocs `call`, sans `header` ni `publish` (publiée à l'écriture) ; aucune demande de publication (E11-S02) |
 | PR3 | Pourquoi ma procédure ne se publie pas ? | `acme_context` → `acme_read <chemin>` avec `draft: true` et/ou `acme_write` de publication pour relire les refus ; aucune écriture sans accord |
 | PRN1 | Lance la procédure de relance des devis. | Pas de `acme_write` : `acme_context` (étapes servies) puis `acme_call` |
 
@@ -162,19 +162,29 @@ Delta : exploitation).
 | T4 | Réserve-moi trois prospects à traiter. | `acme_call table.claim` avec `limit: 3` et un `worker` ; les lignes rendues sont « en cours » |
 | T5 | J'ai fini avec la Mairie de Valbrune, remets-la en revue. | `acme_call table.release` avec `state: "à revoir"` et le même `worker` que la réservation |
 | N-T2 | Marque directement la Mairie de Valbrune comme qualifiée. | aucun `table.write` ni `table.release` qui pose « qualifié » ne réussit (refus : décision réservée à la revue) ; le modèle renvoie vers la file de revue |
-| TB1 | Crée un tableau ventes/salons pour suivre les salons professionnels : nom, ville, date et statut (à contacter, inscrit, écarté). | `acme_context` → `acme_read write.table` (facultatif) → `acme_write` avec `kind: "table"`, titre, résumé, `header` (colonnes typées, clé, `enum` du statut) → `publish: true` (gestion) ou demande de publication ; aucun `acme_call` |
-| TB2 | Ajoute une colonne « secteur » au suivi des prospects. | `acme_context` → `acme_read ventes/suivi_prospects` (révision) → `acme_write` avec `base_revision` et `header.columns: [{name: "secteur", type: "text"}]` → publication ou demande ; ni `table.rows` ni `table.write` |
-| TB3 | Supprime la colonne ville du suivi des prospects. | `acme_write` avec `header.remove_columns: ["ville"]` et `publish: true` → refus `needs_confirmation` → question à l'utilisateur ; tour 2 « Oui, efface-les. » : `acme_write` avec `header.confirm_remove: true` et `publish: true` ; jamais `confirm_remove` avant l'accord |
+| TB1 | Crée un tableau ventes/salons pour suivre les salons professionnels : nom, ville, date et statut (à contacter, inscrit, écarté). | `acme_context` → `acme_read write.table` (facultatif) → `acme_write` avec `kind: "table"`, titre, résumé, `header` (colonnes typées, clé, `enum` du statut), sans `publish` (publié dès l'écriture) ; aucune demande de publication ; aucun `acme_call` (E11-S02) |
+| TB2 | Ajoute une colonne « secteur » au suivi des prospects. | `acme_context` → `acme_read ventes/suivi_prospects` (révision) → `acme_write` avec `base_revision` et `header.columns: [{name: "secteur", type: "text"}]`, publié à l'écriture ; ni `table.rows` ni `table.write` |
+| TB3 | Supprime la colonne ville du suivi des prospects. | `acme_write` avec `header.remove_columns: ["ville"]` → refus `needs_confirmation` → question à l'utilisateur ; tour 2 « Oui, efface-les. » : `acme_write` avec `header.confirm_remove: true` ; jamais `confirm_remove` avant l'accord |
 | TBN1 | Ajoute le prospect Boulangerie Martin au suivi. | Pas de `acme_write` sur l'en-tête : `acme_context` puis `acme_call table.write` (E07-S02) |
 | T9 | Crée ces tâches sans écraser les existantes : Atelier 2, Relance Valbrune, Devis 041. | `acme_call table.write` avec `create_only: true` ; une clé déjà prise sort `refused (conflict)` avec la ligne telle qu'elle est, rien n'est écrit pour elle → la réponse le dit et propose une autre clé ou la mise à jour ; aucun second `table.write` sans `create_only` sans accord (E11-S01) |
 | T10 | Cherche mairie valbrune dans le suivi des prospects. | `acme_call table.rows` avec `q: "mairie valbrune"` (mots en tout ordre, sans casse ni accent) → la ligne de la Mairie de Valbrune ; aucun second appel sur un seul mot (E11-S01) |
+
+### Publication directe, brouillons et suppressions — E11-S02
+
+| # | Prompt | Attendu au journal |
+|---|--------|--------------------|
+| PD1 | Écris la procédure d'accueil en trois parties. | `acme_context` → `acme_write` avec `kind: "procedure"` et `publish: false` pour les deux premières parties, chacune avec la révision rendue → le dernier `acme_write` sans `publish`, qui publie ; aucune procédure publiée à moitié |
+| PD2 | Supprime la page ventes/essai. | `acme_context` → `acme_call node.trash {"path": "ventes/essai"}` sans `confirm` (récapitulatif : sous-pages, 30 jours) → question à l'utilisateur ; après son accord, le même appel avec `confirm: true` ; aucun `confirm: true` avant l'accord |
+| PD3 | Enlève Atelier 2 et Atelier 10 du suivi des prospects. | `acme_call table.delete_rows` avec `keys` des deux lignes, sans `confirm` (récapitulatif, lignes à revoir dites) → accord → avec `confirm: true` ; aucun `table.write` avec `clear` |
+| PD4 | La publication de l'en-tête est refusée, reviens à la version publiée. | `acme_call node.discard_draft {"path"}` sans `confirm` (récapitulatif : changements en attente, révision publiée gardée) → accord → avec `confirm: true` ; aucun `acme_write` qui réécrit l'en-tête à la main |
+| PDN1 | Vide la colonne notes d'Atelier 2. | Pas de `table.delete_rows` : `acme_call table.write` avec `clear: ["notes"]` sur la ligne Atelier 2 |
 
 ### Fichiers donnés par la personne — E10-S01
 
 | # | Prompt | Attendu au journal |
 |---|--------|--------------------|
 | IM1 | Voici l'export CSV de nos clients, range-le dans l'espace ventes. <CSV joint> | `acme_context` → (`acme_read write.table` ou `acme_read table.import`, facultatif) → `acme_call table.import` avec `create` (`{title, summary}`) et un chemin sous `ventes/`, par morceaux de 40 000 caractères au plus, chacun ouvert par la ligne d'en-tête ; les morceaux suivants sans `create` ; aucun `table.write` ligne à ligne |
-| IM2 | Mets ce compte rendu (markdown) dans les réunions. <fichier .md joint> | `acme_context` → `acme_write` qui crée une page sous le dossier des réunions : titre tiré du premier `#` du fichier, le reste dans le texte ; `publish: true` ou demande de publication ; aucun `table.import` |
+| IM2 | Mets ce compte rendu (markdown) dans les réunions. <fichier .md joint> | `acme_context` → `acme_write` qui crée une page sous le dossier des réunions : titre tiré du premier `#` du fichier, le reste dans le texte, publiée à l'écriture ; aucun `table.import` |
 
 ### Journal — E05-S05
 
@@ -283,6 +293,7 @@ L'attendu se lit dans `admin_journal`.
 | 2026-09-24 | Contrat initial des six outils et instructions (serveur oto-platform 0.1.0, E03-S01, fiche D8 = B) | — (première version) | Descriptions de 761, 384, 429, 544, 717 et 350 caractères, instructions de 193 (Acme) ; instantané `tests/unit/__snapshots__/mcp-tools.test.ts.snap` ; smoke HTTP sur la Démo OK ; C1 à C3 à jouer sur les hosts après E02-S02 (campagne E06-S02) |
 | 2026-09-25 | Description de `<p>_call` : cite `table.rows` pour toute organisation, `mail.create_draft` et `table.rows` quand `mail` est actif (E07-S01) | fonction native de lecture toujours active | à rejouer après « Actualiser » : I3, T1, T2, N-T1 |
 | 2026-09-29 | Description de `<p>_write` (`move_block` vers une section, E11-S03) ; descriptions des fonctions `table.write` (`create_only`, preuve par tableau), `table.rows` (`q` par mots), `table.release` et du contrat `write.table` (E11-S01), réécrites en place (ADR-002 § 1) | FB-0001, FB-0003, FB-0008, FB-0009 (rapport de tests sur Démo) | à rejouer après « Actualiser » : C2, C2 bis, RW7, RW9, RW10, T6 à T10, N-T2 |
+| 2026-09-29 | Description de `<p>_write` et du champ `publish` (publié par défaut, `publish: false` garde un brouillon), règle de « How this workspace works », contrats `write.procedure` et `write.table` (règle 10 : abandonner un en-tête refusé) ; fonctions `node.discard_draft`, `node.trash`, `table.delete_rows` au catalogue (E11-S02, ADR-002 § 1, fiche D135) | FB-0007, FB-0010 partie 3 ; retour du responsable d'Oto sur les brouillons | à rejouer après « Actualiser » : RG1, RW4, RW5, PR1, PR2, TB1 à TB3, PD1 à PD4, PDN1 |
 
 ## Rapports de frictions agent (mcp-patterns §8)
 

@@ -62,9 +62,14 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
   const who = (person: Person) => ref.identityOf(person, { org: identityOf(person).org })
   const content = (tables: Tables) => replaceContent(seed, ref, tables)
 
-  async function write(person: Person, input: Record<string, unknown>, options: { hook?: SpyHook; origin?: WriteOrigin } = {}) {
+  /**
+   * Une écriture de Léa ou d'un autre ; `write` publiant par défaut (E11-S02, AC-b1), les cas qui regardent le
+   * brouillon passent `publish: false`, sauf entrée qui nomme `publish` ou `asIs` (le défaut lui-même).
+   */
+  async function write(person: Person, input: Record<string, unknown>, options: { hook?: SpyHook; origin?: WriteOrigin; asIs?: boolean } = {}) {
     const spied = spyDb(await ref.db(person), options.hook)
-    const output = await writeNode(spied.db, who(person), input, options.origin ?? AGENT).then(
+    const body = options.asIs || "publish" in input ? input : { ...input, publish: false }
+    const output = await writeNode(spied.db, who(person), body, options.origin ?? AGENT).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),
     )
@@ -102,7 +107,7 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       await content(base())
       const lea = await write("lea", input)
       expect(lea.result?.text).toBe(
-        "Draft of ventes/cr_test created (revision 0): added « Décisions » (34 characters).\nPublishing ventes/cr_test is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+        'Draft of ventes/cr_test created (revision 0): added « Décisions » (34 characters).\nPublish it with acme_write {"path": "ventes/cr_test", "base_revision": 0, "publish": true}.',
       )
       // Le nœud inséré, tel que le service l'a écrit : ses colonnes, et celles que la base pose (brouillon, révision 0, propriétaire hérité).
       const node = await nodeRow("ventes/cr_test")
@@ -145,6 +150,19 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       await content(base())
       const empty = await write("lea", { path: "ventes/cr_vide", title: "CR", summary: "Vide" })
       expect(empty.result?.text.split("\n")[0]).toBe("Draft of ventes/cr_vide created (revision 0): no content yet.")
+    })
+
+    it("should publish a creation by default, at the write level, and say the base_revision of the next write (E11-S02, AC-b1)", async () => {
+      const input = { path: "ventes/cr_test", kind: "page", title: "CR de test", summary: "Compte rendu de test", ops: [{ op: "add_section", section: "Décisions", text: "Lancer la pré-étude." }] }
+      await content(base())
+      const lea = await write("lea", input, { asIs: true })
+      expect(lea.result?.text).toBe(
+        "Draft of ventes/cr_test created (revision 0): added « Décisions » (34 characters).\nPublished ventes/cr_test revision 1 (1 section, 2 blocks). Next write: base_revision 1.",
+      )
+      expect(lea.result?.data).toMatchObject({ path: "ventes/cr_test", revision: 1, status: "published", has_draft: false, draft_stamp: null })
+      expect(await nodeRow("ventes/cr_test")).toMatchObject({ status: "published", revision: 1 })
+      expect(await draftsOfO()).toEqual([])
+      expect((await blockRows("ventes/cr_test", "published")).map((row) => row.text)).toEqual(["Décisions", "Lancer la pré-étude."])
     })
 
     it("should refuse a creation without header, under a missing, reserved or occupied path, and a table or a header (AC20)", async () => {
@@ -263,13 +281,16 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       expect([creation.error, writes(creation.calls)]).toMatchObject([{ code: "invalid_arguments", message: expect.stringMatching(/^Op 1 \(add_section « A »\): line 1 /) }, []])
     })
 
-    it("should refuse a write with nothing to write (AC26)", async () => {
+    it("should refuse a write with nothing to write (AC26 ; E11-S02, AC-b3)", async () => {
       await content(devis())
       for (const input of [{ path: "ventes/devis", base_revision: 1 }, { path: "ventes/devis", base_revision: 1, ops: [] }]) {
         expect((await write("lea", input)).error).toMatchObject({
           code: "invalid_arguments",
-          message: "Nothing to write: give ops, title, summary or header, or publish: true.",
+          message: "Nothing to write: give ops, title, summary or header.",
         })
+        // Sans `publish: false`, `write` publie le brouillon en attente : ici, aucun.
+        const published = await write("lea", input, { asIs: true })
+        expect([published.error, writes(published.calls)]).toMatchObject([{ code: "invalid_arguments", message: "Nothing to publish: ventes/devis has no pending draft." }, []])
       }
     })
 
@@ -277,7 +298,7 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       await content(devis())
       const lea = await write("lea", { path: "ventes/devis", base_revision: 1, title: "Relance d'un devis", summary: "Relancer un devis." })
       expect(lea.result?.text).toBe(
-        "Draft of ventes/devis saved on revision 1: title « Relance d'un devis », summary « Relancer un devis. ».\nPublishing ventes/devis is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+        'Draft of ventes/devis saved on revision 1: title « Relance d\'un devis », summary « Relancer un devis. ».\nPublish it with acme_write {"path": "ventes/devis", "base_revision": 1, "publish": true}.',
       )
       expect(ref.readable(await draftsOfO())).toMatchObject([{ node_id: "node:ventes/devis", title: "Relance d'un devis", summary: "Relancer un devis.", updated_by: "user-lea" }])
       expect(await nodeRow("ventes/devis")).toMatchObject({ title: "Devis" })
@@ -290,7 +311,7 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
         [{ path: "ventes/devis", kind: "table" }, "invalid_arguments", "A page cannot become a table: create the table at a new path."],
         [{ path: "ventes/suivi", ops: [{ op: "append", section: "x", text: "y" }] }, "invalid_arguments", "ventes/suivi is a table: it has no sections. Write its rows with acme_call table.write."],
         // Un en-tête vide ne change rien au tableau (E07-S04) : rien à écrire.
-        [{ path: "ventes/suivi", header: {} }, "invalid_arguments", "Nothing to write: give ops, title, summary or header, or publish: true."],
+        [{ path: "ventes/suivi", header: {} }, "invalid_arguments", "Nothing to write: give ops, title, summary or header."],
         [{ path: "ventes/devis", header: {} }, "invalid_arguments", "header applies only to tables; ventes/devis is a page."],
         [{ path: "ventes/proc", header: {} }, "invalid_arguments", "header applies only to tables; ventes/proc is a procedure."],
         [{ path: "ventes/contexte", header: {} }, "invalid_arguments", "header applies only to tables; ventes/contexte is a context page."],

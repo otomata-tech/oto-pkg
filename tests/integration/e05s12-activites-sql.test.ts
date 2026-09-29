@@ -72,6 +72,30 @@ describe.skipIf(!sqlConfigured)(portable("listActivities on a real base: scope, 
       { at: now - 30 * MINUTE, user: paul.id, team: support, method: "api", tool: "POST nodes", target: "support/faq", args: { path: "support/faq", base_revision: 0 } },
       { at: now - 20 * MINUTE, user: claire.id, team: ventes, method: "api", tool: "POST tables/review", target: "ventes/salons", args: { table: "ventes/salons", key: "Salon A" } },
       { at: now - 10 * MINUTE, user: lea.id, team: ventes, method: "api", tool: "POST nodes/position", target: "ventes/tarifs", args: { path: "ventes/tarifs", after: null } },
+      // E11-S02 (AC-h3) : les gestes d'un assistant par `call`. Un récapitulatif (sans `confirm`) et un abandon de
+      // brouillon ne comptent pas ; deux suppressions confirmées de lignes se regroupent, leurs lignes à revoir lues
+      // de `args._outcome` (un `_outcome` qui n'est pas un entier est ignoré) ; une mise à la corbeille confirmée.
+      { at: now - 8 * MINUTE, user: lea.id, team: ventes, method: "tools/call", tool: `${o.org.prefix}_call`, target: "table.delete_rows", args: { ctx: ran, function: "table.delete_rows", arguments: { table: "ventes/salons", keys: ["Salon A"] } } },
+      {
+        at: now - 7 * MINUTE,
+        user: lea.id,
+        team: ventes,
+        method: "tools/call",
+        tool: `${o.org.prefix}_call`,
+        target: "table.delete_rows",
+        args: { ctx: ran, function: "table.delete_rows", arguments: { table: "ventes/salons", keys: ["Salon A", "Salon B"] }, confirm: true, _outcome: { deleted: 2, review: 1 } },
+      },
+      {
+        at: now - 6 * MINUTE,
+        user: lea.id,
+        team: ventes,
+        method: "tools/call",
+        tool: `${o.org.prefix}_call`,
+        target: "table.delete_rows",
+        args: { ctx: ran, function: "table.delete_rows", arguments: { table: "ventes/salons", keys: ["Salon C"] }, confirm: true, _outcome: { deleted: 1, review: "1" } },
+      },
+      { at: now - 5 * MINUTE, user: lea.id, team: ventes, method: "tools/call", tool: `${o.org.prefix}_call`, target: "node.discard_draft", args: { ctx: ran, function: "node.discard_draft", arguments: { path: "ventes/salons" }, confirm: true } },
+      { at: now - 4 * MINUTE, user: lea.id, team: ventes, method: "tools/call", tool: `${o.org.prefix}_call`, target: "node.trash", args: { ctx: ran, function: "node.trash", arguments: { path: "ventes/tarifs" }, confirm: true } },
     ]
     for (const line of lines) {
       await fx.admin`
@@ -97,6 +121,8 @@ describe.skipIf(!sqlConfigured)(portable("listActivities on a real base: scope, 
     const page = await activitiesOf("lea")
 
     expect(shown(page)).toEqual([
+      ["trashed", "ventes/tarifs", "Tarifs 2026", "page", 1, "Léa Roux"],
+      ["deleted_rows", "ventes/salons", "Salons", "table", 2, "Léa Roux"],
       ["trashed", "ventes/cachee", null, "page", 1, "Léa Roux"],
       ["trashed", "ventes/ancienne", null, "page", 1, "Léa Roux"],
       ["created", "private/lea/notes", "Notes", "page", 1, "Léa Roux"],
@@ -106,11 +132,14 @@ describe.skipIf(!sqlConfigured)(portable("listActivities on a real base: scope, 
       ["edited", "ventes/tarifs", "Tarifs 2026", "page", 2, "Léa Roux"],
     ])
     expect(page.activities.find((activity) => activity.verb === "ran")?.ctx).toBe(ran)
+    expect(page.activities.find((activity) => activity.verb === "deleted_rows")?.inReview).toBe(1)
     expect(page.truncated).toBe(false)
   })
 
   it("should give a team lead her gestures and those of the team she leads, never a gesture of another team nor of a personal space", async () => {
     expect(shown(await activitiesOf("claire"))).toEqual([
+      ["trashed", "ventes/tarifs", "Tarifs 2026", "page", 1, "Léa Roux"],
+      ["deleted_rows", "ventes/salons", "Salons", "table", 2, "Léa Roux"],
       ["reviewed", "ventes/salons", "Salons", "table", 1, "Claire Morel"],
       ["trashed", "ventes/cachee", null, null, 1, "Léa Roux"],
       ["trashed", "ventes/ancienne", null, "page", 1, "Léa Roux"],
@@ -122,6 +151,8 @@ describe.skipIf(!sqlConfigured)(portable("listActivities on a real base: scope, 
 
   it("should give an administrator the whole organisation, another person's personal space cut to private/<handle>, without title nor nature", async () => {
     expect(shown(await activitiesOf("ada"))).toEqual([
+      ["trashed", "ventes/tarifs", "Tarifs 2026", "page", 1, "Léa Roux"],
+      ["deleted_rows", "ventes/salons", "Salons", "table", 2, "Léa Roux"],
       ["reviewed", "ventes/salons", "Salons", "table", 1, "Claire Morel"],
       ["edited", "support/faq", "FAQ", "page", 1, "Paul Girard"],
       ["trashed", "ventes/cachee", null, "page", 1, "Léa Roux"],

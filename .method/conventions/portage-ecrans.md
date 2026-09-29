@@ -183,6 +183,11 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
 
 ## 6. Une règle du service, une seule source
 
+- **Une rangée locale jamais envoyée (sans `id`) n'est pas du contenu** : ce que l'éditeur rend au reste
+  de l'écran pour décrire le brouillon (publication, confirmation d'un Contexte vide) exclut le Texte
+  local d'une page vide, sinon une page vide passe pour remplie. **Vérifiable :** le test de la
+  confirmation d'un Contexte vide passe sur une page qui porte ce Texte local.
+
 - **Ce que le service et l'écran appliquent tous deux vit dans `schemas/`** : la validation d'une valeur
   (une date), une chaîne que le service sert et que l'écran reconnaît (`FORMER_MEMBER`), une borne
   qu'une phrase de l'écran dit (`FILTERED_ROWS_MAX`, `REVIEW_REASON_MAX`). `ui/` n'importe pas `server/`

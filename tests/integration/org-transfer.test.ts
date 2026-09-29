@@ -7,7 +7,7 @@
 // `test-<hex>@example.invalid`, supprimées en `afterAll`, même en échec. La connexion d'administration
 // sert au test et aux scripts, jamais au paquet. Marqué Supabase : le script Démo crée ses comptes par
 // l'API d'administration de Supabase Auth (AC-f4 d'E01-S10) ; depuis E01-S10 f2, plus rien ne passe par
-// PostgREST.
+// PostgREST. Le `describe` AC14, la carte face aux tables lues dans le catalogue, est portable (E11-S14).
 import { execFile } from "child_process"
 import fs from "fs"
 import os from "os"
@@ -19,7 +19,7 @@ import { NEVER_EXPORTED, orgRowsSql, TABLES } from "../../scripts/lib/org-transf
 import { pendingMigrations, pendingReason, privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 import { platformTables } from "../helpers/platform-tables"
 import { createFixtures, ctxCode, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestUser } from "../helpers/plateforme"
-import { adminConnectionSecrets, asCaller, SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { adminConnectionSecrets, asCaller, portable, SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
 // 20260928120000 n'est pas appliquée au projet (`database-patterns.md § Règles`).
@@ -514,8 +514,8 @@ describe.skipIf(!configured)(
 )
 
 // Délai de la suite : la lecture de la spécification OpenAPI a pris 38 s sous charge (HN-E09S04-22).
-describe.skipIf(!supabaseConfigured)(
-  supabaseConfigured ? "org transfer map against the project (AC14)" : `org transfer map against the project (AC14) (${SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable("org transfer map against the database (AC14)"),
   { timeout: TIMEOUT },
   () => {
     it("should match the platform tables of the project, the tables never exported aside, column by column, the null policy on nullable columns only", async (ctx) => {

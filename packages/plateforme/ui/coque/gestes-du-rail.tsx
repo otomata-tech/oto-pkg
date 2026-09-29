@@ -17,7 +17,7 @@ import { Trash } from "@phosphor-icons/react/dist/csr/Trash"
 import { nodePathBodySchema, type NodeKind } from "../../schemas"
 import { appelerPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
-import { telecharger, type FichierRendu } from "../api/telecharger"
+import { telechargerLExport } from "../api/telecharger"
 import { RACINE } from "../arbre/depuis-l-arbre"
 import { ConfirmDialog } from "../ds/react/confirm-dialog"
 import { AnimatedIcon } from "../ds/react/icon"
@@ -128,13 +128,10 @@ export function useGestesDuRail({ prefixe, sousContenus, precedente }: Lecture):
 
   async function exporter(cible: Cible) {
     commencer(EXPORTS.enCours)
-    const tableau = cible.genre === "table"
-    const ressource = `${tableau ? "tables" : "nodes"}/export?path=${encodeURIComponent(cible.chemin)}`
-    const reponse = await appelerPlateforme<FichierRendu>({ methode: "GET", ressource })
+    const issue = await telechargerLExport(cible.chemin, cible.genre === "table" ? "csv" : "md")
     setEnCours(null)
-    if (reponse.erreur) return setRefus(messageDErreur(reponse.erreur, EXPORTS.refus))
-    telecharger(reponse.data, tableau ? "text/csv;charset=utf-8" : "text/markdown;charset=utf-8")
-    setAnnonce(EXPORTS.pret(reponse.data.filename))
+    if (issue.erreur) return setRefus(messageDErreur(issue.erreur, EXPORTS.refus))
+    setAnnonce(EXPORTS.pret(issue.fichier.filename))
   }
 
   const exportPour = (cible: Cible): MenuItem[] => [

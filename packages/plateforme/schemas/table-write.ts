@@ -177,6 +177,18 @@ export const tableReleaseArgsSchema = z.strictObject({
 
 export type TableReleaseArgs = z.infer<typeof tableReleaseArgsSchema>
 
+/** `table.delete_rows` (E11-S02, AC-f1) : les lignes désignées par leur clé, 50 au plus, comme `table.write`. */
+export const tableDeleteRowsArgsSchema = z.strictObject({
+  table: tablePathArgSchema,
+  keys: z
+    .array(rowKeyArgSchema)
+    .min(1)
+    .max(MAX_WRITE_ROWS, { error: `${MAX_WRITE_ROWS} keys at most per call; send the others in another call` })
+    .describe('The keys of the rows to delete, 1 to 50, e.g. ["Atelier 2", "Atelier 10"].'),
+})
+
+export type TableDeleteRowsArgs = z.infer<typeof tableDeleteRowsArgsSchema>
+
 // ------------------------------------------------------------------------ Import d'un CSV (E10-S01)
 // `table.import` (AC-c1) et le corps de `POST /api/plateforme/tables/import` (AC-b3 à AC-b5) : deux portes
 // d'un même service (`importRows`, `mcp-patterns.md § 1`). La lecture et le contrôle d'un CSV sont des

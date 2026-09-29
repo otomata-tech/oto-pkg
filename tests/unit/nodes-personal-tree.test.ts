@@ -59,8 +59,10 @@ describe.skipIf(!sqlConfigured)(portable("personal space, screens and tree on a 
   const who = (person: Person) => ref.identityOf(person, { org: identityOf(person).org })
   const content = (tables: Tables) => replaceContent(seed, ref, tables)
 
+  /** `write` publiant par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde ici le brouillon. */
   async function write(person: Person, input: Record<string, unknown>) {
-    return writeNode(await ref.db(person), who(person), input, { kind: "agent", ctx: null }).then(
+    const body = "publish" in input ? input : { ...input, publish: false }
+    return writeNode(await ref.db(person), who(person), body, { kind: "agent", ctx: null }).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),
     )

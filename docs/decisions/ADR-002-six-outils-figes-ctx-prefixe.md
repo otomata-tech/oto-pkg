@@ -27,7 +27,9 @@ hosts sans confusion.
    devient une procédure ou une fonction, donc du contenu. En 1.1.0, sans client (fiche D131, stade
    R&D), les descriptions de `write` et des fonctions de tableau sont réécrites en place et non
    seulement allongées : les hosts rafraîchissent la liste d'outils à la mise à jour (amendement
-   E11-S01, E11-S03).
+   E11-S01, E11-S03). Exception assumée, sans client (fiche D135) : le défaut de `publish` de
+   `write` passe de `false` à `true` ; `publish: false` garde le sens d'avant ; la description de
+   `write` change en conséquence (amendement E11-S02).
 2. **Le champ `ctx` est requis partout sauf sur `context`.** C'est une ligne en base créée par
    `context` (personne, organisation, `rules_version`, Contextes servis, host, heure) ; il regroupe
    les appels d'une conversation dans le journal. Le code `ctx` garde (`ctx.contexts`), pour chaque

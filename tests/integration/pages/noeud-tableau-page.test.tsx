@@ -8,6 +8,7 @@ import { act, cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { NodeView, TableHeader } from "@otomata_tech/oto_platform/schemas"
 import {
+  lastConnections,
   listMembers,
   listNodeRules,
   listTeams,
@@ -48,6 +49,7 @@ vi.mock("@otomata_tech/oto_platform/server", async (importOriginal) => ({
   tableReviewQueue: vi.fn(),
   resolveReferencesForScreen: vi.fn(),
   nodeLinks: vi.fn(),
+  lastConnections: vi.fn(),
 }))
 
 const TABLEAU = "ventes/suivi_prospects"
@@ -93,7 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: IDENTITE, session: SESSION } })
   vi.mocked(loadNode).mockResolvedValue(tableau())
-  // Les liens du nœud (« Contenus liés », E05-S10 AC-b6), lus par `nodeLinks` : aucun.
+  // Les liens du nœud (« Cité dans », « Cite » ; E05-S10 AC-b6, E11-S05 AC-e3), lus par `nodeLinks` : aucun.
   vi.mocked(nodeLinks).mockResolvedValue({ links_out: [], links_out_total: 0, links_in: [], links_in_total: 0 })
   vi.mocked(visibleTree).mockResolvedValue({ tree: [], truncated: false })
   vi.mocked(listTeams).mockResolvedValue([])
@@ -159,6 +161,44 @@ describe("/n/[...chemin] page of a table (AC1, AC4 à AC8, AC10)", () => {
     await montrer(await page(["ventes", "suivi_prospects"]))
     expect(await screen.findByRole("table", { name: "Suivi des prospects — 10 lignes" })).toBeInTheDocument()
     expect(tableReviewQueue).not.toHaveBeenCalled()
+  })
+})
+
+// E11-S05 (AC-h1, HN-E11S05-17) : qui écrira les lignes d'un tableau vide, lu seulement quand il n'en a aucune.
+describe("/n/[...chemin] page of an empty table (E11-S05, AC-h1)", () => {
+  const vide = { rows: [], total: 0, count: 0 }
+  const connexion = (family: string) => ({ family, signature: `${family}@1`, at: "2026-09-29T08:00:00.000Z" })
+
+  it("should read the connections of the person only without a row, and name its most recent assistant", async () => {
+    await montrer(await page(["ventes", "suivi_prospects"]))
+    expect(lastConnections).not.toHaveBeenCalled()
+    cleanup()
+
+    vi.mocked(tableGridRows).mockResolvedValue(vide)
+    vi.mocked(lastConnections).mockResolvedValue([connexion("ChatGPT"), connexion("claude.ai")])
+    await montrer(await page(["ventes", "suivi_prospects"]))
+    expect(lastConnections).toHaveBeenCalledWith(SESSION.db, IDENTITE)
+    expect(await screen.findByText("C'est ChatGPT qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
+    cleanup()
+
+    vi.mocked(lastConnections).mockResolvedValue([connexion("Claude Code")])
+    await montrer(await page(["ventes", "suivi_prospects"]))
+    expect(await screen.findByText("C'est Claude qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
+  })
+
+  it("should say « votre assistant » without a connection or when they cannot be read, never with an alert", async () => {
+    vi.mocked(tableGridRows).mockResolvedValue(vide)
+    vi.mocked(tableReviewQueue).mockResolvedValue({ count: 0, rows: [] })
+    vi.mocked(lastConnections).mockResolvedValue([])
+    await montrer(await page(["ventes", "suivi_prospects"]))
+    expect(await screen.findByText("C'est votre assistant qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
+    cleanup()
+
+    vi.mocked(lastConnections).mockRejectedValue(new Error("panne"))
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    await montrer(await page(["ventes", "suivi_prospects"]))
+    expect(await screen.findByText("C'est votre assistant qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
+    expect(screen.queryByRole("alert")).toBeNull()
   })
 })
 

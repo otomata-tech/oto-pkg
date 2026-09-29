@@ -436,6 +436,21 @@ son « + » insère après lui (AC-a1).
   sur le Texte seul d'une page vide, et vaut exactement
   `Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)`, sans ajout
   sur `/`, même après E10-S06. Option écartée : ajouter « , « / » pour choisir un bloc ».
+- **HN-E11S05-23** (implémentation) : la borne publique `PUBLIC_TABLE_ROWS_MAX = 500` vit dans
+  `schemas/node-gestures.ts`, lue par la page publique et son libellé (source : AC-d1, « la borne lue d'une
+  constante », portage § 6).
+- **HN-E11S05-24** (implémentation) : `PublicNodeView.language` est typé `Language`, non `string` (source :
+  `organisationLanguage`, AC-d3).
+- **HN-E11S05-25** (implémentation) : un refus du téléchargement se dit par `messageDErreur(erreur,
+  EXPORTS.refus)` (source : AC-c3).
+- **HN-E11S05-26** (implémentation) : l'invite ne se pose que sur le Texte seul, local et vide d'une page vide
+  (source : HN-E11S05-22).
+- **HN-E11S05-27** (implémentation) : Entrée dans le titre mène au premier bloc ; à l'ouverture, le focus va au
+  Texte d'une page vide seulement si le titre n'est pas « Sans titre » (source : AC-g2).
+- **HN-E11S05-28** (implémentation) : l'aperçu d'un Contexte se place entre « À quoi sert cette page » et les
+  encarts (source : AC-e2, E11-S10).
+- **HN-E11S05-29** (implémentation) : la ligne d'encarts d'un tableau est masquée vide (`empty:hidden`)
+  (source : HN-E11S05-14, la ligne part sans rien).
 
 ## Actions JB
 
@@ -481,8 +496,24 @@ son « + » insère après lui (AC-a1).
 
 ### Écarts avec l'architecture
 
+- `ui/noeud/editeur/modele.ts` ne gagne qu'une ligne : le modèle d'une page vide vit dans `page-vide.ts`
+  (borne `max-lines`).
+- La composition du `.md` (« Refacto ») était déjà faite par E10-S01 (`pageMarkdown`) : rien à déplacer.
+- AC-d3 dit « dans le navigateur » : le fichier public est composé au rendu serveur, à partir de la même vue,
+  puis passé à l'îlot ; aucune requête au clic (HN-E11S05-10).
+- `language` ajouté à la vue publique (`readPublicNode`, `GET public/<jeton>`) : une donnée de marque, au
+  regard d'ADR-013 § 3.
+- Les specs e2e mesurent l'opacité du chevron par `toHaveCSS`, comme la story l'exige.
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `BoutonTelecharger` | `packages/plateforme/ui/components/bouton-telecharger.tsx` | Client ; `format`, `libelle`, puis `chemin` (fichier du service) ou `fichier` (déjà composé, page publique) ; refus en `role="alert"` |
+| `modeleDeLaPage`, `estLaPageVide` | `packages/plateforme/ui/noeud/editeur/page-vide.ts` | Une page sans bloc s'ouvre sur un Texte local jamais vide, invite `EDITEUR.invite` ; retirer le dernier bloc le remet |
 
 ### Notes
+
+- Approuvée en revue, fusionnée sur `main` sans commit (commit commun à venir). Hypothèses d'implémentation
+  HN-E11S05-23 à 29 reportées avec les autres dans `docs/decisions/hypotheses.md`.
+- Lecture des cellules (`cellValue`, `keyValue`, `rowCells`) commune à l'export connecté et public, dans
+  `schemas/csv.ts` ; `rowCells` et `keyValue` exportés par `./schemas`.

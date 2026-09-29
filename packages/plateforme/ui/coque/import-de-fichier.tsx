@@ -3,8 +3,8 @@
 // « Importer un fichier… » (E10-S01, AC-a3, AC-b1 à AC-b5) : un dialogue (`Dialog` du design system) dont la zone de
 // dépôt est doublée d'un `<input type="file">` accessible au clavier, les limites dites avant la sélection
 // (`uploads-patterns.md § Côté composant`). Le fichier est lu par le navigateur, jamais téléversé (HN-E10S01-1) :
-// un `.md` devient une page en brouillon (titre, résumé, morceaux de `readPageMarkdown`) ; un `.csv`, un tableau
-// nouveau ou les lignes d'un tableau existant (`import-csv.tsx`). Ouvert par le « + » du rail, par un fichier lâché
+// un `.md` devient une page publiée (titre, résumé, morceaux de `readPageMarkdown` ; écrire publie, E11-S02) ;
+// un `.csv`, un tableau nouveau ou les lignes d'un tableau existant (`import-csv.tsx`). Ouvert par le « + » du rail, par un fichier lâché
 // sur une ligne du rail (`DeposerSurLeRail`), ou sur un tableau (`DepotSurLeTableau`). Sans lui, un fichier ne se
 // range qu'à travers un assistant.
 import { createContext, useEffect, useId, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react"
@@ -99,7 +99,7 @@ function ZoneDeDepot({ limites, choisir }: { limites: string; choisir: (fichier:
   )
 }
 
-/** Un `.md` en page (AC-a3) : le titre et le résumé tirés du fichier, puis la création en brouillon, en une requête. */
+/** Un `.md` en page (AC-a3) : le titre et le résumé tirés du fichier, puis la création, publiée, en une requête. */
 type PanneauMarkdownProps = {
   lu: Extract<Lu, { genre: "md" }>
   adresses: (segment: string) => string[]

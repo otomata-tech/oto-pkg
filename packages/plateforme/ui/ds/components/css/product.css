@@ -641,6 +641,9 @@
 .oto-node-facts > div { display: contents; }
 .oto-node-facts dd { margin: 0; font-weight: var(--fw-semibold); }
 
+/* E11-S05 (lot c) — « Télécharger » à gauche de « Partager » : les commandes de l'accès vont à la ligne plutôt que de déborder à 375 px, et le refus d'un téléchargement passe dessous, sur toute la largeur. */
+.oto-screen-header-access { flex-wrap: wrap; justify-content: flex-end; }
+
 /* Le niveau d'une ligne du partage : le `Select` à sa largeur, poussé en fin de ligne comme `.oto-pop-meta` ; son cadre arrondi est celui de toute liste de choix (E05-S11, retour 8). */
 .oto-share-level { flex: none; inline-size: auto; margin-inline-start: auto; }
 

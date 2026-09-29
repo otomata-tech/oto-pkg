@@ -15,8 +15,6 @@ import { bloc, PAGE, simulerLAPI } from "../../helpers/noeud"
 // prendre le focus (AC-28). Sous la file d'écriture, `fetch` simulé pour `POST /api/plateforme/nodes`. La position
 // de l'indication (rien ne bouge) se mesure dans un navigateur : `tests/e2e/e05s11-page.spec.ts`.
 
-// Le lien que l'écran serveur passe à l'éditeur, déjà rendu.
-const VERSION_PUBLIEE = "/n/ventes/modele_relance?version=publiee"
 const rafraichir = vi.fn()
 let api: ReturnType<typeof simulerLAPI>
 
@@ -37,16 +35,7 @@ function monter({ blocs = PAGE, cibles, liens }: Montage = {}) {
         <h1>
           <TitreModifiable titre="Modèle de relance" revisionServie={4} tamponServi={null} />
         </h1>
-        <EditeurDeBlocs
-          niveau={3}
-          blocs={blocs}
-          revisionServie={4}
-          phraseDePublication="La publication revient aux administrateurs de Démo."
-          prefixeDesPages="/n/"
-          lienVersionPubliee={<a href={VERSION_PUBLIEE}>Voir la version publiée</a>}
-          cibles={cibles}
-          liens={liens}
-        />
+        <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" cibles={cibles} liens={liens} />
       </>,
     ),
   )

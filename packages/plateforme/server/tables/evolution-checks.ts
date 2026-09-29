@@ -109,8 +109,19 @@ export function readsRows(diff: HeaderDiff): boolean {
   return diff.added.length > 0 || diff.removed.length > 0 || diff.key !== null || narrowed || workingMoved(diff) !== null
 }
 
+/**
+ * La fin de tout refus d'un en-tête à la publication (E11-S02, AC-d5) : le brouillon gardé, et comment en
+ * sortir ; sans elle, chaque écriture d'en-tête suivante repartait du brouillon refusé (FB-0007).
+ */
+export function keptDraft(prefix: string, path: string): string {
+  return `The draft is kept; nothing was published. To go back to the published header, discard the draft: ${prefix}_call node.discard_draft {"path": "${path}"}.`
+}
+
+/** La raison d'un refus d'en-tête, lue par l'écran pour sa phrase d'aide (E11-S02, AC-d5, AC-g1 ; HN-E11S02-15). */
+export const HEADER_REFUSED = { reason: "header_refused" } as const
+
 function refused(check: Check, reasons: string): string {
-  return `Publication of ${check.path} refused: ${reasons} The draft is kept; nothing was published.`
+  return `Publication of ${check.path} refused: ${reasons} ${keptDraft(check.prefix, check.path)}`
 }
 
 /**
@@ -146,7 +157,7 @@ function checkRemovals(check: Check): void {
   if (erased > PURGE_MAX_ROWS) {
     const names = boundedList(removed.map((removal) => `« ${removal.column} »`))
     const reason = `removing ${names} would erase values on ${rowsText(erased)}; ${formatCount(PURGE_MAX_ROWS)} at most per publication: clear them in batches with ${prefix}_call table.write, then remove the ${plural(removed.length, "column")}.`
-    throw new PlatformError("too_large", refused(check, reason))
+    throw new PlatformError("too_large", refused(check, reason), HEADER_REFUSED)
   }
   const held = removed.filter((removal) => removal.rows.length > 0)
   if (held.length === 0 || check.confirmRemove) return
@@ -157,7 +168,8 @@ function checkRemovals(check: Check): void {
   )
   throw new PlatformError(
     "needs_confirmation",
-    `Publication of ${path} needs confirmation: ${clauses}. Columns cannot be renamed: to rename one, add the new column, copy the values with ${prefix}_call table.write, then remove the old one. The draft is kept; nothing was published. If the user agrees to erase them, call ${prefix}_write {"path": "${path}", "base_revision": ${check.revision}, "header": {"confirm_remove": true}, "publish": true}.`,
+    `Publication of ${path} needs confirmation: ${clauses}. Columns cannot be renamed: to rename one, add the new column, copy the values with ${prefix}_call table.write, then remove the old one. ${keptDraft(prefix, path)} If the user agrees to erase them, call ${prefix}_write {"path": "${path}", "base_revision": ${check.revision}, "header": {"confirm_remove": true}, "publish": true}.`,
+    HEADER_REFUSED,
   )
 }
 
@@ -242,7 +254,7 @@ function warningsOf(check: Check): Warned[] {
  */
 export function checkEvolution(check: Check): { warnings: Warned[]; stale: string[] } {
   const reasons = conflictReasons(check)
-  if (reasons.length > 0) throw new PlatformError("conflict", refused(check, boundedList(reasons, " ")))
+  if (reasons.length > 0) throw new PlatformError("conflict", refused(check, boundedList(reasons, " ")), HEADER_REFUSED)
   checkRemovals(check)
   const stale = check.diff.added.filter((column) => check.rows.some((row) => carries(row, column.name))).map((column) => column.name)
   return { warnings: warningsOf(check), stale }

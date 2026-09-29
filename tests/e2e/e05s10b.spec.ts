@@ -142,16 +142,16 @@ test.describe("E05-S10 partie b : la coque et les actions d'en-tête", () => {
         await page.keyboard.press("Escape")
         await expect(panneauPartager).toHaveCount(0)
 
-        // « Contenus liés » (AC-b6) : replié, hors de la carte des blocs, « Sous-pages » à l'ouverture (E05-S11, AC-29).
-        const bandeau = page.locator("details.oto-linked").filter({ hasText: "Contenus liés" })
-        await expect(bandeau).not.toHaveAttribute("open")
-        await expect(bandeau.locator("xpath=ancestor::*[contains(@class, 'oto-island')]")).toHaveCount(0)
-        await bandeau.locator("summary").click()
-        await expect(bandeau.getByRole("list", { name: "Sous-pages" }).getByRole("link", { name: /^Enfant d'essai/ })).toBeVisible()
-        // Les mentions lues, une rubrique vide n'est pas rendue.
-        await attendre(bandeau.getByText("Lecture des mentions…")).toHaveCount(0)
-        await expect(bandeau.getByText("Cités", { exact: true })).toHaveCount(0)
-        await capturer(page, testInfo, `contenus-lies-${nom}`)
+        // « Sous-pages » (E11-S05, AC-e1, qui remplace « Contenus liés » d'AC-b6) : replié, hors de la carte des blocs.
+        const sousPages = page.locator("details.oto-linked").filter({ has: page.locator("summary strong", { hasText: "Sous-pages" }) })
+        await expect(sousPages).not.toHaveAttribute("open")
+        await expect(sousPages.locator("xpath=ancestor::*[contains(@class, 'oto-island')]")).toHaveCount(0)
+        await sousPages.locator("summary").click()
+        await expect(sousPages.getByRole("list", { name: "Sous-pages" }).getByRole("link", { name: /^Enfant d'essai/ })).toBeVisible()
+        // Les liens lus, un encart vide n'est pas rendu.
+        await attendre(page.getByText("Lecture des liens…")).toHaveCount(0)
+        await expect(page.locator("details.oto-linked summary strong", { hasText: /^Cit/ })).toHaveCount(0)
+        await capturer(page, testInfo, `encarts-${nom}`)
         await context.close()
       })
     }

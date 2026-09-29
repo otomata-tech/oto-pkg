@@ -2,7 +2,7 @@
 // revue et des blocs `reference`, pluriels et résumé de revue. Tout autre refus de l'API prend le texte
 // de `messageDErreur` (`ui/api/messages.ts`), que complètent les phrases propres à la décision. Depuis la
 // reprise d'oto-frontend (E05-S09 partie c2), celles de sa grille : la recherche, les deux vides, l'échec.
-import { REVIEW_REASON_MAX, TABLE_VIEW_ROWS_MAX, type ScreenReferenceProblem } from "../../schemas"
+import { REVIEW_REASON_MAX, TABLE_VIEW_ROWS_MAX, type ScreenReferenceProblem, type TableLifecycle } from "../../schemas"
 import { FILTERED_ROWS_MAX, FORMER_MEMBER } from "../../schemas/tables"
 import type { MessagesDuGeste } from "../api/messages"
 import { nombreLisible } from "../format/nombres"
@@ -26,7 +26,8 @@ export const GRILLE = {
   effacerLaRecherche: "Effacer la recherche",
   retirerTout: "Retirer la recherche et les filtres",
   vide: "Ce tableau est vide",
-  videTexte: "Ses colonnes sont prêtes. Les lignes viendront d'un assistant qui écrit ici.",
+  /** Qui écrira les lignes (E11-S05, AC-h1) : « C'est Claude qui pourra créer et modifier ses lignes. » */
+  videTexte: (assistant: string) => `C'est ${assistant} qui pourra créer et modifier ses lignes.`,
   aucune: "Aucune ligne pour cette recherche",
   aucuneTexte: "D'autres lignes existent : aucune ne répond à ce que vous cherchez.",
   chargerPlus: "Charger plus",
@@ -84,7 +85,25 @@ export const REVUE = {
   copier: "Copier pour la conversation",
   copie: "Copié",
   copieImpossible: "Copie impossible : sélectionnez le texte du résumé.",
+  /**
+   * Le cycle d'une ligne, dit sous le titre de l'îlot (E11-S05, AC-a5, HN-E11S05-4) avec les états que l'en-tête
+   * déclare : l'entrée (le premier état), l'état de travail, celui de la revue, puis les deux décisions.
+   */
+  cycle: ({ states, working, review }: TableLifecycle & { review: NonNullable<TableLifecycle["review"]> }) =>
+    `Une ligne entre à « ${states[0] ?? working} », passe à « ${working} » quand un assistant la prend, puis à « ${review.state} ». ` +
+    `Vous l'approuvez (« ${review.approve} ») ou la refusez (« ${review.reject} »). Les lignes à revoir sont surlignées dans le tableau.`,
 } as const
+
+/**
+ * Le nom de l'assistant de la personne dans le vide d'un tableau (E11-S05, AC-h1 ; HN-E11S05-17, HN-E11S05-18) : la
+ * famille de sa connexion la plus récente (`lastConnections`), « Claude » pour claude.ai et Claude Code, « ChatGPT »,
+ * sinon « votre assistant » (famille inconnue, client non identifié, aucune connexion ou lecture en échec).
+ */
+export function nomDeLAssistant(famille: string | undefined): string {
+  if (famille === "claude.ai" || famille === "Claude Code") return "Claude"
+  if (famille === "ChatGPT") return "ChatGPT"
+  return "votre assistant"
+}
 
 /**
  * Les refus des lectures de l'écran d'un tableau (AC9), passés à `resultatDe` par la page : au-delà de la
@@ -159,3 +178,31 @@ export const REFERENCES = {
   vue: (titre: string) => `${titre} — vue`,
   ancienChemin: (chemin: string) => `ancien chemin : ${chemin}`,
 } as const
+
+/** Les réglages d'un tableau à l'écran (E11-S01, AC-g1 à AC-g6) : le bouton, le panneau, ses trois interrupteurs. */
+export const OPTIONS = {
+  bouton: "Réglages",
+  titre: "Réglages du tableau",
+  preuve: {
+    intitule: "Preuve exigée",
+    aide: "Chaque valeur nouvelle écrite par un assistant doit citer sa source : un commentaire ou un lien.",
+  },
+  revue: {
+    intitule: "L'assistant peut décider la revue",
+    /** Les états de la revue déclarée (`lifecycle.review`) : « à revoir », « qualifié », « écarté ». */
+    aide: (etats: { state: string; approve: string; reject: string }) =>
+      `Un assistant peut aussi passer une ligne « ${etats.state} » à « ${etats.approve} » ou « ${etats.reject} » ; sa décision est tracée comme venant d'un assistant.`,
+  },
+  ferme: {
+    intitule: "Fermé",
+    aide: "Seules les lignes existantes s'écrivent : aucune ligne nouvelle n'est créée.",
+  },
+  /** L'issue d'une bascule publiée (AC-g3) : « Preuve exigée : activée. ». */
+  annonce: (intitule: string, active: boolean) => `${intitule} : ${active ? "activée" : "désactivée"}.`,
+  enAttente: "Un changement de l'en-tête attend en brouillon. Demandez à l'assistant de le publier ou de l'abandonner, puis rechargez la page.",
+} as const
+
+/** Les refus propres aux réglages (AC-g5) ; tout autre code prend le texte de `messageDErreur`. */
+export const REFUS_DES_OPTIONS: MessagesDuGeste = {
+  stale_revision: "Le tableau a changé pendant que la page était ouverte. Rechargez la page, puis réessayez.",
+}

@@ -116,9 +116,13 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
         })
       })
       expect(await requireNodeLevel(dbOf("lea"), lea, devis(), "write")).toBe(2)
-      await expect(requireNodeLevel(dbOf("lea"), lea, devis(), "publish")).rejects.toMatchObject({
+      // Écrire publie, et le chemin suit le titre au niveau écriture (E11-S02, H63 remplacée, HN-E11S02-18) ;
+      // déplacer reste à la gestion.
+      expect(await requireNodeLevel(dbOf("lea"), lea, devis(), "publish")).toBe(2)
+      expect(await requireNodeLevel(dbOf("lea"), lea, devis(), "rename")).toBe(2)
+      await expect(requireNodeLevel(dbOf("lea"), lea, devis(), "move")).rejects.toMatchObject({
         code: "forbidden",
-        message: "Publishing ventes/devis is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
+        message: "Moving ventes/devis is reserved to team Ventes (lead: Claire Morel). Ask them to move it.",
       })
       await expect(requireNodeLevel(dbOf("lea"), lea, { id: ref.nodeId("annonces"), path: "annonces" }, "write")).rejects.toMatchObject({
         code: "forbidden",

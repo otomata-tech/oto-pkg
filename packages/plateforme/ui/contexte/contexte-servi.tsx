@@ -2,8 +2,8 @@
 // parties du texte que `context` servirait à la personne, empilées dans l'ordre servi, chacune avec son nom et son
 // ancre. Même moteur que l'encart d'un Contexte (`previewContext` sans phrase), découpé par son rapport
 // (`partiesDuContexte`). Une partie venue d'un Contexte que la personne peut écrire (niveau 2 ou 3, décidé par le
-// service à la lecture du nœud) s'y écrit en place, avec l'éditeur d'une page et sa file (publication seule au
-// niveau gestion, qui fait relire la page) ; les autres se lisent. Server Component : l'éditeur et sa file sont les
+// service à la lecture du nœud) s'y écrit en place, avec l'éditeur d'une page et sa file (publication seule dès
+// le niveau écriture depuis E11-S02, qui fait relire la page) ; les autres se lisent. Server Component : l'éditeur et sa file sont les
 // îlots client de l'écran de nœud, montés tels quels. Sans elle, personne ne lit d'un coup ce que son assistant
 // reçoit, ni n'écrit ses Contextes depuis là.
 //
@@ -24,13 +24,11 @@ import type { ReactNode } from "react"
 import type { NodeView } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
-import { LIEN } from "../components/classes"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
 import { Island, IslandBody } from "../ds/react/island"
 import { blocsAffiches, niveauDEcritureDe } from "../noeud/corps-du-noeud"
 import { EditeurDeBlocs } from "../noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../noeud/editeur/file-d-operations"
-import { ECRAN, phraseDePublication } from "../noeud/libelles"
 import type { DonneesDeLApercu } from "./apercu-du-contexte"
 import { APERCU_DU_CONTEXTE, CONTEXTE_SERVI, NOMS_DES_BLOCS, nomDuBloc, type EquipesNommees } from "./libelles"
 import { ListesServies } from "./listes-servies"
@@ -54,20 +52,18 @@ export type DonneesDuContexteServi = {
   contextes: Readonly<Record<string, Resultat<NodeView>>>
   /** Les équipes de la personne : le nom d'un Contexte d'équipe. */
   equipes: EquipesNommees
-  /** Le nom de l'organisation : à qui revient la publication d'un Contexte de l'organisation. */
-  nomOrganisation: string
 }
 
 export type ContexteServiProps = {
   donnees: DonneesDuContexteServi
   Lien: LienDeLHote
-  /** Le préfixe des pages de l'arbre (« /n/ ») : la version publiée d'un Contexte, et les liens de l'éditeur. */
+  /** Le préfixe des pages de l'arbre (« /n/ ») : les liens de l'éditeur et des listes servies. */
   prefixeDesPages: string
   /** L'adresse de la vue, pour « Réessayer ». */
   ici: string
 }
 
-type CorpsProps = Omit<ContexteServiProps, "donnees"> & Pick<DonneesDuContexteServi, "contextes" | "nomOrganisation" | "equipes"> & { partie: PartieServie }
+type CorpsProps = Omit<ContexteServiProps, "donnees"> & Pick<DonneesDuContexteServi, "contextes" | "equipes"> & { partie: PartieServie }
 
 /** La carte d'une partie lue (AC-14) : sa carte, comme celle de l'éditeur d'un Contexte, sans éditeur. */
 function Carte({ children }: { children: ReactNode }) {
@@ -84,23 +80,11 @@ function Carte({ children }: { children: ReactNode }) {
  * l'indication d'enregistrement de l'éditeur, posée en absolu en haut à droite de la carte (E05-S11, AC-1). Sous
  * l'éditeur, dans la même carte, les listes que le texte servi porte en plus de ses blocs (M71 ; E05-S13, AC-15).
  */
-function EditeurDuContexte({ vue, niveau, nomOrganisation, prefixeDesPages, Lien, children }: { vue: NodeView; niveau: 2 | 3; children: ReactNode } & Pick<CorpsProps, "nomOrganisation" | "prefixeDesPages" | "Lien">) {
+function EditeurDuContexte({ vue, prefixeDesPages, children }: { vue: NodeView; children: ReactNode } & Pick<CorpsProps, "prefixeDesPages">) {
   return (
     <FileDOperations key={vue.id} chemin={vue.path} revisionPubliee={vue.revision} tampon={vue.draft?.draftStamp ?? null}>
       <Island as="div">
-        <EditeurDeBlocs
-          niveau={niveau}
-          blocs={blocsAffiches(vue, false)}
-          revisionServie={vue.revision}
-          phraseDePublication={phraseDePublication(vue.owner, nomOrganisation)}
-          prefixeDesPages={prefixeDesPages}
-          lienVersionPubliee={
-            <Lien href={`${prefixeDesPages}${vue.path}?version=publiee`} className={LIEN}>
-              {ECRAN.voirLaVersionPubliee}
-            </Lien>
-          }
-          genre="context"
-        />
+        <EditeurDeBlocs blocs={blocsAffiches(vue, false)} revisionServie={vue.revision} prefixeDesPages={prefixeDesPages} genre="context" />
         {children && <IslandBody>{children}</IslandBody>}
       </Island>
     </FileDOperations>
@@ -112,7 +96,7 @@ function EditeurDuContexte({ vue, niveau, nomOrganisation, prefixeDesPages, Lien
  * la personne peut l'écrire, servi ou non, ses listes servies dans sa carte ; sinon la suite servie dans une carte
  * (corps tel que servi, listes et fin en français), ou, rien n'étant servi après la tête, la phrase qui le dit (AC-f2).
  */
-function CorpsDuContexte({ partie, contextes, nomOrganisation, prefixeDesPages, ici, Lien }: CorpsProps) {
+function CorpsDuContexte({ partie, contextes, prefixeDesPages, ici, Lien }: CorpsProps) {
   const chemin = cheminDuContexte(partie)
   const lu = chemin === null ? undefined : contextes[chemin]
   const vue = lu?.data ?? null
@@ -123,7 +107,7 @@ function CorpsDuContexte({ partie, contextes, nomOrganisation, prefixeDesPages, 
   return (
     <>
       {vue && niveau !== null ? (
-        <EditeurDuContexte vue={vue} niveau={niveau} nomOrganisation={nomOrganisation} prefixeDesPages={prefixeDesPages} Lien={Lien}>
+        <EditeurDuContexte vue={vue} prefixeDesPages={prefixeDesPages}>
           {listes.length > 0 && <ListesServies morceaux={listes} {...navigation} />}
         </EditeurDuContexte>
       ) : partie.suite !== "" ? (
@@ -215,11 +199,11 @@ function Parties({ apercu, ...corps }: PartiesProps) {
 const HAUT_DE_LA_VUE = "haut-de-la-vue"
 
 export function ContexteServi({ donnees, ...props }: ContexteServiProps) {
-  const { apercu, contextes, equipes, nomOrganisation } = donnees
+  const { apercu, contextes, equipes } = donnees
   if (apercu.error !== undefined) return <ErreurDeLecture titre={APERCU_DU_CONTEXTE.echec} message={apercu.error} href={props.ici} Lien={props.Lien} />
   return (
     <div id={HAUT_DE_LA_VUE} className="flex flex-col gap-5">
-      <Parties apercu={apercu.data} equipes={equipes} contextes={contextes} nomOrganisation={nomOrganisation} {...props} />
+      <Parties apercu={apercu.data} equipes={equipes} contextes={contextes} {...props} />
       <VersLaPartie haut={HAUT_DE_LA_VUE} />
     </div>
   )

@@ -845,8 +845,33 @@ l. 195) ne lit aucun niveau.
 
 ### Écarts avec l'architecture
 
+- Invariants amendés par le pilote, textes de la story : ADR-011 § 3 (écrire publie ; `discard_draft`, troisième
+  fonction atomique du brouillon), ADR-002 § 1 (défaut de `publish`, fiche D135), H63 ; N28 remplacée.
+- `table.import` avec `create` n'exige plus que l'écriture sur le parent, comme `write` : fiche D150, qui amende
+  D120 (contradiction relevée au § Effet produit) ; refus « Writing under <parent> is reserved to <who>. Ask
+  them for access. ».
+- `heldByOther` et `claimedBySentence` sortis dans `tables/row-store.ts`, partagés par `table.write` et
+  `table.delete_rows` ; `tables/import.ts` garde une troisième copie du prédicat (M90).
+- Code mort repéré, non touché (M91) : commentaire « jamais publié » d'`en-tete-modifiable.tsx`, `brouillon`
+  et `ecrit` de l'instantané de `FileDOperations`, `EN_TETE.enregistre` et `EN_TETE.aRenvoyer`.
+
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| `discardDraft`, `nodeDiscardDraft` | `packages/plateforme/server/nodes/discard.ts` | `node.discard_draft`, sensible, connecteur natif `node` ; tampon lu par le service |
+| `nodeTrash`, `trashPlan` (interne) | `packages/plateforme/server/nodes/trash.ts` | `node.trash` ; `trashPlan` décide sans écrire, `trashNode` l'appelle puis écrit |
+| `tableDeleteRows` | `packages/plateforme/server/tables/delete-rows.ts` | `table.delete_rows`, suppression définitive par clé, `outcome: { deleted, review }` |
+| `heldByOther`, `claimedBySentence` | `packages/plateforme/server/tables/row-store.ts` | Bail actif d'autrui et sa phrase, partagés par `table.write` et `table.delete_rows` |
+| `keptDraft`, `HEADER_REFUSED` | `packages/plateforme/server/tables/evolution-checks.ts` | Fin commune des refus de publication d'un en-tête, raison lue par l'écran |
+| `nodePathArgsSchema` ; `tableDeleteRowsArgsSchema` | `packages/plateforme/schemas/{node-gestures,table-write}.ts` | Entrées des trois fonctions |
+| `FunctionOutput.outcome`, `ToolOutput.outcome` | `packages/plateforme/server/{catalog/define,tool-output}.ts` | Nombres d'une exécution, écrits en `args._outcome` de la ligne de journal |
+| `platform.discard_draft` | `packages/plateforme/migrations/20260929190000_discard_draft.sql` | Security definer, verrou 7401, `55000`, `PT409` |
 
 ### Notes
+
+- Approuvée en revue, fusionnée sur `main` sans commit (commit commun à venir) ; la migration Ⓜ
+  `20260929190000_discard_draft.sql` attend son application au projet de test, après celles d'E10-S04 et
+  d'E11-S03.
+- Golden queries RG1, RW4, RW5, PR1, PR2, TB1 à TB3 et IM2 réécrites (aucune demande de publication) ;
+  PD1 à PD4 et PDN1 ajoutées.
+- Tâches de suite M90 et M91 ouvertes dans `status.md`.

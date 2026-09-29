@@ -34,6 +34,11 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - `table.schema` gives the table's revision; `table.rows` with `provenance: true` shows the MCP client (`host`) and the `worker` behind each value.
 - A column with `allow_verified_empty: false` needs a real value; a table whose review has `agents_may_decide: true` lets you set approve or reject.
 - Proof is per table: a new value needs `{value, comment | link}` only where the header says `proof: true`, as `table.schema` tells.
+- `write` publishes by default and says « Next write: base_revision N. »; pass `publish: false` to keep an unpublished draft, e.g. until the last call of a long procedure.
+- Whoever can write a node publishes it, a table's header included; a published title moves the path at that level, and the old path still leads to the node.
+- `call node.discard_draft` drops a node's pending draft, such as a refused table header, back to its published revision; a refused header says to do so.
+- `call node.trash` moves a node to the trash (manage level, restorable 30 days on screen); `call table.delete_rows` deletes rows by key for good, naming those in review.
+- `call table.import` with `create` needs the write level on the parent, no longer manage.
 
 ### Hosts
 - Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
@@ -49,7 +54,7 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - UI: pages show the new blocks (simple table scrolling inside its block, divider, toggle closed by default, nested lists); in the editor, a block's « + » and `/` in an empty text open a choice in two groups (« Texte », « Insérer »), and a simple table, a divider and a toggle are written on screen.
 - UI: the rail's « ⋯ » offers « Télécharger en .md » (page, procedure, Contexte) and « Télécharger en .csv » (table); « Importer un fichier… » in the rail's « + », or a file dropped on a rail line, imports a `.md` as a page or a `.csv` as a table; to who writes a table, its screen offers « Importer un fichier… » above the table and takes a dropped `.csv`.
 - MCP: `table.import` joins the `call` catalogue; the tool list served to hosts is unchanged, nothing to refresh.
-- API: `GET nodes/export?path=` (the `.md` of a published node) and `GET tables/export?path=` (the `.csv` of a table, 5,000 rows at most) answer `{filename, content}` and are reads, never journaled; `POST tables/import` writes one lot of 500 CSV rows at most, creating the table only for who manages its parent.
+- API: `GET nodes/export?path=` (the `.md` of a published node) and `GET tables/export?path=` (the `.csv` of a table, 5,000 rows at most) answer `{filename, content}` and are reads, never journaled; `POST tables/import` writes one lot of 500 CSV rows at most, creating the table for who can write its parent.
 - API: the body of `POST nodes` takes `tolerant: true` (paste and file import: nothing refused, `kept_as_text` counts what stayed text); `write` over MCP stays strict.
 - Schemas: `./schemas` exports the CSV functions (`parseCsv`, `columnNameOf`, `inferTable`, `checkImport`, `toCsv`…), `pageMarkdown`, `readPageMarkdown`, `tableImportArgsSchema`, `tableImportBodySchema` and the import bounds (`IMPORT_*`).
 - Migrations: `20260929180000_ctx_contexts.sql` adds the column `platform.ctx.contexts`; every conversation open at the upgrade calls `context` once more; run `oto-platform migrations sync`, then apply it.
@@ -58,6 +63,17 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - Schemas: `./schemas` exports `queryWords`; `tableHeaderSchema` gains `proof`, `tableColumnSchema` `allow_verified_empty`, `tableReviewSchema` `agents_may_decide`.
 - MCP: unlike `table.import`, the description of `write` changes (`move_block` into a section): refresh the tool list in each host after upgrading; the table functions, described through `read`, need nothing.
 - UI: the editor draws one marker per list item, on its first line, and edits a link in a « Lien » panel; nothing for the host to do.
+- API: default changed: `write` and `POST /api/plateforme/nodes` publish by default; `publish: false` keeps a draft; publishing a node or a table header needs the write level, no longer manage.
+- Migrations: `20260929190000_discard_draft.sql` adds `platform.discard_draft` (security definer, granted to `authenticated`), no table, column or policy; run `oto-platform migrations sync`, then apply it.
+- MCP: the descriptions of `write` and of its `publish` field change: refresh the tool list in each host after upgrading; `node.discard_draft`, `node.trash` and `table.delete_rows` join the `call` catalogue.
+- Server: the `node.` namespace belongs to the package's native `node` connector: `registerFunctions` refuses an ERP function named `node.*`.
+- Server: the journal line of a `table.delete_rows` run carries `_outcome` (`deleted`, `review`) among its arguments, shown by the journal screen and `admin_journal`.
+- UI: a node created from the rail is published at once; the draft banner, « Voir la version publiée » and « La publication revient… » are gone; the home feed says « a supprimé des lignes dans …, dont N à revoir ».
+- UI: a table's header offers « Réglages » to who writes it (proof required, review decided by the assistant, closed), published through the page's queue; nothing for the host to do.
+- API: `GET public/<token>` and `readPublicNode` return `language`, the organisation's, which sets the separator of a public table's CSV.
+- UI: `TableauDuNoeud` takes `assistant?`, the most recent family of `lastConnections`, read by the host for a table without rows (example: `src/app/(dashboard)/n/[...chemin]/page.tsx`); an empty table names that assistant.
+- UI: `EcranDeNoeud` always lays a page, a procedure or a Contexte out in two columns, « Cité dans », « Cite » and « Sous-pages » folded on the right; a node's header and the public page offer « Télécharger en .csv/.md ».
+- Schemas: `./schemas` exports `rowCells`, `keyValue` (moved from the server) and `PUBLIC_TABLE_ROWS_MAX`.
 
 ## 1.0.0 — 2026-09-28
 

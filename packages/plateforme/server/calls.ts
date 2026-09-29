@@ -183,5 +183,7 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
     ...journal,
     // L'équipe rendue par la fonction prime (N8) : un tableau suivi par un ancien chemin (E07-S02).
     teamId: output.teamId === undefined ? journal.teamId : journalTeam(identity, output.teamId),
+    // Ce que la fonction a fait, pour sa ligne de journal (E11-S02, AC-h2).
+    ...(output.outcome ? { outcome: output.outcome } : {}),
   }
 }

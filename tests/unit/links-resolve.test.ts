@@ -108,7 +108,7 @@ describe.skipIf(!sqlConfigured)(portable("links on a real database"), { timeout:
       )
       expect(published.text).toBe(
         [
-          "Published ventes/a revision 2 (0 sections, 2 blocks).",
+          "Published ventes/a revision 2 (0 sections, 2 blocks). Next write: base_revision 2.",
           "Warnings:",
           "- link [[ventes/grille]]: no page at this path yet",
           "- link [[ventes/b#zzz]]: ventes/b has no block « zzz »",
@@ -119,7 +119,7 @@ describe.skipIf(!sqlConfigured)(portable("links on a real database"), { timeout:
       // Un brouillon seulement enregistré ne touche pas aux liens : `publish_node` n'est pas appelé.
       await content(tables)
       const saving = spyDb(await ref.db("claire"))
-      await writeNode(saving.db, who("claire"), { path: "ventes/a", base_revision: 1, ops: [{ op: "add_section", section: "Suite", text: "[[ventes/autre]]" }] }, { kind: "agent", ctx: null })
+      await writeNode(saving.db, who("claire"), { path: "ventes/a", base_revision: 1, ops: [{ op: "add_section", section: "Suite", text: "[[ventes/autre]]" }], publish: false }, { kind: "agent", ctx: null })
       expect(functionCalls(saving.calls, "publish_node")).toEqual([])
 
       openDraftRow(tables, "ventes/proc")

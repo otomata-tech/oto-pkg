@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test"
 import { clientAuth } from "./fixtures/base"
-import { assurerLeNoeud, attendre, attendreLEnregistrement, capturer, seConnecterSurLEspace, statut } from "./fixtures/noeud"
+import { assurerLeNoeud, attendre, attendreLEnregistrement, capturer, ouvrirAQuoiSert, seConnecterSurLEspace, statut } from "./fixtures/noeud"
 import { CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 
 // Contrôle visuel connecté de la page d'un nœud (E05-S02, AC24 ; E05-S08, AC10 : champs toujours montés ;
@@ -17,6 +17,13 @@ import { CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 // ligne du rail : l'en-tête n'a plus de « Déplacer » (E05-S13, AC-20) ; aucune erreur d'hydratation. Une capture
 // par étape, et le Contexte et la page dans les huit thèmes, posés sur la racine `.oto` sans écrire la marque
 // (AC-x1, AC-x3), dans `test-results/`, à la largeur des captures d'oto-frontend (1 920 px).
+//
+// E11-S02 (AC-c1, AC-c2, AC-c5, AC-g1) : une page créée par le « + » du rail, son titre tapé, se lit publiée
+// après un rechargement ; une publication refusée pour son en-tête (réponse simulée) se dit sans « Réessayer »,
+// en clair puis en sombre. Le compte E2E, seul compte de la campagne, y est au niveau gestion : le niveau
+// écriture est tenu par `ecran-de-noeud.test.tsx` (AC-c2) et `e05s10e-gestes.test.ts` (AC-c1). E11-S05 (AC-e2, AC-g1,
+// AC-g2) : « À quoi sert cette page » s'ouvre par Entrée ; Entrée dans le titre d'une page neuve mène à son Texte vide,
+// qui porte l'invite, et une page vide déjà titrée s'ouvre le focus dans ce Texte.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -137,7 +144,7 @@ test.describe("page d'un nœud", () => {
       const rail = page.getByRole("navigation", { name: "Navigation principale" })
       await rail.getByRole("link", { name: `Contexte · ${EQUIPE.nom}` }).click()
       await attendre(page).toHaveURL(`${ESPACE.adresse}/n/${CHEMINS.contexteDeLEquipe}`)
-      const note = page.getByRole("note", { name: "À quoi sert cette page" })
+      const note = await ouvrirAQuoiSert(page)
       await attendre(note.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
       await expect(note.getByRole("definition")).toHaveCount(0)
       await expect(page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("list", { name: "Ordre de lecture" })).toBeVisible()
@@ -230,6 +237,81 @@ test.describe("page d'un nœud", () => {
       await deplacerSous(page, `private/${handle}`, essai)
       expect(hydratation).toEqual([])
       await context.close()
+    })
+  }
+
+  for (const mode of MODES) {
+    test(`should publish a page created by « + » once its title is typed, then say a refused header without « Réessayer » (${mode})`, async ({ browser }, testInfo) => {
+      test.setTimeout(300_000)
+      const context = await browser.newContext({ colorScheme: mode, viewport: { width: 1920, height: 900 } })
+      const page = await context.newPage()
+      await seConnecterSurLEspace(page, { email, password })
+      const rail = page.getByRole("navigation", { name: "Navigation principale" })
+      const contexte = (await rail.getByRole("link", { name: "Contexte · Privé" }).getAttribute("href")) ?? ""
+      expect(contexte).toMatch(/^\/n\/private\/[^/]+\/contexte$/)
+      await page.goto(`${ESPACE.adresse}${contexte}`)
+
+      // AC-c1 : le « + » de la ligne du Contexte de Privé crée une page, publiée dès sa création, et l'ouvre.
+      const ligne = rail.getByRole("link", { name: "Contexte · Privé", exact: true })
+      await ligne.hover()
+      await ligne.locator("xpath=..").getByRole("button", { name: "Ajouter dans Contexte · Privé" }).click()
+      await page.getByRole("menuitem", { name: "Une page" }).click()
+      await attendre(page).toHaveURL(new RegExp(`${contexte}/sans_titre(_\\d+)?$`))
+      const cree = new URL(page.url()).pathname.slice("/n/".length)
+      try {
+        // AC-c5 : le titre d'un nœud neuf est sélectionné, la frappe le remplace ; AC-c2 : rechargée, la page se lit publiée.
+        const titre = page.getByRole("textbox", { name: "Titre", exact: true })
+        await attendre(titre).toBeFocused()
+        const horodatage = new Date().toISOString().slice(0, 19)
+        await page.keyboard.type(`Créée ${horodatage}`)
+        await page.keyboard.press("Enter")
+        // E11-S05 (AC-g1, AC-g2) : Entrée mène au Texte vide de la page, qui porte l'invite, sans « Commencer à écrire ».
+        const texteVide = page.getByRole("textbox", { name: /^Modifier ce texte — / })
+        await attendre(texteVide).toBeFocused()
+        await expect(texteVide).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
+        await expect(page.getByRole("button", { name: "Commencer à écrire" })).toHaveCount(0)
+        await expect(page.getByText("Cette page n'a pas encore de contenu.")).toHaveCount(0)
+        await capturer(page, testInfo, `page-vide-${mode}`)
+        await attendreLEnregistrement(page)
+        await page.reload()
+        await attendre(page.getByRole("textbox", { name: "Titre", exact: true })).toHaveValue(`Créée ${horodatage}`)
+        // Une page vide déjà titrée s'ouvre le focus dans son Texte (AC-g2).
+        await attendre(page.getByRole("textbox", { name: /^Modifier ce texte — / })).toBeFocused()
+        await attendre(async () => {
+          await page.goto(`${ESPACE.adresse}/n/${cree}?version=publiee`)
+          await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Créée ${horodatage}`)
+        }).toPass({ timeout: 90_000 })
+        await capturer(page, testInfo, `creee-publiee-${mode}`)
+
+        // AC-g1 : une publication refusée pour son en-tête (réponse du service simulée, `details.reason`) le dit en
+        // alerte, sans « Réessayer » ; les écritures du brouillon passent.
+        await page.goto(`${ESPACE.adresse}/n/${cree}`)
+        await page.route("**/api/plateforme/nodes", async (route) => {
+          const corps: unknown = route.request().postDataJSON()
+          if (route.request().method() !== "POST" || !(typeof corps === "object" && corps !== null && "publish" in corps && corps.publish === true)) return route.continue()
+          return route.fulfill({
+            status: 409,
+            contentType: "application/json",
+            body: JSON.stringify({ error: { code: "conflict", message: "header refused", details: { reason: "header_refused" } } }),
+          })
+        })
+        const champ = page.getByRole("textbox", { name: "Titre", exact: true })
+        await attendre(champ).toHaveValue(`Créée ${horodatage}`)
+        await champ.fill(`Refusée ${horodatage}`)
+        await champ.press("Enter")
+        const alerte = page.getByRole("group", { name: "Publication" }).getByRole("alert")
+        await attendre(alerte).toHaveText("Ce changement d'en-tête est refusé : demandez à votre assistant d'abandonner le brouillon.")
+        await expect(page.getByRole("button", { name: "Réessayer" })).toHaveCount(0)
+        await capturer(page, testInfo, `en-tete-refuse-${mode}`)
+        await page.unroute("**/api/plateforme/nodes")
+      } finally {
+        const statutDeLaCorbeille = await page.evaluate(
+          async (corps) => (await fetch("/api/plateforme/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
+          { path: cree },
+        )
+        expect(statutDeLaCorbeille).toBe(200)
+        await context.close()
+      }
     })
   }
 })

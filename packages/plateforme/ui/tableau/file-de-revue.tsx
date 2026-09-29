@@ -11,6 +11,7 @@
 // compte en pastille, l'état vide, l'îlot qui reçoit le focus quand la ligne décidée s'en va. Retiré :
 // « Libérer » et la colonne « Exécution » (`run`), le dialogue de confirmation (une décision par ligne, en un
 // clic, E07-S03), l'îlot qui disparaît après la dernière décision (le résumé de la session y reste).
+// E11-S05 (AC-a5, HN-E11S05-4) : sous le titre, une phrase dit le cycle d'une ligne avec les états déclarés.
 import type { TableColumn, TableHeader, TableReviewQueue, TableRowRead } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
@@ -92,13 +93,16 @@ function ValeursDeLaLigne({ entete, ligne }: { entete: TableHeader; ligne: Table
 }
 
 export function FileDeRevue({ chemin, entete, revue, redacteur, Lien, ici }: FileDeRevueProps) {
-  const etats = entete.lifecycle?.review
-  if (!etats) return null
+  const cycle = entete.lifecycle
+  const etats = cycle?.review
+  if (!cycle || !etats) return null
   const file = revue.error === undefined ? revue.data : null
   // Aucune pastille quand il n'y a rien : un « 0 » se lirait comme un compteur en panne, pas comme le calme.
   const pastille = file && file.count > 0 ? nombreLisible(file.count) : undefined
   return (
     <WaitList id={ANCRE_DE_LA_REVUE} tabIndex={-1} label={REVUE.titre} count={pastille}>
+      {/* Le cycle des états, pour qui lit comme pour qui décide (E11-S05, AC-a5). */}
+      <p className="oto-caption px-2 pt-1">{REVUE.cycle({ ...cycle, review: etats })}</p>
       {revue.error !== undefined && <ErreurDeLecture titre={REVUE.enEchec} message={revue.error} href={ici} Lien={Lien} />}
       {file && file.count === 0 && <EmptyState compact title={REVUE.rien} />}
       {file && file.count > 0 && <p className="oto-caption px-2 pt-1">{aRevoir(file.count)}</p>}

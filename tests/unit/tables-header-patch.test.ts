@@ -81,10 +81,22 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table written by patch
 
       const before = await tableRows(seed, ref)
       const claire = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, publish: true })
-      expect(claire.result?.text).toBe("Published ventes/suivi_prospects revision 4: added telephone; changed entreprise (max_length).")
+      expect(claire.result?.text).toBe("Published ventes/suivi_prospects revision 4: added telephone; changed entreprise (max_length). Next write: base_revision 4.")
       expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual(draft.meta)
       expect(await tableRows(seed, ref)).toEqual(before)
       expect(writesOf(claire.calls).filter((call) => call.kind === "table" && call.table === "blocks")).toEqual([])
+    })
+
+    it("should publish a header change at the write level, by default, naming each change (E11-S02, AC-a2, AC-b1)", async () => {
+      await freshTable(seed, ref)
+      // Léa écrit dans l'équipe Ventes (niveau 2) : sans `publish`, l'en-tête changé est publié après ses contrôles.
+      const lea = await writeAs(ref, "lea", { path: PROSPECTS.path, base_revision: 3, header: { columns: [{ name: "telephone", type: "text" }], closed: true }, publish: undefined })
+      expect(lea.error).toBeNull()
+      expect(lea.result?.text).toBe("Published ventes/suivi_prospects revision 4: added telephone; closed. Next write: base_revision 4.")
+      expect(lea.result?.data).toMatchObject({ revision: 4, status: "published", has_draft: false })
+      expect(publishCalls(lea.calls)).toHaveLength(1)
+      expect(await pendingHeaders()).toEqual([])
+      expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toMatchObject({ closed: true })
     })
 
     it("should refuse, never lose, a pending header another writer saved while the draft opened", async () => {
@@ -151,7 +163,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table written by patch
         [{ header: { remove_columns: ["fax"] } }, `Invalid table header: remove_columns: « fax » is not a column of ventes/suivi_prospects. Columns: ${columns}. ${contract}`],
         [{ header: { remove_columns: ["entreprise"] } }, `Invalid table header: remove_columns: « entreprise » is the key of ventes/suivi_prospects; a key column cannot be removed. ${contract}`],
         [{ header: { columns: [{ name: "fax", type: "text" }], remove_columns: ["fax"] } }, `Invalid table header: « fax » is both in columns and remove_columns. ${contract}`],
-        [{ header: { remove_columns: ["notes"], confirm_remove: true } }, "confirm_remove only applies with publish: true."],
+        [{ header: { remove_columns: ["notes"], confirm_remove: true } }, "confirm_remove only applies when the write publishes: remove publish: false."],
         [{ header: { order: ["ville"] } }, "header: unknown key « order »; keys: columns, remove_columns, key, lifecycle, closed, proof, confirm_remove"],
         [{ header: { columns: [{ name: "ville", width: 3 }] } }, "header.columns[0]: unknown key « width »; keys: name, type, options, required, allow_verified_empty, max_length"],
         // Des clés inconnues sans nombre fixé : 20 citées, puis leur nombre restant (`mcp-patterns.md § 4`).

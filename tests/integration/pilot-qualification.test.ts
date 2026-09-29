@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Pilote V1, qualification de prospects, de bout en bout sur le projet Supabase d'oto-platform
+// Pilote V1, qualification de prospects, de bout en bout sur une vraie base
 // (E06-S01 : AC3 à AC13, AC15 ; H120), là où la base est le sujet (`testing-strategy.md § Budget de
 // tests`) : publication (`publish_node` par `write`), routage (`route_candidates`), recherche
 // (`search_content`) et parcours de la file (`table.*`, revue humaine). Les règles propres à chaque
@@ -9,10 +9,10 @@
 // personnels et Contextes nés par déclencheur (P39). Contenu : le module
 // `scripts/lib/pilot-qualification.mjs` (pages, tableau et Contextes par `publishBlocks` et `addRows`),
 // puis la procédure écrite et publiée par A avec `write` (AC3). Sessions MCP par `InMemoryTransport`
-// (`connectMcp`, câblé comme `/api/mcp`) sous les jetons réels ; la revue par `handlePlateforme`.
-// Marqué Supabase : les deux portes reçoivent le jeton d'une session de Supabase Auth, que l'API vérifie.
-// Depuis E01-S10 f2, les relectures passent par la connexion d'administration, le routage et la lecture
-// de S par leur session sur la face SQL (`asCaller`), plus par PostgREST.
+// (`connectMcp`, câblé comme `/api/mcp`) sous les jetons ; la revue par `handlePlateforme`.
+// Suite portable (E11-S14) : personnes sans compte, jetons signés localement que l'API vérifie par
+// `verifyToken` (`tests/helpers/session-locale.ts`) ; relectures par la connexion d'administration, le
+// routage et la lecture de S par leur session sur la face SQL (`asCaller`).
 // Repris de la maquette (`mcp-test/tests/integration/proto-routing.test.ts` l. 14-81) : le rapport de
 // routage imprimé ; retiré : les déclencheuses et voisines lues dans les données (P37).
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
@@ -25,8 +25,9 @@ import { isJsonObject } from "../../packages/plateforme/server/json"
 import { applyBonuses, CANDIDATES_SHOWN, decide, formatScore, loadRoutingSettings, rankCandidates, type RoutingSettings } from "../../packages/plateforme/server/routing"
 import { PILOT_CONTEXTS, PILOT_DOMAINS, PILOT_PAGES, PILOT_PROCEDURE, PILOT_TABLE } from "../../scripts/lib/pilot-qualification.mjs"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestOrg, type TestUser } from "../helpers/plateforme"
-import { asCaller, SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex, type TestOrg } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { asCaller, portable, sqlConfigured, testAdminSql, type SqlUser, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 import { PILOT_PROCEDURE_PATH, PILOT_ROUTING_CASES, type PilotRoutingCase } from "./pilot-routing.cases"
 
@@ -48,7 +49,7 @@ const FOLLOW = "Follow these steps now. Ask the user's explicit approval before 
 const callLine = (prefix: string) =>
   `A \`\`\`call block holds <function> <arguments JSON>: run it with ${prefix}_call {"function": "<function>", "arguments": <arguments JSON>}, replacing each "<…>" value with the real one.`
 
-type Person = TestUser & { name: string; handle: string; token: string }
+type Person = SqlUser & { name: string; handle: string; token: string }
 type Place = TestOrg & { host: string }
 type Called = Awaited<ReturnType<Awaited<ReturnType<typeof connectMcp>>["call"]>>
 type Fields = Record<string, unknown>
@@ -139,14 +140,13 @@ function missed(outcome: Outcome): string | null {
 
 type RowRead = { key: string; data: unknown; provenance: unknown; revision: number; claimed_by: string | null; claimed_by_user: string | null; lease_until: Date | null }
 
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "pilot V1, prospect qualification, end to end"
 
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable(SUITE), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let org: Place
     let a: Person
@@ -173,7 +173,7 @@ describe.skipIf(!configured || privatePending)(
     }
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       const host = `t${hex(4)}.example.invalid`
       org = { ...(await fx.createOrg({ name: "Démo pilote", hosts: [host], settings: { domains: PILOT_DOMAINS } })), host }
@@ -232,7 +232,7 @@ describe.skipIf(!configured || privatePending)(
 
     it("should publish the procedure an administrator writes with no refusal: no header, three sections, the calls of the module and its links (AC3)", async () => {
       // Le brouillon créé, puis publié : aucun refus du contrôle d'E03-S06, aucun avertissement de lien.
-      expect([published.isError, published.text.split("\n").slice(1)]).toEqual([false, [`Published ${PATH} revision 1 (3 sections, 14 blocks).`]])
+      expect([published.isError, published.text.split("\n").slice(1)]).toEqual([false, [`Published ${PATH} revision 1 (3 sections, 14 blocks). Next write: base_revision 1.`]])
       const node = await admin`select kind, title, summary, meta, revision from platform.nodes where id = ${ids.procedure}`
       expect(node).toEqual([{ kind: "procedure", title: PILOT_PROCEDURE.title, summary: PILOT_PROCEDURE.summary, meta: {}, revision: 1 }])
       const blocks = await admin<{ id: string; type: string; text: string | null; data: unknown }[]>`
@@ -402,7 +402,7 @@ describe.skipIf(!configured || privatePending)(
             body: JSON.stringify({ table: TABLE, key, revision, decision, ...(reason ? { reason } : {}) }),
             headers: { origin: `https://${org.host}`, "x-forwarded-proto": "https", "user-agent": reviewAgent, "content-type": "application/json" },
           }),
-          { accessToken: a.token, host: org.host, defer: (task) => tasks.push(task) },
+          { accessToken: a.token, host: org.host, verifyToken: fx.verifyToken, defer: (task) => tasks.push(task) },
         )
         for (const task of tasks) await task()
         return { status: response.status, body: await response.json(), revision: typeof revision === "number" ? revision : 0 }

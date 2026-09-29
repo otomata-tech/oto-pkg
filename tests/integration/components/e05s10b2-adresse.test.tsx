@@ -55,7 +55,7 @@ describe("Publication, the address of a renamed content (AC-b12)", () => {
           <h1>
             <TitreModifiable titre="Sans titre" revisionServie={0} tamponServi={null} />
           </h1>
-          <Publication niveau={3} phrase="" />
+          <Publication />
         </FileDOperations>
       </ContexteDeRafraichissement.Provider>,
     )
@@ -87,7 +87,7 @@ describe("Publication, the address of a renamed content (AC-b12)", () => {
 
     await ecrireEtPublier("Tarifs 2026")
 
-    expect(envoyes.map((corps) => [corps.path, corps.publish ?? corps.title])).toEqual([
+    expect(envoyes.map((corps) => [corps.path, corps.publish === true ? true : corps.title])).toEqual([
       ["ventes/sans_titre", "Tarifs 2026"],
       ["ventes/sans_titre", true],
     ])

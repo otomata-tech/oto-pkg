@@ -127,6 +127,23 @@ describe("FileDeRevue, the queue (AC10)", () => {
     expect(screen.queryByRole("heading", { name: "À revoir" })).toBeNull()
   })
 
+  it("should say the cycle of a row under its title, composed of the declared states, to a writer and a reader alike (E11-S05, AC-a5)", () => {
+    const etats = ["nouveau", "pris", "à valider", "retenu", "rejeté"]
+    const entete: TableHeader = {
+      ...ENTETE,
+      columns: ENTETE.columns.map((colonne) => (colonne.name === "statut" ? { ...colonne, options: etats } : colonne)),
+      lifecycle: { column: "statut", states: etats, working: "pris", review: { state: "à valider", approve: "retenu", reject: "rejeté" } },
+    }
+    const cycle =
+      "Une ligne entre à « nouveau », passe à « pris » quand un assistant la prend, puis à « à valider ». Vous l'approuvez (« retenu ») ou la refusez (« rejeté »). Les lignes à revoir sont surlignées dans le tableau."
+    for (const niveau of [2, 1] as const) {
+      render(ecran({ revue: file(null, 0), niveau, entete }))
+      const region = screen.getByRole("region", { name: "À revoir" })
+      expect(region.querySelector(".oto-wait-body")?.firstElementChild).toHaveTextContent(cycle)
+      cleanup()
+    }
+  })
+
   it("should say a failed read of the queue, with « Réessayer » to the same address, and no count nor decision", () => {
     render(ecran({ revue: { error: "Une erreur est survenue. Réessayez." } }))
     const section = within(screen.getByRole("region", { name: "À revoir" }))

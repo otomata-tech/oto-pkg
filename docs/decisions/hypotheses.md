@@ -62,7 +62,7 @@
 | H60 | Publier une procédure contrôle chaque bloc `call` : fonction active, clés d'arguments connues, valeurs conformes, contrôle propre à la fonction ; un bloc `code` en langage `call` est refusé ; un refus nomme section, rang du bloc et étape. |
 | H61 | L'espace personnel `perso/<handle>` (handle unique tiré de l'email) et son Contexte naissent à l'arrivée du membre ; un nœud personnel n'est visible que de son propriétaire et de ses partages ; `perso` et l'espace ne se suppriment ni ne se déplacent. |
 | H62 | `read` sert deux pseudo-fonctions non appelables, au rendu d'un contrat de fonction : `write.procedure` (écrire une procédure) et `write.table` (l'en-tête d'un tableau). |
-| H63 | Publier exige le niveau gestion ; écrire un brouillon exige le niveau écriture : un membre d'équipe rédige, son responsable publie. |
+| H63 | Écrire et publier exigent le niveau écriture, en-tête d'un tableau compris ; la gestion garde le partage, les règles, le déplacement, la corbeille et le propriétaire. Le chemin qui suit un titre publié change au niveau écriture ; l'ancien chemin reste un alias qui mène au nœud (fiche D135). |
 | H65 | Quatre niveaux d'accès : aucun (0), lecture (1), écriture (2), gestion (3). |
 | H66 | Niveau sur un nœud : l'administrateur gère tout sauf l'espace personnel ; le responsable de l'équipe propriétaire garde la gestion sauf règle qui le nomme ; sinon la règle la plus proche dans l'arbre, même plus basse (à même nœud, la plus précise : personne, équipe, organisation ; une règle d'organisation ne retire rien au propriétaire) ; sinon le propriétaire effectif décide. |
 | H67 | Niveau sur un compte : même calcul, sans héritage ; par défaut, compte d'organisation en lecture (gestion à l'administrateur), d'équipe en écriture (gestion au responsable), personnel à son propriétaire ; une fonction sensible exige l'écriture. |
@@ -422,7 +422,7 @@
 | N24 | L'écart depuis une révision se donne au bloc : ajoutés, changés, déplacés (hors de la plus longue suite ordonnée), supprimés, groupés par section. |
 | N26 | `page` ↔ `procedure` se change au brouillon et s'applique à la publication ; `table` et `context` ne changent jamais de genre. |
 | N27 | Un tableau n'a pas de blocs de document : ses lignes ne passent jamais par le brouillon et `ops` y est refusé ; son en-tête passe par `header` (`readHeaderPatch`). |
-| N28 | Publication refusée (droit, contrôle) : le brouillon de l'appel est gardé, la réponse le dit, `isError` avec le code du refus. |
+| N28 | Un refus de publication garde le brouillon et rend `isError` avec son code ; `write` publie par défaut, `publish: false` garde un brouillon ; le refus d'une procédure finit par « Writing it in several calls? Pass publish: false until the last one. » |
 | N29 | `perso/<handle>` et son Contexte naissent en base ; `write` n'en crée jamais et refuse un `perso/<x>` qui n'est pas celui de l'appelant. |
 | N31 | Créer sur un chemin occupé par un nœud invisible rend `conflict` « not available », sans dire qu'il existe. |
 | N32 | Arbre des écrans : nœuds de niveau calculé ≥ 1 (un lot), brouillons compris, rangés par `position` puis par chemin, rattachés à l'ancêtre visible le plus proche, 5 000 au plus après ce filtre. |
@@ -959,7 +959,7 @@
 | HN-E10S01-18 | `GET nodes/export` et `GET tables/export` ne sont pas journalisés, comme toute lecture : leurs routes ne rendent aucune ligne de journal, `exportNode` et `exportTable` ne calculent ni cible ni équipe ; l'export reste borné à 5 000 lignes et décidé par la lecture. Confirmée par JB le 2026-09-29 (D138). |
 | HN-E10S01-19 | `table.import` sur un tableau existant : `key`, s'il est donné, doit nommer sa clé, sinon refus ; les colonnes inconnues, nommées deux fois ou l'état d'une file sont ignorées et listées dans la réponse (texte et champs), comme à l'écran. |
 | HN-E10S01-20 | La borne de 40 000 caractères de `table.import` est une constante à côté du schéma (`IMPORT_CSV_MAX`), dite par sa description et contrôlée par l'adaptateur en `too_large` (un `.max` Zod rendrait `invalid_arguments`). |
-| HN-E10S01-21 | Une création (écran, `table.import`, conversion) décide les droits (gestion du parent), contrôle tout le lot, crée et publie le tableau par le service de `write`, puis écrit les lignes en une transaction ; toute erreur levée après la création (relecture du tableau, lecture de son équipe, refus ou panne du lot) porte `details.created` et le dit (« The table <chemin> was created and published, but none of these rows was written… »), une erreur sans code devenant `internal` ; « Reprendre » remplit ce tableau sans `create`, un refus portant `details.created` n'essaie pas l'adresse suivante, et la conversion garde par rangée le tableau d'un premier lot refusé (`convertis`, `use-envois.ts`). Reste ouvert : M77. |
+| HN-E10S01-21 | Une création (écran, `table.import`, conversion) décide les droits (écriture sur le parent, D150), contrôle tout le lot, crée et publie le tableau par le service de `write`, puis écrit les lignes en une transaction ; toute erreur levée après la création (relecture du tableau, lecture de son équipe, refus ou panne du lot) porte `details.created` et le dit (« The table <chemin> was created and published, but none of these rows was written… »), une erreur sans code devenant `internal` ; « Reprendre » remplit ce tableau sans `create`, un refus portant `details.created` n'essaie pas l'adresse suivante, et la conversion garde par rangée le tableau d'un premier lot refusé (`convertis`, `use-envois.ts`). Reste ouvert : M77. |
 | HN-E10S01-22 | La provenance `import` passe par `RowActor.origin` : toute cellule écrite par un import, clé et état d'entrée d'une file compris, porte `origin: "import"` ; le commentaire va aux valeurs posées. |
 | HN-E10S01-23 | Le dépôt d'un `.csv` sur un tableau existant enveloppe son corps (`ui/tableau/tableau-du-noeud.tsx`), vide compris, avec « Importer un fichier… » pour le clavier ; `grille.tsx` n'est pas touché (D140). |
 | HN-E10S01-24 | Le « ⋯ » d'un Contexte offre « Télécharger en .md », son seul geste ; remplace E05-S10 AC-b8 (« aucun ⋯ sur un Contexte »). Confirmée par JB le 2026-09-29 (D139). |
@@ -1091,9 +1091,11 @@ organisation qui compte beaucoup de membres sans email.
 | HN-E11S14-4 | La vérification d'un vrai jeton par la JWKS du projet est un `it` explicite de `mcp-http`, gardé par le projet (session par `createFixtures().sessionFor`). |
 | HN-E11S14-5 | AC1 et AC2 de `portabilite-schema` (lecture d'`auth.users` et `auth.oauth_*`) restent sur le projet, entiers. |
 | HN-E11S14-6 | `tests/unit/gardes-supabase.test.ts` lit les noms importés par `import {…} from`, `export {…} from` et un import dynamique déstructuré (`const {…} = await import(…)`), alias et `type` retirés. |
-| HN-E11S14-7 | La liste de `gardes-supabase.test.ts` est fermée dans les deux sens : un fichier qui importe une garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers des lots b et c y sont marqués « pending ». |
+| HN-E11S14-7 | La liste de `gardes-supabase.test.ts` est fermée dans les deux sens : un fichier qui importe une garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers du lot c y sont marqués « pending ». |
+| HN-E11S14-8 | Les noms de `describe` passés en A au lot b qui disaient « on the cloud project » disent « on a real database » ; rien d'autre de leur nom ne change. |
+| HN-E11S14-9 | Le `describe` principal d'`org-transfer` (export et import par les emails des comptes Auth) reste sur le projet, inchangé ; seul le `describe` AC14 passe en A. |
 
-### E11-S01 — Tableaux : créer sans écraser, colonne obligatoire stricte, recherche par mots, révision et auteur, décision de revue par l'agent, preuve par tableau (lots a à f)
+### E11-S01 — Tableaux : créer sans écraser, colonne obligatoire stricte, recherche par mots, révision et auteur, décision de revue par l'agent, preuve par tableau, réglages à l'écran
 
 | Id | Règle |
 |---|---|
@@ -1112,11 +1114,88 @@ organisation qui compte beaucoup de membres sans email.
 | HN-E11S01-13 | La fixture `PROSPECTS_HEADER` (`tests/factories/table-fixture.ts`) porte `proof: true`, pour que les tests de M53 et d'HN-M53-10 gardent leurs assertions ; un en-tête dérivé sans `proof` sert les cas du lot f. |
 | HN-E11S01-14 | Textes du changement de `proof` : « require proof » et « stop requiring proof » en attente, « proof required » et « proof optional » à la publication. |
 | HN-E11S01-15 | Sans `proof`, `withoutBareValues` retire encore une valeur nue égale à la valeur rangée : un renvoi tel quel ne remplace pas une provenance prouvée ou importée. |
+| HN-E11S01-16 | Dans le créneau `access` de l'en-tête d'un tableau : « Télécharger en .csv », « Réglages », puis « Partager · <espace> », toujours le dernier. Validée (2026-09-29). |
+| HN-E11S01-17 | Sans `lifecycle.review`, l'interrupteur « L'assistant peut décider la revue » est absent, pas désactivé. |
+| HN-E11S01-18 | Un geste du panneau « Réglages du tableau » part par la file d'opérations de la page, qui pose la révision et le tampon courants ; un appel direct avec la révision lue serait périmé. |
+| HN-E11S01-19 | Au succès, une annonce nomme l'interrupteur et son nouvel état, puis la page se relit (`useRafraichir`). |
+| HN-E11S01-20 | Un en-tête en attente dans le brouillon bloque le panneau, plutôt que publier le brouillon entier avec le réglage ou écrire sur l'en-tête publié par une porte nouvelle. Validée (2026-09-29). |
+| HN-E11S01-21 | Le panneau s'ouvre dès le niveau écriture (`vue.level >= 2`), comme la publication d'un en-tête (HN-E11S02-17). Tranchée par le responsable d'Oto (2026-09-29). |
 | HN-E11S01-22 | `agents_may_decide` est `.optional()` dans `tableReviewSchema`, sans défaut écrit : absent, il se lit faux, et un en-tête lu ne gagne pas la clé. |
 | HN-E11S01-23 | La description de `required` du patch d'en-tête (`tableColumnPatchSchema`) reprend celle du schéma de colonne, avec son exemple et son défaut (« e.g. true (default: unchanged; false for a new column) »). |
 | HN-E11S01-24 | Dans `table.schema`, la clé et la colonne d'état se disent `required` seul : `verified_empty` y est toujours refusé. |
 | HN-E11S01-25 | Publier `allow_verified_empty: false` sur une colonne déjà requise avertit (`missing_required`) des seules lignes qui n'y ont qu'un `verified_empty` ; une colonne rendue requise et stricte d'un coup avertit de toute ligne sans vraie valeur. |
 | HN-E11S01-26 | `table.release` range toujours le `worker` de l'appel dans la provenance de l'état ; sa description et sa ligne de refus disent l'exception d'un tableau qui laisse l'assistant décider. |
+| HN-E11S01-27 | Une bascule du panneau part avec le tampon courant du brouillon (`draft_stamp` posé seulement si un brouillon existe), comme la publication de la page. |
+| HN-E11S01-28 | Un refus ne relit pas la page : l'interrupteur revient à l'état publié lu, l'arrêt de la file est levé pour qu'un geste suivant reparte, la relecture reste à la personne (« Rechargez la page »). |
+| HN-E11S01-29 | Décocher « L'assistant peut décider la revue » publie `agents_may_decide: false` explicite, plutôt que retirer la clé. |
+| HN-E11S01-30 | Un nœud `table` dont `vue.meta` ne passe pas `tableHeaderSchema` n'a pas de bouton « Réglages ». |
+| HN-E11S01-31 | L'annonce s'accorde à l'option, au féminin pour les trois : « Fermé : activée. ». |
+| HN-E11S01-32 | L'intitulé et l'aide d'un interrupteur prennent leurs couleurs d'`oto-choice` (`--ink`) et `oto-choice-desc` (`--mute`), même rendu que `text-ink` et `text-mute` dans les deux thèmes. |
+
+### E11-S02 — Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant
+
+| Id | Règle |
+|---|---|
+| HN-E11S02-1 | Noms `node.discard_draft`, `node.trash`, `table.delete_rows` ; connecteur natif `node`. |
+| HN-E11S02-2 | Abandonner un brouillon exige le niveau écriture (action `write`). |
+| HN-E11S02-3 | On abandonne le brouillon entier, titre et résumé en attente compris ; le récapitulatif les nomme. |
+| HN-E11S02-4 | L'abandon d'un nœud jamais publié est refusé, avec un renvoi à `node.trash`. |
+| HN-E11S02-5 | Le brouillon s'abandonne par une fonction SQL (`platform.discard_draft`, verrou 7401), jamais par un privilège ni une policy `DELETE` sur `node_drafts`. |
+| HN-E11S02-6 | Les trois fonctions sont `sensitive` : deux temps. |
+| HN-E11S02-7 | Un tableau fermé n'empêche pas la suppression de lignes : `closed` n'interdit que la création. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-8 | Une ligne à l'état de revue se supprime comme les autres, quel que soit `review.agents_may_decide` ; le récapitulatif et le résultat le disent ; P10 n'est pas touchée. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-9 | Une ligne réservée par autrui, bail actif, est refusée à la suppression ; bail expiré ou propre, supprimée. |
+| HN-E11S02-10 | Une ligne supprimée l'est pour de bon, sans corbeille de lignes. |
+| HN-E11S02-11 | Fil d'activité : `trashed` réutilisé, `deleted_rows` ajouté (« a supprimé des lignes dans »), l'abandon d'un brouillon absent. |
+| HN-E11S02-12 | Aucun bouton « Abandonner le brouillon » ni route à l'écran : seul un assistant abandonne un brouillon. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-13 | L'assistant ne passe pas de tampon à `node.discard_draft` : le service passe celui qu'il lit. |
+| HN-E11S02-14 | Ni `checkArgs` ni refus dans un bloc `call` de procédure pour les trois fonctions : elles y restent en deux temps. |
+| HN-E11S02-15 | L'écran reconnaît le refus d'un en-tête à `details.reason = "header_refused"`, posée par le service ; il le dit dans la zone de publication, sans « Réessayer ». Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-16 | Le nombre de lignes supprimées et à revoir voyage de la fonction au journal par `FunctionOutput.outcome` et `ToolOutput.outcome`, écrit en clé réservée `args._outcome`, sans migration. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-17 | Qui peut écrire publie aussi l'en-tête changé d'un tableau publié (colonnes, clé, `proof`, `agents_may_decide`, `closed`) ; canal ouvert voulu, tracé. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-18 | Le chemin suit le titre au niveau écriture (action `rename`) ; l'ancien chemin reste un alias de `node_aliases`, lu par `findNode` et `writeNode`. Validée (2026-09-29). |
+| HN-E11S02-19 | Aucun avis à l'ouverture d'un nœud qui a un brouillon : la frappe suivante le publie entier. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S02-20 | Cadence de 3 s gardée, aucune fusion de révisions. |
+| HN-E11S02-21 | Le défaut de `publish` se lit dans le service (`publish !== false`) ; l'écran passe `publish: false` par la file d'opérations. |
+| HN-E11S02-22 | Refus de publication : brouillon gardé, `isError` avec son code (N28). |
+| HN-E11S02-23 | Contextes et espaces créés par la base restent à la révision 0 jusqu'à leur première écriture. |
+| HN-E11S02-24 | Fil d'accueil inchangé pour l'écriture : `publish: true` explicite donne « publié », sinon « créé » ou « modifié ». |
+| HN-E11S02-25 | `?version=publiee`, `read draft: true` et `node.discard_draft` restent pour les brouillons rares ; le lien « Voir la version publiée » part avec le bandeau. |
+| HN-E11S02-26 | Aucun filtre des contenus « Sans titre » vides. |
+| HN-E11S02-27 | La ligne de publication de `write` donne la révision de la prochaine écriture (« Next write: base_revision N. »). |
+| HN-E11S02-28 | Le Contexte suit la règle : écrire le publie. |
+| HN-E11S02-29 | « Sans titre » s'ouvre titre sélectionné quelle que soit la révision. |
+
+### E11-S05 — Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides
+
+| Id | Règle |
+|---|---|
+| HN-E11S05-1 | Le repère du repli d'une cellule est un chevron `CaretDown` dans le `summary`, ses règles dans `table.css`. |
+| HN-E11S05-2 | Le détail d'une cellule ouverte est en `text-mute` : aucun token ajouté. |
+| HN-E11S05-3 | Seul l'état de revue marque une ligne de la grille (`data-state="review"`) ; `running` et `failed` restent inutilisés. |
+| HN-E11S05-4 | L'aide du cycle de revue est une phrase visible dans l'îlot « À revoir », composée des états déclarés. Validée (2026-09-29). |
+| HN-E11S05-8 | « Télécharger en .csv » exporte tout le tableau, comme le rail, même sous un filtre ou une recherche. Validée (2026-09-29). |
+| HN-E11S05-9 | Le bouton « Télécharger » est offert à qui lit un nœud publié, version publiée seule ; il ne manque qu'à un nœud gardé en brouillon par un assistant. |
+| HN-E11S05-10 | Le fichier d'une page publique se compose de la vue déjà chargée (500 lignes au plus, dit par le libellé), au rendu serveur, et part sans requête au clic. Validée (2026-09-29). |
+| HN-E11S05-11 | Le séparateur du CSV public suit la langue de l'organisation, servie par `readPublicNode`. |
+| HN-E11S05-12 | Ordre des encarts : « Cité dans », « Cite », « Sous-pages » ; glyphes `ArrowSquareIn`, `ArrowSquareOut`, `TreeStructure` ; total seul. |
+| HN-E11S05-13 | La colonne de droite d'une page, d'une procédure ou d'un Contexte a toujours sa piste ; sans lien ni sous-page, elle reste vide, sans phrase. |
+| HN-E11S05-14 | Pour un tableau, « Lecture des liens… » tient la ligne des encarts pendant la lecture. |
+| HN-E11S05-15 | Le résumé ne se montre ni ne s'écrit à l'écran hors d'une procédure (Contexte et tableau compris) ; l'assistant l'écrit par `write`. Validée (2026-09-29). |
+| HN-E11S05-16 | Le résumé par défaut d'une procédure est une vraie valeur stockée, sans exemple métier. |
+| HN-E11S05-17 | L'assistant nommé dans un tableau vide est la famille la plus récente de `lastConnections`. Validée (2026-09-29). |
+| HN-E11S05-18 | Famille inconnue ou « Client non identifié » : « votre assistant ». |
+| HN-E11S05-19 | Le Texte d'une page vide n'existe que sur le poste ; il ne part jamais vide. |
+| HN-E11S05-20 | « Nœud neuf » = titre « Sans titre » et aucun bloc, sans condition de révision. |
+| HN-E11S05-21 | Au niveau lecture et sur la page publique, « Cette page n'a pas encore de contenu. » reste. Validée (2026-09-29). |
+| HN-E11S05-22 | L'invite d'une page vide vaut exactement `Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)`, sans mention de `/`. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S05-23 | La borne des lignes d'un tableau public est `PUBLIC_TABLE_ROWS_MAX = 500`, dans `schemas/node-gestures.ts`, lue par la page publique et son libellé. |
+| HN-E11S05-24 | `PublicNodeView.language` est typé `Language`. |
+| HN-E11S05-25 | Un refus de téléchargement se dit par `messageDErreur(erreur, EXPORTS.refus)`. |
+| HN-E11S05-26 | L'invite ne se pose que sur le Texte seul, local et vide, d'une page vide. |
+| HN-E11S05-27 | Entrée dans le titre mène au premier bloc ; à l'ouverture, le focus va au Texte d'une page vide seulement si le titre n'est pas « Sans titre ». |
+| HN-E11S05-28 | L'aperçu d'un Contexte se place entre « À quoi sert cette page » et les encarts. |
+| HN-E11S05-29 | La ligne d'encarts d'un tableau est masquée quand elle est vide (`empty:hidden`). |
 
 ### E11-S06 — Éditeur : une puce par élément de liste, modifier un lien dans un panneau
 

@@ -107,6 +107,23 @@ describe("home activities, one line each (E05-S12, AC-13, AC-15)", () => {
     expect(within(liens[1]).getByText("a écrit dans le tableau Salons")).toHaveAttribute("title", "a écrit dans le tableau Salons")
   })
 
+  it("should say how many deleted rows were waiting for review, and nothing more without them (E11-S02, AC-h3)", () => {
+    monter({
+      activites: {
+        data: {
+          truncated: false,
+          activities: [
+            activite(2, { userId: MOI, userName: "Claire Morel", verb: "deleted_rows", kind: "table", path: "ventes/suivi_prospects", title: "Suivi des prospects", inReview: 2 }),
+            activite(1, { verb: "deleted_rows", kind: "table", path: "ventes/salons", title: "Salons" }),
+          ],
+        },
+      },
+    })
+    const [avecRevue, sansRevue] = lignes()
+    expect(avecRevue).toHaveAccessibleName("Vous avez supprimé des lignes dans le tableau Suivi des prospects, dont 2 à revoir 11:00")
+    expect(sansRevue).toHaveAccessibleName("Ada Martin a supprimé des lignes dans le tableau Salons 11:00")
+  })
+
   it("should open the conversation of a launched procedure, and nothing for a content the person does not read, keeping its path as the journal shows it", () => {
     monter({
       activites: {

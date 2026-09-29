@@ -39,6 +39,11 @@ export type FunctionOutput = {
   /** Fonctions proposées ensuite ; les sensibles en sont retirées à la mise en forme (H87). */
   next?: string[]
   teamId?: string | null
+  /**
+   * Ce que l'exécution a fait, en nombres, pour la ligne de journal de l'appel (`args._outcome`) : le fil de
+   * l'accueil le relit (E11-S02, AC-h2, HN-E11S02-16) ; `table.delete_rows` seule le pose.
+   */
+  outcome?: Record<string, number>
 }
 
 /** Un schéma d'arguments strict : une clé inconnue (« filters » pour « filter ») est refusée. */

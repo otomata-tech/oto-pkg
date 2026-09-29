@@ -89,3 +89,17 @@ export async function attendreLEnregistrement(page: Page): Promise<void> {
   await attendre(statut(page, "Enregistré.")).toBeVisible()
   await attendre(statut(page, "Enregistrement…")).toHaveCount(0)
 }
+
+/**
+ * « À quoi sert cette page » d'un Contexte, replié à l'arrivée (E11-S05, AC-e2) : ouvert par Entrée sur son `summary`,
+ * l'état et l'annonce viennent du navigateur.
+ */
+export async function ouvrirAQuoiSert(page: Page): Promise<Locator> {
+  const repli = page.getByRole("group", { name: "À quoi sert cette page" })
+  await attendre(repli).toBeVisible()
+  await expect(repli).not.toHaveAttribute("open")
+  await repli.locator("summary").focus()
+  await page.keyboard.press("Enter")
+  await expect(repli).toHaveAttribute("open", "")
+  return repli
+}

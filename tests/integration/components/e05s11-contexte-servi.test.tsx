@@ -66,7 +66,7 @@ function contextes(niveaux: { toutLeMonde: NodeView["level"]; ventes: NodeView["
 /** Tout le monde en lecture (niveau 1), Ventes en gestion (3), le Contexte Privé en écriture (2). */
 const CONTEXTES = contextes({ toutLeMonde: 1, ventes: 3, prive: 2 })
 
-const DONNEES: DonneesDuContexteServi = { apercu: APERCU, contextes: CONTEXTES, equipes: [{ slug: "ventes", name: "Ventes" }], nomOrganisation: "Démo" }
+const DONNEES: DonneesDuContexteServi = { apercu: APERCU, contextes: CONTEXTES, equipes: [{ slug: "ventes", name: "Ventes" }] }
 
 function monter(donnees: Partial<DonneesDuContexteServi> = {}) {
   render(
@@ -115,7 +115,9 @@ describe("écrire un Contexte dans la vue (AC-14)", () => {
     // Gestion (Ventes) et écriture (Privé) : l'éditeur d'une page, ses champs toujours montés.
     expect(partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })).toBeInTheDocument()
     expect(partie("Contexte : Privé").getByRole("textbox", { name: "Modifier ce texte — Signature : Léa." })).toBeInTheDocument()
-    expect(partie("Contexte : Privé").getByText("La publication revient à Léa Martin.")).toBeInTheDocument()
+    // Écrire publie (E11-S02, AC-c2) : au niveau écriture aussi, la publication seule, sans phrase.
+    expect(partie("Contexte : Privé").getByRole("group", { name: "Publication" })).toBeInTheDocument()
+    expect(partie("Contexte : Privé").queryByText(/La publication revient/)).toBeNull()
     // Lecture (Tout le monde) : le texte servi, aucun champ.
     expect(partie("Contexte : Tout le monde").queryByRole("textbox")).toBeNull()
     expect(partie("Contexte : Tout le monde").getByText("Nous vendons des logiciels.", { selector: "pre" })).toBeInTheDocument()

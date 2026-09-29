@@ -27,7 +27,7 @@ import { BarreDuTableau } from "./barre-du-tableau"
 import { Grille } from "./grille"
 import { IlotDuTableau } from "./ilot-du-tableau"
 import { LienBouton } from "./lien-bouton"
-import { correspondent, GRILLE, nLignes } from "./libelles"
+import { correspondent, GRILLE, nLignes, nomDeLAssistant } from "./libelles"
 import { TableFoot } from "./table-foot"
 
 type Navigation = { reglages: Reglages; Lien: LienDeLHote; hrefDuTableau: (reglages: Reglages) => string }
@@ -41,11 +41,16 @@ export type CorpsTableauProps = Navigation & {
   avis: boolean
   /** L'adresse du tableau sans paramètre : la base des adresses que la barre et la table construisent. */
   adresse: string
+  /** La famille de l'assistant le plus récent de la personne (E11-S05, AC-h1), qui nomme qui écrira les lignes. */
+  assistant?: string
 }
 
-/** Les deux vides (AC9) : un tableau sans ligne ; aucune ligne pour la recherche ou les filtres, et le geste qui les retire. */
-function TableauVide({ lu, reglages, Lien, hrefDuTableau }: Navigation & { lu: TableGridRows }) {
-  if (lu.count === 0) return <EmptyState title={GRILLE.vide}>{GRILLE.videTexte}</EmptyState>
+/**
+ * Les deux vides (AC9) : un tableau sans ligne, et qui les écrira (E11-S05, AC-h1) ; aucune ligne pour la recherche
+ * ou les filtres, et le geste qui les retire.
+ */
+function TableauVide({ lu, reglages, Lien, hrefDuTableau, assistant }: Navigation & { lu: TableGridRows; assistant?: string }) {
+  if (lu.count === 0) return <EmptyState title={GRILLE.vide}>{GRILLE.videTexte(nomDeLAssistant(assistant))}</EmptyState>
   const filtres = reglages.clauses.length > 0
   const recherche = reglages.q !== null
   // Le geste qui répare retire tout ce qui vide l'écran : ne défaire que la recherche d'un tableau aussi filtré le laisserait vide.
@@ -79,7 +84,7 @@ function Barre({ lu, avis, adresse, ...navigation }: Navigation & { lu: TableGri
 }
 
 export function CorpsTableau(props: CorpsTableauProps) {
-  const { entete, titre, lignes, resume, avis, adresse, ...navigation } = props
+  const { entete, titre, lignes, resume, avis, adresse, assistant, ...navigation } = props
   const { reglages, Lien, hrefDuTableau } = navigation
   if (lignes.error !== undefined) {
     return (
@@ -98,7 +103,7 @@ export function CorpsTableau(props: CorpsTableauProps) {
       <Barre lu={lu} avis={avis} adresse={adresse} {...navigation} />
       {lu.rows.length === 0 ? (
         <IslandBody>
-          <TableauVide lu={lu} {...navigation} />
+          <TableauVide lu={lu} assistant={assistant} {...navigation} />
         </IslandBody>
       ) : (
         // Bord à bord : la table porte son cadre et son en-tête collant.

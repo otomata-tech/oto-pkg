@@ -12,6 +12,7 @@ Texte complet : `.method/conventions/forms-patterns.md`. La fiche suffit pour é
 - Une validation asynchrone est un confort, avec un debounce (~400 ms) ; l'unicité tient par un `UNIQUE` en base, et l'action traduit `23505` en message. § Validation asynchrone (unicité, disponibilité)
 - Une mise à jour optimiste appelle `addOptimistic` dans la transition, rend et affiche `{ error }` en cas d'échec, et se réserve aux actions rapides rarement en échec. § Mise à jour optimiste
 - Un bouton désactivé ne déduplique pas côté serveur : une création facturable ou irréversible porte une clé d'idempotence. § Double soumission
+- Un contrôle bloqué par une règle métier se garde aussi dans son gestionnaire, pas seulement par `disabled` ; son test clique le contrôle désactivé et n'attend aucune requête. § Double soumission
 - Un schéma, un formulaire, une action. § Règles
 - Une erreur de champ s'affiche en ligne sous le champ ; l'erreur globale porte `role="alert"`. § Règles
 - Tout champ a un `<label>` associé (`htmlFor` et `id`) ; seul le champ d'un éditeur en place se nomme par `aria-label`, lu dans son test par `getByRole("textbox", { name })`. § Règles

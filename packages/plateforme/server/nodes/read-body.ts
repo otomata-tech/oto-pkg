@@ -40,7 +40,8 @@ function footerOf(request: BodyRequest): string[] {
   if (level < ACCESS_LEVELS.write) return []
   const { prefix } = request
   const lines = [`To edit: ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "ops": [...]}.`]
-  if (level >= ACCESS_LEVELS.manage && request.draftMode && request.draft) {
+  // Dès le niveau écriture, qui publie (E11-S02, AC-b4).
+  if (request.draftMode && request.draft) {
     lines.push(`Publish it with ${prefix}_write ${callArguments({ path: node.path, base_revision: node.revision, publish: true })}.`)
   }
   return lines

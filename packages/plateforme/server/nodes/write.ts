@@ -1,6 +1,7 @@
 // `write` et `POST /api/plateforme/nodes` (E03-S03, AC19 à AC34) : création, opérations par section et
 // par bloc, brouillon partagé (`open_draft`, blocs `draft`, `node_drafts`), garde de révision, genre,
-// provenance, publication par `publishNode`. L'écriture est exigée sur le nœud, ou sur le parent pour
+// provenance, publication par `publishNode`, par défaut (écrire publie, fiche D135, E11-S02 ; `publish:
+// false` garde le brouillon). L'écriture est exigée sur le nœud, ou sur le parent pour
 // une création (`access.ts`), avant toute écriture (H123) ; un chemin occupé par un nœud invisible est
 // refusé avant l'insertion (N31). Branche `table` (E07-S04) : création d'un tableau, et son en-tête
 // écrit par patch dans `node_drafts.meta` (`tables/evolution.ts`). Sans lui, rien ne s'écrit.
@@ -202,16 +203,11 @@ function pendingHeader(body: WriteNodeBody, node: NodeRow): { title?: string; su
 }
 
 /**
- * Publie après l'écriture (ou seule) ; au niveau écriture, le brouillon est gardé et le refus le dit
- * (AC29, N28), décidé sur le niveau déjà calculé : aucun second calcul (N47).
+ * Publie après l'écriture (ou seule) : le niveau écriture, déjà exigé, suffit (E11-S02, H63) ; un refus de
+ * la publication garde le brouillon (N28).
  */
 async function publishAfter(db: PlatformDb, identity: Identity, edit: Edit, saved: Saved | null): Promise<PublishResult> {
   const { node } = edit
-  if (edit.level < ACCESS_LEVELS.manage) {
-    const refusal = reservedTo("publish", node.path, await whoToAsk(db, identity, await ownerOf(db, node.id)))
-    if (!saved) throw new PlatformError("forbidden", refusal)
-    throw new PlatformError("forbidden", `Draft of ${node.path} saved on revision ${node.revision}, not published: ${refusal[0].toLowerCase()}${refusal.slice(1)}`)
-  }
   const draftStamp = saved ? (saved.stamp ?? undefined) : edit.body.draft_stamp
   // `confirm_remove` confirme l'effacement des colonnes retirées d'un tableau, jamais enregistré (E07-S04 AC8).
   return publishNode(db, identity, node, { baseRevision: node.revision, draftStamp, confirmRemove: edit.patch?.confirm_remove === true })
@@ -219,16 +215,16 @@ async function publishAfter(db: PlatformDb, identity: Identity, edit: Edit, save
 
 /**
  * Le brouillon écrit au besoin (`created` : déjà écrit, dans la transaction de la création), puis la
- * publication, hors de la transaction de l'écriture : un refus de publier garde le brouillon (AC29).
+ * publication, sauf `publish: false` (E11-S02, AC-b1 ; le défaut se lit ici, HN-E11S02-21), hors de la
+ * transaction de l'écriture : un refus de publier garde le brouillon (AC29, N28).
  */
 async function finish(db: PlatformDb, identity: Identity, edit: Edit, created?: Saved): Promise<ToolOutput> {
   const { body, node } = edit
   const writes = (body.ops?.length ?? 0) > 0 || body.title !== undefined || body.summary !== undefined || body.kind !== undefined || changesHeader(edit.patch)
   const saved = created ?? (writes ? await saveEdits(db, identity, edit) : null)
-  const published = body.publish ? await publishAfter(db, identity, edit, saved) : null
+  const published = body.publish !== false ? await publishAfter(db, identity, edit, saved) : null
   const owner = await ownerOf(db, node.id)
-  const publisher = !published && edit.level < ACCESS_LEVELS.manage ? await whoToAsk(db, identity, owner) : null
-  const output = savedResult({ identity, edit, saved, published, publisher, teamId: teamOf(owner) })
+  const output = savedResult({ identity, edit, saved, published, teamId: teamOf(owner) })
   // E05-S10, AC-b12 : l'adresse a suivi le titre publié, pour l'écran comme pour un assistant (HN-E05S10e-5).
   const renamed = published?.renamed
   if (!renamed) return output
@@ -352,12 +348,11 @@ async function edit(
   const patch = node.kind === "table" ? readHeaderPatch(edits, identity.org.prefix) : null
   const header = node.kind === "table" ? changesHeader(patch) : edits.header !== undefined
   const writes = (edits.ops?.length ?? 0) > 0 || edits.title !== undefined || edits.summary !== undefined || kind !== undefined || header
-  if (!writes && !edits.publish) throw new PlatformError("invalid_arguments", "Nothing to write: give ops, title, summary or header, or publish: true.")
+  // Sans rien à écrire, `write` publie le brouillon en attente, sauf `publish: false` (E11-S02, AC-b3).
+  if (!writes && edits.publish === false) throw new PlatformError("invalid_arguments", "Nothing to write: give ops, title, summary or header.")
   checkKinds(edits, node, identity.org.prefix)
   checkOneLine(edits)
-  if (level < (writes ? ACCESS_LEVELS.write : ACCESS_LEVELS.manage)) {
-    await requireNodeLevel(db, identity, { id: node.id, path: node.path }, writes ? "write" : "publish")
-  }
+  if (level < ACCESS_LEVELS.write) await requireNodeLevel(db, identity, { id: node.id, path: node.path }, writes ? "write" : "publish")
   if (edits.base_revision !== node.revision) throw await staleRevision(db, node, edits.base_revision)
   return finish(db, identity, { node, level, created: false, body: edits, origin, patch })
 }

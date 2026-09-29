@@ -175,7 +175,7 @@ describe.skipIf(!sqlConfigured)(portable("moves and old paths on a real database
       expect((await readNode(db, lea, { path: "ventes/b/long", cursor: String(cursor) })).data).toMatchObject({ part: 2, parts: 2 })
 
       const written = spyDb(db)
-      const output = await writeNode(written.db, lea, { path: "ventes/a/x", base_revision: 1, ops: [{ op: "append", section: "Objet", text: "Ajout." }] }, AGENT)
+      const output = await writeNode(written.db, lea, { path: "ventes/a/x", base_revision: 1, ops: [{ op: "append", section: "Objet", text: "Ajout." }], publish: false }, AGENT)
       expect(output.text.split("\n")[0]).toBe(notice)
       expect(output.data).toMatchObject({ moved_from: "ventes/a/x", path: "ventes/b/x" })
       expect(await draftTexts("ventes/b/x")).toContain("Ajout.")
@@ -373,7 +373,7 @@ describe.skipIf(!sqlConfigured)(portable("moves and old paths on a real database
       expect([freeMove.error, freeMove.result?.target]).toEqual([null, "ventes/old_2"])
 
       const claire = spyDb(await ref.db("claire"))
-      const edited = await writeNode(claire.db, who("claire"), { path: "ventes/old", base_revision: 1, ops: [{ op: "append", section: "Objet", text: "Suite." }] }, AGENT)
+      const edited = await writeNode(claire.db, who("claire"), { path: "ventes/old", base_revision: 1, ops: [{ op: "append", section: "Objet", text: "Suite." }], publish: false }, AGENT)
       expect(edited.text.split("\n")[0]).toBe("ventes/old moved to ventes/confidentiel on 2026-09-24: use the new path.")
       expect(await draftTexts("ventes/confidentiel")).toContain("Suite.")
       expect(nodeInserts(claire.calls)).toEqual([])

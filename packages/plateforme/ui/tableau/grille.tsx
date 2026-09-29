@@ -8,6 +8,8 @@
 // une fonction, et navigue par l'hôte (`useHote`). Le tri se fait par le service : l'adresse change, la page
 // relit (`tables-patterns.md § L'état de la table vit dans l'URL`).
 //
+// E11-S05 (AC-a4) : une ligne à l'état de revue porte le repère de ligne du design system.
+//
 // Porté d'oto-frontend (`src/components/noeud/corps-tableau.tsx`, `colonneDuDS` et la `Table`) : toutes les
 // colonnes triables, le filtre posé dans l'en-tête et gardé visible quand il est posé, l'identité de la ligne
 // venue de la donnée, jamais son rang. Changé : la colonne clé est la colonne principale (oto-frontend : la
@@ -44,6 +46,16 @@ function rendu(ligne: TableRowRead, colonne: TableColumn, entete: TableHeader): 
   )
 }
 
+/**
+ * Le repère d'une ligne (E11-S05, AC-a4, HN-E11S05-3) : `review` quand sa colonne d'état vaut l'état de revue que
+ * l'en-tête déclare (fond et barre de `table.css`) ; aucun autre état ne se marque.
+ */
+function etatDeLaLigne(ligne: TableRowRead, entete: TableHeader): "review" | undefined {
+  const cycle = entete.lifecycle
+  if (!cycle?.review) return undefined
+  return valeurDe(ligne, { name: cycle.column, type: "enum" }, entete.key) === cycle.review.state ? "review" : undefined
+}
+
 /** Une colonne déclarée traduite en colonne du design system : triable, filtrable, rendue au format de son type. */
 function colonneDuDS(colonne: TableColumn, { entete, reglages, adresse }: Ecran): Column<TableRowRead> {
   return {
@@ -78,6 +90,7 @@ export function Grille({ entete, reglages, adresse, lignes, legende }: GrillePro
       rows={lignes}
       // La clé du service, jamais le rang : une liste qui s'allonge et se retrie recyclerait les nœuds au mauvais endroit.
       getRowId={(ligne) => String(ligne.key)}
+      rowState={(ligne) => etatDeLaLigne(ligne, entete)}
       sort={reglages.tri ? { key: reglages.tri.colonne, dir: reglages.tri.sens } : undefined}
       // Le sens que la table calcule est celui d'`avecTri` : croissant, puis décroissant sur la colonne triée croissante.
       onSortChange={(tri) => naviguer(adresseDuTableau(adresse, avecTri(reglages, tri.key)))}

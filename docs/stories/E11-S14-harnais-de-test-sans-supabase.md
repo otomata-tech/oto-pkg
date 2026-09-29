@@ -287,6 +287,12 @@ par ajout seul. Ordre proposé :
 - **HN-E11S14-7** (implémentation) : la liste est fermée dans les deux sens : un fichier qui importe une
   garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers des
   lots b et c y sont marqués « pending » jusqu'à leur lot (source : AC-a7).
+- **HN-E11S14-8** (implémentation, lot b) : les noms de `describe` passés en A qui disaient « on the cloud
+  project » disent « on a real database » ; rien d'autre de leur nom ne change (source : AC-a4, seuls les
+  noms de `describe` changent).
+- **HN-E11S14-9** (implémentation, lot b) : le `describe` principal d'`org-transfer` (export et import par
+  les emails des comptes Auth) reste sur le projet, inchangé ; seul le `describe` AC14 passe en A (source :
+  AC-b1).
 
 ## Textes proposés (écrits par le pilote à la fusion)
 
@@ -332,8 +338,7 @@ la fusion. »
 
 ### Écarts avec l'architecture
 
-Aucun : ni `packages/` ni `src/` ne changent. Seul le lot a est livré ; les lots b et c restent ouverts
-(`status.md`).
+Aucun : ni `packages/` ni `src/` ne changent. Lots a et b livrés ; le lot c reste ouvert (`status.md`).
 
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
@@ -351,3 +356,8 @@ Aucun : ni `packages/` ni `src/` ne changent. Seul le lot a est livré ; les lot
   locale ») et `testing-strategy.md § Base de test locale` (puce « Ce qui se saute en local ») et sa fiche.
 - Tâche M24 : le signataire de jetons commun est livré, retiré de la tâche ; tâche de suite M85 ouverte pour
   le mode sans Supabase des scripts à comptes (Hors périmètre). HN-E11S14-2 reste à confirmer avant le lot c.
+- Lot b livré, revue approuvée, fusionné sur `main` sans commit (commit commun à venir) : `mcp-core`,
+  `context-full`, `feedback-prompts`, `pilot-qualification` et le `describe` AC14 d'`org-transfer` passent sur
+  Postgres nu, sans assertion changée ; leurs lignes sortent de `tests/unit/gardes-supabase.test.ts`
+  (`org-transfer` y reste pour son `describe` principal, HN-E11S14-9). En base locale, 16 → 12 fichiers
+  sautés en entier. Hypothèses HN-E11S14-8 et 9 reportées dans `docs/decisions/hypotheses.md`.

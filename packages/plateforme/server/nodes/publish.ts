@@ -1,5 +1,6 @@
 // Publication d'un nœud (E03-S03, AC29 à AC33, N22, N46) : en trois temps, branches explicites par
-// genre. (1) Préparer : la gestion exigée d'abord (`requireNodeLevel`, action `publish`), puis le
+// genre. (1) Préparer : l'écriture exigée d'abord (`requireNodeLevel`, action `publish` ; écrire publie,
+// fiche D135, E11-S02 : en-tête d'un tableau compris, HN-E11S02-17), puis le
 // tampon du brouillon, ses blocs lus une fois, les contrôles du genre publié, les liens extraits ; un
 // refus ici garde le brouillon et n'appelle pas `publish_node`. (2) Publier : `publish_node`, atomique
 // (garde de révision, instantané, liens, brouillon effacé). (3) Dériver : ligne d'un Contexte au
@@ -108,7 +109,7 @@ async function contextChanged(db: PlatformDb, node: NodeRow, revision: number, b
 }
 
 /**
- * Publie le brouillon d'un nœud (N22) : exige la gestion avant toute lecture du brouillon et tout
+ * Publie le brouillon d'un nœud (N22) : exige l'écriture (E11-S02) avant toute lecture du brouillon et tout
  * appel à `publish_node` ; lit le tampon du brouillon avant les contrôles et le passe en
  * `p_draft_stamp` (N46, E03-S06 N9) ; `draftStamp` (l'écran) exige en plus que le
  * brouillon n'ait pas bougé depuis sa lecture. Un tableau se publie sans `p_links` (ses liens ne

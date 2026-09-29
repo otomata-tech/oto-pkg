@@ -1,6 +1,6 @@
 // @vitest-environment node
-// Publication sur une base réelle (E03-S03, AC29, AC30, AC32, AC33, AC39 ; E01-S10, lot t1-b) : la gestion
-// décidée par le service avant `publish_node` ; les textes des refus de `publish_node` (`PT409`, lu par
+// Publication sur une base réelle (E03-S03, AC29, AC30, AC32, AC33, AC39 ; E01-S10, lot t1-b) : l'écriture
+// décidée par le service avant `publish_node` (E11-S02, AC-a1 : écrire publie) ; les textes des refus de `publish_node` (`PT409`, lu par
 // `errors.ts`) ; Contextes et document long. Chaque cas écrit ses tables simulées sur l'organisation O de la
 // graine du fichier (`replaceContent`) ; une course est une vraie écriture de la connexion d'administration
 // juste avant `publish_node` (l'espion, `spyDb`) : une autre publication, ou le brouillon enregistré de
@@ -65,9 +65,11 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
   const who = (person: Person) => ref.identityOf(person, { org: identityOf(person).org })
   const content = (tables: Tables) => replaceContent(seed, ref, tables)
 
+  /** `write` publiant par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde ici le brouillon. */
   async function write(person: Person, input: Record<string, unknown>, hook?: SpyHook) {
     const spied = spyDb(await ref.db(person), hook)
-    const outcome = await writeNode(spied.db, who(person), input, { kind: "agent", ctx: null }).then(
+    const body = "publish" in input ? input : { ...input, publish: false }
+    const outcome = await writeNode(spied.db, who(person), body, { kind: "agent", ctx: null }).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),
     )
@@ -102,44 +104,44 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
   }
 
   describe("publishing (AC29, AC30)", () => {
-    it("should keep a writer's draft and refuse to publish it, and let the team lead publish it (AC29)", async () => {
+    it("should let a writer publish what they write, a pending draft, and a table (AC29 ; E11-S02, AC-a1, AC-a2)", async () => {
+      // Léa écrit dans l'équipe Ventes (niveau 2) : son écriture, sans `publish`, est publiée (AC-b1).
       await content(crTest())
-      const lea = await write("lea", { path: "ventes/cr_test", base_revision: 0, ops: [{ op: "append", section: "Décisions", text: "Autre." }], publish: true })
-      expect(lea.error).toMatchObject({
-        code: "forbidden",
-        message:
-          "Draft of ventes/cr_test saved on revision 0, not published: publishing ventes/cr_test is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
-      })
-      expect((await blocksOf("ventes/cr_test")).filter((row) => row.state === "draft").map((row) => row.text)).toContain("Autre.")
-      expect(publishCalls(lea.calls)).toEqual([])
-      await content(crTest())
-      const alone = await write("lea", { path: "ventes/cr_test", base_revision: 0, publish: true })
-      expect(alone.error).toMatchObject({ code: "forbidden", message: "Publishing ventes/cr_test is reserved to team Ventes (lead: Claire Morel). Ask them to publish it." })
-      expect(publishCalls(alone.calls)).toEqual([])
+      const lea = await write("lea", { path: "ventes/cr_test", base_revision: 0, ops: [{ op: "append", section: "Décisions", text: "Autre." }], publish: undefined })
+      expect(lea.error).toBeNull()
+      expect(lea.result?.text.split("\n").slice(1)).toEqual([
+        "Published ventes/cr_test revision 1 (1 section, 3 blocks). Next write: base_revision 1.",
+        "Renamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here.",
+      ])
+      expect(publishCalls(lea.calls)).toHaveLength(1)
 
       const tables = crTest()
       const draftIds = tables.blocks.map((row) => row.id)
       await content(tables)
-      const claire = await write("claire", { path: "ventes/cr_test", base_revision: 0, publish: true })
+      const alone = await write("lea", { path: "ventes/cr_test", base_revision: 0, publish: true })
       // Le tampon du brouillon lu avant les contrôles part avec la publication (E03-S06 AC13, N9).
-      expect(ref.readable(publishCalls(claire.calls).map(publishArgs))).toEqual([
+      expect(ref.readable(publishCalls(alone.calls).map(publishArgs))).toEqual([
         { p_node: nodeId("ventes/cr_test"), p_base_revision: 0, p_draft_stamp: sameInstant(CONTENT_AT), p_links: [] },
       ])
-      // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17), l'ancienne restant un alias.
-      expect(claire.result?.text).toBe(
-        "Published ventes/cr_test revision 1 (1 section, 2 blocks).\nRenamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here.",
+      // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17), l'ancienne restant un alias ; au niveau
+      // écriture depuis E11-S02 (AC-a3, HN-E11S02-18).
+      expect(alone.result?.text).toBe(
+        "Published ventes/cr_test revision 1 (1 section, 2 blocks). Next write: base_revision 1.\nRenamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here.",
       )
       expect(await nodeRow("ventes/cr_de_test_final")).toMatchObject({ status: "published", revision: 1, title: "CR de test final" })
       expect(ref.readable((await blocksOf("ventes/cr_de_test_final")).map((row) => [row.id, row.state]))).toEqual(draftIds.map((id) => [id, "published"]))
       expect(await draftsOfO()).toEqual([])
       expect(ref.readable(await versionsOfO())).toMatchObject([{ node_id: nodeId("ventes/cr_test"), revision: 1 }])
-      expect(claire.result?.data).toMatchObject({ revision: 1, status: "published", has_draft: false })
+      expect(alone.result?.data).toMatchObject({ revision: 1, status: "published", has_draft: false })
 
+      // Un tableau au brouillon en attente, publié par une rédactrice (AC-a2).
       const table = base([{ path: "ventes/suivi", kind: "table", revision: 1 }])
       openDraftRow(table, "ventes/suivi", { title: "Suivi des prospects" })
       await content(table)
-      const published = await write("claire", { path: "ventes/suivi", base_revision: 1, publish: true })
-      expect(published.result?.text).toBe("Published ventes/suivi revision 2.\nRenamed: now at ventes/suivi_des_prospects; the old path ventes/suivi still leads here.")
+      const published = await write("lea", { path: "ventes/suivi", base_revision: 1, publish: true })
+      expect(published.result?.text).toBe(
+        "Published ventes/suivi revision 2. Next write: base_revision 2.\nRenamed: now at ventes/suivi_des_prospects; the old path ventes/suivi still leads here.",
+      )
       expect(ref.readable(publishCalls(published.calls).map(publishArgs))).toEqual([{ p_node: nodeId("ventes/suivi"), p_base_revision: 1, p_draft_stamp: sameInstant(CONTENT_AT) }])
     })
 
@@ -192,14 +194,14 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       await content(tables)
       const ada = await write("ada", { path: "contexte", base_revision: 1, publish: true })
       expect(ada.result?.text).toBe(
-        "Published contexte revision 2 (0 sections, 1 block).\nContext contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
+        "Published contexte revision 2 (0 sections, 1 block). Next write: base_revision 2.\nContext contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
       )
       expect(ada.result?.data).toMatchObject({ rules_changed: true })
 
       await ref.openDraft("contexte")
       await ref.addBlocks("contexte", "draft", [paragraph("Tutoyer.")])
       const same = await write("ada", { path: "contexte", base_revision: 2, publish: true })
-      expect(same.result?.text).toBe("Published contexte revision 3 (0 sections, 1 block).")
+      expect(same.result?.text).toBe("Published contexte revision 3 (0 sections, 1 block). Next write: base_revision 3.")
       expect(same.result?.data).toMatchObject({ rules_changed: false })
     })
 
@@ -213,7 +215,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       const third = await write("claire", { path: "ventes/long", base_revision: 0, ops: [{ op: "append", section: "Corps", text: m3 }] })
       expect(third.result?.text.split("\n")[0]).toBe("Draft of ventes/long saved on revision 0: appended to « Corps » (+20,000 → 60,014 characters).")
       const published = await write("claire", { path: "ventes/long", base_revision: 0, publish: true })
-      expect(published.result?.text).toBe("Published ventes/long revision 1 (1 section, 4 blocks).")
+      expect(published.result?.text).toBe("Published ventes/long revision 1 (1 section, 4 blocks). Next write: base_revision 1.")
       const blocks = (await blocksOf("ventes/long")).filter((row) => row.state === "published")
       expect(renderBlocks(blocks.map((row) => ({ type: row.type, text: row.text, data: row.data })))).toBe(`## Corps\n\n${m1}\n\n${m2}\n\n${m3}`)
     })

@@ -27,7 +27,7 @@ async function boite(element: Locator) {
 
 /**
  * Le haut du premier bloc dans la carte du document : il ne bouge pas quand l'indication paraît ou disparaît (AC-1).
- * Mesuré depuis le haut de la carte : le défilement et « Contenus liés », qui paraît au-dessus après la publication, n'y entrent pas.
+ * Mesuré depuis le haut de la carte : le défilement et les encarts, qui paraissent après la publication, n'y entrent pas.
  */
 async function hautDuPremierBloc(page: Page): Promise<number> {
   const rangee = page.locator(".oto-block-row").first()

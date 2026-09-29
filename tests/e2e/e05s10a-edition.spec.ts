@@ -155,9 +155,10 @@ test.describe("édition sans friction (E05-S10, partie a)", () => {
         await capturer(page, testInfo, `procedure-${nom}`)
         await page.keyboard.press("Escape")
 
-        // Un tableau : son titre et son résumé en place (AC-a10), rien n'est écrit.
+        // Un tableau : son titre en place (AC-a10), son résumé ni lu ni écrit (E11-S05, AC-f1), rien n'est écrit.
         await page.goto(`${ESPACE.adresse}/n/${CHEMINS.tableau}`)
-        await attendre(page.getByRole("textbox", { name: "Résumé" })).toBeVisible()
+        await attendre(page.getByRole("textbox", { name: "Titre", exact: true })).toBeVisible()
+        await expect(page.getByRole("textbox", { name: "Résumé" })).toHaveCount(0)
         await capturer(page, testInfo, `tableau-${nom}`)
         expect(hydratation).toEqual([])
         await context.close()

@@ -1,7 +1,7 @@
 // @vitest-environment node
 // L'import d'un CSV sur une vraie base (E10-S01, AC-b3 à AC-b5, AC-c1, AC-c2 ; fiches D100, D117, D120) :
 // `table.import` par `acme_call` (`InMemoryTransport`, `connectDeps`) et `POST tables/import` (la route de l'API),
-// deux portes d'`importRows`. Création sous la gestion du parent, en-tête publié, types et clé déduits, provenance
+// deux portes d'`importRows`. Création sous l'écriture du parent (E11-S02), en-tête publié, types et clé déduits, provenance
 // `import` par cellule, second morceau fusionné sur la clé, lot tout ou rien, refus mot pour mot, aucune requête
 // d'écriture après un refus de droit (`spyDb`), le journal de `call`. Et `write` : `tolerant` ignoré par le MCP,
 // lu par l'API. Fixture des tableaux semée une fois (`seedTableFixture`), suite portable.
@@ -118,13 +118,24 @@ describe.skipIf(!sqlConfigured)(portable("table.import and POST tables/import on
     )
   })
 
-  it("should refuse a new table without the manage level of the parent before any write, saying whom to ask (AC-b3, D120)", async () => {
-    const { db, sent } = spyDb(await ref.db("lea"))
-    const request = { path: "ventes/de_lea", by: { kind: "human" as const }, comment: "Importé de lea.csv", headers: ["nom"], rows: [["x"]] }
-    const refused = await importRows({ db, identity: acmeIdentity(ref, "lea") }, { ...request, create: { title: "De Léa", summary: "Essai.", header: { columns: [{ name: "nom", type: "text" }], key: "nom" } } }).catch((error: unknown) => error)
-    expect(refused).toMatchObject({ code: "forbidden", message: expect.stringMatching(/^Publishing a new table under ventes is reserved to .+\. Ask them to publish it\.$/) })
-    // Aucune écriture : ni instruction, ni fonction qui ouvre un brouillon ou publie.
-    expect([...writesOf(sent), ...sent.filter((query) => query.op === "call" && ["open_draft", "publish_node"].includes(query.target ?? ""))]).toEqual([])
+  it("should create and publish a table under a parent the caller writes, and refuse a reader of the parent before any write, saying whom to ask (AC-b3, E11-S02)", async () => {
+    const request = { by: { kind: "human" as const }, comment: "Importé de essai.csv", headers: ["nom"], rows: [["x"]] }
+    const create = (title: string) => ({ title, summary: "Essai.", header: { columns: [{ name: "nom", type: "text" as const }], key: "nom" } })
+    // Léa écrit `ventes` (membre de l'équipe Ventes) sans le gérer : écrire publie, la création comprise.
+    await importRows({ db: await ref.db("lea"), identity: acmeIdentity(ref, "lea") }, { ...request, path: "ventes/de_lea", create: create("De Léa") })
+    const [node] = await seed.admin<{ revision: number; status: string }[]>`select revision, status from platform.nodes where org_id = ${ref.org.id} and path = 'ventes/de_lea'`
+    expect(node).toEqual({ revision: 1, status: "published" })
+
+    const [rule] = await ref.addRules([{ node: "ventes", user: "marc", level: "read" }])
+    try {
+      const { db, sent } = spyDb(await ref.db("marc"))
+      const refused = await importRows({ db, identity: acmeIdentity(ref, "marc") }, { ...request, path: "ventes/de_marc", create: create("De Marc") }).catch((error: unknown) => error)
+      expect(refused).toMatchObject({ code: "forbidden", message: "Writing under ventes is reserved to team Ventes (lead: Claire Morel). Ask them for access." })
+      // Aucune écriture : ni instruction, ni fonction qui ouvre un brouillon ou publie.
+      expect([...writesOf(sent), ...sent.filter((query) => query.op === "call" && ["open_draft", "publish_node"].includes(query.target ?? ""))]).toEqual([])
+    } finally {
+      await seed.admin`delete from platform.access_rules where id = ${rule}`
+    }
   })
 
   it("should keep a table whose first lot is refused after its creation, say its path, and fill it on a resume without create (HN-E10S01-21)", async () => {

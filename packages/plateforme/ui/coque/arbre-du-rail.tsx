@@ -13,8 +13,8 @@
 import { useContext, useState, type AnchorHTMLAttributes, type DragEvent, type MouseEvent } from "react"
 import { FileText } from "@phosphor-icons/react/dist/csr/FileText"
 import { Info } from "@phosphor-icons/react/dist/csr/Info"
-import { ListBullets } from "@phosphor-icons/react/dist/csr/ListBullets"
 import { Play } from "@phosphor-icons/react/dist/csr/Play"
+import { Table } from "@phosphor-icons/react/dist/csr/Table"
 import { titreDeContexte } from "../arbre/depuis-l-arbre"
 import type { NatureDeNoeud, NoeudDArbre } from "../arbre/types"
 import { AnimatedIcon, type Glyphe } from "../ds/react/icon"
@@ -28,9 +28,10 @@ import { useDeplierAuClic, type DepliageDuRail } from "./use-depliage-du-rail"
 
 /**
  * Le glyphe de chaque nature, décoratif (le nom est écrit à côté) ; le seul : l'arbre du rail, la palette, la
- * création et les écrans le lisent. Une procédure porte `Play` (E05-S11, retour 19, AC-35).
+ * création et les écrans le lisent. Une procédure porte `Play` (E05-S11, retour 19, AC-35) ; un tableau, `Table`
+ * (E11-S05, AC-h2).
  */
-export const GLYPHES: Record<NatureDeNoeud, Glyphe> = { page: FileText, tableau: ListBullets, procedure: Play, contexte: Info }
+export const GLYPHES: Record<NatureDeNoeud, Glyphe> = { page: FileText, tableau: Table, procedure: Play, contexte: Info }
 
 /** Un nom vide s'affiche « Sans titre » : un lien sans texte n'a rien à cliquer ni à annoncer. */
 const libelle = (titre: string) => (titre.trim() === "" ? "Sans titre" : titre)

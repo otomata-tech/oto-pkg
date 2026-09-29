@@ -4,8 +4,8 @@ import type { Icon } from "@phosphor-icons/react"
 // Server Component), et le baril charge les 1 500 icônes à chaque import (40 s sous Vitest).
 import { FileText } from "@phosphor-icons/react/dist/ssr/FileText"
 import { Info } from "@phosphor-icons/react/dist/ssr/Info"
-import { ListBullets } from "@phosphor-icons/react/dist/ssr/ListBullets"
 import { Play } from "@phosphor-icons/react/dist/ssr/Play"
+import { Table } from "@phosphor-icons/react/dist/ssr/Table"
 import { BrancheDArbre } from "./branche-d-arbre"
 import { ARBRE_VIDE } from "./depuis-l-arbre"
 import type { NatureDeNoeud, NoeudDArbre, ResultatDArbre, SectionDArbre } from "./types"
@@ -31,10 +31,10 @@ type NavigateurDArbreProps = {
   sections?: SectionDArbre[]
 }
 
-/** Les glyphes du rail (`coque/arbre-du-rail.tsx`), en `ssr` : une procédure porte `Play` (E05-S11, AC-35). */
+/** Les glyphes du rail (`coque/arbre-du-rail.tsx`), en `ssr` : une procédure porte `Play` (E05-S11, AC-35), un tableau `Table` (E11-S05, AC-h2). */
 const GLYPHES: Record<NatureDeNoeud, Icon> = {
   page: FileText,
-  tableau: ListBullets,
+  tableau: Table,
   procedure: Play,
   contexte: Info,
 }

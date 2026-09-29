@@ -37,13 +37,15 @@ export { nodeOwner } from "./access-facts"
 export { ancestorPaths, nodeDepth, ROOT_PATH } from "./access-levels"
 
 /**
- * Ce que l'appelant tente sur un nœud, et le niveau que cela exige : écrire le brouillon, publier
- * (H63), poser ou retirer une règle d'accès (fiche D4, E05-S03), déplacer (H71, E03-S07), changer son
- * propriétaire (E08-S06, N19). L'action fixe le niveau : un refus ne dit « publish » que pour la gestion.
+ * Ce que l'appelant tente sur un nœud, et le niveau que cela exige : écrire le brouillon et publier
+ * (H63 ; écrire publie, fiche D135, E11-S02), renommer par le titre publié (le chemin qui suit le titre,
+ * HN-E11S02-18), poser ou retirer une règle d'accès (fiche D4, E05-S03), déplacer (H71, E03-S07),
+ * changer son propriétaire (E08-S06, N19). L'action fixe le niveau et le verbe du refus.
  */
 const NODE_ACTIONS = {
   write: ACCESS_LEVELS.write,
-  publish: ACCESS_LEVELS.manage,
+  publish: ACCESS_LEVELS.write,
+  rename: ACCESS_LEVELS.write,
   share: ACCESS_LEVELS.manage,
   move: ACCESS_LEVELS.manage,
   transfer: ACCESS_LEVELS.manage,
@@ -60,6 +62,7 @@ export type AccessAction = NodeAction | "use"
 const ACTIONS: Record<AccessAction, { verb: string; ask: string }> = {
   write: { verb: "Writing", ask: "Ask them for access." },
   publish: { verb: "Publishing", ask: "Ask them to publish it." },
+  rename: { verb: "Renaming", ask: "Ask them to rename it." },
   share: { verb: "Sharing", ask: "Ask them to share it." },
   move: { verb: "Moving", ask: "Ask them to move it." },
   transfer: { verb: "Changing the owner of", ask: "Ask them to change it." },
@@ -251,7 +254,7 @@ export function reservedTo(action: AccessAction, target: string, who: string): s
 }
 
 /**
- * Exige sur un nœud le niveau de l'action (écrire : 2, publier : 3) et rend le niveau de
+ * Exige sur un nœud le niveau de l'action (écrire et publier : 2, gérer : 3) et rend le niveau de
  * l'appelant. Invisible : `not_found` (H68) ; visible sans le niveau : `forbidden`, qui dit à qui
  * demander. Décidé comme `nodeLevel`, exact depuis E01-S08.
  */

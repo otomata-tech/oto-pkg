@@ -2,7 +2,8 @@
 // `TableauDuNoeud` et son chargement, rendus comme la page de l'hôte les monte, sur des lectures construites
 // en mémoire (forme de H93). L'hôte est simulé par ce qu'il prête : son lien (une ancre marquée) et sa
 // navigation, espionnée (`ContexteDeLHote`) ; les adresses du tableau par `adresseDesReglages`. Les nombres
-// attendus se calculent sur ces lignes.
+// attendus se calculent sur ces lignes. E11-S05 : le repère d'un repli de cellule (AC-a1, AC-a2), la ligne à revoir
+// (AC-a4), le vide nommé par l'assistant de la personne (AC-h1).
 import type { AnchorHTMLAttributes, ComponentProps } from "react"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -181,6 +182,39 @@ describe("TableauDuNoeud, provenance (AC3)", () => {
     expect(within(cellule("P-002", "email")).getByText("Vérifié vide par l'assistant de Léa Roux : Aucune adresse sur le site")).toBeInTheDocument()
     expect(within(cellule("P-001", "ref")).getByText("Importé")).toBeInTheDocument()
     expect(cellule("P-001", "entreprise").querySelector("details")).toBeNull()
+  })
+
+  it("should mark the disclosure by a chevron after the value, hidden from assistive technologies, the value in ink and the detail in grey (E11-S05, AC-a1, AC-a2)", () => {
+    rendre()
+    const repli = cellule("P-001", "montant_estime").querySelector("details")
+    if (!repli) throw new Error("repli absent")
+    expect(repli).toHaveClass("oto-cell-detail")
+    const resume = repli.querySelector("summary")
+    expect(resume).toHaveClass("text-ink")
+    expect(resume?.lastElementChild).toHaveClass("oto-cell-chevron")
+    expect(resume?.lastElementChild).toHaveAttribute("aria-hidden", "true")
+    expect(resume).toHaveTextContent(/^12 000$/)
+    expect(within(repli).getByText("Décidé par Claire Morel").parentElement).toHaveClass("text-mute")
+    // Un lien du détail est gris comme lui, et reste souligné.
+    expect(within(repli).getByRole("link", { name: "https://valbrune.test/deliberation-12" })).toHaveClass("text-mute", "underline")
+  })
+})
+
+describe("TableauDuNoeud, rows in review (E11-S05, AC-a4)", () => {
+  const etats = () =>
+    within(table())
+      .getAllByRole("row")
+      .slice(1)
+      .map((rangee) => rangee.getAttribute("data-state"))
+
+  it("should mark the row whose state is the review state of the header, and no other", () => {
+    rendre()
+    expect(etats()).toEqual([null, null, "review"])
+    cleanup()
+
+    // Sans revue déclarée, aucune ligne n'est marquée.
+    rendre({ entete: { ...ENTETE, lifecycle: { column: "statut", states: STATES, working: "en cours" } } })
+    expect(etats()).toEqual([null, null, null])
   })
 })
 
@@ -374,10 +408,14 @@ describe("TableauDuNoeud, four states (AC9)", () => {
     expect(within(screen.getByRole("alert")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `${ADRESSE}?q=tilleuls&tri=ref`)
     expect(screen.getByRole("searchbox", { name: "Chercher dans le tableau" })).toHaveValue("tilleuls")
     cleanup()
+    // Le vide dit qui écrira les lignes (E11-S05, AC-h1) : l'assistant le plus récent, sinon « votre assistant ».
     rendre({ lignes: lignes([], 0, 0) })
     expect(screen.getByText("Ce tableau est vide")).toBeInTheDocument()
-    expect(screen.getByText("Ses colonnes sont prêtes. Les lignes viendront d'un assistant qui écrit ici.")).toBeInTheDocument()
+    expect(screen.getByText("C'est votre assistant qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
     expect(screen.queryByRole("table")).toBeNull()
+    cleanup()
+    rendre({ lignes: lignes([], 0, 0), assistant: "claude.ai" })
+    expect(screen.getByText("C'est Claude qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
     cleanup()
     rendre({ lignes: lignes([], 0, 10), parametres: { f: "statut:egal:écarté" } })
     expect(screen.getByText("Aucune ligne pour cette recherche")).toBeInTheDocument()

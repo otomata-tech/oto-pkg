@@ -5,11 +5,11 @@
 //
 // Porté d'oto-frontend (`design-system/components/react/content.jsx` l. 214-260, `EmbedCard`) : un
 // contenu cité est un objet, le nom porte le lien, pas la carte. Retiré : la vignette, le volume, le mode
-// d'injection et le bouton « Ouvrir », doublon du lien.
+// d'injection et le bouton « Ouvrir », doublon du lien. E11-S05 (AC-f2) : le résumé d'une procédure seule.
 import type { ScreenCard } from "../../schemas"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
-import { NATURES } from "../noeud/libelles"
+import { NATURES, resumeMontre } from "../noeud/libelles"
 import { REFERENCES } from "./libelles"
 
 type CarteDeNoeudProps = { carte: ScreenCard; Lien: LienDeLHote; hrefDuChemin: (chemin: string) => string }
@@ -23,7 +23,7 @@ export function CarteDeNoeud({ carte, Lien, hrefDuChemin }: CarteDeNoeudProps) {
         </Lien>
       </p>
       <p className="text-sm">{[NATURES[carte.nodeKind], ...(carte.movedFrom ? [REFERENCES.ancienChemin(carte.movedFrom)] : [])].join(" · ")}</p>
-      <p className="text-sm">{carte.summary}</p>
+      {resumeMontre(carte.nodeKind) && <p className="text-sm">{carte.summary}</p>}
     </div>
   )
 }

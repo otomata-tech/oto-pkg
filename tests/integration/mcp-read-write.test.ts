@@ -73,7 +73,7 @@ describe.skipIf(!configured || privatePending)(
         "### Détail\n\nTexte.\n\n#### Précision\n\n##### Note\n\n###### Fin",
         "<details>\n<summary>Notes brutes</summary>\n\nTout ce qui a été dit.\n\n</details>",
       ].join("\n\n")
-      await lea.call("write", { path, title: "CR markdown", summary: "Compte rendu en markdown.", ops: [{ op: "add_section", section: "Réunion", text: body }] })
+      await lea.call("write", { path, title: "CR markdown", summary: "Compte rendu en markdown.", ops: [{ op: "add_section", section: "Réunion", text: body }], publish: false })
       expect((await claire.call("write", { path, base_revision: 0, publish: true })).text).toMatch(new RegExp(`^Published ${path} revision 1 `))
       expect((await lea.call("read", { path, section: "Réunion" })).text).toContain(`\n\n## Réunion\n\n${body}\n\nTo edit`)
 
@@ -92,14 +92,15 @@ describe.skipIf(!configured || privatePending)(
         title: "CR de la réunion",
         summary: "Compte rendu de test.",
         ops: [{ op: "add_section", section: "Décisions", text: "Lancer la pré-étude.\n\nRelancer Acme." }],
+        publish: false,
       })
       expect(created.text.split("\n")[0]).toMatch(new RegExp(`^Draft of ${path} created \\(revision 0\\): added « Décisions »`))
-      expect((await claire.call("write", { path, base_revision: 0, publish: true })).text).toBe(`Published ${path} revision 1 (1 section, 3 blocks).`)
+      expect((await claire.call("write", { path, base_revision: 0, publish: true })).text).toBe(`Published ${path} revision 1 (1 section, 3 blocks). Next write: base_revision 1.`)
 
       const section = await lea.call("read", { path, section: "Décisions", refs: true })
       const blockRef = /<!-- ref: (\S+) -->\nRelancer Acme\./.exec(section.text)?.[1]
       expect(blockRef).toBeTruthy()
-      await lea.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: blockRef, text: "Relancer Acme vendredi." }] })
+      await lea.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: blockRef, text: "Relancer Acme vendredi." }], publish: false })
       const draft = await lea.call("read", { path, draft: true })
       expect(draft.text).toContain("\n\n## Décisions\n\nLancer la pré-étude.\n\nRelancer Acme vendredi.")
       const node = await fx.nodeId(ref.org.id, path)
@@ -124,6 +125,27 @@ describe.skipIf(!configured || privatePending)(
       expect([of("lea"), of("claire")]).toEqual([expected(["write", "read", "write", "read"]), expected(["write"])])
     })
 
+    // E11-S02 (AC-b1, AC-a2) : écrire publie, au niveau écriture ; `publish: false` garde un brouillon.
+    it("should publish a write without publish, keep a draft with publish: false, and publish a table header at the write level", async () => {
+      const lea = await session("lea", `pub-${hex(4)}`)
+      const path = `ventes/faq_${hex(3)}`
+      const created = await lea.call("write", { path, title: "FAQ", summary: "Questions fréquentes.", ops: [{ op: "add_section", section: "Livraison", text: "Sous huit jours." }] })
+      expect(created.isError, created.text).toBe(false)
+      expect(created.text.split("\n")[1]).toBe(`Published ${path} revision 1 (1 section, 2 blocks). Next write: base_revision 1.`)
+      expect(created.result.structuredContent).toMatchObject({ status: "published", revision: 1 })
+      const drafted = await lea.call("write", { path, base_revision: 1, ops: [{ op: "append", section: "Livraison", text: "Hors week-end." }], publish: false })
+      expect(drafted.text.split("\n")[1]).toBe(`Publish it with ${ref.org.prefix}_write {"path": "${path}", "base_revision": 1, "publish": true}.`)
+      expect(drafted.result.structuredContent).toMatchObject({ status: "published", revision: 1, has_draft: true })
+
+      const table = `ventes/salons_${hex(3)}`
+      const header = { columns: [{ name: "nom", type: "text" }], key: "nom" }
+      const made = await lea.call("write", { path: table, kind: "table", title: "Salons", summary: "Les salons.", header })
+      expect(made.text).toBe(`Published ${table} revision 1: a table with 1 column, key nom. Write rows with ${ref.org.prefix}_call table.write. Next write: base_revision 1.`)
+      const changed = await lea.call("write", { path: table, base_revision: 1, header: { columns: [{ name: "ville", type: "text" }], closed: true } })
+      expect(changed.text).toBe(`Published ${table} revision 2: added ville; closed. Next write: base_revision 2.`)
+      expect((await lea.call("read", { path: table })).text).toContain("\naccess: write (write and publish; sharing, moving and deleting are reserved to team Ventes (lead: Claire Morel))\n")
+    })
+
     it("should keep both changes when two people write two different blocks of the same draft at once (AC25)", async () => {
       const path = `ventes/devis_${hex(3)}`
       const node = await fx.createNode(ref.org.id, { parentId: ref.nodes.ventes, path, title: "Devis" })
@@ -132,8 +154,8 @@ describe.skipIf(!configured || privatePending)(
       const agent = `rw-${hex(4)}`
       const [lea, claire] = await Promise.all([session("lea", agent), session("claire", agent)])
       await Promise.all([
-        lea.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: first.slice(0, 8), text: "Premier, par Léa." }] }),
-        claire.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: second.slice(0, 8), text: "Second, par Claire." }] }),
+        lea.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: first.slice(0, 8), text: "Premier, par Léa." }], publish: false }),
+        claire.call("write", { path, base_revision: 1, ops: [{ op: "replace_block", block: second.slice(0, 8), text: "Second, par Claire." }], publish: false }),
       ])
       const blocks = await admin<{ id: string; text: string | null }[]>`select id, text from platform.blocks where node_id = ${node} and state = 'draft' order by position`
       expect(blocks.map((block) => [block.id, block.text])).toEqual([

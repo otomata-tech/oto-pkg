@@ -73,25 +73,17 @@ function ecran(props: Partial<ComponentProps<typeof EcranDeNoeud>> = {}) {
   )
 }
 
-type Montage = { blocs: BlockView[]; genre?: NodeKind; niveau?: 2 | 3; tampon?: string | null }
+type Montage = { blocs: BlockView[]; genre?: NodeKind; tampon?: string | null }
 
 /**
  * L'éditeur d'E05-S02 sous sa file d'écriture, comme l'écran le monte au niveau écriture ; « Ailleurs »,
  * hors de l'éditeur : le focus qui y va quitte le bloc (E05-S08).
  */
-function editeur({ blocs, genre, niveau = 2, tampon = null }: Montage) {
+function editeur({ blocs, genre, tampon = null }: Montage) {
   return render(
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin={CHEMIN} revisionPubliee={4} tampon={tampon}>
-        <EditeurDeBlocs
-          niveau={niveau}
-          blocs={blocs}
-          revisionServie={4}
-          phraseDePublication="La publication revient au responsable de l'équipe Ventes (Claire Morel) ou à un administrateur."
-          prefixeDesPages="/n/"
-          lienVersionPubliee={<a href={`/n/${CHEMIN}?version=publiee`}>Voir la version publiée</a>}
-          genre={genre}
-        />
+        <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" genre={genre} />
       </FileDOperations>
       <button type="button">Ailleurs</button>
     </ContexteDeRafraichissement.Provider>,
@@ -277,13 +269,15 @@ describe("un appel déjà écrit, sur l'écran d'une page (M59)", () => {
 
 describe("titre et résumé d'une procédure (AC5)", () => {
   // M59 (fiche D104) : une procédure a l'aide d'une page, aucune propre à elle.
-  // Le titre d'un Contexte est composé, jamais écrit en place (E05-S11, AC-17).
-  it.each(["procedure", "page", "context"] as const)("should give a %s no summary help under « Résumé », written in place with its title, except a Contexte's (E05-S10, AC-a1)", (kind) => {
+  // Le titre d'un Contexte est composé, jamais écrit en place (E05-S11, AC-17). Le résumé ne s'écrit à l'écran que pour
+  // une procédure (E11-S05, AC-f1, HN-E11S05-15).
+  it.each(["procedure", "page", "context"] as const)("should give a %s its title in place, except a Contexte's, and « Résumé » without help for a procedure only (E05-S10, AC-a1)", (kind) => {
     ecran({ noeud: { data: procedure({ kind, level: 2, draft: brouillon() }) } })
     expect(screen.queryByRole("button", { name: "Modifier le titre et le résumé" })).toBeNull()
     if (kind === "context") expect(screen.queryByRole("textbox", { name: "Titre" })).toBeNull()
     else expect(screen.getByRole("textbox", { name: "Titre" })).toHaveValue("Qualifier les prospects à traiter")
-    expect(screen.getByRole("textbox", { name: "Résumé" })).toHaveAccessibleDescription("")
+    if (kind === "procedure") expect(screen.getByRole("textbox", { name: "Résumé" })).toHaveAccessibleDescription("")
+    else expect(screen.queryByRole("textbox", { name: "Résumé" })).toBeNull()
   })
 })
 
@@ -311,7 +305,7 @@ function refuserLaPublication(refusals: unknown[]) {
 
 describe("publication refusée, par emplacement (AC7)", () => {
   it("should say how many problems block the publication, each by its place, its function or argument and its kind, lead to its block, fold the service text, and keep the draft", async () => {
-    editeur({ blocs: PROCEDURE, genre: "procedure", niveau: 3, tampon: TAMPON })
+    editeur({ blocs: PROCEDURE, genre: "procedure", tampon: TAMPON })
     // La publication part seule (E05-S10, AC-a6) : un texte écrit, puis la page quittée.
     const texte = await champ("Modifier ce texte — Quand des fiches de")
     fireEvent.change(texte, { target: { value: "Quand des fiches de prospects sont incomplètes ou anciennes." } })
@@ -406,10 +400,10 @@ describe("liste des procédures (AC9)", () => {
       ["État", "col"],
     ])
     expect(lignes()).toEqual([
-      ["Titre de guide/accueil", "guide/accueil", "Organisation", "Brouillon · jamais publiée"],
+      ["Titre de guide/accueil", "guide/accueil", "Organisation", "Non publiée"],
       // Une procédure d'un espace personnel n'a pas d'équipe, et n'est pas celle de l'organisation (HN-E05S04-21).
       ["Titre de private/lea/ma_relance", "private/lea/ma_relance", "Privé", "Publiée · rév. 4"],
-      ["Titre de support/traiter_un_ticket", "support/traiter_un_ticket", "Support", "Publiée · rév. 2 · brouillon en attente"],
+      ["Titre de support/traiter_un_ticket", "support/traiter_un_ticket", "Support", "Publiée · rév. 2 · modifications en attente"],
       [`Titre de ${CHEMIN}`, CHEMIN, "Ventes", "Publiée · rév. 4"],
     ])
     expect(screen.getByRole("link", { name: `Titre de ${CHEMIN}` })).toHaveAttribute("href", `/n/${CHEMIN}`)

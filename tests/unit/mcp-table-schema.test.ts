@@ -94,11 +94,11 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table through MCP"), {
         header: { columns: [{ name: "nom", type: "text", required: true }, { name: "ville", type: "text" }], key: "nom" },
         publish: true,
       })
-      expect([created.isError, created.text]).toEqual([false, "Published ventes/salons revision 1: a table with 2 columns, key nom. Write rows with acme_call table.write."])
+      expect([created.isError, created.text]).toEqual([false, "Published ventes/salons revision 1: a table with 2 columns, key nom. Write rows with acme_call table.write. Next write: base_revision 1."])
       expect(created.result.structuredContent).toMatchObject({ text: created.text, path: "ventes/salons", revision: 1 })
 
       const added = await claire.write({ path: "ventes/salons", base_revision: 1, header: { columns: [{ name: "stand", type: "text" }] }, publish: true })
-      expect([added.isError, added.text]).toEqual([false, "Published ventes/salons revision 2: added stand."])
+      expect([added.isError, added.text]).toEqual([false, "Published ventes/salons revision 2: added stand. Next write: base_revision 2."])
       expect(added.result.structuredContent).toMatchObject({ text: added.text })
 
       // Deux salons écrits entre-temps (E07-S02 les écrirait par `table.write`), qui ont une ville.
@@ -107,10 +107,10 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table through MCP"), {
       const asked = await claire.write({ path: "ventes/salons", base_revision: 2, header: { remove_columns: ["ville"] }, publish: true })
       expect(asked.isError).toBe(true)
       expect(asked.text).toBe(
-        'Publication of ventes/salons needs confirmation: removing column « ville » erases its values on 2 rows (sample keys: Batimat, Pollutec). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. The draft is kept; nothing was published. If the user agrees to erase them, call acme_write {"path": "ventes/salons", "base_revision": 2, "header": {"confirm_remove": true}, "publish": true}.',
+        'Publication of ventes/salons needs confirmation: removing column « ville » erases its values on 2 rows (sample keys: Batimat, Pollutec). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {"path": "ventes/salons"}. If the user agrees to erase them, call acme_write {"path": "ventes/salons", "base_revision": 2, "header": {"confirm_remove": true}, "publish": true}.',
       )
       const confirmed = await claire.write({ path: "ventes/salons", base_revision: 2, header: { confirm_remove: true }, publish: true })
-      expect([confirmed.isError, confirmed.text]).toEqual([false, "Published ventes/salons revision 3: removed ville (2 values erased)."])
+      expect([confirmed.isError, confirmed.text]).toEqual([false, "Published ventes/salons revision 3: removed ville (2 values erased). Next write: base_revision 3."])
       expect(confirmed.result.structuredContent).toMatchObject({ text: confirmed.text, revision: 3 })
 
       const writes = claire.journal.filter((entry) => entry.tool === "acme_write")

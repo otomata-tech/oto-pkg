@@ -287,7 +287,7 @@ function Editeur({ blocs = PAGE, children }: { blocs?: BlockView[]; children?: R
   return (
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
-        <EditeurDeBlocs niveau={2} blocs={blocs} revisionServie={4} phraseDePublication="" prefixeDesPages="/n/" lienVersionPubliee={null} />
+        <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" />
       </FileDOperations>
       {children}
     </ContexteDeRafraichissement.Provider>
@@ -307,7 +307,7 @@ describe("EditeurDeBlocs — a paste (AC-a1, AC-a2)", () => {
       coller(champDuTexte(), "# Titre\n\n```call\nx {\n```")
     })
     await waitFor(() => expect(rafraichir).toHaveBeenCalled())
-    expect(envoyes.map(({ corps }) => corps)).toEqual([{ path: "ventes/modele_relance", base_revision: 4, ops: [{ op: "insert_after", text: "# Titre\n\n```call\nx {\n```", block: ID.objet }], tolerant: true }])
+    expect(envoyes.map(({ corps }) => corps)).toEqual([{ path: "ventes/modele_relance", base_revision: 4, publish: false, ops: [{ op: "insert_after", text: "# Titre\n\n```call\nx {\n```", block: ID.objet }], tolerant: true }])
     expect(screen.getAllByRole("status").some((region) => region.textContent?.includes(IMPORT.conserves(2)))).toBe(true)
   })
 
@@ -357,7 +357,7 @@ describe("EditeurDeBlocs — convert a simple table (AC-b7)", () => {
           rows: [["Atelier", "12,5"], ["Forge", "3"]],
         },
       ],
-      ["/api/plateforme/nodes", { path: "ventes/modele_relance", base_revision: 4, ops: [{ op: "replace_block", block: tableau.id, input: { type: "reference", text: null, data: { path: "ventes/modele_relance/objet" } } }] }],
+      ["/api/plateforme/nodes", { path: "ventes/modele_relance", base_revision: 4, publish: false, ops: [{ op: "replace_block", block: tableau.id, input: { type: "reference", text: null, data: { path: "ventes/modele_relance/objet" } } }] }],
     ])
   })
 

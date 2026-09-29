@@ -1,8 +1,9 @@
 // Le corps d'un nœud (E05-S02, AC3, AC4, AC7 à AC9, AC17 ; E05-S09, partie c1) : l'avis de la version
 // publiée, le document dans son îlot (ses blocs lus, ou l'éditeur au niveau écriture), et le complément de
-// l'hôte ; les sous-pages sont dans « Contenus liés », hors du document (E05-S10, AC-b6). Un tableau n'a pas d'éditeur : son brouillon (titre et résumé en
-// attente, lignes écrites par le modèle) a son bandeau et sa publication, sa grille vit dans le complément
-// (E07-S03, HN-E05S02-27). Server Component. Sans lui, l'écran n'aurait que son en-tête.
+// l'hôte ; les sous-pages sont dans l'encart « Sous-pages », hors du document (E11-S05, AC-e1). Un tableau n'a pas d'éditeur : son brouillon (titre et résumé en
+// attente, en-tête écrit en place) a sa publication, sa grille vit dans le complément (E07-S03,
+// HN-E05S02-27) ; ni bandeau ni lien « Voir la version publiée » depuis E11-S02 (AC-c3). Server Component.
+// Sans lui, l'écran n'aurait que son en-tête.
 //
 // Porté d'oto-frontend (`routes/n.$nodeId.lazy.tsx`, `NoeudCharge`, et `components/noeud/corps-du-noeud.tsx`,
 // `CorpsDuNoeud`) : le document dans un îlot nommé par le titre, le corps de lecture (`Reader`), les blocs
@@ -12,6 +13,7 @@
 // E05-S11 : une page citée se lit par son titre (AC-26, AC-27), d'abord par l'arbre visible (`cibles`), puis par
 // les liens sortants lus (`liens`, que seul le titre d'un lien attend, M64) ; l'indication
 // d'enregistrement d'un tableau se pose en haut à droite de son brouillon (AC-1).
+// E11-S05 (AC-g2) : une page vide dont le titre est écrit s'ouvre le focus dans son Texte vide.
 import type { ReactNode } from "react"
 import type { BlockView, NodeView } from "../../schemas"
 import { listItemTexts, tableCells } from "../../schemas/blocks"
@@ -19,6 +21,7 @@ import { fencedParts } from "../../schemas/link-syntax"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
+import { CREATION } from "../coque/libelles"
 import { EmptyState } from "../ds/react/empty-state"
 import { Island } from "../ds/react/island"
 import { Alert } from "../ds/react/primitives"
@@ -26,8 +29,8 @@ import { Reader } from "../ds/react/reader"
 import { EditeurDeBlocs } from "./editeur/editeur-de-blocs"
 import { IndicationDEnregistrement } from "./editeur/lignes-d-etat"
 import { cheminsCitesDans, type CiblesDesLiens } from "./en-ligne"
-import { ECRAN, genreDuNoeud, PAGE_VIDE, phraseDePublication } from "./libelles"
-import { BandeauDuBrouillon, Publication } from "./publication"
+import { ECRAN, genreDuNoeud, PAGE_VIDE } from "./libelles"
+import { Publication } from "./publication"
 import { RenduDUnBloc } from "./rendu-des-blocs"
 
 /** Le niveau d'écriture de l'écran (AC9) : celui d'un rédacteur hors de la version publiée, sinon aucun. */
@@ -68,7 +71,6 @@ export type CorpsDuNoeudProps = {
   /** Le titre montré : il nomme l'îlot du document. */
   titre: string
   versionPubliee: boolean
-  nomOrganisation: string
   Lien: LienDeLHote
   hrefDuChemin: (chemin: string) => string
   prefixeDesPages: string
@@ -99,27 +101,20 @@ function Lecture({ blocs, Lien, hrefDuChemin, referencesRendues, cibles, liens }
 }
 
 /**
- * Le brouillon d'un tableau (AC9, AC17) : son bandeau, puis sa publication, seule au niveau gestion : son
+ * Le brouillon d'un tableau (AC9, AC17) : sa publication seule, dès le niveau écriture (E11-S02, AC-a2) : son
  * en-tête écrit en place se publie comme le texte d'une page (E05-S10, AC-a10) ; la grille est dans le complément.
  */
-function BrouillonDuTableau({ niveau, phrase, lien }: { niveau: 2 | 3; phrase: string; lien: ReactNode }) {
+function BrouillonDuTableau() {
   return (
     <div className="relative flex flex-col gap-2">
-      <IndicationDEnregistrement niveau={niveau} />
-      <BandeauDuBrouillon lien={lien} niveau={niveau} />
-      <Publication niveau={niveau} phrase={phrase} />
+      <IndicationDEnregistrement />
+      <Publication />
     </div>
   )
 }
 
 export function CorpsDuNoeud(props: CorpsDuNoeudProps) {
   const { vue, niveauDEcriture, titre, versionPubliee, Lien, hrefDuChemin } = props
-  const lienVersionPubliee = (
-    <Lien href={`${hrefDuChemin(vue.path)}?version=publiee`} className={LIEN}>
-      {ECRAN.voirLaVersionPubliee}
-    </Lien>
-  )
-  const phrase = phraseDePublication(vue.owner, props.nomOrganisation)
   const blocs = blocsAffiches(vue, versionPubliee)
   return (
     <>
@@ -129,13 +124,13 @@ export function CorpsDuNoeud(props: CorpsDuNoeudProps) {
           title={ECRAN.versionPubliee(vue.revision)}
           actions={
             <Lien href={hrefDuChemin(vue.path)} className={LIEN}>
-              {ECRAN.revenirAuBrouillon}
+              {ECRAN.revenirAuxModifications}
             </Lien>
           }
         />
       )}
       {vue.kind === "table" ? (
-        niveauDEcriture !== null && <BrouillonDuTableau niveau={niveauDEcriture} phrase={phrase} lien={lienVersionPubliee} />
+        niveauDEcriture !== null && <BrouillonDuTableau />
       ) : (
         <Island aria-label={titre}>
           {niveauDEcriture === null ? (
@@ -143,17 +138,16 @@ export function CorpsDuNoeud(props: CorpsDuNoeudProps) {
           ) : (
             <EditeurDeBlocs
               key={vue.id}
-              niveau={niveauDEcriture}
               blocs={blocs}
               revisionServie={vue.revision}
-              phraseDePublication={phrase}
               prefixeDesPages={props.prefixeDesPages}
-              lienVersionPubliee={lienVersionPubliee}
               referencesRendues={props.referencesRendues}
               cibles={props.cibles}
               liens={props.liens}
               // Le genre du brouillon s'il en change (E05-S04 : la publication d'un Contexte).
               genre={genreDuNoeud(vue)}
+              // Un nœud neuf garde le focus à son titre (E05-S10, AC-b3) ; une page vide déjà titrée le donne au Texte.
+              focusALOuverture={blocs.length === 0 && titre !== CREATION.sansTitre}
             />
           )}
         </Island>

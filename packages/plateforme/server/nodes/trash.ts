@@ -6,10 +6,14 @@
 // (`access-facts.ts`) : absent de l'arbre, des lectures, de `find`, de `context`, des outils MCP, des liens
 // résolus. Décidé par le service avant toute écriture : la gestion du nœud (actions `trash`, `restore`),
 // l'écriture sur l'ancêtre qui le reçoit. Sans lui, un contenu ne se supprime pas depuis l'écran.
+// E11-S02 (lot e) : `node.trash`, la même corbeille derrière `call`, en deux temps ; son récapitulatif rejoue
+// la décision (`trashPlan`) sans rien écrire.
 import { nodePathBodySchema, type TrashItem } from "../../schemas"
+import { nodePathArgsSchema } from "../../schemas/node-gestures"
 import { ACCESS_LEVELS, ancestorPaths, describeOwner, nodeDecisions, nodeLevel, nodeLevels, requireNodeLevel, reservedTo } from "../access"
+import { defineFunction, type FunctionContext, type FunctionSummary } from "../catalog/define"
 import type { PlatformDb } from "../db"
-import { changedMeanwhile, inTransaction, invalidInput, PlatformError } from "../errors"
+import { boundedList, changedMeanwhile, inTransaction, invalidInput, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import type { Mutation } from "../members"
 import { findNode, NODE_SQL_COLUMNS, unknownNode, type NodeRow } from "./lookup"
@@ -57,38 +61,52 @@ async function refuseStructure(db: PlatformDb, identity: Identity, node: NodeRow
   throw new PlatformError("invalid_arguments", `${node.path} cannot be deleted: ${reasons[structure.kind]}`)
 }
 
-/** Les descendants vivants d'un nœud (par le préfixe de son chemin), une lecture. */
-async function liveDescendants(db: PlatformDb, identity: Identity, node: NodeRow): Promise<string[]> {
-  const rows = await inTransaction(db, "trash: descendants", (sql) => sql<{ id: string }[]>`
-    select id from platform.nodes where org_id = ${identity.org.id} and deleted_at is null and starts_with(path, ${`${node.path}/`})`)
-  return rows.map((row) => row.id)
+/** Les descendants vivants d'un nœud (par le préfixe de son chemin), une lecture, triés par chemin. */
+async function liveDescendants(db: PlatformDb, identity: Identity, node: NodeRow): Promise<{ id: string; path: string }[]> {
+  return inTransaction(db, "trash: descendants", (sql) => sql<{ id: string; path: string }[]>`
+    select id, path from platform.nodes where org_id = ${identity.org.id} and deleted_at is null and starts_with(path, ${`${node.path}/`})
+     order by path`)
 }
 
+/** Ce que la corbeille a décidé, sans rien écrire : le nœud et ses descendants vivants, tous visibles. */
+type TrashPlan = { node: NodeRow; descendants: { id: string; path: string }[] }
+
 /**
- * Met un nœud et son sous-arbre à la corbeille (AC-b11) : le nœud lu par `findNode` ; ce que l'arbre
- * garde en place refusé ; la gestion exigée ; un sous-arbre qui porte un contenu que la personne ne voit
- * pas refusé (sa purge l'effacerait sans que son propriétaire le sache, HN-E05S10e-3). Purge d'abord
- * l'ancien, puis, sous le verrou de l'arbre, une écriture de `deleted_at`, gardée par le chemin lu et par
- * les descendants jugés : un nœud déplacé, ou un contenu rangé dessous entre-temps, rend `conflict`. Rend
- * le nombre de nœuds partis, lui compris.
+ * La décision de la corbeille (AC-b11), sans écrire : le nœud lu par `findNode` ; ce que l'arbre garde en
+ * place refusé ; la gestion exigée ; un sous-arbre qui porte un contenu que la personne ne voit pas refusé
+ * (sa purge l'effacerait sans que son propriétaire le sache, HN-E05S10e-3). Lue par `trashNode` et par le
+ * récapitulatif de `node.trash` (E11-S02, AC-e1).
  */
-export async function trashNode(db: PlatformDb, identity: Identity, input: unknown): Promise<Mutation<{ path: string; count: number }>> {
-  const parsed = nodePathBodySchema.safeParse(input)
-  if (!parsed.success) throw invalidInput(parsed.error)
-  const found = await findNode(db, identity, parsed.data.path)
-  if (!found) throw unknownNode(parsed.data.path, identity.org.prefix)
+async function trashPlan(db: PlatformDb, identity: Identity, path: string): Promise<TrashPlan> {
+  const found = await findNode(db, identity, path)
+  if (!found) throw unknownNode(path, identity.org.prefix)
   const { node } = found
   await refuseStructure(db, identity, node)
   if (found.level < ACCESS_LEVELS.manage) await requireNodeLevel(db, identity, { id: node.id, path: node.path }, "trash")
   const descendants = await liveDescendants(db, identity, node)
-  const levels = await nodeLevels(db, identity, descendants)
-  const hidden = descendants.filter((id) => (levels.get(id) ?? ACCESS_LEVELS.none) === ACCESS_LEVELS.none).length
+  const levels = await nodeLevels(db, identity, descendants.map((row) => row.id))
+  const hidden = descendants.filter((row) => (levels.get(row.id) ?? ACCESS_LEVELS.none) === ACCESS_LEVELS.none).length
   if (hidden > 0) {
     throw new PlatformError(
       "forbidden",
       `${node.path} holds ${hidden} ${hidden === 1 ? "page" : "pages"} you cannot see: their owners must move them out before it is deleted.`,
     )
   }
+  return { node, descendants }
+}
+
+/**
+ * Met un nœud et son sous-arbre à la corbeille (AC-b11) : la décision (`trashPlan`), puis purge d'abord
+ * l'ancien et, sous le verrou de l'arbre, une écriture de `deleted_at`, gardée par le chemin lu et par
+ * les descendants jugés : un nœud déplacé, ou un contenu rangé dessous entre-temps, rend `conflict`. Rend
+ * le nombre de nœuds partis, lui compris.
+ */
+export async function trashNode(db: PlatformDb, identity: Identity, input: unknown): Promise<Mutation<{ path: string; count: number }>> {
+  const parsed = nodePathBodySchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const plan = await trashPlan(db, identity, parsed.data.path)
+  const { node } = plan
+  const descendants = plan.descendants.map((row) => row.id)
   const teamId = teamOf(await ownerOf(db, node.id))
   await purgeTrash(db, identity)
   const changed = () => changedMeanwhile("trashNode", node.id, `${node.path} changed meanwhile: reload it and try again.`)
@@ -218,3 +236,50 @@ export async function restoreNode(db: PlatformDb, identity: Identity, input: unk
   const path = place?.path ?? node.path
   return { data: { path, from: node.path, count }, target: path, teamId: teamOf(await ownerOf(db, node.id)) }
 }
+
+/** « A manager can restore it… » : où restaurer, par l'écran Corbeille de l'adresse appelée (AC-e1, AC-e2). */
+function restoreHint(context: FunctionContext): string {
+  return `A manager can restore it for ${TRASH_DAYS} days from the Trash screen (${context.origin ?? ""}/corbeille); after that it is erased.`
+}
+
+/** « with 3 pages under it » : le compte des descendants. */
+function underIt(count: number): string {
+  return `with ${count} ${count === 1 ? "page" : "pages"} under it`
+}
+
+/** Le récapitulatif d'AC-e1 : les contrôles de `trashNode` (`trashPlan`), sans rien écrire ; 20 chemins au plus. */
+async function summarizeTrash(context: FunctionContext, args: { path: string }): Promise<FunctionSummary> {
+  const { node, descendants } = await trashPlan(context.db, context.identity, args.path)
+  const listed = descendants.length > 0 ? [boundedList(descendants.map((row) => `- ${row.path}`), "\n")] : []
+  const under = descendants.length > 0 ? `, ${underIt(descendants.length)}:` : "."
+  const text = [`About to move ${node.path} (${node.kind} « ${node.title} ») to the trash${under}`, ...listed, restoreHint(context)]
+  return { text: text.join("\n"), data: { path: node.path, kind: node.kind, title: node.title, pages_under: descendants.length } }
+}
+
+export const nodeTrash = defineFunction({
+  name: "node.trash",
+  connector: "node",
+  class: "sensitive",
+  origin: "paquet",
+  description:
+    "Moves a page, procedure or table to the trash with everything under it, as Delete does on the screen: it disappears at once, and a manager can restore it from the Trash screen for 30 days before it is erased. Use it when the user asks to delete a content. Two steps: a summary of what would go, then confirm: true after the user agreed. Needs the manage level.",
+  schema: nodePathArgsSchema,
+  examples: [{ path: "ventes/essai" }],
+  refusals: [
+    "Unknown path: not a node you can read.",
+    "The root, a personal space, a Contexte or the folder of a team: they stay in place; delete the pages inside instead.",
+    "Deleting is reserved to those who manage the node: the refusal says whom to ask.",
+    "Pages under it that you cannot see: their owners must move them out first.",
+    "The node changed meanwhile: read it again, then retry.",
+  ],
+  summarize: summarizeTrash,
+  run: async (context, args) => {
+    const { data, teamId } = await trashNode(context.db, context.identity, args)
+    const pages = data.count - 1
+    return {
+      text: `${data.path} moved to the trash${pages > 0 ? ` ${underIt(pages)}` : ""}. ${restoreHint(context)}`,
+      data: { path: data.path, pages_under: pages },
+      teamId,
+    }
+  },
+})

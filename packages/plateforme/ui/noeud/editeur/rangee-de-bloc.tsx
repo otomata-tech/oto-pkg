@@ -68,6 +68,8 @@ type RangeeDeBlocProps = {
   liens: LiensDesBlocs
   /** Un bloc `reference` rendu en place par la page serveur (vue, carte ou avis, E07-S03, AC16), montré en lecture. */
   rendu?: ReactNode
+  /** L'invite du champ vide : celle du Texte d'une page vide (E11-S05, AC-g1) ; absente ailleurs. */
+  invite?: string
 }
 
 type Menu = {
@@ -172,10 +174,11 @@ type BlocEcritProps = {
   menuOuvert: boolean
   /** La cellule d'un tableau simple qui prend le focus : la rangée la tient pour son menu (E10-S06, AC-b2). */
   suivreLaCellule: (position: Position) => void
+  invite?: string
 }
 
 /** Les champs d'un tableau ou d'un repli (E10-S06), ou le champ de texte de toute autre forme écrite. */
-function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, suivreLaCellule, decritPar }: Omit<BlocEcritProps, "erreur"> & { decritPar?: string }) {
+function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, suivreLaCellule, decritPar, invite }: Omit<BlocEcritProps, "erreur"> & { decritPar?: string }) {
   const { cle, bloc } = rangee
   const mots = premiersMots(bloc)
   if (forme === "tableau") return <TableauEdite cle={cle} bloc={bloc} decritPar={decritPar} lectureSeule={verrouille} suivre={suivreLaCellule} />
@@ -193,6 +196,7 @@ function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, suivreLaCe
       // Le code et un appel inchangé se lisent tels quels, comme à l'écran de lecture (M59) : ni lien ni rendu au repos.
       liens={forme === "code" || bloc.type === "call" ? null : liens}
       menuOuvert={menuOuvert}
+      invite={invite}
     />
   )
 }
@@ -229,7 +233,7 @@ function BlocEcrit(props: BlocEcritProps) {
   )
 }
 
-export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, verrouillee, erreur, conflit, liens, rendu }: RangeeDeBlocProps) {
+export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, verrouillee, erreur, conflit, liens, rendu, invite }: RangeeDeBlocProps) {
   const gestes = useGestes()
   // La cellule courante d'un tableau simple, où son menu ajoute et retire (E10-S06, AC-b2).
   const [cellule, setCellule] = useState<Position>({ ligne: 0, colonne: 0 })
@@ -242,7 +246,7 @@ export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, ve
   const contenu = conflit ? (
     <ConflitDeBloc conflit={conflit} />
   ) : forme ? (
-    <BlocEcrit rangee={rangee} forme={forme} erreur={erreur} verrouille={verrouillee} liens={liens} menuOuvert={menuOuvert} suivreLaCellule={setCellule} />
+    <BlocEcrit rangee={rangee} forme={forme} erreur={erreur} verrouille={verrouillee} liens={liens} menuOuvert={menuOuvert} suivreLaCellule={setCellule} invite={invite} />
   ) : (
     <RenduDUnBloc bloc={bloc} Lien="a" hrefDuChemin={(chemin) => `${liens.prefixe}${chemin}`} cibles={liens.cibles} rendu={rendu} />
   )

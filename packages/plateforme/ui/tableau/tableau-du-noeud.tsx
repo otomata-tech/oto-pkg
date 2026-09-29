@@ -41,6 +41,11 @@ export type TableauDuNoeudProps = {
   hrefDuTableau: (reglages: Reglages) => string
   /** L'adresse du tableau sans paramètre : l'action des formulaires GET. */
   adresse: string
+  /**
+   * La famille de l'assistant le plus récent de la personne (`lastConnections`), lue par l'hôte pour un tableau sans
+   * ligne seulement (E11-S05, AC-h1) ; absente, « votre assistant ».
+   */
+  assistant?: string
 }
 
 export function TableauDuNoeud(props: TableauDuNoeudProps) {
@@ -56,6 +61,7 @@ export function TableauDuNoeud(props: TableauDuNoeudProps) {
       Lien={Lien}
       hrefDuTableau={hrefDuTableau}
       adresse={props.adresse}
+      assistant={props.assistant}
     />
   )
   return (

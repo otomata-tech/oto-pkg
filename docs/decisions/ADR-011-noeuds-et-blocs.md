@@ -48,15 +48,23 @@ identifiants stables fabriqués par le serveur.
      données du bloc, index GIN.
    - **Droits** : ceux du nœud, décidés par le service (ADR-012 § 3) ; aucune règle par bloc.
 
-3. **Brouillon et publication** (page, procédure, Contexte). Modifier écrit l'état `draft` : la
-   première modification ouvre le brouillon et copie les blocs publiés, avec les mêmes `id`.
-   Publier, qui exige la gestion, remplace l'état `published` par le brouillon, incrémente
-   `nodes.revision`, prend un instantané des blocs dans `node_versions`, réécrit les liens, puis
-   efface le brouillon. L'en-tête en attente (titre, résumé, type, schéma) et la marque d'un
-   brouillon ouvert vivent dans `node_drafts`, une ligne par nœud ; brouillon et publication passent
-   par deux fonctions atomiques de la base, `open_draft` et `publish_node`. Un tableau n'a pas de
-   brouillon de lignes : ses blocs `row` s'écrivent directement à l'état `published`, avec leur
-   révision ; son schéma suit la publication du nœud.
+3. **Brouillon et publication** (page, procédure, Contexte, en-tête de tableau). **Écrire publie** :
+   une écriture de l'écran ou de `write` est publiée dans la foulée, au niveau écriture ; l'écran
+   regroupe les frappes et publie 3 s après la dernière et en quittant la page. Un brouillon ne reste
+   que si un assistant le demande (`publish: false`) ou si la publication est refusée (contrôle d'une
+   procédure, en-tête de tableau, Contexte vide non confirmé) ; il est partagé, et la publication
+   suivante le publie entier. Modifier écrit l'état `draft` : la première modification ouvre le
+   brouillon et copie les blocs publiés, avec les mêmes `id`. Publier remplace l'état `published`
+   par le brouillon, incrémente `nodes.revision`, prend un instantané des blocs dans
+   `node_versions`, réécrit les liens, puis efface le brouillon. L'en-tête d'un tableau suit la même
+   règle, publié ou non. Abandonner un brouillon le supprime entier sans toucher l'état publié.
+   L'en-tête en attente (titre, résumé, type, schéma) et la marque d'un brouillon ouvert vivent dans
+   `node_drafts`, une ligne par nœud ; brouillon, publication et abandon passent par trois fonctions
+   atomiques de la base, `open_draft`, `publish_node` et `discard_draft`.
+   `discard_draft(p_node, p_draft_stamp)` : verrou 7401, `55000` sans brouillon, `PT409` sur tampon
+   changé, blocs `draft` puis `node_drafts` supprimés. Un tableau n'a pas de brouillon de lignes :
+   ses blocs `row` s'écrivent directement à l'état `published`, avec leur révision ; son schéma suit
+   la publication du nœud (amendement E11-S02, fiche D135 : publier n'exige plus la gestion).
 
 4. **Recherche**. `find` cherche dans les blocs publiés des nœuds que la personne lit, hors de la
    corbeille. Rang : titre du nœud, puis résumé, puis blocs. Chaque résultat donne le nœud, le bloc

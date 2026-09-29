@@ -12,7 +12,7 @@
 // l'intitulé de section, le commutateur en balisage natif habillé du design system (`oto-choice`,
 // `oto-switch-track`), le lien sous lui. Changé : le geste part au réseau, la copie par `ValeurCopiable`, la case
 // des sous-contenus, la désactivation confirmée. Retiré : l'historique du lien.
-import { useEffect, useId, useRef, useState, type Ref } from "react"
+import { useEffect, useRef, useState } from "react"
 import { shareNodeSchema, type ShareView } from "../../schemas"
 import { appelerPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
@@ -20,6 +20,7 @@ import { BOUTON_DISCRET } from "../components/classes"
 import { useConfirmationEnLigne } from "../components/confirmation-en-ligne"
 import { ValeurCopiable } from "../connexion/valeur-copiable"
 import { Checkbox } from "../ds/react/checkbox"
+import { Switch } from "../ds/react/switch"
 import { PARTAGE_WEB, REFUS_DU_PARTAGE_WEB } from "../noeud/libelles"
 
 /** L'adresse des pages publiques dans l'hôte (ADR-013 § 4 : `/p/<jeton>`), que la page `src/app/p/` monte. */
@@ -57,29 +58,6 @@ function useLienPublic(chemin: string, signaler: Voix["signaler"]) {
       setEssai((courant) => courant + 1)
     },
   }
-}
-
-/**
- * Le commutateur du design system en balisage natif (oto-frontend, `Commutateur`) : l'élément natif porte
- * l'état, le focus et `Espace` ; la piste est décorative.
- */
-function Commutateur({ actif, desactive, basculer, entree }: { actif: boolean; desactive: boolean; basculer: () => void; entree: Ref<HTMLInputElement> }) {
-  const id = useId()
-  // Le nom est l'intitulé seul ; l'explication, sa description : dans le `<label>`, elle allongeait le nom.
-  const idDuTitre = `${id}-titre`
-  const idDeLExplication = `${id}-explication`
-  return (
-    <label className="oto-choice" htmlFor={id} data-disabled={desactive ? "" : undefined}>
-      <input id={id} ref={entree} type="checkbox" role="switch" checked={actif} disabled={desactive} onChange={basculer} aria-labelledby={idDuTitre} aria-describedby={idDeLExplication} />
-      <span className="oto-switch-track" aria-hidden="true" />
-      <span className="oto-choice-text">
-        <span id={idDuTitre}>{PARTAGE_WEB.titre}</span>
-        <span id={idDeLExplication} className="oto-choice-desc">
-          {PARTAGE_WEB.explication}
-        </span>
-      </span>
-    </label>
-  )
 }
 
 export function PartageSurLeWeb({ chemin, annoncer, signaler }: { chemin: string } & Voix) {
@@ -157,7 +135,14 @@ export function PartageSurLeWeb({ chemin, annoncer, signaler }: { chemin: string
   }
   return (
     <div className="flex flex-col gap-2">
-      <Commutateur actif={lien !== null} desactive={enCours} entree={entree} basculer={() => (lien ? question.demander() : regler({ path: chemin }, PARTAGE_WEB.cree))} />
+      <Switch
+        ref={entree}
+        label={PARTAGE_WEB.titre}
+        description={PARTAGE_WEB.explication}
+        checked={lien !== null}
+        disabled={enCours}
+        onChange={() => (lien ? question.demander() : regler({ path: chemin }, PARTAGE_WEB.cree))}
+      />
       {lien && (
         <>
           <ValeurCopiable valeur={`${window.location.origin}${PREFIXE_PUBLIC}${lien.token}`} cible={PARTAGE_WEB.cible} />

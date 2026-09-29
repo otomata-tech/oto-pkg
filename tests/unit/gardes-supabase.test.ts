@@ -31,12 +31,7 @@ const SUPABASE_GUARDED: Record<string, string> = {
   "tests/integration/oauth-consent-page.test.tsx": "one describe drives the OAuth server of Supabase",
   "tests/integration/platform-staff-script.test.ts": "one describe runs the script in its Supabase mode",
   "tests/unit/server-oauth.test.ts": "one describe drives the OAuth server of Supabase",
-  "tests/integration/org-transfer.test.ts": "export and import read and match the emails of Auth accounts (AC14 goes portable in lot b)",
-  // Lot b d'E11-S14 : passent en suites portables après la fusion d'E11-S03 et E11-S10.
-  "tests/integration/mcp-core.test.ts": "lot b of E11-S14, pending",
-  "tests/integration/context-full.test.ts": "lot b of E11-S14, pending",
-  "tests/integration/feedback-prompts.test.ts": "lot b of E11-S14, pending",
-  "tests/integration/pilot-qualification.test.ts": "lot b of E11-S14, pending",
+  "tests/integration/org-transfer.test.ts": "export and import read and match the emails of Auth accounts (the AC14 describe is portable)",
   // Lot c d'E11-S14 : le semis de l'isolation par le mode OIDC du script Démo.
   "tests/integration/isolation/donnees.ts": "lot c of E11-S14, pending: seeds through the Demo script and Auth accounts",
   "tests/integration/isolation/api.test.ts": "lot c of E11-S14, pending",

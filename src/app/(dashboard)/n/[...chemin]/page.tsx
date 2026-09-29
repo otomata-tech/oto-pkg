@@ -11,6 +11,7 @@ import {
 } from "@otomata_tech/oto_platform/schemas"
 import {
   isPlatformError,
+  lastConnections,
   listMembers,
   listNodeRules,
   loadNode,
@@ -48,7 +49,7 @@ import { loginPath } from "@/lib/schemas/auth"
 // les règles du nœud avec le jeton de la session, en parallèle, chacun par `resultatDe` ; l'écran
 // envoie ses écritures à `/api/plateforme/nodes` et demande la relecture au fournisseur du layout.
 // E05-S10 (partie b) : les règles, les équipes et les membres vont au panneau « Partager » de l'écran
-// (AC-b5) ; les liens du nœud (« Contenus liés », AC-b6), lus par `nodeLinks` dès le chemin connu, arrivent
+// (AC-b5) ; les liens du nœud (ses encarts, E11-S05, AC-e1), lus par `nodeLinks` dès le chemin connu, arrivent
 // après la page, sous leur `<Suspense>` (M58). E05-S10 (partie c) : l'arbre et les équipes sont ceux que le
 // layout a lus (`lectures.ts`, une fois par rendu).
 // Les droits sont décidés par les services (H123) : la page ne décide rien, elle traduit un nœud
@@ -185,11 +186,22 @@ async function complementsDuNoeud({ db, identity, vue, lu, ici }: Complements) {
   return { annexes }
 }
 
-type LecturesDuTableau = Pick<TableauDuNoeudProps, "lignes" | "resume" | "revue">
+type LecturesDuTableau = Pick<TableauDuNoeudProps, "lignes" | "resume" | "revue" | "assistant">
+
+/**
+ * L'assistant le plus récent de la personne (E11-S05, AC-h1, HN-E11S05-17), qui nomme qui écrira les lignes d'un
+ * tableau vide : lu seulement quand le tableau n'a aucune ligne ; une lecture en échec se tait (« votre assistant »).
+ */
+async function assistantDuVide(db: PlatformDb, identity: Identity, lignes: LecturesDuTableau["lignes"]): Promise<string | undefined> {
+  if (lignes.data?.count !== 0) return undefined
+  const connexions = await resultatDe(lastConnections(db, identity))
+  return connexions.data?.[0]?.family
+}
 
 /**
  * Les lignes, le résumé et la file de revue d'un tableau (E07-S03), en parallèle, chacun par `resultatDe`
- * aux phrases de l'écran d'un tableau (`too_large` : plus de lignes que la borne des filtres, N6).
+ * aux phrases de l'écran d'un tableau (`too_large` : plus de lignes que la borne des filtres, N6) ; puis, sans
+ * ligne, l'assistant de la personne (E11-S05).
  */
 async function lireLeTableau(db: PlatformDb, identity: Identity, table: { path: string; entete: TableHeader; reglages: ReglagesLus }): Promise<LecturesDuTableau> {
   const { path, entete, reglages } = table
@@ -200,7 +212,7 @@ async function lireLeTableau(db: PlatformDb, identity: Identity, table: { path: 
     resultatDe(tableGridSummary(db, identity, selection), MESSAGES_DU_TABLEAU),
     entete.lifecycle?.review ? resultatDe(tableReviewQueue(db, identity, { table: path }), MESSAGES_DU_TABLEAU) : undefined,
   ])
-  return { lignes, resume, revue }
+  return { lignes, resume, revue, assistant: await assistantDuVide(db, identity, lignes) }
 }
 
 /** Le tableau lu, sous son propre `<Suspense>` : l'en-tête du nœud paraît sans attendre ses lignes (AC9). */

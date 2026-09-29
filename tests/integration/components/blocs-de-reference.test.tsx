@@ -82,7 +82,8 @@ describe("referencesRendues (AC15, AC16)", () => {
     render(<>{tous[BLOCS[1].id]}</>)
     expect(screen.getByRole("link", { name: "Grille tarifaire" })).toHaveAttribute("href", `/n/${GRILLE}`)
     expect(screen.getByText("Page · ancien chemin : conseil/ancienne_grille")).toBeInTheDocument()
-    expect(screen.getByText("Tarifs des études, en euros HT.")).toBeInTheDocument()
+    // Le résumé d'une page ne se montre pas sur sa carte, seul celui d'une procédure (E11-S05, AC-f2).
+    expect(screen.queryByText("Tarifs des études, en euros HT.")).toBeNull()
     cleanup()
     render(
       <>
@@ -128,15 +129,7 @@ describe("references rendered at rest (AC16, AC17)", () => {
     render(
       <ContexteDeRafraichissement.Provider value={() => {}}>
         <FileDOperations chemin="ventes/prospects_valbrune" revisionPubliee={1} tampon={null}>
-          <EditeurDeBlocs
-            niveau={2}
-            blocs={[BLOCS[1], BLOCS[11]]}
-            revisionServie={1}
-            phraseDePublication="La publication revient aux administrateurs de Démo."
-            prefixeDesPages="/n/"
-            lienVersionPubliee={<LienDeTest href="/n/ventes/prospects_valbrune?version=publiee">Voir la version publiée</LienDeTest>}
-            referencesRendues={tous}
-          />
+          <EditeurDeBlocs blocs={[BLOCS[1], BLOCS[11]]} revisionServie={1} prefixeDesPages="/n/" referencesRendues={tous} />
         </FileDOperations>
       </ContexteDeRafraichissement.Provider>,
     )
@@ -147,10 +140,11 @@ describe("references rendered at rest (AC16, AC17)", () => {
 
   // Depuis la grille portée d'oto-frontend (E05-S09 partie c2) : l'îlot du tableau, sa barre, sa table et le
   // filtre d'une colonne sont des îlots client (la table du design system rend ses cellules par des fonctions,
-  // l'îlot replie le focus) ; les vues, les cartes et l'écran restent rendus par le serveur.
-  it("should keep the views, the cards and the screen on the server, the island, the toolbar, the table, the filter and the review as client islands", () => {
+  // l'îlot replie le focus) ; les vues, les cartes et l'écran restent rendus par le serveur. Les réglages du
+  // tableau (E11-S01, lot g) sont un îlot client : leurs interrupteurs tiennent un état et publient un geste.
+  it("should keep the views, the cards and the screen on the server, the island, the toolbar, the table, the filter, the options and the review as client islands", () => {
     const dossier = path.resolve(__dirname, "../../../packages/plateforme/ui/tableau")
     const ilots = fs.readdirSync(dossier).filter((fichier) => fs.readFileSync(path.join(dossier, fichier), "utf8").startsWith('"use client"'))
-    expect(ilots.sort()).toEqual(["barre-du-tableau.tsx", "decision-de-revue.tsx", "filtre-de-colonne.tsx", "grille.tsx", "ilot-du-tableau.tsx", "resume-de-revue.tsx"])
+    expect(ilots.sort()).toEqual(["barre-du-tableau.tsx", "decision-de-revue.tsx", "filtre-de-colonne.tsx", "grille.tsx", "ilot-du-tableau.tsx", "options-du-tableau.tsx", "resume-de-revue.tsx"])
   })
 })

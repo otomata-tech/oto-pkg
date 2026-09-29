@@ -1,20 +1,21 @@
 "use client"
 
-// La publication seule et le bandeau du brouillon (E05-S02, AC8, AC9, AC17 ; H63 ; E05-S10, AC-a6). Au
-// niveau gestion, aucun bouton « Publier » : ce qui est écrit est publié 3 s après la dernière frappe de la
+// La publication seule (E05-S02, AC8, AC17 ; H63 ; E05-S10, AC-a6 ; E11-S02, AC-c2). Dès le niveau écriture
+// (écrire publie, fiche D135), aucun bouton « Publier » : ce qui est écrit est publié 3 s après la dernière frappe de la
 // personne, et quand elle quitte la page (navigation de l'hôte, `pagehide`, onglet caché). La publication part
 // par la file, après les écritures qui la précèdent, avec la révision publiée lue et le dernier tampon du
 // brouillon (même service que le bouton d'hier, `publish_node`, garde de révision comprise) ; un champ dont le
 // texte est refusé, ou un conflit ouvert, la retient. Un échec se dit, avec « Réessayer », et le texte reste
-// dans le brouillon ; la frappe suivante republie. Au niveau écriture, la phrase qui dit à qui revient la
-// publication. Rendus par l'éditeur et, pour un tableau sans éditeur, par l'écran (HN-E05S02-27). Sans eux,
-// rien d'écrit à l'écran ne serait lu par les assistants, qui lisent la version publiée.
+// dans le brouillon ; la frappe suivante republie. Rendue par l'éditeur et, pour un tableau sans éditeur,
+// par l'écran (HN-E05S02-27). Sans elle, rien d'écrit à l'écran ne serait lu par les assistants, qui lisent
+// la version publiée. E11-S02 retire le bandeau du brouillon et la phrase « La publication revient… »
+// (AC-c3) ; un en-tête de tableau refusé (`header_refused`) se dit sans « Réessayer » (AC-g1, HN-E11S02-15).
 //
 // E05-S04 : un refus du contrôle d'une procédure se dit refus par refus, chacun menant à son bloc (AC7) ; un
 // Contexte vide ne se publie qu'après confirmation (AC11), sans que la question prenne le focus de celui qui
 // écrit. E05-S10 retire le bouton, « Publié en révision N. » et, au niveau gestion, le bandeau d'un brouillon
 // que la personne vient d'écrire. E11-S10 (AC-g3) retire la phrase de recharge des conversations.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { NodeKind } from "../../schemas"
 import type { ErreurPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
@@ -32,9 +33,6 @@ export const DELAI_DE_PUBLICATION_MS = 3_000
 type BlocAncre = { id?: string; ref?: string }
 
 type PublicationProps = {
-  /** Gestion (3) : la publication seule ; écriture (2) : `phrase`, à qui revient la publication. */
-  niveau: 2 | 3
-  phrase: string
   /** Le genre du nœud (E05-S04) : un Contexte confirme sa publication vide. */
   genre?: NodeKind
   /**
@@ -42,26 +40,6 @@ type PublicationProps = {
    * Contexte demande confirmation avant de publier (AC11).
    */
   blocs?: readonly BlocAncre[]
-}
-
-/**
- * Le bandeau d'un brouillon (AC9) : au niveau écriture, dès le premier geste enregistré, sans relecture ; au
- * niveau gestion, seulement pour un brouillon trouvé à l'ouverture (écrit par un assistant) tant que la
- * personne n'a rien écrit : le sien se publie seul (E05-S10, AC-a6). Un avis, pas une alerte.
- */
-export function BandeauDuBrouillon({ lien, niveau }: { lien: ReactNode; niveau: 2 | 3 }) {
-  const file = useFileDOperations()
-  if (!file.brouillon || (niveau === 3 && file.ecrit)) return null
-  return (
-    <div className="oto-alert" data-tone="review">
-      <div className="oto-alert-body flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="oto-alert-title">
-          {file.revision > 0 ? `Brouillon non publié — ouvert sur la révision ${file.revision}.` : "Brouillon non publié — cette page n'a jamais été publiée."}
-        </p>
-        {lien}
-      </div>
-    </div>
-  )
 }
 
 function refusDeLaPublication(erreur: ErreurPlateforme): string {
@@ -82,6 +60,8 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
   const { envoyer, ecouterLesFrappes, preparer, aUnBrouillon, remplacerLArret } = useFileDOperations()
   const rafraichir = useRafraichir()
   const [erreur, setErreur] = useState("")
+  // Un en-tête de tableau refusé ne se réessaie pas : seul un assistant abandonne le brouillon (AC-g1).
+  const [reessayable, setReessayable] = useState(true)
   const [refus, setRefus] = useState<RefusLu[] | null>(null)
   const [contexteVide, setContexteVide] = useState(false)
   // Le dernier rendu, lu au départ de la publication : un minuteur armé plus tôt publie l'état courant.
@@ -113,8 +93,10 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
           remplacerLArret(null)
           // Le contrôle d'une procédure nomme chaque problème par son emplacement (E03-S06, `details.refusals`).
           const lusRefus = issue.erreur.code === "invalid_arguments" ? lireLesRefus(issue.erreur.details) : null
+          const enTeteRefuse = issue.erreur.raison === "header_refused"
           setRefus(lusRefus)
-          setErreur(lusRefus ? "" : refusDeLaPublication(issue.erreur))
+          setReessayable(!enTeteRefuse)
+          setErreur(lusRefus ? "" : enTeteRefuse ? PUBLICATION_SEULE.enTeteRefuse : refusDeLaPublication(issue.erreur))
           if (issue.erreur.code === "stale_revision" || issue.erreur.code === "not_found") lus.current.rafraichir()
         },
       })
@@ -163,11 +145,15 @@ function usePublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readon
     }
   }, [envoyer, ecouterLesFrappes, preparer, aUnBrouillon, remplacerLArret])
 
-  return { erreur, refus, contexteVide, commandes }
+  return { erreur, reessayable, refus, contexteVide, commandes }
 }
 
-function PublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readonly BlocAncre[] }) {
-  const { erreur, refus, contexteVide, commandes } = usePublicationSeule({ genre, blocs })
+/**
+ * La publication seule (AC-c2), dès le niveau écriture ; ni bandeau ni avis d'un brouillon (AC-c3) : la
+ * publication qui suit une frappe publie le brouillon partagé entier (HN-E11S02-19).
+ */
+export function Publication({ genre, blocs = [] }: PublicationProps) {
+  const { erreur, reessayable, refus, contexteVide, commandes } = usePublicationSeule({ genre, blocs })
   return (
     <div role="group" aria-label="Publication" className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${refus ? "basis-full" : ""}`}>
       {erreur && (
@@ -175,9 +161,11 @@ function PublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readonly 
           <p role="alert" className="text-sm text-ink">
             {erreur}
           </p>
-          <Button variant="secondary" size="sm" onClick={() => commandes.current.reessayer()}>
-            {PUBLICATION_SEULE.reessayer}
-          </Button>
+          {reessayable && (
+            <Button variant="secondary" size="sm" onClick={() => commandes.current.reessayer()}>
+              {PUBLICATION_SEULE.reessayer}
+            </Button>
+          )}
         </>
       )}
       {contexteVide && (
@@ -199,9 +187,4 @@ function PublicationSeule({ genre, blocs }: { genre?: NodeKind; blocs: readonly 
       )}
     </div>
   )
-}
-
-export function Publication({ niveau, phrase, genre, blocs = [] }: PublicationProps) {
-  if (niveau < 3) return <p className="oto-caption">{phrase}</p>
-  return <PublicationSeule genre={genre} blocs={blocs} />
 }

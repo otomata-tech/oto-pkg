@@ -54,6 +54,12 @@ describe("reservedTo", () => {
     )
   })
 
+  it("should say who renames and ask them to rename it (E11-S02)", () => {
+    expect(reservedTo("rename", "ventes/devis", "team Ventes (lead: Claire Morel)")).toBe(
+      "Renaming ventes/devis is reserved to team Ventes (lead: Claire Morel). Ask them to rename it.",
+    )
+  })
+
   it("should say who uses an account and ask for access", () => {
     expect(reservedTo("use", "account « Mail Ventes »", "team Ventes (lead: Claire Morel)")).toBe(
       "Using account « Mail Ventes » is reserved to team Ventes (lead: Claire Morel). Ask them for access.",

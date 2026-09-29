@@ -37,4 +37,6 @@ export type ToolOutput = {
   ctx?: string
   /** Pour le journal : signature du host (`client_name@version`) portée par le `ctx`. */
   host?: string | null
+  /** Pour le journal : ce qu'une fonction de `call` a fait, en nombres, écrit en `args._outcome` (E11-S02, AC-h2). */
+  outcome?: Record<string, number>
 }

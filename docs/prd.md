@@ -218,7 +218,7 @@ Phrases de test par outil : `docs/mcp-golden-queries.md`.
 | `find` | Chercher dans les titres, les résumés et le contenu (blocs, lignes de tableau), et dans les fonctions | `query`, `type` facultatif | `ctx` | trois nœuds et trois fonctions avec score, chacun avec le bloc trouvé et un extrait, ou une question |
 | `read` | Lire une procédure, une page, un tableau, le journal ou le contrat d'une fonction ; en plan, par section, depuis une révision, en brouillon | `path`, `section`, `outline`, `since_revision`, `draft`, `refs`, `cursor` | `ctx` | contenu en texte et en structuré |
 | `call` | Exécuter une fonction du catalogue après validation, droits et résolution du compte | `function`, `arguments`, `confirm`, `team`, `account` | `ctx` | résultat et suites possibles |
-| `write` | Créer ou modifier une page, une procédure, un tableau, par opérations ; brouillon puis publication | `path`, `base_revision`, `title`, `summary`, `kind`, `ops`, `header`, `publish` | `ctx` | révision et différences |
+| `write` | Créer ou modifier une page, une procédure, un tableau, par opérations ; publié à chaque écriture, brouillon sur demande (`publish: false`) | `path`, `base_revision`, `title`, `summary`, `kind`, `ops`, `header`, `publish` | `ctx` | révision et différences |
 | `feedback` | Signaler une friction, un manque, une erreur d'outil | `type`, `text`, `target` | `ctx` | numéro de ticket |
 
 **Ce que renvoie `context`.** 35 000 caractères au plus, environ 10 000 tokens, qui repartent au
@@ -228,7 +228,7 @@ entier, sans taille propre (fiche D134).
 
 | Bloc, dans l'ordre servi | Contenu |
 |---|---|
-| Règles et candidats | Le code `ctx`, « How this workspace works » (outils, espaces, brouillon et publication, confirmation), la langue de réponse, les candidats avec leur score et la consigne qui les accompagne ; toujours servi |
+| Règles et candidats | Le code `ctx`, « How this workspace works » (outils, espaces, publication directe et brouillon sur demande, confirmation), la langue de réponse, les candidats avec leur score et la consigne qui les accompagne ; toujours servi |
 | Procédure reconnue | Son contenu complet, blocs `call` compris, et la consigne d'accord |
 | Contexte de Tout le monde | Ligne de faits de l'organisation (nom, domaines), puis mission, lexique, règles, ton de marque, les contenus rangés dessous et les pages liées (20 au plus) |
 | Contexte de l'espace Privé | Ligne de faits de la personne (nom, rôle, équipes, langue), puis ton, signature et préférences |
@@ -304,7 +304,7 @@ assistants sont recoupés avec le journal avant toute décision.
 |---|---|---|
 | Accueil | oto-frontend | Onglets « Activités » (contenus récents, sans agents ni connecteurs) et « Contexte » (ce que `context` sert à la personne) |
 | Profil | Description | Prénom, nom, langue de réponse de l'assistant, couleur (celle de l'organisation par défaut) ; ouvert depuis le menu du compte |
-| Page d'un nœud | oto-frontend | Page, procédure, Contexte ou tableau, à la même adresse ; « Contenus liés » : dessous, cités, qui le citent |
+| Page d'un nœud | oto-frontend | Page, procédure, Contexte ou tableau, à la même adresse ; encarts repliés « Cité dans », « Cite », « Sous-pages » dans la colonne de droite (en ligne au-dessus de la grille d'un tableau) ; « Télécharger en .csv/.md » à côté de « Partager » |
 | Journal | oto-frontend | Conversations par `ctx`, recherche, filtre et tri dans l'adresse ; appels d'une conversation |
 | Usage et retours | Description | Par organisation et équipe : procédures les plus utilisées, erreurs par fonction, demandes sans procédure ; tickets des assistants |
 
@@ -335,10 +335,12 @@ tableau (`row`) ; la liste s'étend par ajout. Chaque bloc a un identifiant stab
 facultative, sa provenance (personne, assistant et son `ctx`, import) et sa révision : deux
 personnes qui modifient deux blocs d'une page ne se gênent pas.
 
-**Brouillon et publication.** Modifier écrit un brouillon partagé ; publier exige la gestion, fait
-avancer la révision et garde un instantané : un membre d'équipe rédige, son responsable publie. À
-l'écran, pour qui a la gestion, la publication est seule, 3 s après la dernière frappe et en
-quittant la page.
+**Brouillon et publication.** Écrire publie (fiche D135) : un contenu est publié dès sa création et
+à chaque modification, par qui peut l'écrire ; publier fait avancer la révision et garde un
+instantané. À l'écran, la publication est seule, 3 s après la dernière frappe et en quittant la
+page. Un brouillon partagé ne reste que si un assistant le demande (`publish: false`) ou si la
+publication est refusée ; l'assistant peut l'abandonner (`node.discard_draft`). La gestion garde le
+partage, les règles, le déplacement et la corbeille.
 
 **Procédure.** Un titre, un résumé qui dit comment on la demande, puis des sections faites de blocs ;
 des « Étapes » numérotées sont la façon recommandée, la première annonce ce qui va être fait. Le
@@ -347,7 +349,7 @@ part, ni voisines, ni slots, ni entrées. À l'écran, tant que les connecteurs 
 procédure s'édite et se lit comme une page, en texte seul ; ses blocs `call` s'écrivent par
 l'assistant, et `context`, les prompts et le contrôle à la publication restent les siens.
 
-**Tableau.** Pas d'outil à lui : six fonctions derrière `call`, dont `read` sert le contrat.
+**Tableau.** Pas d'outil à lui : ses fonctions derrière `call`, dont `read` sert le contrat.
 
 | Propriété | Pourquoi |
 |---|---|
@@ -357,13 +359,15 @@ l'assistant, et `context`, les prompts et le contrôle à la publication restent
 | File de travail : état, réservation avec bail et nom du travailleur, libération | Assistants et routines en parallèle sans collision |
 | Revue humaine : une fiche, deux décisions, résumé à coller dans la conversation ; ou par l'assistant si le tableau l'autorise | Un humain décide, l'assistant reprend ; une décision d'assistant reste tracée (`origin: agent`) |
 | Garde de révision | Une écriture calculée sur une lecture périmée est refusée |
+| Réglages du tableau à l'écran (écriture) : preuve exigée, revue par l'assistant, fermé | Régler un tableau sans passer par un assistant |
 
 Une écriture est faite d'opérations explicites : `set`, `clear`, `verified_empty` avec sa raison ;
 un champ non nommé reste intact, `null` est refusé. Dans un tableau qui l'exige (`proof`), une
 valeur nouvelle porte sa preuve (`{value, comment | link}`), sinon l'appel est refusé ; ailleurs,
 elle s'écrit nue ; la colonne d'état s'écrit nue, dans les transitions permises. Dans un lot, seule
 la ligne fautive est refusée. Une ligne s'écrit sans
-brouillon ; le schéma suit la publication du nœud.
+brouillon ; le schéma suit la publication du nœud. Une ligne se supprime par sa clé, pour de bon,
+en deux temps (`table.delete_rows`) ; vider des cellules reste `clear`.
 
 **Organiser depuis l'écran.** Le rail crée une page, un tableau ou une procédure sous tout nœud,
 sans modale ; un contenu se glisse-dépose sur un autre pour en devenir l'enfant, ou entre deux
@@ -383,21 +387,21 @@ n'est jamais indexée ; un lien désactivé ou inconnu rend
 
 | Écran | Référence UI | Ce qu'il montre |
 |---|---|---|
-| Éditeur de page | oto-frontend | Titre et résumé en place, blocs à la poignée (menu, glisser-déposer, styles), « @ » pour citer un contenu, liens cliquables, publication seule |
+| Éditeur de page | oto-frontend | Titre en place (le résumé, d'une procédure seule), blocs à la poignée (menu, glisser-déposer, styles), page vide ouverte sur un Texte et son invite, « @ » pour citer un contenu, liens cliquables, publication seule |
 | Procédure | oto-frontend | Même éditeur et même lecture qu'une page, texte seul ; un bloc `call` déjà écrit s'y lit en texte |
 | Contexte | oto-frontend | Même éditeur ; aperçu du contexte d'une personne |
-| Tableau | oto-frontend | Grille avec tri, filtres, agrégats, défilement horizontal en fenêtre étroite ; file de revue (choisir la fiche, passer, preuves des valeurs, raison copiée) |
+| Tableau | oto-frontend | Grille avec tri, filtres, agrégats, défilement horizontal en fenêtre étroite, repli des cellules au survol, lignes à revoir marquées ; file de revue (cycle expliqué, choisir la fiche, passer, preuves des valeurs, raison copiée) ; réglages (écriture) ; vide nommé par l'assistant de la personne |
 | Rail | oto-frontend | Arbre par espace, création, glisser-déposer, Déplacer, Partager, corbeille |
-| Page publique | Description | Contenu publié en lecture seule, sans session |
+| Page publique | Description | Contenu publié en lecture seule, sans session ; « Télécharger en .csv/.md » de ce que la page montre |
 
 | ID | Exigence | Priorité | État |
 |---|---|---|---|
-| FR-CONC-01 | `write` opère sur une section adressée par son titre (remplacer, insérer, supprimer, ajouter, remplacer un passage) ou sur un bloc adressé par sa référence courte (remplacer, insérer après, supprimer, déplacer) ; brouillon puis publication ; une écriture sur une révision périmée est refusée avec l'état actuel, bloc par bloc ; la réponse donne la révision, les différences et le nouveau chemin si le titre a changé | Must | Livrée |
+| FR-CONC-01 | `write` opère sur une section adressée par son titre (remplacer, insérer, supprimer, ajouter, remplacer un passage) ou sur un bloc adressé par sa référence courte (remplacer, insérer après, supprimer, déplacer) ; publiée à chaque écriture, brouillon sur demande (`publish: false`) ; une écriture sur une révision périmée est refusée avec l'état actuel, bloc par bloc ; la réponse donne la révision, les différences et le nouveau chemin si le titre a changé | Must | Livrée |
 | FR-CONC-02 | Procédure (ci-dessus) : à la publication, le serveur vérifie que chaque fonction, argument et état cité par un bloc `call` existe et est accepté ; le refus nomme la section, le rang du bloc, l'étape qui le précède, la fonction et l'élément fautif | Must | Livrée |
-| FR-CONC-03 | Éditeurs web de page, de procédure et de Contexte, repris d'oto-frontend : titre et résumé en place, poignée de bloc, publication seule pour qui a la gestion, « @ », aperçu de ce que le modèle recevra d'un Contexte ; une procédure s'y édite comme une page | Should | Livrée ; à l'écran, le bloc d'appel, le contrôle du brouillon et le score d'une phrase (« Tester une phrase ») d'une procédure : V2, avec les connecteurs |
+| FR-CONC-03 | Éditeurs web de page, de procédure et de Contexte, repris d'oto-frontend : titre en place (et résumé, pour une procédure seule), poignée de bloc, publication seule dès le niveau écriture, « @ », aperçu de ce que le modèle recevra d'un Contexte ; une procédure s'y édite comme une page | Should | Livrée ; à l'écran, le bloc d'appel, le contrôle du brouillon et le score d'une phrase (« Tester une phrase ») d'une procédure : V2, avec les connecteurs |
 | FR-CONC-04 | Les nouveautés de l'organisation (pages et procédures publiées, connecteurs activés) apparaissent dans `context` à la conversation suivante ; le bloc est omis quand rien n'a changé depuis une conversation du jour même ; la publication d'un contenu changé d'un Contexte invalide les seuls codes `ctx` auxquels il était servi. Aucune note de version de la plateforme n'y figure | Should | Livrée ; les notes de version de la plateforme : Retirées (elles n'aidaient pas la demande de l'utilisateur) |
-| FR-CONC-05 | Tableaux (ci-dessus) : création et évolution du schéma par `write` ; six fonctions derrière `call` (`table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`), dont le contrat dit la forme de la preuve, exigée par tableau, et l'ordre de réservation ; revue humaine à l'écran, ou par l'assistant si le tableau l'autorise | Must | Livrée |
-| FR-CONC-06 | Liens `[[chemin]]` et `[[chemin#clé]]` extraits des blocs publiés avec leur bloc source, indexés sortants et entrants, servis par l'en-tête de `read` et par « Contenus liés » ; un déplacement ou un renommage laisse l'ancien chemin en alias | Could | Livrée |
+| FR-CONC-05 | Tableaux (ci-dessus) : création et évolution du schéma par `write`, dès le niveau écriture ; fonctions derrière `call` (`table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`, `delete_rows`), dont le contrat dit la forme de la preuve, exigée par tableau, et l'ordre de réservation ; revue humaine à l'écran, ou par l'assistant si le tableau l'autorise | Must | Livrée |
+| FR-CONC-06 | Liens `[[chemin]]` et `[[chemin#clé]]` extraits des blocs publiés avec leur bloc source, indexés sortants et entrants, servis par l'en-tête de `read` et par les encarts « Cité dans » et « Cite » ; un déplacement ou un renommage laisse l'ancien chemin en alias | Could | Livrée |
 | FR-CONC-07 | Import et export sans type de contenu nouveau : un markdown collé ou un `.md` importé devient les blocs d'une page (mode tolérant à l'écran, strict pour `write` ; lâché dans une page, au choix inséré ou joint comme fichier), une page s'exporte en `.md` ; un CSV devient un tableau typé (types et clé déduits, modifiables), un tableau s'exporte en CSV ; `table.import` derrière `call` ; un tableau simple se convertit en tableau de données (E10-S01) | Should | Prévue |
 | FR-CONC-08 | Images et fichiers déposés dans une page, stockés derrière un port S3 configuré par l'hôte (ADR-016), lus sous les droits du nœud, par lien public compris ; une image se rend dans la page, un autre fichier est une carte avec « Télécharger » et, pour `html`, `md`, `pdf`, `txt`, `csv`, « Voir » dans un nouvel onglet ; l'assistant en lit le nom, le texte alternatif et le texte d'un fichier texte (`read {file}`) (E10-S02) | Should | Prévue |
 | FR-CONC-09 | Fichier HTML : une page HTML (un artefact généré par Claude Code) jointe à une page comme tout fichier, vue par « Voir » dans un nouvel onglet, exécutée isolée, sans accès à l'hôte (ADR-017) ; vue aussi par lien public, sous une bannière (E10-S02) | Could | Prévue |
@@ -405,6 +409,7 @@ n'est jamais indexée ; un lien désactivé ou inconnu rend
 | FR-CONC-11 | Un assistant qui a déjà un fichier (Claude Code) le dépose sans le réécrire : `upload.link` derrière `call` rend un lien à usage unique (15 min, 1 Mo, lié à la personne et à la destination), l'assistant y envoie un fichier à joindre, un `.md` ou un CSV par `curl` (sans shell : adresse publique téléchargée par le serveur, sinon formulaire de dépôt), le service revérifie les droits à l'envoi (E10-S02) | Should | Prévue |
 | FR-CONC-12 | Organiser l'arbre depuis l'écran (ci-dessus) : création sans modale, glisser-déposer, Déplacer avec son impact, Dupliquer (« <titre> (copie) », sous-contenus et lignes compris, sans les règles explicites), corbeille de 30 jours ; le chemin suit le titre, le premier libre s'il est pris ; sous un Contexte se rangent d'autres contenus | Must | Livrée |
 | FR-CONC-13 | Partage public d'un contenu par lien (ci-dessus, ADR-013) | Should | Livrée |
+| FR-CONC-14 | Supprimer depuis un assistant, derrière `call`, en deux temps (récapitulatif, puis `confirm: true`) : `node.trash` met un contenu à la corbeille (gestion), `table.delete_rows` supprime des lignes par clé pour de bon (écriture ; lignes à revoir dites, et au fil de l'accueil), `node.discard_draft` abandonne le brouillon d'un contenu publié (écriture) (E11-S02) | Must | Prévue |
 
 | ID | Catégorie | Exigence | Cible | État |
 |---|---|---|---|---|
@@ -426,8 +431,8 @@ visible et révocable par l'admin du client, et journalisé.
 |---|---|---|
 | Aucun | Invisible | Inutilisable |
 | Lecture | Lire, être trouvé par `find`, apparaître dans `context` | Fonctions de lecture |
-| Écriture | Modifier le brouillon, créer des enfants | Fonctions d'écriture ; les sensibles, en deux temps |
-| Gestion | Publier, déplacer, poser des règles, partager | Partager, révoquer |
+| Écriture | Modifier et publier (en-tête d'un tableau compris ; le chemin suit le titre), créer des enfants | Fonctions d'écriture ; les sensibles, en deux temps |
+| Gestion | Déplacer, mettre à la corbeille, poser des règles, partager | Partager, révoquer |
 
 Sans règle, le propriétaire décide : l'espace commun est lisible par tous ; un nœud d'équipe est
 modifiable par l'équipe, géré par son responsable, invisible aux autres ; un nœud privé n'est vu que

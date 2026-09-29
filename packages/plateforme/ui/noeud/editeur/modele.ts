@@ -23,6 +23,8 @@
 // menu : il ne se convertit pas depuis un texte) ; un séparateur reste sans forme. Le « + » et « / » insèrent le bloc
 // choisi ; les préfixes de titre vont de `# ` à `###### ` ; `---`, `***` ou `___` tapé dans un Texte en fait un
 // séparateur. Ce qui est propre au tableau, au repli et aux niveaux de liste vit dans `blocs-de-page.ts`.
+//
+// E11-S05 (AC-g1) : retirer le dernier bloc laisse un Texte vide ; le Texte d'une page vide vit dans `page-vide.ts`.
 import type { BlockView } from "../../../schemas"
 import { simpleTableOf } from "../../../schemas/blocks"
 import { isRecord } from "../../../schemas/tables"
@@ -407,7 +409,7 @@ export function remplacerLeBloc(modele: readonly Rangee[], cle: string, bloc: Bl
   return modele.map((rangee) => (rangee.cle === cle ? { cle, bloc } : rangee))
 }
 
-/** Un bloc neuf en tête : le seul chemin d'une page sans bloc (AC11). */
+/** Un bloc neuf en tête (AC11) : le Texte d'une page vide (E11-S05, `page-vide.ts`). */
 export function insererEnTete(modele: readonly Rangee[], forme: Forme = "texte"): Suite {
   const neuve = nouvelleRangee(forme, "")
   return { modele: [neuve, ...modele], focus: { cle: neuve.cle, curseur: 0 } }
@@ -415,12 +417,13 @@ export function insererEnTete(modele: readonly Rangee[], forme: Forme = "texte")
 
 /**
  * Retirer une rangée (AC12) : le focus va au bloc précédent, au suivant s'il n'y en a pas, en fin de son
- * champ, ou sur sa poignée s'il n'en a pas (E05-S08, AC4 ; oto-frontend `removeAt`).
+ * champ, ou sur sa poignée s'il n'en a pas (E05-S08, AC4 ; oto-frontend `removeAt`). La dernière retirée laisse un
+ * Texte vide à sa place, le focus dedans : l'éditeur n'est jamais sans rangée (E11-S05, AC-g1).
  */
 export function retirer(modele: readonly Rangee[], cle: string): Suite & { retiree?: Retiree } {
   const rang = rangDe(modele, cle)
   if (rang < 0) return { modele: [...modele] }
-  const suivant = modele.filter((rangee) => rangee.cle !== cle)
+  const suivant = modele.length > 1 ? modele.filter((rangee) => rangee.cle !== cle) : [nouvelleRangee("texte", "")]
   const voisine = suivant[rang - 1] ?? suivant[rang]
   const retiree = { rangee: modele[rang], voisin: modele[rang - 1]?.cle ?? null, rang }
   return { modele: suivant, retiree, ...(voisine ? { focus: { cle: voisine.cle, curseur: Number.MAX_SAFE_INTEGER } } : {}) }

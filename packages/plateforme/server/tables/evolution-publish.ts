@@ -18,7 +18,7 @@ import { formatCount } from "../nodes/document"
 import type { NodeRow } from "../nodes/lookup"
 import { plural } from "../nodes/op-kit"
 import { diffTableHeaders, draftHeader, headerShape, publishedOrNull, type HeaderDiff } from "./evolution"
-import { carries, checkEvolution, readsRows, rowsText, warned, type TableWarning, type Warned } from "./evolution-checks"
+import { carries, checkEvolution, HEADER_REFUSED, keptDraft, readsRows, rowsText, warned, type TableWarning, type Warned } from "./evolution-checks"
 import { rowCells, type RowBlock } from "./meta"
 import { sortRows } from "./paging"
 import { countRows, FILTERED_ROWS_MAX, loadRows } from "./rows"
@@ -49,10 +49,11 @@ type TableStep = { diff: HeaderDiff; target: TableHeader; first: boolean; rows: 
 /** Ce que la réponse de `write` dit d'une publication de tableau : son résumé et ses avertissements (AC6). */
 export type TablePublication = { summary: string | null; warnings: TableWarning[]; texts: string[] }
 
-function tooManyRows(path: string, count: number): PlatformError {
+function tooManyRows(table: { path: string; prefix: string }, count: number): PlatformError {
   return new PlatformError(
     "too_large",
-    `Publication of ${path} refused: the table has ${formatCount(count)} rows; header changes that check its rows work on tables of ${formatCount(FILTERED_ROWS_MAX)} rows at most in this version. The draft is kept; nothing was published.`,
+    `Publication of ${table.path} refused: the table has ${formatCount(count)} rows; header changes that check its rows work on tables of ${formatCount(FILTERED_ROWS_MAX)} rows at most in this version. ${keptDraft(table.prefix, table.path)}`,
+    HEADER_REFUSED,
   )
 }
 
@@ -60,11 +61,12 @@ function tooManyRows(path: string, count: number): PlatformError {
  * Les lignes d'un tableau pour les contrôles (AC9) : comptées d'abord, sans en lire aucune au-delà de
  * 5 000 ; lues par pages (`loadRows` d'E07-S01) ; rangées dans l'ordre naturel des clés (E07-S01, AC6).
  */
-async function scanRows(db: PlatformDb, table: NodeRow, header: TableHeader): Promise<RowBlock[]> {
+async function scanRows(db: PlatformDb, table: NodeRow, scan: { header: TableHeader; prefix: string }): Promise<RowBlock[]> {
+  const { header } = scan
   const count = await countRows(db, table.id)
-  if (count > FILTERED_ROWS_MAX) throw tooManyRows(table.path, count)
+  if (count > FILTERED_ROWS_MAX) throw tooManyRows({ path: table.path, prefix: scan.prefix }, count)
   const rows = await loadRows(db, table.id, FILTERED_ROWS_MAX)
-  if (rows.length > FILTERED_ROWS_MAX) throw tooManyRows(table.path, rows.length)
+  if (rows.length > FILTERED_ROWS_MAX) throw tooManyRows({ path: table.path, prefix: scan.prefix }, rows.length)
   return sortRows(rows.map((block) => ({ block, cells: rowCells(block, header) })), header, undefined).map((entry) => entry.block)
 }
 
@@ -223,7 +225,7 @@ export async function prepareTablePublication(
   const published = publishedOrNull(node)
   const target = draftHeader(node.path, request.meta)
   const diff = diffTableHeaders(published, target)
-  const rows = readsRows(diff) ? await scanRows(db, node, published ?? target) : []
+  const rows = readsRows(diff) ? await scanRows(db, node, { header: published ?? target, prefix: identity.org.prefix }) : []
   const check = { path: node.path, prefix: identity.org.prefix, revision: node.revision, published, target, diff, rows, confirmRemove: request.confirmRemove, now: Date.now() }
   const { warnings, stale } = checkEvolution(check)
   const purged = await purgeColumns({ db, identity, nodeId: node.id, columns: stale })

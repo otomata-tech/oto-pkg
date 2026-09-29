@@ -156,13 +156,13 @@ describe("/n/[...chemin] page reads (AC9, AC19, AC22)", () => {
     expect(within(ouvrirLePartage().getByRole("list", { name: "Ont accès" })).getByRole("combobox", { name: "Accès de Équipe Ventes" })).toHaveValue("write")
   })
 
-  it("should read the links of the node by nodeLinks, with the page, and fold them in « Contenus liés »", async () => {
+  it("should read the links of the node by nodeLinks, with the page, and fold them in « Cité dans » (E11-S05, AC-e1)", async () => {
     vi.mocked(nodeLinks).mockResolvedValue({ links_out: [], links_out_total: 0, links_in: [{ path: "conseil/guide", title: "Guide du conseil" }], links_in_total: 1 })
     await monter(await page(["ventes", "modele_relance"]))
     expect(nodeLinks).toHaveBeenCalledWith(SESSION.db, identite("member"), { path: "ventes/modele_relance" })
-    const repli = await screen.findByText("Contenus liés")
-    await waitFor(() => expect(repli.closest("summary")).toHaveTextContent("Contenus liés1mentionné dans 1 contenu"))
-    expect(within(repli.closest("details") ?? document.body).getByRole("link", { name: /^Guide du conseil/ })).toHaveAttribute("href", "/n/conseil/guide")
+    const titre = await screen.findByText("Cité dans", { selector: "strong" })
+    await waitFor(() => expect(titre.closest("summary")).toHaveTextContent("Cité dans1"))
+    expect(within(titre.closest("details") ?? document.body).getByRole("link", { name: /^Guide du conseil/ })).toHaveAttribute("href", "/n/conseil/guide")
   })
 
   it("should show a writer the published version on ?version=publiee", async () => {
@@ -201,7 +201,8 @@ describe("/n/[...chemin] page not found and failures (AC6, AC7)", () => {
     expect(screen.getByText("Cette page n'existe pas ou ne vous est pas partagée.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^Partager/ })).toBeNull()
     // Lus avec la page (E05-S10, partie c), les liens d'un nœud introuvable ne se montrent pas.
-    expect(screen.queryByText("Contenus liés")).toBeNull()
+    expect(screen.queryByText("Cité dans")).toBeNull()
+    expect(document.querySelector("details.oto-linked")).toBeNull()
   })
 
   // Un panneau « Partager » sans ses sujets proposerait un champ vide : la lecture en échec se dit (portage § 4).
@@ -266,7 +267,7 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     expect(previewContext).not.toHaveBeenCalled()
     expect(screen.queryByRole("region", { name: "Contrôle du brouillon" })).toBeNull()
     expect(screen.queryByRole("region", { name: "Tester une phrase" })).toBeNull()
-    expect(screen.queryByRole("note", { name: "À quoi sert cette page" })).toBeNull()
+    expect(screen.queryByRole("group", { name: "À quoi sert cette page" })).toBeNull()
   })
 
   const lea = (): Identity => {
@@ -292,7 +293,7 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     await monter(await page(chemin.split("/")))
 
     expect(previewContext).toHaveBeenCalledWith(SESSION.db, lea(), {})
-    const note = within(screen.getByRole("note", { name: "À quoi sert cette page" }))
+    const note = within(screen.getByRole("group", { name: "À quoi sert cette page" }))
     // E05-S13 (AC-17) : qui le reçoit, dit en une phrase.
     expect(note.getByText(recu)).toBeInTheDocument()
     const encart = within(screen.getByRole("note", { name: "Voici ce que votre agent va lire" }))
@@ -316,7 +317,7 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
 
   it("should give a page neither annexes, nor a control, nor a phrase test", async () => {
     await monter(await page(["ventes", "modele_relance"], { phrase: "Relance le devis" }))
-    expect(screen.queryByRole("note", { name: "À quoi sert cette page" })).toBeNull()
+    expect(screen.queryByRole("group", { name: "À quoi sert cette page" })).toBeNull()
     expect(screen.queryByRole("region", { name: "Tester une phrase" })).toBeNull()
     expect(checkProcedure).not.toHaveBeenCalled()
   })

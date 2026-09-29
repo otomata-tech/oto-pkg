@@ -85,6 +85,8 @@ type ChampDeBlocProps = {
   liens: LiensDesBlocs | null
   /** Le menu de la poignée est ouvert par la sélection de tout le texte (AC-28). */
   menuOuvert: boolean
+  /** L'invite du champ vide : le Texte d'une page vide (E11-S05, AC-g1). */
+  invite?: string
 }
 
 /**
@@ -178,7 +180,7 @@ function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
   }
 }
 
-export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert }: ChampDeBlocProps) {
+export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert, invite }: ChampDeBlocProps) {
   const gestes = useGestes()
   const champ = useRef<HTMLTextAreaElement>(null)
   const unTexte = genre === "paragraph"
@@ -246,6 +248,7 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
           // Son rendu est posé dessus : hors du focus, le texte brut se tait (`editeur.css`).
           data-rendu={auRepos ? "" : undefined}
           aria-label={nom}
+          placeholder={invite}
           aria-describedby={decrit}
           aria-autocomplete={liste ? "list" : undefined}
           aria-controls={liste?.id}

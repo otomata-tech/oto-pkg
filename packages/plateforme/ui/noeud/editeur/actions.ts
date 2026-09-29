@@ -27,6 +27,7 @@ import { gestesDuMenu } from "./gestes-du-menu"
 import * as modeleDEdition from "./modele"
 import { avecTexte, formeDe, type BlocEdite, type Choix, type Focus, type Rangee, type Retiree, type Suite } from "./modele"
 import { controler, estVide } from "./operations"
+import { estLaPageVide } from "./page-vide"
 import type { useEnvois } from "./use-envois"
 
 export type EtatDeLEditeur = {
@@ -163,8 +164,6 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
     changerModele(suite.modele)
     if (suite.focus) setFocus(suite.focus)
   }
-  /** Un bloc neuf, sans `id`, après une rangée ou en tête, le focus dedans ; il part avec son texte (AC4). */
-  const ajouter = (suite: (modele: Rangee[]) => Suite) => (verrouille(etat) ? undefined : appliquer(suite(modele.current)))
   /** Un séparateur n'a pas de texte à attendre : il part tout de suite (E10-S06, AC-a4) ; un autre bloc attend sa frappe. */
   const partirOuAttendre = (cle: string, choix: Choix) => {
     if (choix === "separateur") envoyerLeTexte(cle)
@@ -179,7 +178,6 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
       appliquer(suite)
       if (choix === "separateur" && suite.focus) partirOuAttendre(suite.focus.cle, choix)
     },
-    insererEnTete: () => ajouter((courant) => modeleDEdition.insererEnTete(courant)),
     remplacerParChoix(cle: string, choix: Choix, colle?: Tableau) {
       if (verrouille(etat)) return
       annulerLeDiffere(cle)
@@ -194,7 +192,8 @@ function structure(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolea
     },
     /** « Annuler » (AC4) : le même bloc, sans `id`, après son ancien voisin ; le serveur en fabrique un nouveau. */
     retablirSuppression(retiree: Retiree) {
-      const suite = modeleDEdition.retablir(modele.current, retiree)
+      // Le Texte vide laissé par le dernier bloc retiré cède sa place au bloc rétabli (E11-S05, AC-g1).
+      const suite = modeleDEdition.retablir(estLaPageVide(modele.current) ? [] : modele.current, retiree)
       appliquer(suite)
       const cle = suite.focus?.cle
       if (!cle) return

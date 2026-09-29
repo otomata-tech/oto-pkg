@@ -80,6 +80,12 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   conversation, `{<chemin>: <révision>}` ; un code périme quand l'un d'eux change, non plus par
   `orgs.rules_version`. Additive : un code émis avant est nul, donc périmé, et les conversations ouvertes
   au déploiement rappellent `context` une fois. Déclencheur, policies et index inchangés.
+- `20260929190000_discard_draft.sql` (E11-S02, lot d ; ADR-011 § 3) : `platform.discard_draft(node, stamp)`,
+  `security definer`, accordée à `authenticated` : refuse un nœud hors des organisations de l'appelant
+  (`42501`), prend le verrou consultatif 7401 de `publish_node`, rend `55000` sans brouillon et `PT409` sur
+  un tampon changé, puis supprime les blocs `draft` et la ligne `node_drafts` ; `nodes` et les blocs publiés
+  ne bougent pas. Le droit (niveau écriture, nœud déjà publié) est décidé par le service. Aucune table,
+  colonne, policy ni index.
 
 ## Installer sur un hôte neuf
 

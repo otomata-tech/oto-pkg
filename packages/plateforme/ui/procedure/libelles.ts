@@ -60,10 +60,10 @@ export const LISTE = {
 } as const
 
 /**
- * L'état d'une procédure listée (AC9) : « Publiée · rév. 4 », « · brouillon en attente » quand un
- * brouillon attend sa publication ; « Brouillon · jamais publiée » sinon, dont le brouillon est l'état.
+ * L'état d'une procédure listée (AC9) : « Publiée · rév. 4 », « · modifications en attente » quand un
+ * brouillon attend sa publication ; « Non publiée » sinon (E11-S02, AC-c4 : le mot « brouillon » ne se dit plus).
  */
 export function etatDeLaProcedure(procedure: Pick<ProcedureSummary, "status" | "revision" | "hasDraft">): string {
-  if (procedure.status !== "published") return "Brouillon · jamais publiée"
-  return `Publiée · rév. ${procedure.revision}${procedure.hasDraft ? " · brouillon en attente" : ""}`
+  if (procedure.status !== "published") return "Non publiée"
+  return `Publiée · rév. ${procedure.revision}${procedure.hasDraft ? " · modifications en attente" : ""}`
 }

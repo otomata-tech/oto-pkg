@@ -1,17 +1,18 @@
 // @vitest-environment node
-// `context` complet sur le projet Supabase d'oto-platform (E03-S08, AC11) : le seul test de la story
+// `context` complet sur une vraie base (E03-S08, AC11) : le seul test de la story
 // sur la vraie base, dont le sujet est la latence de `context` et les lectures de la story sur le vrai
 // schéma — jointure `node_versions` → `nodes`, `links` et leurs cibles, blocs publiés des Contextes,
 // `blocks.updated_by`, journal. Une organisation jetable, Acme semée par `seedNodes` (Contextes publiés,
 // une procédure, une page, le tableau), un Contexte republié avec un lien, un journal ; tout passe par la
-// porte MCP sous la session de la personne, la connexion d'administration ne sert qu'à poser. Marqué
-// Supabase : la porte reçoit le jeton d'une session de Supabase Auth (`connectMcp`) ; depuis E01-S10 f2,
-// plus aucune lecture ni écriture de `platform` par PostgREST. Les autres AC se prouvent sur la base
+// porte MCP sous la session de la personne, la connexion d'administration ne sert qu'à poser. Suite
+// portable (E11-S14) : personne sans compte, jeton signé localement (`tests/helpers/session-locale.ts`),
+// passé à la porte par `connectMcp`. Les autres AC se prouvent sur la base
 // simulée (`tests/unit/context-blocks.test.ts`, `tests/unit/context-engine.test.ts`).
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
 import type { BlockInput } from "../../packages/plateforme/schemas"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 import { ACME_CONTEXTS, ACME_PEOPLE, ACME_PROCEDURES, ACME_TABLE, ACME_TEAMS, acmeNode, acmeProfile, seedNodesOf, type AcmeTeam } from "./fixtures/acme"
@@ -27,20 +28,19 @@ const RUNS = 5
 
 const GRILLE = "conseil/grille_tarifaire_2026"
 
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "context in full on the cloud project (AC11)"
+const SUITE = "context in full on a real database (AC11)"
 
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable(SUITE), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
     let org: { id: string; prefix: string; name: string; host: string }
     let jb: { id: string; email: string; accessToken: string }
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       const host = `t${hex(4)}.example.invalid`
       org = { ...(await fx.createOrg({ name: "Acme Énergies", hosts: [host] })), host }

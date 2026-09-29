@@ -165,7 +165,8 @@ export function useMenuDeCreation(prefixe: string, pris: ReadonlySet<string>, mo
       return
     }
     setEtat({ enCours: false, erreur: null })
-    montrer({ path: issue.chemin, title: CREATION.sansTitre, kind: demande.genre, status: "draft", children: [] })
+    // Créé publié (`POST nodes` sans `publish` : écrire publie, E11-S02, AC-c1).
+    montrer({ path: issue.chemin, title: CREATION.sansTitre, kind: demande.genre, status: "published", children: [] })
     naviguer(`${prefixe}${issue.chemin}`)
     rafraichir()
   }

@@ -25,4 +25,5 @@ Texte complet : `.method/conventions/portage-ecrans.md`. La fiche suffit pour é
 - Les données d'exemple partent dès que l'écran réel existe. § 4. Quatre états
 - Ne se portent pas : agents, exécutions, runs, toolbox, conventions `_org`, `_project`, `_run_id`, bloc Connecteurs de l'accueil avant la V2 (l'entrée Connecteurs est au pied du rail) ; un commentaire d'historique se réduit à son pourquoi, en une ligne. § 5. Ce qui ne se porte pas
 - Chaque écart visible avec la capture d'oto-frontend se liste, avec sa raison, dans « Écarts avec la référence UI » de la story. § 5. Ce qui ne se porte pas
+- Une rangée locale jamais envoyée (le Texte d'une page vide) n'entre pas dans ce que l'éditeur rend pour décrire le brouillon (publication, Contexte vide). § 6. Une règle du service, une seule source
 - Ce que le service et l'écran appliquent tous deux (validation, chaîne servie, borne dite) vit dans `schemas/` ; aucune fonction de `ui/` ne refait une fonction de `server/`, aucun libellé n'écrit en chiffres une borne de `schemas/`. § 6. Une règle du service, une seule source

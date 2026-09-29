@@ -108,7 +108,7 @@ describe("the parts of the « Contexte » view as read-only cards in French (AC-
   function monter() {
     render(
       <ContexteServi
-        donnees={{ apercu: { data: apercu(PARTIES) }, contextes: {}, equipes: [], nomOrganisation: "Démo" }}
+        donnees={{ apercu: { data: apercu(PARTIES) }, contextes: {}, equipes: [] }}
         Lien={LienDeTest}
         prefixeDesPages="/n/"
         ici="/context"

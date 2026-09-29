@@ -16,6 +16,11 @@ import { seConnecterSurLEspace } from "./fixtures/noeud"
 // les blocs `row` lus juste avant chaque vérification, par la connexion d'administration (HN-E07S03-10,
 // HN-E01S10-f2e2e-3) : jamais écrits en dur. Une capture par étape et par thème, et la grille dans les huit
 // thèmes, posés sur la racine `.oto` de la page, sans écrire la marque.
+//
+// E11-S05 : le chevron d'un repli de cellule, invisible au repos, paraît au survol de la cellule, et reste montré sous le
+// profil mobile (AC-a1) ; une ligne à revoir est marquée, et l'îlot « À revoir » dit le cycle (AC-a4, AC-a5) ;
+// « Télécharger en .csv », à gauche de « Partager », rend le fichier du tableau (AC-c1, AC-c2) ; la carte d'une page
+// citée ne montre pas son résumé (AC-f2).
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -154,6 +159,26 @@ test.describe("tableau, vue et revue", () => {
       const [premiere] = attendu.aRevoir
       await expect(file.getByText(premiere ? compte(attendu.aRevoir.length, "ligne à revoir", "lignes à revoir") : "Rien à revoir.", { exact: true })).toBeVisible()
       if (premiere) await expect(file.locator(".oto-wait-item-demand")).toHaveText(premiere)
+      // E11-S05 (AC-a4, AC-a5) : les lignes à revoir de la page sont marquées, et elles seules ; le cycle se lit sous le titre.
+      const aRevoirAffichees = (await clesAffichees(grille)).filter((cle) => attendu.aRevoir.includes(cle))
+      await expect(grille.locator('tbody tr[data-state="review"]')).toHaveCount(aRevoirAffichees.length)
+      await expect(grille.locator("tbody tr[data-state]:not([data-state='review'])")).toHaveCount(0)
+      await expect(file.getByText(`Une ligne entre à « ${attendu.cycle.states[0]} »`, { exact: false })).toBeVisible()
+      // E11-S05 (AC-c1, AC-c2) : « Télécharger en .csv » à gauche de « Partager » rend le fichier de tout le tableau.
+      const telecharger = page.getByRole("button", { name: "Télécharger en .csv" })
+      const partager = page.getByRole("button", { name: /^Partager · / })
+      expect((await telecharger.boundingBox())?.x ?? 0).toBeLessThan((await partager.boundingBox())?.x ?? 0)
+      const [fichier] = await Promise.all([page.waitForEvent("download"), telecharger.click()])
+      expect(fichier.suggestedFilename()).toBe(`${TABLEAU.split("/").at(-1)}.csv`)
+      // E11-S05 (AC-a1) : le chevron d'un repli, invisible au repos, paraît au survol de sa cellule.
+      const chevron = grille.locator("tbody .oto-cell-detail > summary .oto-cell-chevron").first()
+      if ((await chevron.count()) > 0) {
+        await attendre(chevron).toHaveCSS("opacity", "0")
+        await chevron.locator("xpath=ancestor::td[1]").hover()
+        await attendre(chevron).toHaveCSS("opacity", "1")
+        await capturer(page, testInfo, `chevron-${mode}`)
+        await page.mouse.move(0, 0)
+      }
       // La grille défile dans son îlot, jamais la fenêtre (`tables-patterns.md § Accessibilité`, 1 280 px).
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0)
       await auRepos(page.getByRole("main"))
@@ -242,14 +267,74 @@ test.describe("tableau, vue et revue", () => {
       await expect(vue.getByRole("rowheader")).toHaveText(valbrune.slice(0, LIGNES_DE_LA_VUE))
       await expect(page.getByText(`${nLignes(Math.min(valbrune.length, LIGNES_DE_LA_VUE))} sur ${NOMBRE.format(valbrune.length)}`, { exact: true })).toBeVisible()
       await expect(page.getByRole("link", { name: "Ouvrir le tableau" })).toHaveAttribute("href", `/n/${TABLEAU}`)
-      // La carte : le conteneur le plus proche de son résumé porte son titre en lien.
-      const carte = page.locator("div", { has: page.getByText(lue.carte.resume, { exact: true }) }).last()
-      await expect(carte.getByRole("link", { name: lue.carte.titre, exact: true })).toHaveAttribute("href", `/n/${GRILLE_TARIFAIRE}`)
+      // La carte : son titre en lien, sa nature, sans le résumé d'une page (E11-S05, AC-f2).
+      const lienDeLaCarte = page.getByRole("link", { name: lue.carte.titre, exact: true })
+      await expect(lienDeLaCarte).toHaveAttribute("href", `/n/${GRILLE_TARIFAIRE}`)
+      const carte = page.locator("div", { has: lienDeLaCarte }).last()
       await expect(carte.getByText("Page", { exact: true })).toBeVisible()
+      await expect(carte.getByText(lue.carte.resume, { exact: true })).toHaveCount(0)
       await capturer(page, testInfo, `vue-et-carte-${mode}`)
       await page.close()
     })
   }
+
+  // E11-S01, lot g (AC-g3, AC-g7) : « Preuve exigée » décochée puis recochée depuis « Réglages », au clavier ; l'état
+  // tient après un rechargement ; le panneau capturé dans chaque thème. Le tableau de la Démo exige la preuve (AC-f8).
+  for (const mode of MODES) {
+    test(`should turn « Preuve exigée » off then on from « Réglages », by keyboard, the state holding after a reload (${mode})`, async ({ browser }, testInfo) => {
+      test.setTimeout(600_000)
+      test.skip(!(await lireLaDemo()).entete.proof, `${TABLEAU} does not require proof: see scripts/demo/50-tableau.mjs`)
+      const page = await browser.newPage({ colorScheme: mode, viewport: { width: 1280, height: 900 } })
+      await seConnecterSurLEspace(page, { email, password })
+      await page.goto(`${ESPACE.adresse}/n/${TABLEAU}`)
+      const reglages = page.getByRole("button", { name: "Réglages", exact: true })
+      await attendre(reglages).toBeVisible()
+      await reglages.click()
+      const panneau = page.getByRole("dialog", { name: "Réglages du tableau" })
+      const preuve = panneau.getByRole("switch", { name: "Preuve exigée" })
+      await expect(preuve).toBeChecked()
+      await auRepos(panneau)
+      await capturer(page, testInfo, `reglages-${mode}`)
+
+      // `Tab` atteint l'interrupteur, `Espace` le bascule ; le focus reste sur lui pendant et après l'envoi.
+      await page.keyboard.press("Tab")
+      await expect(preuve).toBeFocused()
+      await page.keyboard.press("Space")
+      await attendre(panneau.getByRole("status")).toHaveText("Preuve exigée : désactivée.")
+      await expect(preuve).not.toBeChecked()
+      await expect(preuve).toBeFocused()
+      expect((await lireLaDemo()).entete.proof).toBe(false)
+      await auRepos(panneau)
+      await capturer(page, testInfo, `reglages-decoche-${mode}`)
+      await page.keyboard.press("Space")
+      await attendre(panneau.getByRole("status")).toHaveText("Preuve exigée : activée.")
+
+      // Rechargée, la page relit l'en-tête publié ; `Échap` ferme le panneau et rend le focus à « Réglages ».
+      await page.reload()
+      await attendre(reglages).toBeVisible()
+      await reglages.click()
+      await expect(preuve).toBeChecked()
+      await page.keyboard.press("Escape")
+      await expect(panneau).toBeHidden()
+      await expect(reglages).toBeFocused()
+      expect((await lireLaDemo()).entete.proof).toBe(true)
+      await page.close()
+    })
+  }
+
+  // E11-S05 (AC-a1) : sans survol (un écran tactile), le chevron d'un repli reste montré.
+  test("should show the chevron of a cell disclosure at once on a touch screen (E11-S05, AC-a1)", async ({ browser }, testInfo) => {
+    test.setTimeout(300_000)
+    const context = await browser.newContext({ viewport: { width: 375, height: 800 }, isMobile: true, hasTouch: true })
+    const page = await context.newPage()
+    await seConnecterSurLEspace(page, { email, password })
+    await page.goto(`${ESPACE.adresse}/n/${TABLEAU}`)
+    const chevron = page.locator("tbody .oto-cell-detail > summary .oto-cell-chevron").first()
+    await attendre(chevron).toBeAttached()
+    await attendre(chevron).toHaveCSS("opacity", "1")
+    await capturer(page, testInfo, "chevron-mobile")
+    await context.close()
+  })
 
   test("should approve a row, then reject the next one, and cite both in the summary (light)", async ({ browser }, testInfo) => {
     test.setTimeout(600_000)

@@ -22,6 +22,8 @@ export const ACTIVITES = {
   /** Plusieurs gestes regroupés (AC-14) : lu « 3 fois », montré « ×3 ». */
   fois: (nombre: number) => `×${nombre}`,
   foisLu: (nombre: number) => `${nombre} fois`,
+  /** Des lignes à revoir parmi les lignes supprimées (E11-S02, AC-h3). */
+  dontARevoir: (nombre: number) => `, dont ${nombre} à revoir`,
 } as const
 
 /** Ce qui est arrivé, par verbe du service : à la troisième personne, et après « Vous » (AC-13). */
@@ -36,6 +38,7 @@ export const VERBES_DES_ACTIVITES: Record<ActivityVerb, { il: string; vous: stri
   wrote_rows: { il: "a écrit dans", vous: "avez écrit dans" },
   reviewed: { il: "a tranché une revue dans", vous: "avez tranché une revue dans" },
   ran: { il: "a lancé", vous: "avez lancé" },
+  deleted_rows: { il: "a supprimé des lignes dans", vous: "avez supprimé des lignes dans" },
 }
 
 /** La nature d'un contenu, avec son article ; une nature inconnue ne se nomme pas (le chemin suit seul). */

@@ -72,7 +72,7 @@ function reponse(status: number, body: unknown): Response {
  */
 export function simulerLAPI() {
   const envoyes: CorpsEnvoye[] = []
-  const suites: ({ statut: number; code: string } | "reseau" | Promise<void>)[] = []
+  const suites: ({ statut: number; code: string; details?: Record<string, unknown> } | "reseau" | Promise<void>)[] = []
   const revisions = new Map<string, number>(PAGE.map((un) => [un.id, un.revision]))
   let compteur = 0
   const fetchMock = vi.fn<typeof fetch>(async (_adresse, init) => {
@@ -82,7 +82,7 @@ export function simulerLAPI() {
     const suite = suites.shift()
     if (suite instanceof Promise) await suite
     else if (suite === "reseau") throw new TypeError("fetch failed")
-    else if (suite) return reponse(suite.statut, { error: { code: suite.code, message: "refused" } })
+    else if (suite) return reponse(suite.statut, { error: { code: suite.code, message: "refused", ...(suite.details ? { details: suite.details } : {}) } })
     compteur += 1
     const tampon = `2026-09-24T10:00:${String(compteur).padStart(2, "0")}.000000+00:00`
     if (corps.publish) return reponse(200, { data: { path: corps.path, revision: corps.base_revision + 1, status: "published", has_draft: false, touched: [], draft_stamp: null } })
@@ -102,7 +102,8 @@ export function simulerLAPI() {
   return {
     envoyes,
     fetchMock,
-    refuser: (code: string, statut: number) => suites.push({ statut, code }),
+    // `details` : les précisions que rend l'API (`details.reason`, E11-S02 AC-g1 : `header_refused`).
+    refuser: (code: string, statut: number, details?: Record<string, unknown>) => suites.push({ statut, code, ...(details ? { details } : {}) }),
     couper: () => suites.push("reseau"),
     retenir: () => {
       let relacher = () => {}

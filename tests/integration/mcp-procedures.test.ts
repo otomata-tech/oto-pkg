@@ -92,10 +92,11 @@ describe.skipIf(!sqlConfigured || privatePending)(
         title: "Relancer les prospects par email",
         summary: "Prépare et envoie les emails de relance des prospects, sur demande « relance les prospects par email ».",
         ops: [{ op: "add_section", section: "Étapes", text }],
+        publish: false,
       })
       expect(created.isError, created.text).toBe(false)
       const published = await claire.call("write", { path, base_revision: 0, publish: true })
-      expect(published.text).toBe(`Published ${path} revision 1 (1 section, 5 blocks).`)
+      expect(published.text).toBe(`Published ${path} revision 1 (1 section, 5 blocks). Next write: base_revision 1.`)
       const node = await fx.nodeId(ref.org.id, path)
       const blocks = await admin<{ type: string; text: string | null; data: unknown }[]>`
         select type, text, data from platform.blocks where node_id = ${node} and state = 'published' order by position`
@@ -114,7 +115,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
       )
       expect(served.text).toContain('```call\nmail.send_draft {"id":"<id du brouillon>"}\n```')
 
-      const appended = await lea.call("write", { path, base_revision: 1, ops: [{ op: "append", section: "Étapes", text: '4. Vérifie l\'envoi :\n   ```call\n   mail.send {"id": "<id>"}\n   ```' }] })
+      const appended = await lea.call("write", { path, base_revision: 1, ops: [{ op: "append", section: "Étapes", text: '4. Vérifie l\'envoi :\n   ```call\n   mail.send {"id": "<id>"}\n   ```' }], publish: false })
       expect(appended.isError, appended.text).toBe(false)
       const refused = await claire.call("write", { path, base_revision: 1, publish: true })
       expect([refused.isError, refused.text]).toEqual([
@@ -123,6 +124,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
           `Publication of ${path} refused: 1 problem(s). The draft is kept; nothing was published.`,
           `- section « Étapes », call block 3 (step 4): unknown function « mail.send »; ${prefix}_find with type function lists the functions`,
           `Fix them with ${prefix}_write (ops on the sections), then publish again. Format and rules: ${prefix}_read {"path": "write.procedure"}.`,
+          "Writing it in several calls? Pass publish: false until the last one.",
         ].join("\n"),
       ])
 

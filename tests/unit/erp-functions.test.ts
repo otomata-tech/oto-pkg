@@ -280,7 +280,7 @@ describe.skipIf(!sqlConfigured)(portable("ERP functions on a real database (E08-
       await resetProcedure()
       const accepted = await session("claire")
       const published = await accepted.run("write", { path: PROCEDURE, base_revision: 1, publish: true })
-      expect([published.isError, published.text]).toEqual([false, `Published ${PROCEDURE} revision 2 (1 section, 3 blocks).`])
+      expect([published.isError, published.text]).toEqual([false, `Published ${PROCEDURE} revision 2 (1 section, 3 blocks). Next write: base_revision 2.`])
       expect(publishCalls(accepted.requests)).toHaveLength(1)
 
       await resetProcedure({ client: "C-001", amount: 100 })
@@ -294,6 +294,7 @@ describe.skipIf(!sqlConfigured)(portable("ERP functions on a real database (E08-
           `- ${at}: erp.create_invoice has no argument « client »; its arguments: customer, amount`,
           `- ${at}: erp.create_invoice needs argument « customer »; write "<…>" for a value known only when the procedure runs`,
           `Fix them with ${ref.org.prefix}_write (ops on the sections), then publish again. Format and rules: ${ref.org.prefix}_read {"path": "write.procedure"}.`,
+          "Writing it in several calls? Pass publish: false until the last one.",
         ].join("\n"),
       ])
       expect(publishCalls(refused.requests)).toEqual([])

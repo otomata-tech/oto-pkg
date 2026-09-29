@@ -16,6 +16,7 @@
 //
 // E05-S11 (AC-2) : un enregistrement réussi se dit par l'indication de la carte du document, qui lit la même file
 // (`IndicationDEnregistrement`), et non plus par une région propre au champ.
+// E11-S05 (AC-g2) : Entrée dans le titre l'enregistre et mène au premier bloc du document, le Texte d'une page vide.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react"
 import { writeNodeSchema } from "../../schemas"
 import { messageDErreur } from "../api/messages"
@@ -171,6 +172,8 @@ function ChampDEnTete({ champ, aide, selectionneALOuverture = false, ...servi }:
     if (evenement.key !== "Enter" && !sauver) return
     evenement.preventDefault()
     enregistrer()
+    // Le champ du premier bloc, dans une rangée de l'éditeur (`data-cle`) : le titre et le résumé portent aussi `data-champ`.
+    if (champ === "title" && evenement.key === "Enter") evenement.currentTarget.ownerDocument.querySelector<HTMLElement>("[data-cle] [data-champ]")?.focus()
   }
   const decritPar = [aide ? `${id}-aide` : "", erreur ? `${id}-erreur` : ""].filter(Boolean).join(" ") || undefined
   return (
@@ -211,10 +214,11 @@ type Lecture = { revisionServie: number; tamponServi: string | null }
 
 /**
  * Le titre en place (AC-a1) : à poser dans le `<h1>` de l'en-tête, dont il prend le corps. Le nœud que le rail
- * vient de créer (« Sans titre », révision 0 : jamais publié) s'ouvre titre prêt à être écrit (AC-b3).
+ * vient de créer (« Sans titre », publié dès sa création depuis E11-S02) s'ouvre titre prêt à être écrit
+ * (AC-b3 ; E11-S02, AC-c5 : reconnu au titre seul, quelle que soit la révision, HN-E11S02-29).
  */
 export function TitreModifiable({ titre, ...lecture }: Lecture & { titre: string }) {
-  const neuf = lecture.revisionServie === 0 && titre === CREATION.sansTitre
+  const neuf = titre === CREATION.sansTitre
   return <ChampDEnTete champ="title" valeur={titre} selectionneALOuverture={neuf} {...lecture} />
 }
 

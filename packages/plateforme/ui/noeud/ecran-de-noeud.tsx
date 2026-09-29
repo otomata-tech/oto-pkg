@@ -4,7 +4,7 @@
 // lectures de la page de l'hôte en `resultat`, son lien et l'adresse d'un chemin ; les îlots client
 // reçoivent des données et du `ReactNode` déjà rendu. Les emplacements `complement` (procédure, tableau :
 // E05-S04, E07-S03) et `annexes` (la colonne d'un Contexte : E05-S04, AC10) sont remplis par l'hôte ; le
-// panneau « Partager » (E05-S10, AC-b5) et « Contenus liés » (AC-b6) reçoivent ses lectures. Sans lui,
+// panneau « Partager » (E05-S10, AC-b5) et les encarts des liens (E11-S05, AC-e1) reçoivent ses lectures. Sans lui,
 // aucune page ne se lit.
 //
 // Porté d'oto-frontend (`routes/n.$nodeId.lazy.tsx`, `routes/context.$sectionId.lazy.tsx`,
@@ -18,9 +18,12 @@
 // E05-S11 : un Contexte se titre « Contexte · <section> », composé ici, jamais écrit en place (AC-17) ; les
 // pages que citent les blocs montrés se lisent par leur titre (AC-26, AC-27), lues dans l'arbre visible.
 // E05-S13 (AC-20) : plus de « Déplacer » en tête, à aucun niveau : le rail déplace (« ⋯ », glisser-déposer).
+// E11-S05 (lot e) : une page, une procédure et un Contexte en deux colonnes, le document à gauche, à droite les
+// annexes de l'hôte puis « Cité dans », « Cite » et « Sous-pages » ; un tableau garde toute la largeur, ses encarts
+// sur une ligne au-dessus de la grille ; la rangée du chapô ne reste que si elle porte quelque chose.
 import type { ReactNode } from "react"
 import { FileText } from "@phosphor-icons/react/dist/ssr/FileText"
-import type { NodeRulesView, NodeView, TreeNode } from "../../schemas"
+import { tableHeaderSchema, type NodeRulesView, type NodeView, type TreeNode } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
@@ -31,11 +34,12 @@ import { ScreenHeader } from "../ds/react/screen-header"
 import { Skeleton, SkeletonText } from "../ds/react/skeleton"
 import { TwoColumns } from "../ds/react/two-columns"
 import type { SujetsDeRegle } from "../equipes/types"
+import { OptionsDuTableau } from "../tableau/options-du-tableau"
 import { blocsAffiches, cheminsCites, CorpsDuNoeud, niveauDEcritureDe, type CorpsDuNoeudProps } from "./corps-du-noeud"
 import { FileDOperations } from "./editeur/file-d-operations"
 import { ChapoDuNoeud, EnTeteDuNoeud } from "./en-tete-du-noeud"
 import { titreDuContexte } from "./fil"
-import { ECRAN, INTROUVABLE, PARTAGE } from "./libelles"
+import { ECRAN, genreDuNoeud, INTROUVABLE, PARTAGE, resumeMontre } from "./libelles"
 import { PartageDuNoeud } from "./partage-du-noeud"
 import { ciblesDesLiens, ContenusLies } from "./sous-pages"
 
@@ -72,13 +76,13 @@ type EcranDeNoeudProps = {
   /** Le préfixe des adresses de pages de l'hôte (`"/n/"`), en chaîne : les îlots n'en reçoivent pas de fonction. */
   prefixeDesPages: string
   complement?: ReactNode
-  /** La colonne d'annexes (E05-S04, AC10) : à droite du document dès 1 024 px, dessous en dessous. */
+  /** Les annexes d'un Contexte (E05-S04, AC10) : en tête de la colonne de droite dès 1 024 px, sous le document en dessous. */
   annexes?: ReactNode
   /** Le panneau « Partager » (AC19 ; E05-S10, AC-b5), ouvert depuis « Partager · <espace> » de l'en-tête. */
   partage?: LecturesDuPartage
   /**
-   * Les champs que sert `read` sur le nœud, pour ses liens (« Cités », AC-b6) : lus par l'hôte sans les
-   * attendre, attendus sous leur `<Suspense>`.
+   * Les champs que sert `read` sur le nœud, pour ses encarts « Cité dans » et « Cite » (E11-S05, AC-e1) : lus
+   * par l'hôte sans les attendre, attendus sous leur `<Suspense>`.
    */
   liens?: Promise<Resultat<Record<string, unknown>>>
   /**
@@ -126,6 +130,9 @@ function PageDuNoeud(props: PageDuNoeudProps) {
   const resume = brouillon?.summary ?? vue.summary
   const arbreLu = arbre.error === undefined ? arbre.data.tree : null
   const partage = props.partage && <PanneauDuPartage partage={props.partage} nomOrganisation={props.nomOrganisation} ici={props.ici} Lien={props.Lien} />
+  // Les réglages d'un tableau, au niveau écriture hors de la version publiée, sous la file d'opérations (E11-S01, AC-g1).
+  const enteteDuTableau = vue.kind === "table" && niveauDEcriture !== null ? tableHeaderSchema.safeParse(vue.meta) : null
+  const reglages = enteteDuTableau?.success ? <OptionsDuTableau entete={enteteDuTableau.data} enAttente={(brouillon?.meta ?? null) !== null} /> : undefined
   const entete = (
     <EnTeteDuNoeud
       vue={vue}
@@ -137,42 +144,59 @@ function PageDuNoeud(props: PageDuNoeudProps) {
       // Le titre d'un Contexte est composé, jamais écrit en place (AC-17, HN-E05S11-13).
       modifiable={niveauDEcriture !== null && !contexte}
       partage={partage}
+      reglages={reglages}
     />
   )
   const cibles = ciblesDesLiens(arbre.error === undefined ? arbre.data : null, cheminsCites(blocsAffiches(vue, versionPubliee)))
   // L'îlot du document garde le nom écrit du nœud : seuls l'en-tête et le fil composent celui d'un Contexte.
   const corps: CorpsDuNoeudProps = { ...props, niveauDEcriture, titre: titreEcrit, cibles }
-  const chapo = (
+  // Le chapô ne porte que le résumé d'une procédure et une lecture en échec (AC-f1) : sans eux, pas de rangée.
+  const chapoPresent = resumeMontre(genreDuNoeud(vue)) || arbre.error !== undefined || equipes.error !== undefined
+  const chapo = chapoPresent && (
     <>
       <ChapoDuNoeud vue={vue} resume={resume} modifiable={niveauDEcriture !== null} />
       <LecturesEnEchec arbre={arbre} equipes={equipes} ici={props.ici} Lien={props.Lien} />
-      {/* Au-dessus du document, dans sa largeur et hors de sa carte (AC-b6). */}
-      <ContenusLies vue={vue} arbre={arbreLu} liens={props.liens} Lien={props.Lien} hrefDuChemin={props.hrefDuChemin} ici={props.ici} />
     </>
   )
-  // Un Contexte : l'en-tête et les colonnes sont frères dans le contenu, l'en-tête suit la colonne du document
-  // (`islands.css`) ; le chapô est seul dans sa rangée, pour que les annexes commencent au haut de la carte
-  // (E05-S12, AC-21 ; deux `TwoColumns` aux mêmes pistes, l'écart entre eux ramené à `--gap` par `content.css`) ;
-  // ailleurs, une colonne, resserrée à la mesure de lecture sauf pour un tableau.
-  const ecran = props.annexes ? (
-    <>
-      {entete}
-      <TwoColumns main="document" className="oto-node-lead">
-        {chapo}
-      </TwoColumns>
-      <TwoColumns main="document" aside={props.annexes}>
-        <CorpsDuNoeud {...corps} />
-      </TwoColumns>
-    </>
-  ) : (
-    <div className="oto-content-max" data-width={vue.kind === "table" ? undefined : "document"}>
-      {entete}
-      <div className="flex flex-col gap-(--gap)">
-        {chapo}
-        <CorpsDuNoeud {...corps} />
+  const encarts = (disposition: "colonne" | "ligne") => (
+    <ContenusLies vue={vue} arbre={arbreLu} liens={props.liens} Lien={props.Lien} hrefDuChemin={props.hrefDuChemin} ici={props.ici} disposition={disposition} />
+  )
+  // Une page, une procédure, un Contexte (AC-e1, AC-e2) : l'en-tête et les colonnes sont frères dans le contenu,
+  // l'en-tête suit la colonne du document (`islands.css`) ; le chapô est seul dans sa rangée, pour que la colonne
+  // de droite commence au haut de la carte (E05-S12, AC-21 ; deux `TwoColumns` aux mêmes pistes, l'écart entre eux
+  // ramené à `--gap` par `content.css`) ; la colonne de droite a toujours sa piste, le document ne bouge pas quand
+  // les liens arrivent (AC-e4, HN-E11S05-13). Un tableau (AC-e3) : une colonne pleine largeur, les encarts en ligne.
+  const ecran =
+    vue.kind === "table" ? (
+      <div className="oto-content-max">
+        {entete}
+        <div className="flex flex-col gap-(--gap)">
+          {chapo}
+          {encarts("ligne")}
+          <CorpsDuNoeud {...corps} />
+        </div>
       </div>
-    </div>
-  )
+    ) : (
+      <>
+        {entete}
+        {chapo && (
+          <TwoColumns main="document" className="oto-node-lead">
+            {chapo}
+          </TwoColumns>
+        )}
+        <TwoColumns
+          main="document"
+          aside={
+            <>
+              {props.annexes}
+              {encarts("colonne")}
+            </>
+          }
+        >
+          <CorpsDuNoeud {...corps} />
+        </TwoColumns>
+      </>
+    )
   if (niveauDEcriture === null) return ecran
   return (
     <FileDOperations key={vue.id} chemin={vue.path} revisionPubliee={vue.revision} tampon={vue.draft?.draftStamp ?? null}>

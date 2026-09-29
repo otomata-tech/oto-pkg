@@ -107,7 +107,8 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
     })
   })
 
-  it("should expose the public fields only: no author, provenance nor rule (ADR-013 § 3)", async () => {
+  // E11-S05 (AC-d3, HN-E11S05-11) : la langue de l'organisation, pour le séparateur du `.csv` bâti par la page.
+  it("should expose the public fields only: no author, provenance nor rule (ADR-013 § 3), and the language of the organisation", async () => {
     const token = await sharedTree("pub_k", true)
     const view = await readPublicNode(o.host, token)
     const keys = (value: object) => Object.keys(value).sort().join(",")
@@ -120,13 +121,15 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
       children: shapes(view.children),
       links: shapes(view.links),
     }).toEqual({
-      view: "blocks,children,includeChildren,links,node,root,table",
+      view: "blocks,children,includeChildren,language,links,node,root,table",
       root: "path,title",
       node: "kind,meta,path,revision,summary,title,updatedAt",
       blocks: ["data,id,key,position,text,type"],
       children: ["kind,path,title"],
       links: ["path,to"],
     })
+    // Sans langue écrite dans sa marque, l'organisation est en français (`organisationLanguage`).
+    expect(view.language).toBe("fr")
   })
 
   it("should refuse a sub-content when the link does not include them, and open it with the option (AC-d3)", async () => {

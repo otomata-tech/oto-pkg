@@ -196,6 +196,24 @@
   box-shadow: inset 2px 0 0 color-mix(in srgb, var(--primary) 60%, transparent);
 }
 
+/* ── le repli d'une cellule (ajout du paquet, E11-S05, AC-a1) : ni triangle natif, un chevron après la valeur, présent dans la boîte même invisible (la cellule ne change pas de largeur), montré au survol de la cellule, au focus clavier du `summary` et une fois ouvert ; l'opacité bouge, jamais la boîte. */
+.oto-cell-detail > summary { list-style: none; display: inline-flex; align-items: center; gap: var(--space-1); }
+.oto-cell-detail > summary::marker { content: ""; }
+/* Safari dessine encore son propre triangle sans cette ligne. */
+.oto-cell-detail > summary::-webkit-details-marker { display: none; }
+.oto-cell-detail > summary .oto-cell-chevron {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out), rotate var(--dur-fast) var(--ease-out);
+}
+.oto-table :is(td, th):hover .oto-cell-detail > summary .oto-cell-chevron,
+.oto-cell-detail > summary:focus-visible .oto-cell-chevron,
+.oto-cell-detail[open] > summary .oto-cell-chevron { opacity: 1; }
+.oto-cell-detail[open] > summary .oto-cell-chevron { rotate: 180deg; }
+/* Sans survol (un écran tactile), rien ne révélerait le repli : le chevron reste montré. */
+@media (hover: none) {
+  .oto-cell-detail > summary .oto-cell-chevron { opacity: 1; }
+}
+
 /* ── colonne de sélection ────────────────────────────────────────── */
 .oto-table .oto-table-select { inline-size: 40px; padding-inline: var(--space-3); }
 

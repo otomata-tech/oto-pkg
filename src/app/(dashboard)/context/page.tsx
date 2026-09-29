@@ -49,7 +49,6 @@ async function lireLeContexte(db: PlatformDb, identity: Identity): Promise<Donne
     ),
     // Les Contextes d'équipe servis sont ceux des équipes de la personne (E03-S08, AC-f7) : l'identité les nomme.
     equipes: identity.teams,
-    nomOrganisation: identity.org.name,
   }
 }
 

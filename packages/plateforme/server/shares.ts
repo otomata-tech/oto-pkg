@@ -20,6 +20,7 @@ import { createAnonPlatformDb, type PlatformDb } from "./db"
 import { memberDirectory } from "./directory"
 import { changedMeanwhile, inTransaction, invalidInput, isPlatformError, PlatformError } from "./errors"
 import { resolveOrg, type Identity } from "./identity"
+import { organisationLanguage } from "./language"
 import { parseId, requireAdmin, type Mutation } from "./members"
 import { findNode, unknownNode, type NodeRow } from "./nodes/lookup"
 import { structureOf } from "./nodes/move"
@@ -221,5 +222,7 @@ export async function readPublicNode(host: string | null, token: string, path?: 
     table: view.table ?? null,
     children: view.children,
     links: view.links,
+    // La langue de l'organisation de l'adresse, lue dans sa marque, sans requête (E11-S05, AC-d3).
+    language: organisationLanguage(org),
   }
 }

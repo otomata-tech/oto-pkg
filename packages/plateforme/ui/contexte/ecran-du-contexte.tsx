@@ -16,7 +16,7 @@ export type EcranDuContexteProps = {
   /** Ce que la page a lu ; `{ error }` quand l'identité n'a pas pu l'être. */
   resultat: Resultat<DonneesDuContexteServi>
   Lien: LienDeLHote
-  /** Le préfixe des pages de l'arbre (« /n/ ») : la version publiée d'un Contexte, et les liens de l'éditeur. */
+  /** Le préfixe des pages de l'arbre (« /n/ ») : les liens de l'éditeur et des listes servies. */
   prefixeDesPages: string
   /** L'adresse de l'écran (`/context`), pour « Réessayer ». */
   ici: string

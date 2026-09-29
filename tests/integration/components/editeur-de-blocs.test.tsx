@@ -14,27 +14,18 @@ import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 // relecture se joue en rerendant l'éditeur avec les blocs relus. « Ailleurs » est un bouton hors de
 // l'éditeur : le focus qui y va quitte le champ et sa rangée, comme en suivant un lien.
 
-type Montage = { blocs?: BlockView[]; niveau?: 2 | 3; tampon?: string | null; revision?: number }
+type Montage = { blocs?: BlockView[]; tampon?: string | null; revision?: number }
 
-// Le lien que l'écran serveur passe à l'éditeur, déjà rendu (AC9 d'E05-S02).
-const VERSION_PUBLIEE = "/n/ventes/modele_relance?version=publiee"
 /** Un bloc que l'écran n'écrit pas (un diagramme) : il se lit, se déplace, se duplique et se supprime. */
 const DIAGRAMME = bloc("f5000000-0000-4000-8000-000000000005", "mermaid", "graph TD")
 const rafraichir = vi.fn()
 let api: ReturnType<typeof simulerLAPI>
 
-function editeur({ blocs = PAGE, niveau = 2, tampon = null, revision = 4 }: Montage) {
+function editeur({ blocs = PAGE, tampon = null, revision = 4 }: Montage) {
   return (
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin="ventes/modele_relance" revisionPubliee={revision} tampon={tampon}>
-        <EditeurDeBlocs
-          niveau={niveau}
-          blocs={blocs}
-          revisionServie={revision}
-          phraseDePublication="La publication revient au responsable de l'équipe Ventes (Claire Morel) ou à un administrateur."
-          prefixeDesPages="/n/"
-          lienVersionPubliee={<a href={VERSION_PUBLIEE}>Voir la version publiée</a>}
-        />
+        <EditeurDeBlocs blocs={blocs} revisionServie={revision} prefixeDesPages="/n/" />
       </FileDOperations>
       <button type="button">Ailleurs</button>
     </ContexteDeRafraichissement.Provider>
@@ -141,11 +132,13 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
     expect(api.envoyes[0]).toEqual({
       path: "ventes/modele_relance",
       base_revision: 4,
+      // Chaque écriture garde le brouillon ; la publication suit les frappes (E11-S02, AC-c2).
+      publish: false,
       ops: [{ op: "replace_block", block: ID.objet, revision: 3, input: { type: "paragraph", text: "Objet revu", data: {} } }],
     })
     expect(statut("Enregistrement…")).toHaveAttribute("aria-busy", "true")
     lache()
-    await waitFor(() => expect(statut("Brouillon enregistré.")).toHaveAttribute("aria-busy", "false"))
+    await waitFor(() => expect(statut("Enregistré.")).toHaveAttribute("aria-busy", "false"))
 
     // ⌘S envoie sans quitter le champ, sur la révision rendue (4) ; un champ inchangé qu'on quitte n'envoie rien.
     ecrire(texte, "Objet revu encore")
@@ -427,18 +420,45 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
     // Le remplacement du bloc supprimé ne part pas : seule sa suppression suit l'écriture retenue.
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[1].ops).toEqual([{ op: "delete_block", block: ID.objet, revision: 3 }])
-    await waitFor(() => expect(statut("Brouillon enregistré.")).toHaveAttribute("aria-busy", "false"))
+    await waitFor(() => expect(statut("Enregistré.")).toHaveAttribute("aria-busy", "false"))
   })
 
-  it("should write the first block of an empty page at its start", async () => {
+  // E11-S05 (AC-g1, HN-E11S05-19, HN-E11S05-22) : ni phrase ni bouton, un Texte vide créé sur le poste, son invite.
+  it("should give an empty page one local empty Texte with its prompt word for word, sent only once typed, at the start", async () => {
     monter({ blocs: [] })
-    expect(screen.getByText("Cette page n'a pas encore de contenu.")).toBeInTheDocument()
-    fireEvent.click(bouton("Commencer à écrire"))
+    expect(screen.queryByText("Cette page n'a pas encore de contenu.")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Commencer à écrire" })).toBeNull()
     const premier = champ("Modifier ce texte — bloc vide")
-    await waitFor(() => expect(document.activeElement).toBe(premier))
-    ecrireEtEchapper(premier, "Premier bloc")
+    expect(premier).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
+    // Vide, quitté, il ne part pas et reste là.
+    act(() => premier.focus())
+    ailleurs()
+    await unTour()
+    expect(api.envoyes).toEqual([])
+    ecrireEtEchapper(champ("Modifier ce texte — bloc vide"), "Premier bloc")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", input: { type: "paragraph", text: "Premier bloc", data: {} } }])
+  })
+
+  it("should leave an empty Texte with its prompt in place of the last block removed: the editor never has no row (AC-g1)", async () => {
+    monter({ blocs: [bloc(ID.objet, "paragraph", "Seul bloc")] })
+    choisir("Seul bloc", "Supprimer")
+    await waitFor(() => expect(api.envoyes).toHaveLength(1))
+    expect(api.envoyes[0].ops).toEqual([{ op: "delete_block", block: ID.objet, revision: 3 }])
+    const vide = champ("Modifier ce texte — bloc vide")
+    expect(vide).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
+    await waitFor(() => expect(document.activeElement).toBe(vide))
+  })
+
+  it("should open the choice of « / » on the Texte of an empty page, and insert after it from its « + » (AC-g2)", () => {
+    monter({ blocs: [] })
+    const texte = champ("Modifier ce texte — bloc vide")
+    act(() => texte.focus())
+    fireEvent.change(texte, { target: { value: "/" } })
+    expect(screen.getByRole("listbox", { name: "Blocs à insérer" })).toBeInTheDocument()
+    fireEvent.change(texte, { target: { value: "" } })
+    fireEvent.click(bouton("Ajouter un bloc après — bloc vide"))
+    expect(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Texte" })).toBeInTheDocument()
   })
 
   it("should tick a checklist line from its box, the state sent at once", async () => {
@@ -538,7 +558,7 @@ describe("EditeurDeBlocs, glisser-déposer (E05-S10, AC-a3)", () => {
 
 describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
   it("should offer no « Publier », and publish 3 s after the last keystroke, after the text, on the stamp it returned", async () => {
-    monter({ niveau: 3 })
+    monter()
     expect(screen.queryByRole("button", { name: "Publier" })).toBeNull()
     vi.useFakeTimers()
     const texte = champ("Modifier ce texte — Objet de la relance")
@@ -551,7 +571,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     expect(api.envoyes).toHaveLength(3)
     expect(api.envoyes[2]).toEqual({ path: "ventes/modele_relance", base_revision: 4, draft_stamp: "2026-09-24T10:00:02.000000+00:00", publish: true })
     expect(rafraichir).toHaveBeenCalledTimes(1)
-    // Au niveau gestion : ni bandeau de brouillon, ni « Publié en révision N. » ; l'enregistrement se dit.
+    // Ni bandeau de brouillon, ni « Publié en révision N. » ; l'enregistrement se dit.
     expect(screen.queryByText(/^Brouillon non publié|^Publié en révision/)).toBeNull()
     expect(statut("Enregistré.")).toBeDefined()
     // Rien de plus sans frappe.
@@ -567,7 +587,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
       Reflect.deleteProperty(document, "visibilityState")
     }],
   ])("should send the waiting text then publish at once when %s", async (_cas, sortir) => {
-    monter({ niveau: 3 })
+    monter()
     ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
     act(sortir)
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
@@ -578,7 +598,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
   })
 
   it("should send a text over the keepalive limit (64 KiB) without keepalive when the tab closes, so that it still leaves", async () => {
-    monter({ niveau: 3 })
+    monter()
     ecrire(champ("Modifier ce texte — Objet de la relance"), "a".repeat(70_000))
     act(() => window.dispatchEvent(new Event("pagehide")))
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
@@ -586,7 +606,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
   })
 
   it("should publish when the host navigates away, the editor going with the page", async () => {
-    const { demonter } = monter({ niveau: 3 })
+    const { demonter } = monter()
     ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
     demonter()
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
@@ -594,7 +614,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
   })
 
   it("should say a stale publication, keep the text, and publish again on « Réessayer »", async () => {
-    monter({ niveau: 3 })
+    monter()
     const texte = champ("Modifier ce texte — Objet de la relance")
     ecrireEtEchapper(texte, "Objet revu")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
@@ -609,14 +629,17 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
   })
 
-  it("should not publish at the writing level, where the publication belongs to someone else", async () => {
-    monter({ niveau: 2 })
-    expect(screen.getByText("La publication revient au responsable de l'équipe Ventes (Claire Morel) ou à un administrateur.")).toBeInTheDocument()
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
-    await waitFor(() => expect(api.envoyes).toHaveLength(1))
-    act(() => window.dispatchEvent(new Event("pagehide")))
-    await unTour()
-    expect(api.envoyes).toHaveLength(1)
+  // E11-S02 (AC-c2) : écrire publie ; l'éditeur, monté au niveau écriture, publie comme à la gestion.
+  it("should publish at the writing level too, 3 s after the last keystroke, with no sentence about who publishes", async () => {
+    monter()
+    expect(screen.queryByText(/La publication revient/)).toBeNull()
+    vi.useFakeTimers()
+    ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    await act(() => vi.advanceTimersByTimeAsync(1_200))
+    expect(api.envoyes.map((corps) => corps.publish)).toEqual([false])
+    expect(statut("Enregistré.")).toBeDefined()
+    await act(() => vi.advanceTimersByTimeAsync(3_000))
+    expect(api.envoyes.map((corps) => corps.publish)).toEqual([false, true])
   })
 
   it("should ask before leaving the tab with a modified field, and no longer once it is sent", async () => {
@@ -632,26 +655,29 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     fireEvent.change(texte, { target: { value: "Objet revu" } })
     expect(quitter()).toBe(true)
     fireEvent.keyDown(texte, { key: "Escape" })
-    await waitFor(() => expect(statut("Brouillon enregistré.")).toBeDefined())
+    await waitFor(() => expect(statut("Enregistré.")).toBeDefined())
     expect(quitter()).toBe(false)
   })
 })
 
-describe("EditeurDeBlocs, brouillon (AC9 d'E05-S02)", () => {
-  it("should show a writer the draft banner once the first gesture is saved, without reread; a manager, only a draft found on opening", async () => {
+describe("EditeurDeBlocs, brouillon (AC9 d'E05-S02 ; E11-S02, AC-c3)", () => {
+  it("should say nothing of a draft, the person's or one an assistant left, and publish the shared draft whole after the next keystroke", async () => {
     monter({ tampon: null })
-    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
     ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
-    expect(await screen.findByText("Brouillon non publié — ouvert sur la révision 4.")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Voir la version publiée" })).toHaveAttribute("href", VERSION_PUBLIEE)
-    expect(rafraichir).not.toHaveBeenCalled()
+    await waitFor(() => expect(api.envoyes).toHaveLength(1))
+    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
+    expect(screen.queryByRole("link", { name: "Voir la version publiée" })).toBeNull()
     cleanup()
 
-    // Au niveau gestion, un brouillon trouvé à l'ouverture (écrit par un assistant) se dit, jusqu'à la première écriture.
-    monter({ niveau: 3, tampon: "2026-09-24T09:00:00.000000+00:00" })
-    expect(screen.getByText("Brouillon non publié — ouvert sur la révision 4.")).toBeInTheDocument()
+    // Un brouillon trouvé à l'ouverture (laissé par un assistant, `publish: false`) : aucun avis (HN-E11S02-19).
+    monter({ tampon: "2026-09-24T09:00:00.000000+00:00" })
+    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
+    vi.useFakeTimers()
     ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
-    await waitFor(() => expect(screen.queryByText(/Brouillon non publié/)).toBeNull())
+    await act(() => vi.advanceTimersByTimeAsync(3_000))
+    // La publication part sur le tampon rendu par l'écriture : le brouillon partagé, entier.
+    expect(api.envoyes.at(-1)).toMatchObject({ publish: true, draft_stamp: expect.any(String) })
+    expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
   })
 })
 
@@ -837,7 +863,7 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
     ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte de Léa")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     relire({ blocs: [PAGE[0], PAGE[2], PAGE[3]] })
-    expect(await screen.findByText("Ce bloc a été supprimé du brouillon pendant que vous écriviez.")).toBeInTheDocument()
+    expect(await screen.findByText("Ce bloc a été supprimé pendant que vous écriviez.")).toBeInTheDocument()
     act(() => bouton("Réinsérer mon texte").focus())
     fireEvent.click(bouton("Réinsérer mon texte"))
     await waitFor(() => expect(document.activeElement).toBe(bouton("Actions sur ce bloc — Texte de Léa")))

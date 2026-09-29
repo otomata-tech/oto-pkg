@@ -3,14 +3,14 @@ import { clientAuth } from "./fixtures/base"
 import { assurerLeNoeud, attendre, capturer, lireLeHtml, seConnecterSurLEspace } from "./fixtures/noeud"
 import { CHEMINS, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 
-// Contrôle visuel connecté des écrans du Contexte après E05-S12, lot C : le compte E2E, administrateur de l'organisation
-// (`espace.ts`), en clair puis en sombre, à 375 et à 1 280 px. Une page jetable `private/<handle>/essai_e05s12`
-// et une page rangée sous le Contexte Privé (D110) donnent à l'une et à l'autre leur « Contenus liés ». Entre ce
-// repliable et la carte, le seul écart de la colonne, le même sur la page et sur le Contexte, sans l'ancienne marge de
-// 20 px (AC-22) ; à 1 280 px, rail ouvert, le haut de « À quoi sert cette page » est au niveau du haut de la carte,
-// dans une colonne d'au moins 270 px, le chapô et « Contenus liés » au-dessus d'elle ; à 375 px, l'ordre chapô,
-// Contenus liés, carte, annexes (AC-21) ; aucun défilement horizontal du contenu, sur le Contexte et sur la vue
-// « Contexte », à `/context` depuis E11-S10, sans « Règles Oto » ni tête servie. Une capture par étape dans `test-results/`.
+// Contrôle visuel connecté des écrans du Contexte après E05-S12, lot C, et E11-S05, lot e : le compte E2E,
+// administrateur de l'organisation (`espace.ts`), en clair puis en sombre, à 375 et à 1 280 px. Une page jetable
+// `private/<handle>/essai_e05s12` et une page rangée sous le Contexte Privé (D110) donnent à l'une et à l'autre leur
+// encart « Sous-pages ». À 1 280 px, rail ouvert, la colonne de droite commence au haut de la carte, dans une piste
+// d'au moins 270 px : sur la page, « Sous-pages » ; sur le Contexte, « À quoi sert cette page » (AC-21, E11-S05 AC-e1,
+// AC-e2) ; à 375 px, une colonne, la carte puis les encarts (AC-e5) ; aucun défilement horizontal du contenu, sur le
+// Contexte et sur la vue « Contexte », à `/context` depuis E11-S10, sans « Règles Oto » ni tête servie. Une capture par
+// étape dans `test-results/`.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -31,18 +31,22 @@ async function sansDefilementHorizontal(page: Page): Promise<boolean> {
   return page.locator(".oto-content").first().evaluate((contenu) => contenu.scrollWidth <= contenu.clientWidth)
 }
 
-/** Le repliable « Contenus liés » et la carte du document de la page ouverte. */
-function repereDeLaPage(page: Page) {
-  return { lies: page.locator(".oto-linked").first(), carte: page.locator(".oto-two-columns-main .oto-island, .oto-content-max .oto-island").first() }
-}
-
-/** L'écart entre le bas de « Contenus liés » et le haut de la carte, une fois les deux rendus. */
-async function ecartSousLesContenusLies(page: Page): Promise<number> {
-  const { lies, carte } = repereDeLaPage(page)
-  await attendre(lies).toBeVisible()
+/**
+ * La colonne de droite commence au haut de la carte du document, à droite d'elle, lisible (280 px, `--annexes-w`,
+ * sous 1 410 px de contenu) ; sous 1 024 px, une colonne, sous la carte (AC-21 ; E11-S05, AC-e1, AC-e5).
+ */
+async function colonneALaCarte(page: Page, premier: Locator, largeur: number) {
+  const carte = page.locator(".oto-two-columns-main .oto-island").first()
   await attendre(carte).toBeVisible()
-  const haut = await boite(lies)
-  return (await boite(carte)).y - (haut.y + haut.height)
+  await attendre(premier).toBeVisible()
+  const [enCarte, enColonne] = [await boite(carte), await boite(premier)]
+  if (largeur === 1_280) {
+    expect(Math.abs(enColonne.y - enCarte.y)).toBeLessThanOrEqual(1)
+    expect(enColonne.x).toBeGreaterThan(enCarte.x + enCarte.width)
+    expect(enColonne.width).toBeGreaterThanOrEqual(270)
+  } else {
+    expect(enColonne.y).toBeGreaterThan(enCarte.y + enCarte.height)
+  }
 }
 
 test.describe("écrans du Contexte (E05-S12, lot C)", () => {
@@ -55,7 +59,7 @@ test.describe("écrans du Contexte (E05-S12, lot C)", () => {
 
   for (const mode of MODES) {
     for (const largeur of LARGEURS) {
-      test(`should align the annexes with the card, drop the margin under linked content and fold the rules (${mode}, ${largeur} px)`, async ({ browser }, testInfo) => {
+      test(`should align the right column with the card, on a page and on a Contexte (${mode}, ${largeur} px)`, async ({ browser }, testInfo) => {
         test.setTimeout(600_000)
         const context = await browser.newContext({ colorScheme: mode, viewport: { width: largeur, height: 900 } })
         const page = await context.newPage()
@@ -70,34 +74,19 @@ test.describe("écrans du Contexte (E05-S12, lot C)", () => {
         await assurerLeNoeud(page, { chemin: `${essai}/enfant`, titre: "Enfant", resume: "Sous-page jetable." })
         await assurerLeNoeud(page, { chemin: `private/${handle}/contexte/essai_e05s12`, titre: "Rangée sous le Contexte", resume: "Page jetable sous le Contexte Privé (D110)." })
 
-        // AC-22 : sur une page, seul l'écart de la colonne entre « Contenus liés » et la carte.
+        // Une page : « Sous-pages » en tête de la colonne de droite ; ni chapô ni résumé (E11-S05, AC-f1).
         await page.goto(`${ESPACE.adresse}/n/${essai}`)
-        const ecartDeLaPage = await ecartSousLesContenusLies(page)
-        expect(ecartDeLaPage).toBeGreaterThanOrEqual(0)
-        expect(ecartDeLaPage).toBeLessThan(16)
+        await colonneALaCarte(page, page.locator(".oto-two-columns-aside details.oto-linked").first(), largeur)
+        await expect(page.locator(".oto-node-lead")).toHaveCount(0)
+        await expect(page.getByText("Page jetable du contrôle visuel d'E05-S12.")).toHaveCount(0)
+        expect(await sansDefilementHorizontal(page)).toBe(true)
         await capturer(page, testInfo, `page-${nom}`)
 
-        // Le Contexte Privé : le même écart (AC-22), puis la colonne d'annexes (AC-21).
+        // Le Contexte Privé : « À quoi sert cette page » en tête de la colonne de droite, replié (AC-e2).
         await page.goto(`${ESPACE.adresse}/n/private/${handle}/contexte`)
-        const ecartDuContexte = await ecartSousLesContenusLies(page)
-        expect(Math.abs(ecartDuContexte - ecartDeLaPage)).toBeLessThanOrEqual(1)
-        const { carte } = repereDeLaPage(page)
-        const annexes = page.getByRole("note", { name: "À quoi sert cette page" })
-        // Le chapô et « Contenus liés » dans leur rangée, au-dessus de la carte et de la colonne d'annexes.
-        const tete = page.locator(".oto-node-lead")
-        await expect(tete.locator(".oto-linked")).toHaveCount(1)
-        const [enTete, enCarte, enAnnexes] = [await boite(tete), await boite(carte), await boite(annexes)]
-        expect(enTete.y + enTete.height).toBeLessThanOrEqual(enCarte.y)
-        if (largeur === 1_280) {
-          // Contenu d'au moins 770 px : les annexes commencent au haut de la carte, à droite d'elle, lisibles
-          // (280 px, `--annexes-w`, sous 1 410 px de contenu).
-          expect(Math.abs(enAnnexes.y - enCarte.y)).toBeLessThanOrEqual(1)
-          expect(enAnnexes.x).toBeGreaterThan(enCarte.x + enCarte.width)
-          expect(enAnnexes.width).toBeGreaterThanOrEqual(270)
-        } else {
-          // Sous 1 024 px : une colonne, les annexes sous la carte.
-          expect(enAnnexes.y).toBeGreaterThan(enCarte.y + enCarte.height)
-        }
+        const aQuoiSert = page.getByRole("group", { name: "À quoi sert cette page" })
+        await colonneALaCarte(page, aQuoiSert, largeur)
+        await expect(aQuoiSert).not.toHaveAttribute("open")
         expect(await sansDefilementHorizontal(page)).toBe(true)
         await capturer(page, testInfo, `contexte-${nom}`)
 

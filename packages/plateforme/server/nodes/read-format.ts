@@ -33,7 +33,7 @@ export type HeaderInput = {
   prefix: string
   /** La ligne `owner:` : « team Ventes (lead: Claire Morel) », « organisation Acme », « you (personal) »… */
   owner: string
-  /** À qui demander de publier (niveau 2) : la partie « à qui » d'`access.ts` (H68). */
+  /** À qui demander de partager, déplacer ou supprimer (niveau 2) : la partie « à qui » d'`access.ts` (H68). */
   publisher: string | null
   parent: { path: string; title: string } | null
   children: ChildLine[]
@@ -50,9 +50,10 @@ export type HeaderInput = {
 /** Rendu d'un bloc `reference` passé à `renderBlocks` (option de M05 ; E03-S07 : clôture puis ligne résolue en commentaire). */
 export type ReferenceRender = NonNullable<RenderOptions["reference"]>
 
+/** La ligne d'accès (E11-S02, AC-b4) : écrire publie ; la gestion garde le partage, le déplacement et la corbeille. */
 function accessLine(level: AccessLevel, publisher: string | null): string {
-  if (level >= ACCESS_LEVELS.manage) return "access: manage (drafts and publishing)"
-  if (level === ACCESS_LEVELS.write) return `access: write (drafts; publishing is reserved to ${publisher ?? "its managers"})`
+  if (level >= ACCESS_LEVELS.manage) return "access: manage (write and publish, share, move, delete)"
+  if (level === ACCESS_LEVELS.write) return `access: write (write and publish; sharing, moving and deleting are reserved to ${publisher ?? "its managers"})`
   return "access: read"
 }
 

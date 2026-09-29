@@ -18,7 +18,7 @@ const ACME_DESCRIPTIONS: Record<string, string> = {
   read: `${REQ} Reads a page, a procedure or a table by its path (e.g. ventes/relance_devis), your journal (path journal), or the contract of a function (e.g. table.rows). A long page comes as an outline: then read one section by its title. since_revision returns only what changed; a result cut at 45,000 characters says how to read the rest. Do not use to run a function (use acme_call).`,
   call: `${REQ} Runs a function of Acme Énergies's catalog (e.g. mail.create_draft, table.rows) with arguments checked against its contract; read the contract with acme_read, path = the function name, if unsure. A sensitive function (sending, deleting, paying) first returns a summary and does nothing: show it to the user, get their explicit approval, then call again with confirm: true. Never set confirm without that approval. Pass team or account only when a result asks for it or the user names one.`,
   // E03-S03 (AC1) : l'ancien texte d'E03-S01 en tête, mot pour mot, puis la phrase des opérations par bloc.
-  write: `${REQ} Creates or edits a page, a procedure or a table by operations on sections addressed by their title, saved as a draft; publish: true makes it live. Creating needs title and summary; editing needs base_revision = the revision you read (a stale one is refused with the current state). ops items: {op: replace_section | append | add_section | delete_section | replace_text, section: "<title>", text, find (replace_text only), after (add_section only)}. A procedure writes each call in a call block and a table takes a header: read their contracts with acme_read, path write.procedure or write.table. Send a long text in parts of about 20,000 characters with append. To change one block, read with refs: true, then use ops {op: replace_block | insert_after | delete_block | move_block, block: "<ref>", text, after_block or section (move_block: after that block, or at the end of that section)}.`,
+  write: `${REQ} Creates or edits a page, a procedure or a table by operations on sections addressed by their title, published at once (publish: false keeps an unpublished draft). Creating needs title and summary; editing needs base_revision = the revision you read (a stale one is refused with the current state). ops items: {op: replace_section | append | add_section | delete_section | replace_text, section: "<title>", text, find (replace_text only), after (add_section only)}. A procedure writes each call in a call block and a table takes a header: read their contracts with acme_read, path write.procedure or write.table. Send a long text in parts of about 20,000 characters with append. To change one block, read with refs: true, then use ops {op: replace_block | insert_after | delete_block | move_block, block: "<ref>", text, after_block or section (move_block: after that block, or at the end of that section)}.`,
   feedback: `${REQ} Reports a friction, a missing capability or a tool error to the Acme Énergies platform team and returns a ticket number. Use this when a tool, a procedure or an instruction was unclear, missing or wrong; set target to the tool, function or path involved. Do not use to send a message to anyone.`,
 }
 
@@ -73,12 +73,12 @@ describe("six tools per organisation (AC6)", () => {
     }
   })
 
-  it("should lengthen write by the block operations only, from 717 to 945 characters, 961 with a 12-character prefix (E03-S03 AC1 ; E11-S03, AC-c6)", () => {
+  it("should lengthen write by the block operations only, from 733 to 961 characters, 977 with a 12-character prefix (E03-S03 AC1 ; E11-S03, AC-c6 ; E11-S02, AC-b4)", () => {
     const write = buildTools(ACME, [])[4].description
     const added = ' To change one block, read with refs: true, then use ops {op: replace_block | insert_after | delete_block | move_block, block: "<ref>", text, after_block or section (move_block: after that block, or at the end of that section)}.'
     expect(write.endsWith(added)).toBe(true)
-    expect([write.length - added.length, write.length]).toEqual([717, 945])
-    expect(buildTools({ ...DELTA, prefix: "abcdefghijkl" }, [])[4].description).toHaveLength(961)
+    expect([write.length - added.length, write.length]).toEqual([733, 961])
+    expect(buildTools({ ...DELTA, prefix: "abcdefghijkl" }, [])[4].description).toHaveLength(977)
   })
 
   it("should bound context with the work domains and the closing line", () => {

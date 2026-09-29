@@ -22,6 +22,7 @@ import {
   type Rangee,
 } from "../../packages/plateforme/ui/noeud/editeur/modele"
 import { controler } from "../../packages/plateforme/ui/noeud/editeur/operations"
+import { estLaPageVide, modeleDeLaPage } from "../../packages/plateforme/ui/noeud/editeur/page-vide"
 
 // Le modèle d'édition (E05-S02, AC11, AC12) : opérations pures, sans écran. Un bloc servi garde son
 // `id`, sa référence, sa révision et sa clé ; un bloc neuf n'a jamais d'`id`.
@@ -133,6 +134,31 @@ describe("modèle d'édition, structure (AC12)", () => {
   // Le rendu du serveur et l'hydratation lisent les mêmes blocs : leurs clés de rendu (`data-cle`) doivent s'accorder.
   it("should give the same render keys to the same served blocks on every reading", () => {
     expect(rangeesDepuis(PAGE).map((rangee) => rangee.cle)).toEqual(rangeesDepuis(PAGE).map((rangee) => rangee.cle))
+  })
+
+  // E11-S05 (AC-g1, HN-E11S05-19) : le modèle d'une page n'est jamais vide.
+  it("should give a page without block one local empty Texte, of a fixed render key, kept by a reading that still serves none", () => {
+    const [vide, ...autres] = modeleDeLaPage([])
+    expect(autres).toEqual([])
+    expect(vide.bloc).toEqual({ type: "paragraph", text: "", data: {}, key: null })
+    expect(estLaPageVide([vide])).toBe(true)
+    // Rendu par le serveur puis hydraté : la même clé à chaque lecture.
+    expect(modeleDeLaPage([])[0].cle).toBe(vide.cle)
+    expect(modeleDeLaPage([], [vide])).toEqual([vide])
+    expect(modeleDeLaPage(PAGE).map((rangee) => rangee.cle)).toEqual(rangeesDepuis(PAGE).map((rangee) => rangee.cle))
+    // Un Texte tapé ou servi n'est plus le Texte d'une page vide.
+    expect(estLaPageVide(ecrireTexte([vide], vide.cle, "Début").modele)).toBe(false)
+    expect(estLaPageVide(rangeesDepuis([servi("eeeeeeee-0005", "paragraph", "")]))).toBe(false)
+  })
+
+  it("should leave an empty Texte, the focus in it, when the last block is removed (AC-g1)", () => {
+    const [seule] = rangeesDepuis([PAGE[1]])
+    const retire = retirer([seule], seule.cle)
+    expect(retire.modele).toHaveLength(1)
+    const [texte] = retire.modele
+    expect(estLaPageVide(retire.modele)).toBe(true)
+    expect(texte.cle).not.toBe(seule.cle)
+    expect(retire.focus).toEqual({ cle: texte.cle, curseur: Number.MAX_SAFE_INTEGER })
   })
 
   it("should never give an id to a new block", () => {

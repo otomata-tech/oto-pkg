@@ -42,10 +42,14 @@ export function tableDb(tables: Tables, options: Partial<SimulatedDbOptions> = {
 
 const AGENT: WriteOrigin = { kind: "agent", ctx: "7K3Q-M2XA" }
 
-/** `write` de `person` : son résultat ou son refus, l'espion des requêtes et les tables laissées. */
+/**
+ * `write` de `person` : son résultat ou son refus, l'espion des requêtes et les tables laissées. `write` publiant
+ * par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde le brouillon (`publish: false`).
+ */
 export async function writeAs(person: Person, input: Record<string, unknown>, tables: Tables, options: Partial<SimulatedDbOptions> = {}) {
   const simulated = tableDb(tables, options)
-  const outcome = await writeNode(simulated.db, identityOf(person), input, AGENT).then(
+  const body = "publish" in input ? input : { ...input, publish: false }
+  const outcome = await writeNode(simulated.db, identityOf(person), body, AGENT).then(
     (result) => ({ result, error: null }),
     (error: unknown) => ({ result: null, error }),
   )

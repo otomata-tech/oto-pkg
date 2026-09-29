@@ -8,6 +8,9 @@
 
 .oto-block-row[data-state="moving"] [data-geste="poignee"] { cursor: grabbing; }
 
+/* ── l'invite du Texte d'une page vide (E11-S05, AC-g1) : en gris, comme toute aide, dans les deux thèmes. */
+.oto-block-field::placeholder { color: var(--mute); opacity: 1; }
+
 /* ── la liste à cocher (AC-a2) : une case par élément, dans le retrait du texte, posée par la copie des éléments comme la puce d'une liste. */
 .oto-block-field[data-kind="checklist"] {
   padding-inline-start: calc(var(--space-2) + var(--space-5));

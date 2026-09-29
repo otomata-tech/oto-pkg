@@ -1277,6 +1277,10 @@ export type Database = {
         }
         Returns: string
       }
+      discard_draft: {
+        Args: { p_draft_stamp: string; p_node: string }
+        Returns: number
+      }
       duplicate_subtree: {
         Args: {
           p_nodes: string[]

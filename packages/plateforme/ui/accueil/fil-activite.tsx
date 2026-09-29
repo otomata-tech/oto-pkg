@@ -73,10 +73,14 @@ function parJournee(activites: readonly Activity[], maintenant: number): Journee
   return journees
 }
 
-/** Ce qui est arrivé : le verbe, la nature quand elle est sue, puis le titre d'un contenu lu, sinon son chemin tel que le journal le montre. */
-function phraseDe({ verb, kind, title, path }: Activity, vous: boolean): string {
+/**
+ * Ce qui est arrivé : le verbe, la nature quand elle est sue, puis le titre d'un contenu lu, sinon son chemin tel
+ * que le journal le montre ; des lignes à revoir parmi les lignes supprimées, à la fin (E11-S02, AC-h3).
+ */
+function phraseDe({ verb, kind, title, path, inReview }: Activity, vous: boolean): string {
   const nature = kind === null ? "" : `${NATURES_DES_ACTIVITES[kind]} `
-  return `${VERBES_DES_ACTIVITES[verb][vous ? "vous" : "il"]} ${nature}${title ?? path}`
+  const aRevoir = inReview ? ACTIVITES.dontARevoir(inReview) : ""
+  return `${VERBES_DES_ACTIVITES[verb][vous ? "vous" : "il"]} ${nature}${title ?? path}${aRevoir}`
 }
 
 /** Où mène la ligne (AC-15) : la conversation d'une procédure lancée, le contenu que la personne lit, sinon nulle part. */

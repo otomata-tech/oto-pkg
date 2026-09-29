@@ -6,8 +6,10 @@
 // publication de Léa (écriture) est refusée avant tout appel de `publish_node`, et un lecteur ne reçoit
 // pas le brouillon que la base rend (`security-patterns.md § Droits dans le service`) ; requêtes vues
 // par `spyDb`. Textes servis au modèle comparés mot pour mot (H04).
+// E11-S01, lot g : les réglages de l'écran publient par la porte de la route, au niveau écriture (AC-g4, AC-g8).
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { readNode } from "../../packages/plateforme/server/nodes/read"
+import { writeNode } from "../../packages/plateforme/server/nodes/write"
 import { teamOf } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
 import { spyDb, type DbCall } from "../helpers/spy-tables"
@@ -58,9 +60,9 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
   }, SETUP_TIMEOUT)
 
   describe("creating a table (AC1, AC2)", () => {
-    it("should create, open the draft, pose the header and publish revision 1 for Claire, and keep Léa's draft unpublished", async () => {
+    it("should create, open the draft, pose the header and publish revision 1 for Claire, and for Léa at the write level (E11-S02, AC-a2)", async () => {
       const claire = await writeAs(ref, "claire", salons("ventes/salons"))
-      expect(claire.result?.text).toBe("Published ventes/salons revision 1: a table with 4 columns, key nom. Write rows with acme_call table.write.")
+      expect(claire.result?.text).toBe("Published ventes/salons revision 1: a table with 4 columns, key nom. Write rows with acme_call table.write. Next write: base_revision 1.")
       const node = await nodeAt(seed, ref, "ventes/salons")
       expect(node).toMatchObject({ kind: "table", status: "published", revision: 1 })
       expect(node?.meta).toEqual({ ...SALONS_HEADER, closed: false, proof: false })
@@ -72,16 +74,14 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       expect(read.text).toContain("\n\nKey: nom — each row is addressed by its nom value; a new value creates a row.\nColumns:\n- nom: text, required, 200 characters at most (key)\n")
       expect(read.text).toContain("\nWork queue on statut: rows enter « à contacter »; « en cours » marks a row a worker holds under a lease.\n")
 
-      // Léa rédige : le brouillon est créé et son en-tête posé, la publication refusée par le service.
+      // Léa rédige dans l'équipe Ventes (niveau 2) : sa création publie aussi l'en-tête (E11-S02, AC-a2, HN-E11S02-17).
       const lea = await writeAs(ref, "lea", salons("ventes/salons_2"))
-      expect(lea.error).toMatchObject({
-        code: "forbidden",
-        message: "Draft of ventes/salons_2 saved on revision 0, not published: publishing ventes/salons_2 is reserved to team Ventes (lead: Claire Morel). Ask them to publish it.",
-      })
-      const drafted = await nodeAt(seed, ref, "ventes/salons_2")
-      expect(drafted).toMatchObject({ kind: "table", revision: 0 })
-      expect(await draftsAt(seed, ref, "ventes/salons_2")).toMatchObject([{ node_id: drafted?.id, meta: { ...SALONS_HEADER, closed: false, proof: false } }])
-      expect(publishCalls(lea.calls)).toEqual([])
+      expect(lea.result?.text).toBe("Published ventes/salons_2 revision 1: a table with 4 columns, key nom. Write rows with acme_call table.write. Next write: base_revision 1.")
+      const created = await nodeAt(seed, ref, "ventes/salons_2")
+      expect(created).toMatchObject({ kind: "table", status: "published", revision: 1 })
+      expect(created?.meta).toEqual({ ...SALONS_HEADER, closed: false, proof: false })
+      expect(await draftsAt(seed, ref, "ventes/salons_2")).toEqual([])
+      expect(publishCalls(lea.calls)).toHaveLength(1)
     })
 
     it("should refuse a new column without type, a header the checks refuse, and ops on a table, writing nothing", async () => {
@@ -118,7 +118,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       const closed = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, title: "Suivi des prospects 2026", header: { closed: true }, publish: true })
       // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17).
       expect(closed.result?.text).toBe(
-        "Draft of ventes/suivi_prospects saved on revision 3: title « Suivi des prospects 2026 ».\nPublished ventes/suivi_prospects revision 4: closed.\nRenamed: now at ventes/suivi_des_prospects_2026; the old path ventes/suivi_prospects still leads here.",
+        "Draft of ventes/suivi_prospects saved on revision 3: title « Suivi des prospects 2026 ».\nPublished ventes/suivi_prospects revision 4: closed. Next write: base_revision 4.\nRenamed: now at ventes/suivi_des_prospects_2026; the old path ventes/suivi_prospects still leads here.",
       )
       expect((await nodeAt(seed, ref, "ventes/suivi_des_prospects_2026"))?.meta).toEqual({ ...PROSPECTS_HEADER, closed: true })
 
@@ -126,7 +126,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       const lifecycle = { column: "statut", states, working: "en cours" }
       await freshTable(seed, ref)
       const replaced = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, header: { columns: [{ name: "statut", options: states }], lifecycle }, publish: true })
-      expect(replaced.result?.text).toBe("Published ventes/suivi_prospects revision 4: changed statut (options); lifecycle replaced.")
+      expect(replaced.result?.text).toBe("Published ventes/suivi_prospects revision 4: changed statut (options); lifecycle replaced. Next write: base_revision 4.")
       // Le cycle remplacé entier : sans `review`, que l'ancien portait.
       expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual({ ...PROSPECTS_HEADER, columns: expect.any(Array), lifecycle })
       // Les états sans les options : `parseTableHeader` refuse, rien n'est écrit.
@@ -169,6 +169,48 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       expect(unchanged.result?.text.endsWith("\nno pending header changes.")).toBe(true)
       await freshTable(seed, ref)
       expect((await read()).result?.text.endsWith("\n\nNo pending draft on ventes/suivi_prospects.")).toBe(true)
+    })
+  })
+
+  describe("settings of the screen (E11-S01, lot g: AC-g4, AC-g8)", () => {
+    // La porte de la route `POST /api/plateforme/nodes` : `writeNode` avec la provenance d'une personne.
+    const screenWrite = async (person: "lea" | "marc", header: Record<string, unknown>, identity = acmeIdentity(ref, person)) => {
+      const { db, calls } = spyDb(await ref.db(person))
+      const outcome = await writeNode(db, identity, { path: PROSPECTS.path, base_revision: 3, header, publish: true }, { kind: "human" }).then(
+        (result) => ({ result, error: null }),
+        (error: unknown) => ({ result: null, error }),
+      )
+      return { ...outcome, calls }
+    }
+
+    it("should publish each setting in one step at the write level, reading no row, the route journaling the table's path", async () => {
+      const cycle = { ...PROSPECTS_HEADER.lifecycle, review: { ...PROSPECTS_HEADER.lifecycle.review, agents_may_decide: true } }
+      const cases: [Record<string, unknown>, string, Record<string, unknown>][] = [
+        [{ proof: false }, "proof optional", { ...PROSPECTS_HEADER, proof: false }],
+        [{ closed: true }, "closed", { ...PROSPECTS_HEADER, closed: true }],
+        [{ lifecycle: cycle }, "lifecycle replaced", { ...PROSPECTS_HEADER, lifecycle: cycle }],
+      ]
+      for (const [header, change, meta] of cases) {
+        await freshTable(seed, ref)
+        // Léa rédige dans l'équipe Ventes (niveau 2) : aucun refus propre au rédacteur (E11-S02, AC-a2, HN-E11S01-21).
+        const lea = await screenWrite("lea", header)
+        expect(lea.result?.text, change).toBe(`Published ventes/suivi_prospects revision 4: ${change}. Next write: base_revision 4.`)
+        // La ligne de journal de la route prend `target` (`api/nodes.ts`).
+        expect(lea.result?.target, change).toBe(PROSPECTS.path)
+        expect(lea.calls.filter((call) => call.kind === "table" && call.table === "blocks"), change).toEqual([])
+        expect(publishCalls(lea.calls), change).toHaveLength(1)
+        expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta, change).toEqual(meta)
+        expect(await draftsAt(seed, ref, PROSPECTS.path), change).toEqual([])
+      }
+    })
+
+    it("should refuse a reader before any write, recording nothing", async () => {
+      await freshTable(seed, ref)
+      await ref.addRules([{ node: PROSPECTS.path, team: "support", level: "read" }])
+      const marc = await screenWrite("marc", { proof: false }, acmeIdentity(ref, "marc", { teams: [teamOf("support", "marc")] }))
+      expect(marc.error).toMatchObject({ code: "forbidden" })
+      expect(writesOf(marc.calls)).toEqual([])
+      expect((await nodeAt(seed, ref, PROSPECTS.path))?.meta).toEqual(PROSPECTS_HEADER)
     })
   })
 })

@@ -35,7 +35,7 @@ function editeur(blocs: BlockView[], cibles?: CiblesDesLiens) {
   return (
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
-        <EditeurDeBlocs niveau={2} blocs={blocs} revisionServie={4} phraseDePublication="" prefixeDesPages="/n/" lienVersionPubliee={null} cibles={cibles} />
+        <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" cibles={cibles} />
       </FileDOperations>
       <button type="button">Ailleurs</button>
     </ContexteDeRafraichissement.Provider>

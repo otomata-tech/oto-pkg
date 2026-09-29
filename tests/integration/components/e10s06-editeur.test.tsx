@@ -19,7 +19,7 @@ function monter(blocs: BlockView[] = PAGE, apres: ReactNode = <button type="butt
   render(
     <ContexteDeRafraichissement.Provider value={rafraichir}>
       <FileDOperations chemin="ventes/modele_relance" revisionPubliee={4} tampon={null}>
-        <EditeurDeBlocs niveau={2} blocs={blocs} revisionServie={4} phraseDePublication="" prefixeDesPages="/n/" lienVersionPubliee={null} />
+        <EditeurDeBlocs blocs={blocs} revisionServie={4} prefixeDesPages="/n/" />
       </FileDOperations>
       {apres}
     </ContexteDeRafraichissement.Provider>,

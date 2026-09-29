@@ -1,9 +1,11 @@
 // E05-S11 (lot e) : la coque sans tiret cadratin (AC-18 : les tables de libellés de `ui/coque/`, et le rail
 // rendu), la procédure au glyphe `Play` partout où la table nature → glyphe sert (AC-35 : rail, palette,
 // création, navigateur d'arbre ; « Contenus liés », l'accueil et le fil lisent la table du rail, `GLYPHES`).
-// Les menus (AC-31 à AC-34, AC-6, AC-e21, AC-e22) : `rail-application.test.tsx`.
+// Les menus (AC-31 à AC-34, AC-6, AC-e21, AC-e22) : `rail-application.test.tsx`. E11-S05 (AC-h2) : le tableau au
+// glyphe `Table`, aux mêmes endroits.
 import type { AnchorHTMLAttributes, ReactNode } from "react"
 import { Play } from "@phosphor-icons/react/dist/ssr/Play"
+import { Table } from "@phosphor-icons/react/dist/ssr/Table"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { TreeNode } from "@otomata_tech/oto_platform/schemas"
@@ -17,7 +19,11 @@ const ARBRE: TreeNode[] = [
   noeud("guide", "page", "Guide de Démo", [
     noeud("contexte", "context", "Contexte de l'organisation"),
     noeud("private", "page", "Espaces personnels", [noeud("private/claire", "page", "Claire", [noeud("private/claire/contexte", "context", "Contexte")])]),
-    noeud("ventes", "page", "Ventes", [noeud("ventes/contexte", "context", "Contexte"), noeud("ventes/qualifier", "procedure", "Qualifier un prospect")]),
+    noeud("ventes", "page", "Ventes", [
+      noeud("ventes/contexte", "context", "Contexte"),
+      noeud("ventes/qualifier", "procedure", "Qualifier un prospect"),
+      noeud("ventes/suivi", "table", "Suivi des prospects"),
+    ]),
   ]),
 ]
 
@@ -64,12 +70,16 @@ function textesDe(valeur: unknown): string[] {
 const traceDans = (element: Element) => element.querySelector("svg path")?.getAttribute("d")
 
 let TRACE_DU_PLAY: string | null | undefined
+let TRACE_DE_TABLE: string | null | undefined
 
 beforeAll(() => {
   simulerLesDialogues()
   const { container, unmount } = render(<Play />)
   TRACE_DU_PLAY = traceDans(container)
   unmount()
+  const table = render(<Table />)
+  TRACE_DE_TABLE = traceDans(table.container)
+  table.unmount()
 })
 
 afterEach(cleanup)
@@ -106,5 +116,26 @@ describe("the procedure glyph (E05-S11, AC-35)", () => {
 
     render(<NavigateurDArbre resultat={{ data: [{ chemin: "ventes/qualifier", titre: "Qualifier un prospect", nature: "procedure" }] }} hrefDuNoeud={(n) => `/n/${n.chemin}`} Lien={Lien} />)
     expect(traceDans(screen.getByRole("link", { name: "Qualifier un prospect" }))).toBe(TRACE_DU_PLAY)
+  })
+})
+
+describe("the table glyph (E11-S05, AC-h2)", () => {
+  it("should draw a table with Table in the rail, the palette, the creation menu and the tree browser", () => {
+    expect(TRACE_DE_TABLE).toBeTruthy()
+    const rail = monterLeRail()
+
+    expect(traceDans(within(rail).getByRole("link", { name: "Suivi des prospects" }))).toBe(TRACE_DE_TABLE)
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Créer dans Ventes" }))
+    expect(traceDans(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Un tableau" }))).toBe(TRACE_DE_TABLE)
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
+
+    fireEvent.click(within(rail).getByRole("searchbox", { name: "Rechercher" }))
+    const tableaux = within(screen.getByRole("group", { name: "Tableaux" }))
+    expect(traceDans(tableaux.getByRole("option", { name: "Suivi des prospects" }))).toBe(TRACE_DE_TABLE)
+    cleanup()
+
+    render(<NavigateurDArbre resultat={{ data: [{ chemin: "ventes/suivi", titre: "Suivi des prospects", nature: "tableau" }] }} hrefDuNoeud={(n) => `/n/${n.chemin}`} Lien={Lien} />)
+    expect(traceDans(screen.getByRole("link", { name: "Suivi des prospects" }))).toBe(TRACE_DE_TABLE)
   })
 })

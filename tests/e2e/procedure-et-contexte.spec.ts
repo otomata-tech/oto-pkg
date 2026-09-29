@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test"
 import { clientAuth } from "./fixtures/base"
 import { CHEMINS, EQUIPE, ESPACE, PROCEDURE as TITRE_DE_LA_PROCEDURE, SANS_ESPACE } from "./fixtures/espace"
-import { attendreLEnregistrement, lireLeHtml, seConnecterSurLEspace } from "./fixtures/noeud"
+import { attendreLEnregistrement, lireLeHtml, ouvrirAQuoiSert, seConnecterSurLEspace } from "./fixtures/noeud"
 
 // Contrôle visuel connecté des écrans d'une procédure et d'un Contexte (E05-S04, AC16 ; E05-S08, AC10 :
 // champs toujours montés ; M59, fiche D104 : l'écran d'une procédure est celui d'une page) : le compte E2E,
@@ -179,7 +179,8 @@ test.describe("procédure et contexte", () => {
       // Le Contexte de l'équipe : qui le reçoit, en une phrase (E05-S13, AC-17), ce que le modèle recevra (AC10, AC12).
       await page.goto(`${ADRESSE}/n/${CHEMINS.contexteDeLEquipe}`)
       // Les notes sont dans la colonne d'annexes, à côté du document (E05-S09 c1, comme `page.spec.ts`).
-      const annexes = page.getByRole("note", { name: "À quoi sert cette page" })
+      // Repliée à l'arrivée (E11-S05, AC-e2) : ouverte par Entrée.
+      const annexes = await ouvrirAQuoiSert(page)
       await attendre(annexes.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
       await expect(page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("list", { name: "Ordre de lecture" })).toBeVisible()
       await capturer(page, testInfo, `contexte-equipe-${theme}`)
@@ -187,7 +188,7 @@ test.describe("procédure et contexte", () => {
       // Le Contexte Perso : ses annexes, sans « Ma fiche » (E05-S11, AC-8) ; une ligne de l'encart, « Contexte :
       // Privé », toujours servie (E05-S12, AC-3), ouvre la vue « Contexte » (`/context`, E11-S10) sur sa partie (AC-11).
       await page.goto(`${ADRESSE}/n/private/${handle}/contexte`)
-      await attendre(page.getByRole("note", { name: "À quoi sert cette page" }).getByText(/vous seul le recevez\.$/)).toBeVisible()
+      await attendre((await ouvrirAQuoiSert(page)).getByText(/vous seul le recevez\.$/)).toBeVisible()
       await expect(page.getByRole("region", { name: "Ma fiche" })).toHaveCount(0)
       await page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("link", { name: /^Contexte : Privé/ }).click()
       await attendre(page).toHaveURL(`${ADRESSE}/context#contexte-prive`)

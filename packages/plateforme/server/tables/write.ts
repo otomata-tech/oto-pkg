@@ -32,10 +32,10 @@ import { memberNames } from "../nodes/view"
 import { checkWriteArgs } from "./check"
 import { columnOf } from "./header"
 import { keyValue, loadTable, type LoadedTable } from "./meta"
-import { requireWrite, tableResult, tableTeamId, utcClock } from "./output"
+import { requireWrite, tableResult, tableTeamId } from "./output"
 import { EMPTY_KEY, rowKey } from "./row-rules"
-import { asJson, insertRow, leaseActive, rowByKey, rowsByKey, updateRow, type StoredRow } from "./row-store"
-import { FORMER_MEMBER, toReadRow } from "./rows"
+import { asJson, claimedBySentence, heldByOther, insertRow, leaseActive, rowByKey, rowsByKey, updateRow, type StoredRow } from "./row-store"
+import { toReadRow } from "./rows"
 import { applyRowWrite, type RowActor, type RowWrite } from "./write-row"
 import { writeReport, type RowOutcome, type RowRefusalCode } from "./write-report"
 import { sameValue } from "./write-values"
@@ -173,10 +173,9 @@ function noRowNow(scope: Scope, key: string, given: number): RowOutcome {
 
 /** AC18 : une ligne sous le bail actif d'une autre personne ; `claimed_by_user` fait foi, pas le libellé (N4). */
 function claimedByOther(scope: Scope, key: string, current: StoredRow): Pending | null {
-  if (!leaseActive(current, scope.now) || current.claimed_by_user === scope.actor.userId) return null
+  if (!heldByOther(current, scope.actor.userId, scope.now)) return null
   return (names) => {
-    const holder = (current.claimed_by_user ? names.get(current.claimed_by_user) : undefined) ?? FORMER_MEMBER
-    const sentence = `claimed by ${holder} (worker ${current.claimed_by}) until ${utcClock(current.lease_until ?? "")}; nothing written. Wait for its release or the end of the lease.`
+    const sentence = `${claimedBySentence(current, names)}; nothing written. Wait for its release or the end of the lease.`
     return refusedRow(scope, key, { code: "conflict", sentence })
   }
 }

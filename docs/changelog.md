@@ -10,6 +10,16 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-30] — Version 1.1.0 préparée : migrations réunies, CHANGELOG du paquet
+
+**Quoi :** Version 1.1.0 préparée, non publiée : migrations réunies en `20260930100000_v1_1_0.sql` (fiche D124), les six de la vague E10 et E11 (`20260929140000` E11-S04, `20260929160000` E11-S10, `20260929170000` E10-S04, `20260929180000` E11-S03, `20260929190000` E11-S02, `20260929200000` E10-S02) au SQL identique (vérifié par comparaison des lignes hors commentaires), dans l'ordre de leurs horodatages, chacune sous une bannière qui nomme sa story et son fichier d'origine, un seul `-- ROLLBACK:` final dans l'ordre inverse (ceux d'E10-S04 et d'E11-S03, absents, écrits) ; les six fichiers retirés du paquet et de `supabase/migrations/`. `version` 1.1.0 ; `## Unreleased` devenu `## 1.1.0 — 2026-09-30` : une seule ligne `Migrations:`, les quatre lignes `MCP:` sur les descriptions à rafraîchir fusionnées (l'une disait « rien à rafraîchir »), l'exclusion d'en-têtes des routes HTML dite une fois sous `api/platform`, `POST /api/plateforme/nodes` devenu `POST nodes`, la ligne Assistants sur les liens d'avant la version retirée (les fichiers joints naissent en 1.1.0), les lignes `### Hosts` regroupées par objet. Gardes « migration en attente » (`DISCARD_DRAFT_VERSION`, `PRIVATE_SPACES_VERSION`) sur la version réunie. ADR-020 indexé.
+
+**Pourquoi :** fiches D124, D131, D145 : une seule version et un seul fichier de migration pour E10 et E11.
+
+**Problèmes :** aucune des six n'a été appliquée au projet de test d'après la trace de la vague (actions JB encore ouvertes) : aucune réparation d'historique ; la procédure pour une base qui en aurait appliqué une est écrite (`packages/plateforme/migrations/README.md § Hôtes qui avaient appliqué une migration de la 1.1.0`). Écart relevé, non tranché : D121 veut qu'une mineure se relise à la main chez l'hôte, `renovate/preset.json` fusionne seules les mineures.
+
+**Fichiers :** `packages/plateforme/migrations/20260930100000_v1_1_0.sql` (et sa copie `supabase/migrations/`), les six anciens fichiers retirés des deux dossiers ; `packages/plateforme/migrations/README.md` (§ Fichiers : une entrée pour la version ; § « Hôtes qui avaient appliqué une migration de la 1.1.0 », nouvelle ; règle du lexique datée de `20260930100000`) ; `packages/plateforme/{package.json,CHANGELOG.md,README.md}` ; `README.md § Publier une version` (étape 3 : la réunion des migrations, D124) ; `tests/helpers/pending-migrations.ts`, `tests/integration/espace-prive.test.ts` ; `.method/sprint/status.md` (section E10 et E11 livrée, M89, actions de JB) ; `docs/decisions/ADR-020-adresses-en-anglais.md` (indexé).
+
 ## [2026-09-30] — E11-S07 : adresses en anglais
 
 **Quoi :** E11-S07 : adresses en anglais (routes, préfixe `/api/platform`, paramètres, valeurs, ancres) sans alias ; garde `check:framework` des segments de route et des anciens noms (ADR-020). Préfixe de l'API des écrans lu d'une seule constante, `PLATFORM_API_PREFIX` ; `seo-patterns.md § Règles SEO` : la redirection permanente ne vaut que pour une page publique indexée, une page authentifiée ou `noindex` renommée répond 404.

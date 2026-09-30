@@ -376,10 +376,11 @@ de `CHANGELOG.md`. L'application Renovate installée sur le dépôt de l'applica
 }
 ```
 
-Le preset épingle la version du paquet. Mineures et correctifs sont fusionnés automatiquement si
-la CI est verte, puisque le paquet ne fait qu'ajouter. Une majeure attend une revue humaine, sous
-le label `oto-platform-major`. Dans les réglages du dépôt de l'application : fusion automatique
-autorisée, CI exigée avant toute fusion.
+Le preset épingle la version du paquet. Une corrective est fusionnée automatiquement si la CI est
+verte. Une mineure attend une revue humaine, sous le label `oto-platform-minor`, parce qu'elle
+apporte des nouveautés sans drapeau par organisation (D121) ; une majeure aussi, sous le label
+`oto-platform-major`. Dans les réglages du dépôt de l'application : fusion automatique autorisée,
+CI exigée avant toute fusion.
 
 ## Versions et CHANGELOG
 
@@ -402,7 +403,9 @@ Réservé aux mainteneurs du dépôt.
 
 1. Dans `CHANGELOG.md`, renommer `## Unreleased` en `## <x.y.z> — <AAAA-MM-JJ>`, et rouvrir un
    `## Unreleased` vide au-dessus.
-2. Porter la même version dans `version` de `packages/plateforme/package.json`.
+2. Porter la même version dans `version` de `packages/plateforme/package.json`, et réunir les
+   migrations écrites depuis la version précédente en un seul `<horodatage>_vX_Y_0.sql` au contenu
+   identique (fiche D124, `migrations/README.md`).
 3. `pnpm verify`, puis le commit par le skill `commit-push`.
 4. JB pousse le tag de la version :
 

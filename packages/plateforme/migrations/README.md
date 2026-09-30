@@ -57,62 +57,76 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   `members_tree_sync` posent le résumé du Contexte au modèle par portée ; un résumé resté l'ancien texte
   généré est remplacé, `updated_at` gardé. Mêmes signatures, privilèges redits ; aucune table, colonne,
   policy ni index.
-- `20260929160000_private_spaces.sql` (E11-S10, lot a) : l'espace « Privé » de chaque membre dès sa
-  première connexion. `platform.ensure_private_space(org, user)`, `security definer`, accordée à
-  personne (`revoke` de `public`, aucun `grant`) : sans dossier `private` ni ligne `members`, elle
-  rend sans rien écrire ; sinon elle pose le handle manquant (`unique_handle`, depuis
-  `members.email`), puis crée `private/<handle>` et son Contexte s'ils manquent ; un espace tenu par
-  une autre personne n'est pas touché, un second appel n'écrit rien. `members_tree_sync` l'appelle
-  (signature et privilèges inchangés, déclencheur inchangé). La migration répare tous les membres,
-  un à la fois, pour que `unique_handle` voie les handles posés aux tours précédents. Aucune table,
-  colonne, policy ni index.
-- `20260929170000_platform_page_markdown.sql` (E10-S04 ; fiches D111 b, D114, D115) : `blocks_type_check` et
-  `blocks_shape_check` élargies en une instruction. Trois types de bloc : `simple_table` (`columns`, `rows`,
-  `align` facultatif ; 1 à 20 colonnes, 200 rangées, cellules d'une ligne sans blanc de bord, `|` écrit `\|`),
-  `divider` (`text` nul) et `toggle` (`data.summary` d'une ligne, 200 caractères ; corps dans `text`, sans ligne
-  blanche de bord ni ligne `<details…` ou `</details>`). Un élément de `list` est une chaîne ou
-  `{text, children: {items, ordered?, start?}}`, trois niveaux, 500 éléments en tout ; `heading.level` de 1 à 5.
-  Toute ligne existante reste valide. `block_search_text` re-versionnée (même signature, privilèges redits) :
-  sous-éléments, cellules et résumé d'un repli cherchables ; même texte qu'avant pour toute forme existante
-  (`search_tsv` n'est pas recalculée). Aucune table, colonne, policy ni index.
-- `20260929180000_ctx_contexts.sql` (E11-S03, lot a ; fiche D132) : colonne `platform.ctx.contexts jsonb`
-  (contrainte `ctx_contexts_check` : nulle ou objet), la révision publiée de chaque Contexte servi à la
-  conversation, `{<chemin>: <révision>}` ; un code périme quand l'un d'eux change, non plus par
-  `orgs.rules_version`. Additive : un code émis avant est nul, donc périmé, et les conversations ouvertes
-  au déploiement rappellent `context` une fois. Déclencheur, policies et index inchangés.
-- `20260929190000_discard_draft.sql` (E11-S02, lot d ; ADR-011 § 3) : `platform.discard_draft(node, stamp)`,
-  `security definer`, accordée à `authenticated` : refuse un nœud hors des organisations de l'appelant
-  (`42501`), prend le verrou consultatif 7401 de `publish_node`, rend `55000` sans brouillon et `PT409` sur
-  un tampon changé, puis supprime les blocs `draft` et la ligne `node_drafts` ; `nodes` et les blocs publiés
-  ne bougent pas. Le droit (niveau écriture, nœud déjà publié) est décidé par le service. Aucune table,
-  colonne, policy ni index.
-- `20260929200000_platform_files.sql` (E10-S02 ; ADR-016, fiches D111, D113, D118) : les fichiers joints à
-  un nœud, migration unique de la story, complétée lot par lot. Lot a : table `files` (`org_id`, `node_id` en
-  cascade, `name` de 1 à 255 caractères, `mime`, `size` de 1 octet à 50 Mo, `status` `pending` ou `ready`,
-  `created_by`, `created_at` ; aucun octet, la clé d'objet vaut `<org_id>/<id>`), index `(org_id, status)` et
-  `(node_id)`, RLS d'isolation par organisation (quatre policies, l'insertion attribuée à l'appelant sur un nœud
-  de l'organisation), privilèges d'`authenticated` (mise à jour de `status` seule). `blocks_type_check` et
-  `blocks_shape_check` élargies : bloc `file` (`{file_id, name, size, mime}`, `text` nul) ; `image.data` porte
-  `src` ou `file_id`, jamais les deux, et `width` facultatif (`small`, `medium`, `full`). Toute ligne existante
-  reste valide. `block_search_text` re-versionnée : le nom d'un fichier est cherchable, même texte qu'avant pour
-  toute forme existante. `forget_user` re-versionnée : `files.created_by` mis à nul. Mêmes signatures,
-  privilèges redits. Lot c : `public_file_by_token(org, token, file)`, `security definer`, `search_path` vide,
-  accordée à `anon` seul (ADR-016 § 7, ADR-017 § 5) : lien actif, nœud du fichier publié, hors corbeille, dans le
-  périmètre du lien et lisible par son auteur, fichier `ready` cité par un bloc publié (`file` ou `image`) de ce
-  nœud ; rend `id`, `name`, `mime`, `size` et le chemin du nœud, ou rien, la même réponse pour tout refus. Lot d :
-  aucun objet SQL. Lot e : `duplicate_subtree` remplacée (retirée puis recréée aussitôt, mêmes arguments, mêmes
-  contrôles, accordée à `authenticated`) : le type rendu gagne `copied_files`, les paires (ancien, nouveau) des
-  fichiers de chaque nœud copié ; chaque fichier qu'un bloc publié d'un nœud copié cite reçoit une ligne neuve
-  `pending` sous la copie, et le `file_id` des blocs copiés, donc de l'instantané de la copie, est réécrit (ADR-016
-  § 6, fiche D118). Le service copie les objets après le commit et passe les lignes à `ready`. Lot f (ADR-018) :
-  table `upload_tickets` (empreintes SHA-256 des deux jetons, celui de `curl` et celui du formulaire, uniques, jamais
-  un jeton ; personne, `ctx`, type, mode, destination et ses paramètres ; `expires_at`, `used_at`), index
-  `(org_id, expires_at)`, RLS d'isolation par organisation (lecture de ses tickets et des tickets expirés, insertion
-  attribuée à l'appelant, suppression d'un ticket expiré seulement ; aucune mise à jour) ;
-  `consume_upload_ticket(org, empreinte, formulaire)`, `security definer`, `search_path` vide, accordée à `anon`
-  seul : un `update` conditionnel sur l'empreinte du jeton de la porte appelante, qui sert le ticket une fois, par
-  l'un ou l'autre jeton, rend la personne, son e-mail dans `members` et la destination, ou rien ; `forget_user`
-  supprime aussi les tickets de la personne.
+- `20260930100000_v1_1_0.sql` (version 1.1.0 ; fiches D124, D131, D145) : les six migrations des epics E10 et
+  E11, écrites une par story pendant le développement puis réunies avant le tag, au contenu identique, dans
+  l'ordre de leurs horodatages ; une bannière nomme la story et le fichier d'origine de chaque partie, un seul
+  bloc `-- ROLLBACK:` en fin de fichier les reprend dans l'ordre inverse. Aucune version publiée ne portait les
+  six fichiers d'origine (§ « Hôtes qui avaient appliqué une migration de la 1.1.0 »).
+  1. E11-S04, lot a (`20260929140000_route_candidates_formulations.sql`) : `platform.lexicon_fix(org, mot)`,
+     la correction d'un mot de 5 à 40 lettres par le mot le plus proche du lexique de l'organisation
+     (trigrammes ≥ 0,3), exécutable par aucun rôle client ; `route_candidates` remplacée (même porte, deux
+     colonnes de plus, `s_phrase` et `lexical_title` : formulations du résumé cherchées une à une, lexèmes
+     pesés par leur rareté, titre compté à part, demande corrigée par `lexicon_fix`, nœud à la corbeille
+     jamais présélectionné) ; `search_content` recréée, sa correction par `lexicon_fix` et la corbeille
+     écartée avant la coupe (M58). Privilèges redits ; aucune table, colonne, policy ni index.
+  2. E11-S10, lot a (`20260929160000_private_spaces.sql`) : l'espace « Privé » de chaque membre dès sa
+     première connexion. `platform.ensure_private_space(org, user)`, `security definer`, accordée à
+     personne (`revoke` de `public`, aucun `grant`) : sans dossier `private` ni ligne `members`, elle
+     rend sans rien écrire ; sinon elle pose le handle manquant (`unique_handle`, depuis
+     `members.email`), puis crée `private/<handle>` et son Contexte s'ils manquent ; un espace tenu par
+     une autre personne n'est pas touché, un second appel n'écrit rien. `members_tree_sync` l'appelle
+     (signature et privilèges inchangés, déclencheur inchangé). La migration répare tous les membres,
+     un à la fois, pour que `unique_handle` voie les handles posés aux tours précédents. Aucune table,
+     colonne, policy ni index.
+  3. E10-S04 (`20260929170000_platform_page_markdown.sql` ; fiches D111 b, D114, D115) : `blocks_type_check`
+     et `blocks_shape_check` élargies en une instruction. Trois types de bloc : `simple_table` (`columns`,
+     `rows`, `align` facultatif ; 1 à 20 colonnes, 200 rangées, cellules d'une ligne sans blanc de bord, `|`
+     écrit `\|`), `divider` (`text` nul) et `toggle` (`data.summary` d'une ligne, 200 caractères ; corps dans
+     `text`, sans ligne blanche de bord ni ligne `<details…` ou `</details>`). Un élément de `list` est une
+     chaîne ou `{text, children: {items, ordered?, start?}}`, trois niveaux, 500 éléments en tout ;
+     `heading.level` de 1 à 5. Toute ligne existante reste valide. `block_search_text` re-versionnée (même
+     signature, privilèges redits) : sous-éléments, cellules et résumé d'un repli cherchables ; même texte
+     qu'avant pour toute forme existante (`search_tsv` n'est pas recalculée). Aucune table, colonne, policy
+     ni index.
+  4. E11-S03, lot a (`20260929180000_ctx_contexts.sql` ; fiche D132) : colonne `platform.ctx.contexts jsonb`
+     (contrainte `ctx_contexts_check` : nulle ou objet), la révision publiée de chaque Contexte servi à la
+     conversation, `{<chemin>: <révision>}` ; un code périme quand l'un d'eux change, non plus par
+     `orgs.rules_version`. Additive : un code émis avant est nul, donc périmé, et les conversations ouvertes
+     au déploiement rappellent `context` une fois. Déclencheur, policies et index inchangés.
+  5. E11-S02, lot d (`20260929190000_discard_draft.sql` ; ADR-011 § 3) : `platform.discard_draft(node,
+     stamp)`, `security definer`, accordée à `authenticated` : refuse un nœud hors des organisations de
+     l'appelant (`42501`), prend le verrou consultatif 7401 de `publish_node`, rend `55000` sans brouillon et
+     `PT409` sur un tampon changé, puis supprime les blocs `draft` et la ligne `node_drafts` ; `nodes` et les
+     blocs publiés ne bougent pas. Le droit (niveau écriture, nœud déjà publié) est décidé par le service.
+     Aucune table, colonne, policy ni index.
+  6. E10-S02 (`20260929200000_platform_files.sql` ; ADR-016, fiches D111, D113, D118) : les fichiers joints
+     à un nœud. Table `files` (`org_id`, `node_id` en cascade, `name` de 1 à 255 caractères, `mime`, `size`
+     de 1 octet à 50 Mo, `status` `pending` ou `ready`, `created_by`, `created_at` ; aucun octet, la clé
+     d'objet vaut `<org_id>/<id>`), index `(org_id, status)` et `(node_id)`, RLS d'isolation par
+     organisation (quatre policies, l'insertion attribuée à l'appelant sur un nœud de l'organisation),
+     privilèges d'`authenticated` (mise à jour de `status` seule). `blocks_type_check` et
+     `blocks_shape_check` élargies : bloc `file` (`{file_id, name, size, mime}`, `text` nul) ; `image.data`
+     porte `src` ou `file_id`, jamais les deux, et `width` facultatif (`small`, `medium`, `full`). Toute
+     ligne existante reste valide. `block_search_text` re-versionnée : le nom d'un fichier est cherchable,
+     même texte qu'avant pour toute forme existante. `forget_user` re-versionnée : `files.created_by` mis à
+     nul, les tickets de la personne supprimés. Mêmes signatures, privilèges redits.
+     `public_file_by_token(org, token, file)`, `security definer`, `search_path` vide, accordée à `anon`
+     seul (ADR-016 § 7, ADR-017 § 5) : lien actif, nœud du fichier publié, hors corbeille, dans le périmètre
+     du lien et lisible par son auteur, fichier `ready` cité par un bloc publié (`file` ou `image`) de ce
+     nœud ; rend `id`, `name`, `mime`, `size` et le chemin du nœud, ou rien, la même réponse pour tout
+     refus. `duplicate_subtree` remplacée (retirée puis recréée aussitôt, mêmes arguments, mêmes contrôles,
+     accordée à `authenticated`) : le type rendu gagne `copied_files`, les paires (ancien, nouveau) des
+     fichiers de chaque nœud copié ; chaque fichier qu'un bloc publié d'un nœud copié cite reçoit une ligne
+     neuve `pending` sous la copie, et le `file_id` des blocs copiés, donc de l'instantané de la copie, est
+     réécrit (ADR-016 § 6, fiche D118) ; le service copie les objets après le commit et passe les lignes à
+     `ready`. Table `upload_tickets` (ADR-018 ; empreintes SHA-256 des deux jetons, celui de `curl` et celui
+     du formulaire, uniques, jamais un jeton ; personne, `ctx`, type, mode, destination et ses paramètres ;
+     `expires_at`, `used_at`), index `(org_id, expires_at)`, RLS d'isolation par organisation (lecture de
+     ses tickets et des tickets expirés, insertion attribuée à l'appelant, suppression d'un ticket expiré
+     seulement ; aucune mise à jour) ; `consume_upload_ticket(org, empreinte, formulaire)`, `security
+     definer`, `search_path` vide, accordée à `anon` seul : un `update` conditionnel sur l'empreinte du
+     jeton de la porte appelante, qui sert le ticket une fois, par l'un ou l'autre jeton, rend la personne,
+     son e-mail dans `members` et la destination, ou rien.
 
 ## Installer sur un hôte neuf
 
@@ -235,6 +249,32 @@ Revenir en arrière avant la poussée : `repair --status reverted 20260928100000
 encore leurs fichiers (le commit d'avant la ligne de base V1) ; la sauvegarde de l'étape 1 dit
 lesquelles.
 
+## Hôtes qui avaient appliqué une migration de la 1.1.0
+
+Les six fichiers d'origine de `20260930100000_v1_1_0.sql` (`20260929140000`, `20260929160000`,
+`20260929170000`, `20260929180000`, `20260929190000`, `20260929200000`) n'ont été publiés par aucune
+version : seule une base de développement, ou le projet de test de ce dépôt, a pu en appliquer. Le
+fichier de version ne se rejoue pas sur une telle base (ses `create` échoueraient) et `supabase db push`
+refuse un historique qui nomme des versions absentes du dossier. Par qui exploite la base, jamais par la
+CI, avant la poussée qui apporte le fichier de version, `DB_URL` posée comme au § précédent :
+
+- **Base locale de test** : `pnpm db:local --reset` la recrée, rien d'autre.
+- **Les six appliquées** (`supabase migration list` les montre côté base) : seul l'historique change.
+
+  ```bash
+  npx supabase migration repair --db-url "$DB_URL" --status reverted 20260929140000 20260929160000 20260929170000 20260929180000 20260929190000 20260929200000
+  npx supabase migration repair --db-url "$DB_URL" --status applied 20260930100000
+  npx supabase migration list --db-url "$DB_URL"
+  npx supabase db push --db-url "$DB_URL" --dry-run   # « Remote database is up to date »
+  ```
+
+- **Une partie seulement** : appliquer d'abord, à la main et dans l'ordre, les parties manquantes du
+  fichier de version (chaque bannière nomme son fichier d'origine), puis le cas précédent ; ou recréer la
+  base.
+
+Les copies des six dans `supabase/migrations/` de l'hôte se suppriment : `migrations sync` ajoute, il
+ne retire rien.
+
 ## Supprimer une personne
 
 Aucune clé ne lie plus `platform` aux comptes de Supabase Auth : supprimer un compte depuis le
@@ -356,7 +396,7 @@ garde ; la ligne de base V1 les porte toutes.
   bloc publié y entrent par ses déclencheurs pour tout écrivain, outillage et import compris, dans
   l'ordre des mots ; `lexicon_rebuild(org)` le reconstruit, appelée par la migration et par
   `forget_user` ; aucune écriture accordée, une lecture qui ne rend aucune ligne à `authenticated` ;
-  seule `lexicon_fix` le lit (depuis `20260929140000`), pour `search_content` et `route_candidates`.
+  seule `lexicon_fix` le lit (depuis `20260930100000`, partie E11-S04), pour `search_content` et `route_candidates`.
   Jamais exporté (`NEVER_EXPORTED`), il se reconstruit à l'import.
 - **Aucune fonction ne lève `40001`** (depuis `20260924130100`) : PostgREST rejoue sans fin une
   transaction en échec de sérialisation ; un conflit de révision lève `PT409`.

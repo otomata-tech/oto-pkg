@@ -3,11 +3,19 @@
   "description": "Mises à jour de @otomata_tech/oto_platform dans une application hôte (ADR-006, ADR-010)",
   "packageRules": [
     {
-      "description": "Mineures et correctifs : version épinglée, fusion automatique si la CI est verte",
+      "description": "Correctives : version épinglée, fusion automatique si la CI est verte",
       "matchPackageNames": ["@otomata_tech/oto_platform"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["patch"],
       "rangeStrategy": "pin",
       "automerge": true
+    },
+    {
+      "description": "Mineures : revue humaine (D121)",
+      "matchPackageNames": ["@otomata_tech/oto_platform"],
+      "matchUpdateTypes": ["minor"],
+      "rangeStrategy": "pin",
+      "automerge": false,
+      "labels": ["oto-platform-minor"]
     },
     {
       "description": "Majeures : revue humaine",

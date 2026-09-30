@@ -12,46 +12,18 @@ Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣
 | E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | ✅ `@otomata_tech/oto_platform` 1.0.0 publié avec provenance (2026-09-29) ; oto-pkg public, oto-saas privé |
 | E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | ✅ fusionné, bout en bout vert, Démo vidée |
 
-## Contenus riches et retours de la démo (epics E10 et E11, après le tag `v1.0.0`)
+## Contenus riches et retours de la démo (epics E10 et E11) : 1.1.0 prête, non publiée
 
-Fiches D111 à D124, D131 à D134, D137 à D150, ADR-016 à ADR-018. E10-S04, E10-S01 et E10-S06 sont livrées et
-fusionnées (changelog du 2026-09-29) ; E10-S02 (fichiers, lots a à f, Ⓜ `20260929200000_platform_files.sql`) est
-livrée et fusionnée (changelog du 2026-09-30, commit commun à venir) ; restes : M86 à M89 et les actions de JB.
-Epic E10 sans story ouverte.
-
-Retours de la démo (epic E11, fiches D131 à D136, rapport de tests FB-0001 à FB-0010, retours
-d'écran du 2026-09-29). Neuf stories, longues à dessein. Deux stories en cours ne touchent jamais le
-même fichier source (`vagues.md § Parallélisme`), ni un fichier d'une story E10 en cours : l'ordre
-suit la matrice des fichiers communs, et la mémoire du poste ne laisse qu'un créneau aux commandes
-lourdes. E11-S14 (harnais de test sans Supabase, lots a à c) est livrée et fusionnée (changelog du
-2026-09-30, commit commun à venir) : seules les suites de l'adaptateur Supabase gardent le projet.
-
-| Vague | ID | Titre | Est. | Ⓜ | Dépend de | Statut |
-|-------|----|-------|------|---|-----------|--------|
-| 1 | E11-S04 | Routage des procédures : trois candidates proposées, égalités, formulations, fautes de frappe (routage et `find`, M58) | L | Ⓜ | — | ✅ approuvée, fusionnée sur main (non commitée) |
-| 1 | E11-S09 | Brancher mon Claude, ChatGPT ou Mistral : un guide par onglet, grande fenêtre et `/connect` | M | | — | ✅ approuvée, fusionnée sur main (non commitée) ; AC-15 en attente (banc Le Chat) |
-| 2 | E11-S03 | Contexte et conversations : invalidation ciblée des ctx, plafond seul et coupe dite, déplacer et compléter une liste | L | Ⓜ | E11-S04 (fichiers communs) ; lot c : E10-S04 | ✅ approuvée, fusionnée sur main (commit commun à venir) ; Ⓜ `20260929180000_ctx_contexts.sql` à appliquer au projet de test (action JB) |
-| 2 | E11-S10 | Rail : espace Privé dès la première connexion, équipes où l'on est membre, créateur inscrit, vue Contexte dans le menu | L | Ⓜ | E11-S09 (accueil) ; E10-S01 (`ui/coque/`) | ✅ approuvée, fusionnée sur main avec S04 et S09 (commit à venir) ; AC-a0 : relevé de diagnostic sur Démo par le responsable d'Oto |
-| 3 | E11-S01 | Tableaux : créer sans écraser, colonne stricte, recherche par mots, révision et auteur, revue par l'agent, preuve par tableau, réglages à l'écran | L | | E10-S01 (fichiers des tableaux) ; lot g après E11-S02 | ✅ lots a à f approuvés, fusionnés sur main (commit commun à venir) ; lot g ✅ approuvé, fusionné sur main (commit à venir) |
-| 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | ✅ approuvée, fusionnée sur main (commit à venir) ; Ⓜ `20260929190000_discard_draft.sql` à appliquer au projet de test (action JB) |
-| 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | ✅ approuvée, fusionnée sur main (commit à venir) |
-| 5 | E11-S06 | Éditeur : une puce par élément de liste, modifier un lien dans un panneau | M | | E10-S04, E10-S06 | ✅ approuvée, fusionnée sur main (commit commun à venir) |
-| 6 | E11-S07 | Adresses en anglais : routes, paramètres, ancres, préfixe d'API | L | | toutes les autres | ✅ approuvée, fusion en cours (cassante, ADR-020) |
-
-- **Livraison** : une seule version, 1.1.0, pour les quatre stories d'E10 et les neuf d'E11 (fiches
-  D131, D145), sans drapeau ni alias d'anciennes adresses. Le tag part quand toutes sont fusionnées, dans
-  le dépôt du paquet. Version mineure : sa PR Renovate ne fusionne pas seule chez l'hôte et se relit à
-  la main (D121 ; adresses renommées, migration).
-- **`### Hosts` du `CHANGELOG.md` du paquet** : une seule migration (D124), à copier par
-  `oto-platform migrations sync` puis à appliquer ; titres de niveau 2 et 3 un cran plus bas ; cinq
-  variables `PLATFORM_STORAGE_*`, facultatives (sans elles, fichiers désactivés ; bucket privé et
-  CORS : README) ; `X-Frame-Options` et `Referrer-Policy` globaux exclus des deux routes HTML ;
-  liste d'outils à rafraîchir dans les hosts (champ `file` de `read`, D119).
-- **Migrations** : une Ⓜ appliquée à la fois au projet de test, dans l'ordre de ses horodatages,
-  toutes additives ; avant le tag `v1.1.0`, le pilote réunit celles d'E10 (S04, S02) et
-  d'E11 (S02, S03, S04, S10) en un seul fichier `<horodatage>_v1_1_0.sql` au contenu identique, puis
-  répare l'historique du projet de test (D124).
-- **CI du paquet** : M88.
+Fiches D111 à D124, D131 à D150, ADR-016 à ADR-018, ADR-020. Livrées et fusionnées sur `main` (commits
+`3a2cc5c` à `b0f6e04`, changelog des 2026-09-29 et 2026-09-30) : les quatre stories d'E10 (S04, S01, S06,
+S02) et les neuf d'E11 (S04, S09, S03, S10, S01, S02, S05, S06, S07), avec le harnais de test sans Supabase
+(E11-S14). Version 1.1.0 préparée (changelog du 2026-09-30) : `version` 1.1.0 du paquet,
+`## 1.1.0 — 2026-09-30` de son `CHANGELOG.md`, et les six migrations de la vague (E11-S04, E11-S10, E10-S04,
+E11-S03, E11-S02, E10-S02) réunies en `20260930100000_v1_1_0.sql` au contenu identique (D124, D145).
+Version mineure, cassante sur les adresses (ADR-020, D131) : sa PR Renovate se relit à la main chez
+l'hôte (D121) : `renovate/preset.json` ne fusionne seules que les correctives, une mineure attend
+une revue sous le label `oto-platform-minor`. Non publiée : tag et suites aux actions de JB ci-dessous ; restes sans
+urgence : M86 à M91.
 
 ## Stories V2 (marquées, non planifiées)
 
@@ -105,7 +77,7 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M86 | E10-S02 : les objets du stockage qui perdent leur ligne `files` sans passer par la purge restent orphelins dans le bucket : nœuds supprimés par `forget_user`, organisation supprimée en SQL (la cascade emporte les lignes), `pnpm test:cleanup` et `pnpm demo:seed` ; les supprimer par préfixe `<org_id>/` (ou lire les clés avant la suppression). |
 | M87 | E10-S02 : `pnpm org:export --force` vide `<fichier>.files/` avant d'écrire les objets (HN-E10S02-112), et une panne du stockage en cours lève avant le JSON (HN-E10S02-87) : l'ancien JSON reste à côté d'objets en partie réécrits. Écrire dans un dossier temporaire, puis remplacer JSON et dossier ensemble. |
 | M88 | E10-S02 : CI du paquet : un service MinIO dans le job d'intégration, pour l'adaptateur S3 réel (SigV4, `copy`, URL signées ; les tests n'ont que l'adaptateur en mémoire) ; la spec d'isolation du HTML (`tests/e2e/e10s02-voir.spec.ts`, F1 à F16, O1 à O7) en Playwright, qui se saute sans stockage. |
-| M89 | E10-S02 : `server/database.ts` (types générés) n'est pas régénéré : `pnpm db:types` après l'application de `20260929200000_platform_files.sql` au projet de test (`files`, `upload_tickets`, `duplicate_subtree`, deux fonctions `anon`). |
+| M89 | E10-S02 : `server/database.ts` (types générés) n'est pas régénéré : `pnpm db:types` après l'application de `20260930100000_v1_1_0.sql` au projet de test (`files`, `upload_tickets`, `duplicate_subtree`, deux fonctions `anon`). |
 | M90 | E11-S02 : `server/tables/import.ts:188` : reprendre `heldByOther` de `row-store.ts` (troisième copie du prédicat). |
 | M91 | E11-S02 : `ui/noeud/en-tete-modifiable.tsx` l. 10-11 : le commentaire dit encore qu'un nœud neuf est « jamais publié » ; `FileDOperations` : `brouillon` et `ecrit` de l'instantané sans lecteur ; `EN_TETE.enregistre`, `EN_TETE.aRenvoyer` morts. |
 
@@ -116,11 +88,12 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | Fin de la V1 (D126) | oto-saas se déploie chez Scaleway (responsable du déploiement, `docs/deploiement.md § 3` d'oto-saas) ; le projet Vercel reste sur l'archive jusque-là. Désactiver le service Windows `postgresql-x64-16` du poste. |
 | Après la ligne de base V1 | `supabase migration repair` sur le projet du premier client, par la procédure de `packages/plateforme/migrations/README.md` (notre projet est réparé). |
 | Sur le poste | Désactiver le service Windows `postgresql-x64-16`, inutilisé par la base de test locale. |
-| Après la fusion d'E10-S04, E10-S01, E10-S06, E11-S03, E11-S14, E11-S01, E11-S02, E11-S05 et E10-S02 | Appliquer la migration `20260929170000_platform_page_markdown.sql` au projet Supabase de test, puis `20260929180000_ctx_contexts.sql` (E11-S03), `20260929190000_discard_draft.sql` (E11-S02) et `20260929200000_platform_files.sql` (E10-S02), dans cet ordre ; puis jouer `tests/integration/mcp-read-write.test.ts` et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
+| 1.1.0 commitée, avant le tag | Projet Supabase de test, dans cet ordre : relevé d'AC-a0 d'E11-S10 (requête de la story, en lecture, sur Démo), puis `supabase db push` de `20260930100000_v1_1_0.sql` (aucune des six migrations d'origine n'y a été appliquée d'après la trace de la vague ; si l'historique en nomme une : `packages/plateforme/migrations/README.md § Hôtes qui avaient appliqué une migration de la 1.1.0`), relevé d'AC-a3, `pnpm db:types` (M89) ; puis jouer `tests/integration/mcp-read-write.test.ts`, les suites sautées tant que la version manquait (`isolation/contenu`, `e11s02-brouillons-et-suppression`, `espace-prive`) et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
 | Avant la campagne visuelle d'E10-S02 | Bucket privé du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3) et ses clés d'accès S3, règles CORS (`PUT` et `GET` depuis chaque adresse de l'application, en-tête `content-type` : README du paquet), cinq variables `PLATFORM_STORAGE_*` du projet (ADR-016 § 2). |
-| Après le bucket et la migration d'E10-S02 | Jouer `tests/e2e/e10s02-voir.spec.ts` (AC-c6, F1 à F16 et O1 à O7, en-têtes reçus, « Voir », lien public ; sautée sans stockage) et la campagne de dépôt sur le bucket réel (image, PDF, `.html` : déposer, voir, relire, voir par un lien public), avec le contrôle visuel dans les deux thèmes ; AC-f17 : banc sur claude.ai (artefact publié, `source_url`) et ChatGPT (formulaire) avec un rapport HTML de 100 ko, résultat noté dans `docs/mcp-golden-queries.md` ; rejouer les golden queries qui mènent à `read` et à `call` (descriptions allongées, journal des révisions du 2026-09-30). |
+| Après le bucket et la migration de 1.1.0 | Jouer `tests/e2e/e10s02-voir.spec.ts` (AC-c6, F1 à F16 et O1 à O7, en-têtes reçus, « Voir », lien public ; sautée sans stockage) et la campagne de dépôt sur le bucket réel (image, PDF, `.html` : déposer, voir, relire, voir par un lien public), avec le contrôle visuel dans les deux thèmes ; AC-f17 : banc sur claude.ai (artefact publié, `source_url`) et ChatGPT (formulaire) avec un rapport HTML de 100 ko, résultat noté dans `docs/mcp-golden-queries.md` ; rejouer les golden queries qui mènent à `read` et à `call` (descriptions allongées, journal des révisions du 2026-09-30). |
 | Quand JB le veut | Trancher la fiche D118 (duplication d'une page qui a des fichiers) : la story avance sous l'option recommandée, la copie des objets. |
-| Après la fusion des stories d'E10 et d'E11 | Tag `v1.1.0` (après la fusion de leurs migrations, D131, D145) ; dans le dépôt SaaS, relire à la main la PR Renovate de cette version (adresses renommées) et renommer les routes de l'hôte. |
+| 1.1.0 commitée et poussée, CI verte | Tag `v1.1.0` (`README.md § Publier une version`), puis `npm view @otomata_tech/oto_platform@1.1.0 version`. oto-saas : relire à la main la PR Renovate de 1.1.0 (mineure cassante sur les adresses, ADR-020, D121, D131 ; renommages : ligne « Après la fusion d'E11-S07 »), puis `oto-platform migrations sync` et l'application de `20260930100000_v1_1_0.sql` à sa base. |
 | Après la fusion d'E11-S07 | Projet Supabase de test : ajouter `/auth/confirm` aux adresses de retour autorisées (`uri_allow_list`, `pnpm auth:settings --to <ref> --site-url <url> --redirect <motif> --apply`), puis retirer à la main le motif de `/auth/confirmer`. oto-saas, en prenant la version : renommer ses dossiers de routes, monter l'API sous `api/platform/[...route]`, mettre à jour son middleware (`/auth/confirm` public) et l'exclusion d'en-têtes des routes HTML (`api/platform/…/html`). Renvoyer les invitations en attente de Démo, dont le lien vise `/auth/confirmer` (404). |
+| Après la publication de 1.1.0 | E11-S09 AC-15 : banc Le Chat (signature `initialize` de Mistral relevée, puis la ligne de `hostFamily`) ; bancs d'E10-S02 AC-f17 sur claude.ai et ChatGPT (ligne « Après le bucket et la migration de 1.1.0 »). |
 | Avant le premier client | Remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (inscriptions, connexions et vérifications 30, rafraîchissements 150, par 5 minutes et par IP). |
 | Au premier client | Test d'installation réel du paquet publié dans l'ERP du premier client ; chaque écart devient une story ; réglages d'Auth par `pnpm auth:settings`, `platform` retiré du Data API par `pnpm data-api:close`. |

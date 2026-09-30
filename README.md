@@ -164,7 +164,11 @@ Un changement se fait ici (retours produit compris), se commite sur `main`, puis
    `packages/plateforme/CHANGELOG.md` (format en tête du fichier, vérifié par les tests).
 2. Choisir le numéro : correctif `x.y.Z` (aucune migration, aucun export changé), mineure `x.Y.0`
    (ajout, migration additive) ; une majeure demande un ADR (le paquet n'ajoute que, ADR-006).
-3. Commit de version : `"version"` de `packages/plateforme/package.json`, `## Unreleased` renommé en
+3. Commit de version : les migrations écrites depuis la version précédente réunies en un seul
+   fichier `<horodatage>_vX_Y_0.sql`, au contenu identique, dans le paquet et dans
+   `supabase/migrations/` (fiche D124 ; historique du projet de test réparé si l'une y était
+   appliquée : `packages/plateforme/migrations/README.md`) ; `"version"` de
+   `packages/plateforme/package.json`, `## Unreleased` renommé en
    `## <version> — <AAAA-MM-JJ>` sous un `## Unreleased` vide ; `pnpm verify`, commit, push sur
    `main`, CI verte.
 4. `git tag -a v<version> -m "@otomata_tech/oto_platform <version>"` puis

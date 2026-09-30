@@ -58,8 +58,9 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
 // E11-S10, lot a (AC-a1, AC-a2) : le handle posé à l'insertion d'un membre qui n'en a pas, et la réparation
 // d'un membre inséré avant le dossier `private` (`ensure_private_space`). Sautés, la version nommée, tant que
-// la migration n'est pas appliquée au projet (`database-patterns.md § Règles`).
-const PRIVATE_SPACES_VERSION = "20260929160000"
+// la migration de la 1.1.0 (`20260930100000_v1_1_0.sql`, partie E11-S10) n'est pas appliquée au projet
+// (`database-patterns.md § Règles`).
+const PRIVATE_SPACES_VERSION = "20260930100000"
 const spacesPending = privatePending || (await pendingMigrations()).includes(PRIVATE_SPACES_VERSION)
 const SPACES_SUITE = "private space of a member without handle (E11-S10, lot a)"
 

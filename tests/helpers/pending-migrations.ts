@@ -48,8 +48,8 @@ export async function privateFolderPending(): Promise<boolean> {
   return (await pendingMigrations()).includes(PRIVATE_FOLDER_VERSION)
 }
 
-/** La migration d'E11-S02 (lot d) : `platform.discard_draft`, qu'appellent `node.discard_draft` et l'isolation. */
-export const DISCARD_DRAFT_VERSION = "20260929190000"
+/** La migration de la 1.1.0 (`20260930100000_v1_1_0.sql`, partie E11-S02 lot d) : `platform.discard_draft`, qu'appellent `node.discard_draft` et l'isolation. */
+export const DISCARD_DRAFT_VERSION = "20260930100000"
 
 /** Le nom d'une telle suite, qui dit pourquoi elle se saute tant que la migration manque. */
 export const privateFolderSuite = (name: string, pending: boolean): string => (pending ? `${name} (${pendingReason([PRIVATE_FOLDER_VERSION])})` : name)

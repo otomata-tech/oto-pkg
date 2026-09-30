@@ -165,11 +165,13 @@ describe("Renovate preset (AC10)", () => {
   // `JSON.parse` rend `any` : la forme d'une règle du preset est déclarée ci-dessus.
   const rules = () => (JSON.parse(read("renovate/preset.json")) as { packageRules: Rule[] }).packageRules
 
-  it("should hold two rules: pin and automerge minor and patch updates, pin majors for a human review under oto-platform-major", () => {
+  it("should hold three rules: pin and automerge patches, pin minors and majors for a human review under their own label", () => {
     const all = rules()
-    expect(all).toHaveLength(2)
+    expect(all).toHaveLength(3)
+    const patch = all.find((r) => r.matchUpdateTypes.includes("patch"))
+    expect(patch).toMatchObject({ matchPackageNames: ["@otomata_tech/oto_platform"], matchUpdateTypes: ["patch"], rangeStrategy: "pin", automerge: true })
     const minor = all.find((r) => r.matchUpdateTypes.includes("minor"))
-    expect(minor).toMatchObject({ matchPackageNames: ["@otomata_tech/oto_platform"], matchUpdateTypes: ["minor", "patch"], rangeStrategy: "pin", automerge: true })
+    expect(minor).toMatchObject({ matchPackageNames: ["@otomata_tech/oto_platform"], matchUpdateTypes: ["minor"], rangeStrategy: "pin", automerge: false, labels: ["oto-platform-minor"] })
     const major = all.find((r) => r.matchUpdateTypes.includes("major"))
     expect(major).toMatchObject({ matchPackageNames: ["@otomata_tech/oto_platform"], matchUpdateTypes: ["major"], rangeStrategy: "pin", automerge: false, labels: ["oto-platform-major"] })
   })

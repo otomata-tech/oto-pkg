@@ -17,6 +17,8 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.0 — 2026-09-30
+
 ### Assistants
 - Without a clear match, `context` offers every shown candidate as a choice for a question, a « comment » question or a polite request; it answers or explains first and runs nothing unpicked.
 - `context` matches a procedure on each phrasing its summary lists, weighs rare words above common ones, and forgives a typo in the request through the organisation's lexicon.
@@ -44,62 +46,52 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - `call upload.link` gives a one-time link (15 minutes, 1 MB) to put a file on your disk in a page, or a `.md` or a CSV in a page or a table: send it with the curl command it returns.
 - Without a shell, `upload.link` takes `source_url`, a public https address the server downloads; otherwise give the person `form_url`, a one-time upload form.
 - `find` finds an attached file by its name.
-- File links served by `read` and upload links from `upload.link` now use `/api/platform/…`; a link given before this version no longer opens.
 
 ### Hosts
-- Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
-- Server: routing scores change for every organisation; an `orgs.settings.routing` threshold keeps its 0 to 1 scale, not its calibration: replay your routing phrases after upgrading.
-- UI: `EcranDAccueilProps` loses `hrefDesGuides`; `DonneesDeLAccueil.adresse` is a whole `AdresseDeConnexion` (url, nom, nomCli, phrase), no longer a string.
-- UI: the `prompts` prop of `EcranConnexion` takes the useful procedures (`usefulProcedures(db, identity, 3)`), no longer `listPrompts`; `/connect` shows the connection guide, then « Vos connexions ».
-- UI: « Brancher mon Claude, ChatGPT ou Mistral » replaces « Brancher un assistant » in the account menu, the palette, the home card and `/connect`; the home card no longer shows the server address.
-- Migrations: applying `20260929160000_private_spaces.sql` sets every missing member handle and creates the « Privé » space and its Context of each member who had none; run `oto-platform migrations sync`.
-- UI: the home page no longer reads `?onglet=`; give the rail `adresses.contexte` (`/context`) and mount `EcranDuContexte` on that route (example: `src/app/(dashboard)/context/page.tsx`).
-- UI: `ContexteServi` and `EcranDAccueil` lose `hrefDuProfil`; `EcranDAccueil` loses `onglet` and `hrefDOnglet`; `ONGLETS_DE_L_ACCUEIL` and `OngletDeLAccueil` are no longer exported.
-- Migrations: `20260929170000_platform_page_markdown.sql` widens `blocks_type_check` and `blocks_shape_check` (block types `simple_table`, `divider`, `toggle`; nested list items; heading levels 1 to 5) and recreates `block_search_text`; every existing row stays valid; run `oto-platform migrations sync`, then apply it.
-- UI: headings render one level lower: a heading of level N is an `h(N+1)`, at most `h6` (`h(N+2)` under `baliseDeTitre="h3"`); level 2 and 3 headings already written become `h3` and `h4`.
-- UI: pages show the new blocks (simple table scrolling inside its block, divider, toggle closed by default, nested lists); in the editor, a block's « + » and `/` in an empty text open a choice in two groups (« Texte », « Insérer »), and a simple table, a divider and a toggle are written on screen.
-- UI: the rail's « ⋯ » offers « Télécharger en .md » (page, procedure, Contexte) and « Télécharger en .csv » (table); « Importer un fichier… » in the rail's « + », or a file dropped on a rail line, imports a `.md` as a page or a `.csv` as a table; to who writes a table, its screen offers « Importer un fichier… » above the table and takes a dropped `.csv`.
-- MCP: `table.import` joins the `call` catalogue; the tool list served to hosts is unchanged, nothing to refresh.
-- API: `GET nodes/export?path=` (the `.md` of a published node) and `GET tables/export?path=` (the `.csv` of a table, 5,000 rows at most) answer `{filename, content}` and are reads, never journaled; `POST tables/import` writes one lot of 500 CSV rows at most, creating the table for who can write its parent.
-- API: the body of `POST nodes` takes `tolerant: true` (paste and file import: nothing refused, `kept_as_text` counts what stayed text); `write` over MCP stays strict.
-- Schemas: `./schemas` exports the CSV functions (`parseCsv`, `columnNameOf`, `inferTable`, `checkImport`, `toCsv`…), `pageMarkdown`, `readPageMarkdown`, `tableImportArgsSchema`, `tableImportBodySchema` and the import bounds (`IMPORT_*`).
-- Migrations: `20260929180000_ctx_contexts.sql` adds the column `platform.ctx.contexts`; every conversation open at the upgrade calls `context` once more; run `oto-platform migrations sync`, then apply it.
-- Server: `context` returns up to 35,000 characters (20,000 before), each block whole; `previewContext` and the « Contexte » view follow.
-- Server: the header attribute `proof` defaults to false: an existing table no longer requires proof until `header: {"proof": true}` is published through `write`; the review queue shows « sans preuve » only then.
-- Schemas: `./schemas` exports `queryWords`; `tableHeaderSchema` gains `proof`, `tableColumnSchema` `allow_verified_empty`, `tableReviewSchema` `agents_may_decide`.
-- MCP: unlike `table.import`, the description of `write` changes (`move_block` into a section): refresh the tool list in each host after upgrading; the table functions, described through `read`, need nothing.
-- UI: the editor draws one marker per list item, on its first line, and edits a link in a « Lien » panel; nothing for the host to do.
-- API: default changed: `write` and `POST /api/plateforme/nodes` publish by default; `publish: false` keeps a draft; publishing a node or a table header needs the write level, no longer manage.
-- Migrations: `20260929190000_discard_draft.sql` adds `platform.discard_draft` (security definer, granted to `authenticated`), no table, column or policy; run `oto-platform migrations sync`, then apply it.
-- MCP: the descriptions of `write` and of its `publish` field change: refresh the tool list in each host after upgrading; `node.discard_draft`, `node.trash` and `table.delete_rows` join the `call` catalogue.
-- Server: the `node.` namespace belongs to the package's native `node` connector: `registerFunctions` refuses an ERP function named `node.*`.
-- Server: the journal line of a `table.delete_rows` run carries `_outcome` (`deleted`, `review`) among its arguments, shown by the journal screen and `admin_journal`.
-- UI: a node created from the rail is published at once; the draft banner, « Voir la version publiée » and « La publication revient… » are gone; the home feed says « a supprimé des lignes dans …, dont N à revoir ».
-- UI: a table's header offers « Réglages » to who writes it (proof required, review decided by the assistant, closed), published through the page's queue; nothing for the host to do.
-- API: `GET public/<token>` and `readPublicNode` return `language`, the organisation's, which sets the separator of a public table's CSV.
-- UI: `TableauDuNoeud` takes `assistant?`, the most recent family of `lastConnections`, read by the host for a table without rows (example: `src/app/(dashboard)/n/[...chemin]/page.tsx`); an empty table names that assistant.
-- UI: `EcranDeNoeud` always lays a page, a procedure or a Contexte out in two columns, « Cité dans », « Cite » and « Sous-pages » folded on the right; a node's header and the public page offer « Télécharger en .csv/.md ».
-- Schemas: `./schemas` exports `rowCells`, `keyValue` (moved from the server) and `PUBLIC_TABLE_ROWS_MAX`.
-- Migrations: `20260929200000_platform_files.sql` adds the tables `platform.files` and `platform.upload_tickets`, the block type `file` (and `image` with `file_id`, `width`), `public_file_by_token` and `consume_upload_ticket` (granted to `anon` only), and recreates `duplicate_subtree`, `block_search_text` and `forget_user`; run `oto-platform migrations sync`, then apply it.
+- Migrations: run `oto-platform migrations sync`, then apply `20260930100000_v1_1_0.sql`, the one additive migration of this version: `platform.lexicon_fix`, `route_candidates` (two more columns, `s_phrase` and `lexical_title`) and `search_content` recreated; `ensure_private_space`, which at application sets every missing member handle and creates the « Privé » space and its Context of each member who had none; `blocks_type_check` and `blocks_shape_check` widened (block types `simple_table`, `divider`, `toggle`, `file`; nested list items; heading levels 1 to 5; `image` with `file_id`, `width`), every existing row staying valid; the column `platform.ctx.contexts` (every conversation open at the upgrade calls `context` once more); `discard_draft` (granted to `authenticated`); the tables `platform.files` and `platform.upload_tickets`, `public_file_by_token` and `consume_upload_ticket` (granted to `anon` only); `duplicate_subtree`, `block_search_text` and `forget_user` recreated. A database that applied one of its six development files follows `migrations/README.md` (« Hôtes qui avaient appliqué une migration de la 1.1.0 »).
 - Install: attached files are optional: set all five of `PLATFORM_STORAGE_ENDPOINT`, `PLATFORM_STORAGE_BUCKET`, `PLATFORM_STORAGE_REGION`, `PLATFORM_STORAGE_ACCESS_KEY_ID`, `PLATFORM_STORAGE_SECRET_ACCESS_KEY` (S3 access keys, never `service_role`), or none: without them, files are disabled and everything else works.
 - Install: the bucket is private, its CORS allows `PUT` and `GET` from each address of the application with the `content-type` header; a host CSP allows the bucket's origin in `img-src` and `connect-src`, and `frame-src 'self'` (package README).
 - Install: pinned dependency `aws4fetch` 1.0.20 (S3 signing, no AWS SDK).
-- API: `GET files`, `POST files`, `POST files/<id>/complete`, `GET files/<id>` (302 to a 60 s presigned URL; `?check`, `?disposition=inline`), `GET files/<id>/markdown`, `GET files/<id>/html`; outside any session `GET public/<token>/files/<id>` (with `/markdown`, `/html`) and `POST uploads/<token>`, never behind CORS.
-- API: `POST nodes/duplicate` copies the attached files, counted in the 10 GB quota; the trash purge deletes the files of purged nodes and their objects.
-- Install: exclude `/api/plateforme/files/<id>/html` and `/api/plateforme/public/<token>/files/<id>/html` from a global `X-Frame-Options`, `Referrer-Policy` or CSP (ADR-017; example: `next.config.ts` of the reference host).
-- UI: pass `fileView` (`/n/…`) or `publicFileView` (`/p/<token>/…`, with `routeDesFichiers={publicFilesRoute(<token>)}`) for `?view=<id>` to show the viewer of an attached `html` or `md` file.
-- UI: add the page `/upload/<token>` under the session: it passes `uploadForm(db, identity, token)` to `EcranDeDepot` (example: `src/app/(dashboard)/upload/[token]/page.tsx`); its form posts to `POST uploads/<token>/form`.
-- MCP: `read` gains the optional field `file` and `upload.link` joins the `call` catalogue; the descriptions of `read` and `call` grow by one sentence: refresh the tool list in each host after upgrading (six tools, unchanged).
-- CLI: `pnpm org:export` and `pnpm org:import` need the five storage variables when the organisation has attached files, and carry their bytes in `<file>.files/`.
+- Install: exclude `api/platform/files/<id>/html` and `api/platform/public/<token>/files/<id>/html` from a global `X-Frame-Options`, `Referrer-Policy` or CSP (ADR-017): source `/((?!api/platform/(?:public/[^/]+/)?files/[^/]+/html/?$).*)` in the reference `next.config.ts`.
 - Install: addresses are in English, without alias or redirect, and an old one answers 404 (ADR-020): rename the route folders `/equipes` to `/teams`, `/profil` to `/profile`, `/corbeille` to `/trash`, `/plateforme` to `/platform`, `/aucune-organisation` to `/no-organization`, `/auth/confirmer` to `/auth/confirm`, `/admin/organisation` to `/admin/organization`, `/admin/connecteurs` to `/admin/connectors`, `/admin/retours` to `/admin/feedback`, and every address the host gives the screens or passes to `redirect()`.
 - Install: drop the pages `/admin/acces`, `/admin/marque` and `/admin/drapeaux` and the `/plateforme/invitations` redirect of `next.config.ts`; `/journal` keeps its name.
 - Install: mount the screens' API on `app/api/platform/[...route]/route.ts` (`PLATFORM_API_PREFIX`, exported by `./schemas`); `/api/plateforme/*` now answers 404, so every screen mutation fails until the route moves.
-- Install: move the exclusion from `X-Frame-Options` and `Referrer-Policy` to `api/platform/(?:public/[^/]+/)?files/[^/]+/html` (source `/((?!api/platform/(?:public/[^/]+/)?files/[^/]+/html/?$).*)` in the reference `next.config.ts`).
 - Install: add `/auth/confirm` to the Supabase Auth redirect URLs (`pnpm auth:settings --redirect`, then remove the `/auth/confirmer` one) and to the middleware's public routes; an invitation sent before this version leads to a 404: send it again.
+- API: `GET nodes/export?path=` (the `.md` of a published node) and `GET tables/export?path=` (the `.csv` of a table, 5,000 rows at most) answer `{filename, content}` and are reads, never journaled; `POST tables/import` writes one lot of 500 CSV rows at most, creating the table for who can write its parent.
+- API: the body of `POST nodes` takes `tolerant: true` (paste and file import: nothing refused, `kept_as_text` counts what stayed text); `write` over MCP stays strict.
+- API: default changed: `write` and `POST nodes` publish by default; `publish: false` keeps a draft; publishing a node or a table header needs the write level, no longer manage.
+- API: `GET public/<token>` and `readPublicNode` return `language`, the organisation's, which sets the separator of a public table's CSV.
+- API: `GET files`, `POST files`, `POST files/<id>/complete`, `GET files/<id>` (302 to a 60 s presigned URL; `?check`, `?disposition=inline`), `GET files/<id>/markdown`, `GET files/<id>/html`; outside any session `GET public/<token>/files/<id>` (with `/markdown`, `/html`) and `POST uploads/<token>`, never behind CORS.
+- API: `POST nodes/duplicate` copies the attached files, counted in the 10 GB quota; the trash purge deletes the files of purged nodes and their objects.
+- MCP: six tools, unchanged, but the descriptions of `write` (its `publish` field, `move_block` into a section), `read` (optional field `file`) and `call` change: refresh the tool list in each host after upgrading; `table.import`, `node.discard_draft`, `node.trash`, `table.delete_rows` and `upload.link` join the `call` catalogue; the table functions, described through `read`, need nothing.
 - MCP: the `not_enabled` refusal links `<origin>/admin/connectors` and `node.trash` points to `<origin>/trash`: the host serves both routes; the tool list and schemas are unchanged.
+- Server: routing scores change for every organisation; an `orgs.settings.routing` threshold keeps its 0 to 1 scale, not its calibration: replay your routing phrases after upgrading.
+- Server: `context` returns up to 35,000 characters (20,000 before), each block whole; `previewContext` and the « Contexte » view follow.
+- Server: the header attribute `proof` defaults to false: an existing table no longer requires proof until `header: {"proof": true}` is published through `write`; the review queue shows « sans preuve » only then.
+- Server: the `node.` namespace belongs to the package's native `node` connector: `registerFunctions` refuses an ERP function named `node.*`.
+- Server: the journal line of a `table.delete_rows` run carries `_outcome` (`deleted`, `review`) among its arguments, shown by the journal screen and `admin_journal`.
+- Schemas: `./schemas` exports the CSV functions (`parseCsv`, `columnNameOf`, `inferTable`, `checkImport`, `toCsv`…), `pageMarkdown`, `readPageMarkdown`, `tableImportArgsSchema`, `tableImportBodySchema` and the import bounds (`IMPORT_*`).
+- Schemas: `./schemas` exports `queryWords`; `tableHeaderSchema` gains `proof`, `tableColumnSchema` `allow_verified_empty`, `tableReviewSchema` `agents_may_decide`.
+- Schemas: `./schemas` exports `rowCells`, `keyValue` (moved from the server) and `PUBLIC_TABLE_ROWS_MAX`.
 - Schemas: URL keys renamed in place, an old name ignored like any unknown parameter: `equipesSearchSchema.tab` (`members`, `teams`); `equipesListesSchema` `filter`, `sort` (`team`, `people`), `order`; `journalFiltersSchema` `period`, `team`, `person`, `errors`, `cursor`, `calls`; `feedbackListQuerySchema` `state`, `period`, `cursor`; `usageQuerySchema` `period`, `team`; `proceduresSearchSchema.team`; `tableScreenParamsSchema.sort`; `nodeVersionParamSchema` takes `published`.
+- UI: `EcranDAccueilProps` loses `hrefDesGuides`; `DonneesDeLAccueil.adresse` is a whole `AdresseDeConnexion` (url, nom, nomCli, phrase), no longer a string.
+- UI: the `prompts` prop of `EcranConnexion` takes the useful procedures (`usefulProcedures(db, identity, 3)`), no longer `listPrompts`; `/connect` shows the connection guide, then « Vos connexions ».
+- UI: « Brancher mon Claude, ChatGPT ou Mistral » replaces « Brancher un assistant » in the account menu, the palette, the home card and `/connect`; the home card no longer shows the server address.
+- UI: the home page no longer reads `?onglet=`; give the rail `adresses.contexte` (`/context`) and mount `EcranDuContexte` on that route (example: `src/app/(dashboard)/context/page.tsx`).
+- UI: `ContexteServi` and `EcranDAccueil` lose `hrefDuProfil`; `EcranDAccueil` loses `onglet` and `hrefDOnglet`; `ONGLETS_DE_L_ACCUEIL` and `OngletDeLAccueil` are no longer exported.
+- UI: headings render one level lower: a heading of level N is an `h(N+1)`, at most `h6` (`h(N+2)` under `baliseDeTitre="h3"`); level 2 and 3 headings already written become `h3` and `h4`.
+- UI: pages show the new blocks (simple table scrolling inside its block, divider, toggle closed by default, nested lists); in the editor, a block's « + » and `/` in an empty text open a choice in two groups (« Texte », « Insérer »), and a simple table, a divider and a toggle are written on screen.
+- UI: the rail's « ⋯ » offers « Télécharger en .md » (page, procedure, Contexte) and « Télécharger en .csv » (table); « Importer un fichier… » in the rail's « + », or a file dropped on a rail line, imports a `.md` as a page or a `.csv` as a table; to who writes a table, its screen offers « Importer un fichier… » above the table and takes a dropped `.csv`.
+- UI: the editor draws one marker per list item, on its first line, and edits a link in a « Lien » panel; nothing for the host to do.
+- UI: a node created from the rail is published at once; the draft banner, « Voir la version publiée » and « La publication revient… » are gone; the home feed says « a supprimé des lignes dans …, dont N à revoir ».
+- UI: a table's header offers « Réglages » to who writes it (proof required, review decided by the assistant, closed), published through the page's queue; nothing for the host to do.
+- UI: `TableauDuNoeud` takes `assistant?`, the most recent family of `lastConnections`, read by the host for a table without rows (example: `src/app/(dashboard)/n/[...chemin]/page.tsx`); an empty table names that assistant.
+- UI: `EcranDeNoeud` always lays a page, a procedure or a Contexte out in two columns, « Cité dans », « Cite » and « Sous-pages » folded on the right; a node's header and the public page offer « Télécharger en .csv/.md ».
+- UI: pass `fileView` (`/n/…`) or `publicFileView` (`/p/<token>/…`, with `routeDesFichiers={publicFilesRoute(<token>)}`) for `?view=<id>` to show the viewer of an attached `html` or `md` file.
+- UI: add the page `/upload/<token>` under the session: it passes `uploadForm(db, identity, token)` to `EcranDeDepot` (example: `src/app/(dashboard)/upload/[token]/page.tsx`); its form posts to `POST uploads/<token>/form`.
 - UI: a grid's `f=` clause is `<column>:<contains|eq|gte|lte|empty|not_empty>:<value>`, a boolean `true|false`, and the « Filtrer » form sends `column`, `contains`, `eq`, `min`, `max`, `presence` (`empty`, `not_empty`); an older clause is dropped and said; `Operation` takes these names, `CHAMP_DE_L_OPERATION` maps them to the form fields.
 - UI: the brand form returns to `?saved=1` (the host reads it for `enregistre`), a consent to redo carries `?error=decision`; anchors are `news`, `recent-content`, `everyone-context`, `private-context`, `context-<slug>` and `part-<n>`.
+- CLI: `pnpm org:export` and `pnpm org:import` need the five storage variables when the organisation has attached files, and carry their bytes in `<file>.files/`.
 
 ## 1.0.0 — 2026-09-28
 

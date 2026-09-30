@@ -220,17 +220,17 @@ describe("TableauDuNoeud, rows in review (E11-S05, AC-a4)", () => {
 
 describe("TableauDuNoeud, sort (AC4)", () => {
   it("should sort a column by its header button through the host, the sorted one the other way, and say an ignored setting", () => {
-    rendre({ parametres: { tri: "montant_estime", f: "couleur:contient:bleu" } })
+    rendre({ parametres: { sort: "montant_estime", f: "couleur:contains:bleu" } })
     const montant = screen.getByRole("columnheader", { name: /montant_estime/ })
     expect(montant).toHaveAttribute("aria-sort", "ascending")
     expect(screen.getByRole("columnheader", { name: /entreprise/ })).toHaveAttribute("aria-sort", "none")
     fireEvent.click(screen.getByRole("button", { name: "Trier sur montant_estime" }))
-    expect(naviguer).toHaveBeenLastCalledWith(`${ADRESSE}?tri=-montant_estime`)
+    expect(naviguer).toHaveBeenLastCalledWith(`${ADRESSE}?sort=-montant_estime`)
     fireEvent.click(screen.getByRole("button", { name: "Trier sur entreprise" }))
-    expect(naviguer).toHaveBeenLastCalledWith(`${ADRESSE}?tri=entreprise`)
+    expect(naviguer).toHaveBeenLastCalledWith(`${ADRESSE}?sort=entreprise`)
     expect(screen.getByText("Un réglage de l'adresse n'a pas été compris : il est ignoré.")).toBeInTheDocument()
     cleanup()
-    rendre({ parametres: { tri: "-montant_estime" } })
+    rendre({ parametres: { sort: "-montant_estime" } })
     expect(screen.getByRole("columnheader", { name: /montant_estime/ })).toHaveAttribute("aria-sort", "descending")
     expect(screen.queryByText(/n'a pas été compris/)).toBeNull()
   })
@@ -238,7 +238,7 @@ describe("TableauDuNoeud, sort (AC4)", () => {
 
 describe("TableauDuNoeud, search (AC5)", () => {
   it("should search from the toolbar through the host, keeping the sort and the filters, cut to 100 characters, and count the rows found", () => {
-    rendre({ parametres: { q: "valbrune", tri: "ref", f: "statut:egal:à traiter", n: "40" }, lignes: lignes([P001], 1, 10) })
+    rendre({ parametres: { q: "valbrune", sort: "ref", f: "statut:eq:à traiter", n: "40" }, lignes: lignes([P001], 1, 10) })
     const champ = screen.getByRole("searchbox", { name: "Chercher dans 10 lignes" })
     const recherche = screen.getByRole("search")
     expect(champ).toHaveValue("valbrune")
@@ -247,8 +247,8 @@ describe("TableauDuNoeud, search (AC5)", () => {
     fireEvent.submit(recherche)
     expect([...derniereAdresse().searchParams]).toEqual([
       ["q", "tilleuls"],
-      ["tri", "ref"],
-      ["f", "statut:egal:à traiter"],
+      ["sort", "ref"],
+      ["f", "statut:eq:à traiter"],
     ])
     fireEvent.change(champ, { target: { value: "x".repeat(150) } })
     fireEvent.submit(recherche)
@@ -262,11 +262,11 @@ describe("TableauDuNoeud, column filters (AC6)", () => {
   const ouvrir = (colonne: string) => fireEvent.click(screen.getByRole("button", { name: `Filtrer sur ${colonne}` }))
 
   it("should offer the operations of each type in the panel of each header, marked when a filter is set", () => {
-    rendre({ parametres: { q: "tilleuls", tri: "ref", f: ["montant_estime:min:10000", "statut:egal:à traiter"] } })
+    rendre({ parametres: { q: "tilleuls", sort: "ref", f: ["montant_estime:gte:10000", "statut:eq:à traiter"] } })
     expect(screen.getByRole("button", { name: "Filtrer sur montant_estime" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByRole("button", { name: "Filtrer sur entreprise" })).toHaveAttribute("aria-pressed", "false")
     ouvrir("entreprise")
-    expect(panneau("entreprise").getByLabelText("Contient")).toHaveAttribute("name", "contient")
+    expect(panneau("entreprise").getByLabelText("Contient")).toHaveAttribute("name", "contains")
     ouvrir("statut")
     expect(libellesDesChoix(panneau("statut").getByLabelText("Égal à"))).toEqual(["Peu importe", ...STATES])
     ouvrir("actif")
@@ -277,12 +277,20 @@ describe("TableauDuNoeud, column filters (AC6)", () => {
     }
     expect(panneau("montant_estime").getByLabelText("Au moins")).toHaveValue(10000)
     ouvrir("email")
-    expect(panneau("email").getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["", "vide", "rempli"])
-    expect(screen.getByRole("link", { name: "Retirer les filtres" })).toHaveAttribute("href", `${ADRESSE}?q=tilleuls&tri=ref`)
+    expect(panneau("email").getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["", "empty", "not_empty"])
+    expect(screen.getByRole("link", { name: "Retirer les filtres" })).toHaveAttribute("href", `${ADRESSE}?q=tilleuls&sort=ref`)
+  })
+
+  it("should write the H95 operators, and true or false for a boolean, in the address (E11-S07, AC-b4)", () => {
+    rendre()
+    ouvrir("actif")
+    choisirDansLaListe(panneau("actif").getByLabelText("Égal à"), "Oui")
+    fireEvent.click(panneau("actif").getByRole("button", { name: "Filtrer" }))
+    expect(derniereAdresse().searchParams.getAll("f")).toEqual(["actif:eq:true"])
   })
 
   it("should apply a filter through the host keeping the other settings, remove it, and move the focus in and out of the panel", () => {
-    rendre({ parametres: { q: "tilleuls", tri: "ref", f: ["montant_estime:min:10000", "statut:egal:à traiter"] } })
+    rendre({ parametres: { q: "tilleuls", sort: "ref", f: ["montant_estime:gte:10000", "statut:eq:à traiter"] } })
     const bouton = screen.getByRole("button", { name: "Filtrer sur montant_estime" })
     fireEvent.click(bouton)
     const auMoins = panneau("montant_estime").getByLabelText("Au moins")
@@ -292,10 +300,10 @@ describe("TableauDuNoeud, column filters (AC6)", () => {
     fireEvent.click(panneau("montant_estime").getByRole("button", { name: "Filtrer" }))
     expect([...derniereAdresse().searchParams]).toEqual([
       ["q", "tilleuls"],
-      ["tri", "ref"],
-      ["f", "statut:egal:à traiter"],
-      ["f", "montant_estime:min:15000"],
-      ["f", "montant_estime:rempli:"],
+      ["sort", "ref"],
+      ["f", "statut:eq:à traiter"],
+      ["f", "montant_estime:gte:15000"],
+      ["f", "montant_estime:not_empty:"],
     ])
     expect(screen.queryByRole("form", { name: "Filtrer sur montant_estime" })).toBeNull()
     expect(document.activeElement).toBe(bouton)
@@ -304,8 +312,8 @@ describe("TableauDuNoeud, column filters (AC6)", () => {
     fireEvent.click(panneau("montant_estime").getByRole("button", { name: "Retirer le filtre de montant_estime" }))
     expect([...derniereAdresse().searchParams]).toEqual([
       ["q", "tilleuls"],
-      ["tri", "ref"],
-      ["f", "statut:egal:à traiter"],
+      ["sort", "ref"],
+      ["f", "statut:eq:à traiter"],
     ])
 
     fireEvent.click(bouton)
@@ -336,7 +344,7 @@ describe("TableauDuNoeud, focus after a gesture (AC-x3)", () => {
     fireEvent.click(within(screen.getByRole("form", { name: "Filtrer sur statut" })).getByRole("button", { name: "Filtrer" }))
     expect(document.activeElement).toBe(bouton)
     // Le filtre ne garde aucune ligne : la table et son bouton partent, le focus va à l'îlot du tableau.
-    vue.rerender(ecran({ q: "tilleuls", f: "statut:egal:écarté" }, lignes([], 0, 3)))
+    vue.rerender(ecran({ q: "tilleuls", f: "statut:eq:écarté" }, lignes([], 0, 3)))
     expect(screen.queryByRole("table")).toBeNull()
     expect(document.activeElement).toBe(screen.getByRole("region", { name: "Suivi des prospects" }))
   })
@@ -388,11 +396,11 @@ describe("TableauDuNoeud, summary (AC8)", () => {
     expect(screen.getByText(`Par statut : ${parEtat}`)).toHaveTextContent("Par statut : à traiter 7 · en cours 0 · à revoir 3 · qualifié 0 · écarté 0")
     expect(screen.getByText(/^montant_estime : total/)).toHaveTextContent("montant_estime : total 21 000")
     cleanup()
-    rendre({ resume: { error: "Une erreur est survenue. Réessayez." }, parametres: { tri: "ref" } })
+    rendre({ resume: { error: "Une erreur est survenue. Réessayez." }, parametres: { sort: "ref" } })
     // Le seul échec de lecture du paquet (M49, HN-M37b-3) : la phrase du résumé en titre, le message dessous.
     expect(screen.getByRole("alert")).toHaveTextContent("Le résumé n'a pas pu être calculé.Une erreur est survenue. Réessayez.")
     expect(screen.getByRole("alert")).toHaveClass("oto-alert")
-    expect(within(screen.getByRole("alert")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `${ADRESSE}?tri=ref`)
+    expect(within(screen.getByRole("alert")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `${ADRESSE}?sort=ref`)
     expect(table()).toBeInTheDocument()
   })
 })
@@ -403,9 +411,9 @@ describe("TableauDuNoeud, four states (AC9)", () => {
     const chargement = screen.getByRole("status")
     expect([chargement.getAttribute("aria-busy"), chargement.textContent, chargement.querySelectorAll(".oto-skeleton[data-shape='row']").length]).toEqual(["true", "Chargement des lignes…", 8])
     cleanup()
-    rendre({ lignes: { error: "Une erreur est survenue. Réessayez." }, parametres: { tri: "ref", q: "tilleuls" } })
+    rendre({ lignes: { error: "Une erreur est survenue. Réessayez." }, parametres: { sort: "ref", q: "tilleuls" } })
     expect(screen.getByRole("alert")).toHaveTextContent("Chargement impossibleUne erreur est survenue. Réessayez.")
-    expect(within(screen.getByRole("alert")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `${ADRESSE}?q=tilleuls&tri=ref`)
+    expect(within(screen.getByRole("alert")).getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `${ADRESSE}?q=tilleuls&sort=ref`)
     expect(screen.getByRole("searchbox", { name: "Chercher dans le tableau" })).toHaveValue("tilleuls")
     cleanup()
     // Le vide dit qui écrira les lignes (E11-S05, AC-h1) : l'assistant le plus récent, sinon « votre assistant ».
@@ -417,11 +425,11 @@ describe("TableauDuNoeud, four states (AC9)", () => {
     rendre({ lignes: lignes([], 0, 0), assistant: "claude.ai" })
     expect(screen.getByText("C'est Claude qui pourra créer et modifier ses lignes.")).toBeInTheDocument()
     cleanup()
-    rendre({ lignes: lignes([], 0, 10), parametres: { f: "statut:egal:écarté" } })
+    rendre({ lignes: lignes([], 0, 10), parametres: { f: "statut:eq:écarté" } })
     expect(screen.getByText("Aucune ligne pour cette recherche")).toBeInTheDocument()
     expect(screen.getAllByRole("link", { name: "Retirer les filtres" }).map((lien) => lien.getAttribute("href"))).toEqual([ADRESSE, ADRESSE])
     cleanup()
-    rendre({ lignes: lignes([], 0, 10), parametres: { q: "tilleuls", f: "statut:egal:écarté", tri: "ref" } })
-    expect(screen.getByRole("link", { name: "Retirer la recherche et les filtres" })).toHaveAttribute("href", `${ADRESSE}?tri=ref`)
+    rendre({ lignes: lignes([], 0, 10), parametres: { q: "tilleuls", f: "statut:eq:écarté", sort: "ref" } })
+    expect(screen.getByRole("link", { name: "Retirer la recherche et les filtres" })).toHaveAttribute("href", `${ADRESSE}?sort=ref`)
   })
 })

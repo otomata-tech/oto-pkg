@@ -5,7 +5,7 @@ import { ContexteDeRafraichissement, EcranProfil, EcranProfilChargement } from "
 import { choisirDansLaListe, libellesDesChoix } from "../../helpers/liste-de-choix"
 
 // L'écran « Profil » (E05-S11, AC-3) : prénom, nom, langue et couleur de la personne, seuls les champs changés
-// envoyés à `PATCH /api/plateforme/profile` (prénom et nom ensemble), « Enregistrer » désactivé tant que rien ne
+// envoyés à `PATCH /api/platform/profile` (prénom et nom ensemble), « Enregistrer » désactivé tant que rien ne
 // change, refus dit par la table des messages ; les quatre états. `fetch` simulé, relecture espionnée.
 
 const rafraichir = vi.fn()
@@ -84,7 +84,7 @@ describe("EcranProfil (AC-3)", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Profil enregistré."))
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Vous" })))
     expect(corps).toEqual([{ language: "en" }])
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/plateforme/profile")
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/platform/profile")
     expect(vi.mocked(fetch).mock.calls[0][1]?.method).toBe("PATCH")
     expect(rafraichir).toHaveBeenCalledTimes(1)
     expect(enregistrer()).toBeDisabled()

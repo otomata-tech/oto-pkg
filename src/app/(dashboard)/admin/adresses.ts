@@ -8,8 +8,8 @@ export const ADRESSES: AdressesDuRail = {
   pages: "/n/",
   accueil: "/",
   journal: "/journal",
-  equipes: "/equipes",
+  equipes: "/teams",
   brancher: "/connect",
-  organisation: "/admin/organisation",
-  connecteurs: "/admin/connecteurs",
+  organisation: "/admin/organization",
+  connecteurs: "/admin/connectors",
 }

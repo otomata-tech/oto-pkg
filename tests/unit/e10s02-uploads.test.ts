@@ -60,7 +60,7 @@ function countedBody(size: number): { stream: ReadableStream<Uint8Array>; read: 
 function post(path: string, init: { headers?: Record<string, string>; body?: ReadableStream<Uint8Array> | string } = {}): Request {
   // `duplex` n'est pas encore dans le type `RequestInit` de TypeScript, et Node l'exige pour un corps en flux.
   const options = { method: "POST", headers: init.headers, body: init.body, duplex: "half" } as RequestInit
-  return new Request(`https://${HOST}/api/plateforme/${path}`, options)
+  return new Request(`https://${HOST}/api/platform/${path}`, options)
 }
 
 async function answer(request: Request) {
@@ -83,7 +83,7 @@ describe("upload token (AC-f3)", () => {
 
 describe("commands given to the assistant (AC-f2)", () => {
   it("should quote a name with spaces, an apostrophe, a dollar and a backtick for bash and for PowerShell", () => {
-    const url = `https://${HOST}/api/plateforme/uploads/${TOKEN}`
+    const url = `https://${HOST}/api/platform/uploads/${TOKEN}`
     expect(uploadCommands(url, "rapport d'avril $1 `x`.html")).toEqual({
       bash: `curl -sS --fail-with-body --data-binary @'rapport d'\\''avril $1 \`x\`.html' '${url}'`,
       powershell: `curl.exe -sS --fail-with-body --data-binary "@rapport d'avril \`$1 \`\`x\`\`.html" "${url}"`,

@@ -1,4 +1,4 @@
-// `GET /api/plateforme/tables/export?path=` (E10-S01, AC-b6) : le `.csv` d'un tableau, pour « Télécharger en
+// `GET /api/platform/tables/export?path=` (E10-S01, AC-b6) : le `.csv` d'un tableau, pour « Télécharger en
 // .csv » du rail. La lecture est décidée par `loadTable` avant toute requête sur les lignes ; les lignes sont lues
 // par pages dans l'ordre de la clé, 5 000 au plus (`FILTERED_ROWS_MAX`, HN-E10S01-7), puis écrites par `toCsv`
 // (`schemas/csv.ts`) dans la langue de l'organisation, formules neutralisées. Sans lui, un tableau ne sort de la

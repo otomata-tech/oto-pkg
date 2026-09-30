@@ -180,13 +180,13 @@ describe("ancres et « (ce contexte) » par le nom de la partie (AC-8)", () => {
     monterLEncart("private/lea/contexte")
     const liste = within(screen.getByRole("list", { name: "Ordre de lecture" }))
     expect(liste.getAllByRole("link").map((lien) => lien.getAttribute("href"))).toEqual(
-      ["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "contenus"].map((ancre) => `/context#${ancre}`),
+      ["everyone-context", "private-context", "context-ventes", "context-conseil", "recent-content"].map((ancre) => `/context#${ancre}`),
     )
     const marquees = liste.getAllByRole("link").filter((lien) => lien.getAttribute("aria-current") === "page")
     expect(marquees.map((lien) => lien.textContent?.startsWith("Contexte : Privé (ce contexte)"))).toEqual([true])
     cleanup()
     monterLaVue()
-    expect(screen.getAllByRole("region").map((region) => region.id)).toEqual(["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "contexte-conseil", "nouveautes", "contenus"])
+    expect(screen.getAllByRole("region").map((region) => region.id)).toEqual(["everyone-context", "private-context", "context-ventes", "context-conseil", "news", "recent-content"])
   })
 })
 

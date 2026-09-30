@@ -79,8 +79,8 @@ export function pluriel(nombre: number, singulier: string, plurielDuMot: string)
 export const ECRAN = "Équipes & accès"
 
 export const ONGLETS: readonly { cle: EquipesTab; libelle: string }[] = [
-  { cle: "membres", libelle: "Membres" },
-  { cle: "equipes", libelle: "Équipes" },
+  { cle: "members", libelle: "Membres" },
+  { cle: "teams", libelle: "Équipes" },
 ]
 
 /** Les responsables d'une équipe à l'écran (E05-S13, AC-24 : une équipe en a zéro, un ou plusieurs). */

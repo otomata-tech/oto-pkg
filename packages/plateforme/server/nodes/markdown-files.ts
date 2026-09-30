@@ -1,5 +1,5 @@
 // Les deux formes markdown d'un fichier joint (E10-S02, AC-d1) relues par `parseMarkdown` : l'image
-// `![<alt>](<origine>/api/plateforme/files/<id>)` et le fichier `[<nom> (<taille>, <type>)](<origine>/api/plateforme/files/<id>)`,
+// `![<alt>](<origine>/api/platform/files/<id>)` et le fichier `[<nom> (<taille>, <type>)](<origine>/api/platform/files/<id>)`,
 // que `renderBlock` écrit (`schemas/blocks-render.ts`). Le chemin de la route fait la forme, quelle que soit l'origine,
 // absente comprise (aller-retour, ADR-011 § 5). Fichier à part de `markdown-parse.ts` pour la borne de 300 lignes.
 //

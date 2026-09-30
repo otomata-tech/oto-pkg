@@ -31,7 +31,7 @@ export type FiltresDuJournalProps = {
 }
 
 type ChoixDuFiltreProps = {
-  nom: "equipe" | "personne"
+  nom: "team" | "person"
   libelle: string
   tous: string
   options: Resultat<{ value: string; label: string }[]>
@@ -60,27 +60,27 @@ export function FiltresDuJournal({ filtres, equipes, personnes, adresse, ici, fi
       <h2 id={TITRE} className="oto-label">
         Filtrer le journal
       </h2>
-      <input type="hidden" name="periode" value={filtres.periode} />
+      <input type="hidden" name="period" value={filtres.period} />
       <div className="flex flex-wrap items-end gap-3">
         <ChoixDuFiltre
-          nom="equipe"
+          nom="team"
           libelle="Équipe"
           tous="Toutes les équipes"
           options={optionsDe(equipes, (equipe) => ({ value: equipe.id, label: equipe.name }))}
-          valeur={filtres.equipe}
+          valeur={filtres.team}
           ici={ici}
           Lien={Lien}
         />
         <ChoixDuFiltre
-          nom="personne"
+          nom="person"
           libelle="Personne"
           tous="Toutes les personnes"
           options={optionsDe(personnes, (membre) => ({ value: membre.userId, label: membre.name }))}
-          valeur={filtres.personne}
+          valeur={filtres.person}
           ici={ici}
           Lien={Lien}
         />
-        <Checkbox name="erreurs" value="1" defaultChecked={filtres.erreurs === "1"} label="Erreurs seulement" />
+        <Checkbox name="errors" value="1" defaultChecked={filtres.errors === "1"} label="Erreurs seulement" />
         <Button type="submit" variant="secondary">
           Filtrer
         </Button>

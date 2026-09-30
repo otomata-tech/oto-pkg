@@ -1,7 +1,7 @@
 "use client"
 
 // Renommer une équipe (E05-S03, AC12 ; porté par E05-S09 partie d1) : un dialogue ouvert depuis le « ⋯ » de sa
-// ligne, un champ, envoyé à `PATCH /api/plateforme/teams/<id>` après le schéma partagé avec l'API
+// ligne, un champ, envoyé à `PATCH /api/platform/teams/<id>` après le schéma partagé avec l'API
 // (`updateTeamSchema`) ; un nom inchangé ne part pas. Porté d'oto-frontend (`teams-columns.tsx`, « Renommer »
 // du menu d'une équipe, et ses refus : nom déjà pris, refus) ; changé : un dialogue à un champ plutôt que
 // `TitleField` en place, qui ne laissait pas de fente sous le champ pour le refus. Le formulaire suit l'équipe

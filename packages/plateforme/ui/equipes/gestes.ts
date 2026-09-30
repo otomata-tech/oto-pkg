@@ -3,7 +3,7 @@
 // Un geste de l'écran des équipes vers l'API du paquet (E05-S09, partie d1) : l'envoi, la phrase d'un refus
 // (`messageDErreur`, jamais le texte du service), et, après un succès, la relecture de la page par l'hôte.
 // Porté d'oto-frontend (`member-actions.tsx`, `useBascule` et les mutations de `queries/members.ts`) ; changé :
-// TanStack Query devient l'appel à `/api/plateforme/*` et la relecture (`useRafraichir`). Sans lui, chaque
+// TanStack Query devient l'appel à `/api/platform/*` et la relecture (`useRafraichir`). Sans lui, chaque
 // menu et chaque dialogue de l'écran redisait ce même envoi.
 import { useState, useTransition } from "react"
 import { appelerPlateforme, type ErreurPlateforme } from "../api/client"

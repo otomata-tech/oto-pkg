@@ -1,7 +1,7 @@
 // Les chaînes de classes des écrans d'authentification de l'hôte, rendus sous `CoquilleOto` (E05-S07).
 // Depuis E05-S09 (partie d3), les formulaires composent le design system porté (`Button`, `Field`,
 // `Input`, `Alert` de `./ui`) : restent ici le lien de texte des écrans et le bouton principal de
-// `/auth/confirmer`, écrit en utilitaires. Jetons du jeu seulement (`tests/unit/ui-tokens.test.ts`).
+// `/auth/confirm`, écrit en utilitaires. Jetons du jeu seulement (`tests/unit/ui-tokens.test.ts`).
 
 export const BOUTON_PRINCIPAL =
   "inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-on disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"

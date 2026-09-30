@@ -1,4 +1,4 @@
-// La page `/equipes` (E05-S03 : AC1, AC2, AC5 ; E05-S09 partie d1 : les réglages des tableaux lus dans
+// La page `/teams` (E05-S03 : AC1, AC2, AC5 ; E05-S09 partie d1 : les réglages des tableaux lus dans
 // l'adresse ; E05-S13, AC-5 : plus d'onglets « Règles d'accès » ni « Accès plateforme ») : la session revérifiée par la page (`nextjs-patterns.md § Un layout n'est JAMAIS une
 // frontière d'autorisation`), les lectures des services avec le client de la session, et leurs refus
 // traduits en états d'écran. Session de l'hôte et services du paquet simulés ; l'écran est le vrai.
@@ -16,8 +16,8 @@ import {
   type Identity,
   type PlatformDb,
 } from "@otomata_tech/oto_platform/server"
-import EquipesLoading from "@/app/(dashboard)/equipes/loading"
-import EquipesPage, { metadata } from "@/app/(dashboard)/equipes/page"
+import EquipesLoading from "@/app/(dashboard)/teams/loading"
+import EquipesPage, { metadata } from "@/app/(dashboard)/teams/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
 vi.mock("@/lib/plateforme/session", () => ({ getPlatformIdentitySafely: vi.fn() }))
@@ -85,16 +85,16 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("/equipes page session", () => {
+describe("/teams page session", () => {
   it("should send a visitor without a session to /login, reading nothing", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code: "unauthenticated" } })
     await expect(page()).rejects.toThrow("NEXT_REDIRECT:/login")
     expect(listMembers).not.toHaveBeenCalled()
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization", async (code) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code } })
-    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
   })
 
   it("should say the lists failed, reading nothing, when the identity cannot be resolved (AC2)", async () => {
@@ -106,13 +106,13 @@ describe("/equipes page session", () => {
     expect(listMembers).not.toHaveBeenCalled()
   })
 
-  it.each(["equipes"])("should say the failure on the %s tab, with « Réessayer », when the identity cannot be resolved (AC2)", async (onglet) => {
+  it.each(["teams"])("should say the failure on the %s tab, with « Réessayer », when the identity cannot be resolved (AC2)", async (onglet) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(null)
 
-    render(await page({ onglet }))
+    render(await page({ tab: onglet }))
 
     expect(screen.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/equipes?onglet=${onglet}`)
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/teams?tab=${onglet}`)
     expect(listTeams).not.toHaveBeenCalled()
   })
 
@@ -126,7 +126,7 @@ describe("/equipes page session", () => {
   })
 })
 
-describe("/equipes page reads (AC1, AC5)", () => {
+describe("/teams page reads (AC1, AC5)", () => {
   it("should read the lists with the session client and show the members tab, with the form, to an administrator", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
 
@@ -146,19 +146,40 @@ describe("/equipes page reads (AC1, AC5)", () => {
   it("should read the search, the filter and the sort of the tables in the address, an unreadable value falling back to its default", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
 
-    render(await page({ q: "ada", sens: "desc", filtre: "inconnu" }))
+    render(await page({ q: "ada", order: "desc", filter: "inconnu" }))
 
     expect(screen.getByRole("searchbox", { name: "Chercher une personne" })).toHaveValue("ada")
     expect(screen.getByRole("columnheader", { name: /Personne/ })).toHaveAttribute("aria-sort", "descending")
     expect(within(screen.getByRole("group", { name: "Les personnes en chiffres" })).getAllByRole("button")[0]).toHaveAttribute("aria-pressed", "true")
   })
 
+  it("should read the tab, the filter and the search under their English names (E11-S07, AC-b2)", async () => {
+    vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
+
+    render(await page({ q: "ada", filter: "invitations" }))
+
+    expect(screen.getByRole("searchbox", { name: "Chercher une personne" })).toHaveValue("ada")
+    expect(within(screen.getByRole("group", { name: "Les personnes en chiffres" })).getAllByRole("button")[1]).toHaveAttribute("aria-pressed", "true")
+    cleanup()
+    render(await page({ tab: "teams", sort: "people", order: "desc" }))
+    expect(screen.getByRole("tab", { name: /^Équipes/ })).toHaveAttribute("aria-selected", "true")
+  })
+
   it("should read an unknown tab as Membres (AC1)", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
 
-    render(await page({ onglet: "inconnu" }))
+    render(await page({ tab: "inconnu" }))
 
     expect(screen.getByRole("tab", { name: /^Membres/ })).toHaveAttribute("aria-selected", "true")
+  })
+
+  it("should ignore the former French names of the tab and the table settings (E11-S07, AC-b2)", async () => {
+    vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
+
+    render(await page({ onglet: "equipes", sens: "desc", filtre: "invitations" }))
+
+    expect(screen.getByRole("tab", { name: /^Membres/ })).toHaveAttribute("aria-selected", "true")
+    expect(screen.getByRole("columnheader", { name: /Personne/ })).toHaveAttribute("aria-sort", "ascending")
   })
 
   it("should mount no form and show no alert when a plain member may not invite (forbidden, AC5)", async () => {
@@ -185,11 +206,11 @@ describe("/equipes page reads (AC1, AC5)", () => {
 })
 
 // E05-S13 (AC-5, fiche D127 b, c) : les deux onglets retirés ouvrent « Membres », et leurs lectures ne partent plus.
-describe("/equipes page without the rules and platform access tabs (AC-5)", () => {
-  it.each(["regles", "acces"])("should open Membres for ?onglet=%s, reading neither the rules nor the platform accesses", async (onglet) => {
+describe("/teams page without the rules and platform access tabs (AC-5)", () => {
+  it.each(["regles", "acces"])("should open Membres for ?tab=%s, reading neither the rules nor the platform accesses", async (onglet) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin"))
 
-    render(await page({ onglet, noeud: "ventes" }))
+    render(await page({ tab: onglet, noeud: "ventes" }))
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Membres1", "Équipes0"])
     expect(screen.getByRole("tab", { name: /^Membres/ })).toHaveAttribute("aria-selected", "true")
@@ -200,7 +221,7 @@ describe("/equipes page without the rules and platform access tabs (AC-5)", () =
 // La page traduit l'identité en `moi` : les équipes que la personne dirige commandent la composition
 // (AC13), son identifiant l'annulation de ses invitations (AC6). Ada dirige Ventes, fait partie de
 // Support, et n'est pas administratrice (`testing-strategy.md § Anti-patterns`).
-describe("/equipes page for a lead who is not an administrator (AC6, AC13)", () => {
+describe("/teams page for a lead who is not an administrator (AC6, AC13)", () => {
   const CLAIRE = "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02"
   const MARC = "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c03"
   const VENTES = "0e8e5a3c-7f10-4a5b-8d3b-2b1c4d5e6f70"
@@ -241,7 +262,7 @@ describe("/equipes page for a lead who is not an administrator (AC6, AC13)", () 
   })
 
   it("should let the lead compose the team she leads, and not the team she is only part of (AC13)", async () => {
-    render(await page({ onglet: "equipes" }))
+    render(await page({ tab: "teams" }))
 
     expect(screen.getByRole("button", { name: "Gérer Ventes" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Gérer Support" })).toBeNull()
@@ -257,17 +278,17 @@ describe("/equipes page for a lead who is not an administrator (AC6, AC13)", () 
 
 // Un membre de l'équipe plateforme, membre simple de l'organisation, l'administre tant que son accès
 // est en cours, comme pour les services (`isOrgAdmin`, HN-E05S03-40, fiche D17).
-describe("/equipes page for a platform staff member who is a plain member (HN-E05S03-40)", () => {
+describe("/teams page for a platform staff member who is a plain member (HN-E05S03-40)", () => {
   const staff = (hasOpenGrant: boolean): Identity => ({ ...identite("member"), isStaff: true, hasOpenGrant })
 
   it("should give the administrator's gestures while the access is current, and not once it is revoked", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: staff(true), session: SESSION } })
-    render(await page({ onglet: "equipes" }))
+    render(await page({ tab: "teams" }))
     expect(screen.getByRole("button", { name: "Créer une équipe" })).toBeInTheDocument()
 
     cleanup()
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: staff(false), session: SESSION } })
-    render(await page({ onglet: "equipes" }))
+    render(await page({ tab: "teams" }))
     expect(screen.queryByRole("button", { name: "Créer une équipe" })).toBeNull()
   })
 })

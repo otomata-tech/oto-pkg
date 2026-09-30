@@ -13,11 +13,11 @@ const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
 const MODES = ["light", "dark"] as const
 
-/** Crée la page jetable, un paragraphe, par `POST /api/plateforme/nodes` depuis la page connectée. */
+/** Crée la page jetable, un paragraphe, par `POST /api/platform/nodes` depuis la page connectée. */
 async function creerLaPage(page: Page, chemin: string): Promise<void> {
   const issue = await page.evaluate(
     async (corps) => {
-      const reponse = await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+      const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
       return reponse.ok ? "écrite" : await reponse.text()
     },
     { path: chemin, title: "Page écrite à l'éditeur", summary: "Page jetable du contrôle d'E10-S06.", publish: true, ops: [{ op: "add_section", section: "Réunion", text: "Premier paragraphe." }] },
@@ -96,10 +96,10 @@ test.describe("éditeur des blocs de page (E10-S06)", () => {
 
       // La version publiée : chaque bloc rendu, sans balisage visible.
       await attendre(async () => {
-        const html = await lireLeHtml(page, `/n/${chemin}?version=publiee`)
+        const html = await lireLeHtml(page, `/n/${chemin}?version=published`)
         expect(html).toContain(">relancer<")
       }).toPass({ timeout: 90_000 })
-      await page.goto(`${ESPACE.adresse}/n/${chemin}?version=publiee`)
+      await page.goto(`${ESPACE.adresse}/n/${chemin}?version=published`)
       await expect(page.getByRole("heading", { level: 4, name: "Chiffres" })).toBeVisible()
       await expect(page.getByRole("columnheader", { name: "Montant" })).toBeVisible()
       await expect(page.getByRole("cell", { name: "à revoir" })).toBeVisible()

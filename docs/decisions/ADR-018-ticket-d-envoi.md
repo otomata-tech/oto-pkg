@@ -19,7 +19,7 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
 
 ## Décision
 
-1. **Une seule porte sans session écrit** : `POST /api/plateforme/uploads/<jeton>`. La preuve est
+1. **Une seule porte sans session écrit** : `POST /api/platform/uploads/<jeton>`. La preuve est
    un ticket créé par `upload.link` (derrière `call`), sous une session vérifiée, pendant une
    conversation (`ctx`).
 2. **Le ticket** :
@@ -55,7 +55,7 @@ vaut sur chaque porte, **sauf** cette route, où le ticket en tient lieu.
 8. **Formulaire de dépôt** (fiches D130, D146, D147) : le ticket se consomme aussi depuis une page
    de la plateforme (`/upload/<token>`, page de l'hôte qui monte l'écran du paquet), sous la session
    web de la personne du ticket, par une route à session distincte de la porte sans session,
-   `POST /api/plateforme/uploads/<jeton>/form`, sous le contrôle d'origine des mutations (§ 5 garde
+   `POST /api/platform/uploads/<jeton>/form`, sous le contrôle d'origine des mutations (§ 5 garde
    son refus des requêtes à `Origin`). Le formulaire a **son propre jeton** (32 octets, gardé en
    empreinte comme le premier) : la porte sans session n'accepte que le jeton de `curl`, la route du
    formulaire que le sien, et le ticket sert une fois, par l'un ou par l'autre ; un jeton de l'autre

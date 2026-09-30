@@ -1,6 +1,6 @@
 "use client"
 
-// « Inviter quelqu'un » (AC28) : adresse, rôle et équipe, envoyés à `POST /api/plateforme/invitations`
+// « Inviter quelqu'un » (AC28) : adresse, rôle et équipe, envoyés à `POST /api/platform/invitations`
 // sur le schéma partagé avec l'API (`schemas/invitations.ts`).
 //
 // Porté d'oto-frontend (`components/settings/invite-someone.tsx`). Repris : messages constants par

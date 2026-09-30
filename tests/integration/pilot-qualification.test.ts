@@ -397,7 +397,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
         const revision = toReview.find((row) => row.key === key)?.revision
         const tasks: (() => Promise<void>)[] = []
         const response = await handlePlateforme(
-          new Request(`https://${org.host}/api/plateforme/tables/review`, {
+          new Request(`https://${org.host}/api/platform/tables/review`, {
             method: "POST",
             body: JSON.stringify({ table: TABLE, key, revision, decision, ...(reason ? { reason } : {}) }),
             headers: { origin: `https://${org.host}`, "x-forwarded-proto": "https", "user-agent": reviewAgent, "content-type": "application/json" },

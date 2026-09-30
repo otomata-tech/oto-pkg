@@ -35,7 +35,7 @@ export async function avecLaBase<T>(fn: (sql: Sql) => Promise<T>): Promise<T> {
   }
 }
 
-/** Le compte est-il de l'équipe plateforme ? Le menu de l'entreprise et `/admin/retours` en dépendent (E05-S13, AC-9, AC-10). */
+/** Le compte est-il de l'équipe plateforme ? Le menu de l'entreprise et `/admin/feedback` en dépendent (E05-S13, AC-9, AC-10). */
 export async function compteDuStaff(email: string): Promise<boolean> {
   const [lu] = await avecLaBase((sql) => sql<{ staff: boolean }[]>`select exists (select 1 from platform.platform_staff where lower(email) = lower(${email})) as staff`)
   return lu?.staff === true

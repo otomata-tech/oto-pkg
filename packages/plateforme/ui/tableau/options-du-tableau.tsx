@@ -4,7 +4,7 @@
 // l'en-tête d'écran, dès le niveau écriture, ouvre le popover « Réglages du tableau » et ses interrupteurs,
 // « Preuve exigée » (`proof`), « L'assistant peut décider la revue » (`lifecycle.review.agents_may_decide`,
 // seulement si le tableau a une revue) et « Fermé » (`closed`). Chaque bascule publie l'en-tête en un geste par
-// la file d'opérations de la page (`POST /api/plateforme/nodes`, la porte de `write`), qui pose la révision et
+// la file d'opérations de la page (`POST /api/platform/nodes`, la porte de `write`), qui pose la révision et
 // le tampon courants (HN-E11S01-18) ; l'issue s'annonce, la page se relit (HN-E11S01-19), un refus se dit sous
 // les interrupteurs et l'interrupteur revient à l'état publié. Un changement d'en-tête en attente dans le
 // brouillon bloque le panneau (AC-g6, HN-E11S01-20) : publier le réglage publierait aussi ce changement sans

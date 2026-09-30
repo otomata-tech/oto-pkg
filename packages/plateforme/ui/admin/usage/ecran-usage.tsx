@@ -63,11 +63,11 @@ function FiltreDEquipe({ equipes, equipe, periode, action }: FiltreDEquipeProps)
   const choisie = equipes.some((candidate) => candidate.id === equipe) ? equipe : ""
   return (
     <form method="get" action={action} aria-label="Filtrer par équipe" className="flex items-center gap-2">
-      <input type="hidden" name="periode" value={periode} />
+      <input type="hidden" name="period" value={periode} />
       <label htmlFor="usage-equipe" className="oto-sr-only">
         Équipe
       </label>
-      <Select key={choisie} id="usage-equipe" name="equipe" defaultValue={choisie} size="sm">
+      <Select key={choisie} id="usage-equipe" name="team" defaultValue={choisie} size="sm">
         <option value="">Toutes les équipes</option>
         {equipes.map((option) => (
           <option key={option.id} value={option.id}>
@@ -213,8 +213,8 @@ function Reglages({ donnees, filtres, hrefDeFenetre, actionDuFiltre }: Pick<Ecra
   const fenetres = JOURNAL_PERIODS.map((jours) => ({ valeur: String(jours), libelle: `${jours} jours`, adresse: hrefDeFenetre(jours) }))
   return (
     <>
-      <FiltreDEquipe equipes={donnees.equipes} equipe={donnees.usage.team?.id} periode={filtres.periode} action={actionDuFiltre} />
-      <FiltreSegmente libelle="La période observée" choix={fenetres} valeur={String(filtres.periode)} />
+      <FiltreDEquipe equipes={donnees.equipes} equipe={donnees.usage.team?.id} periode={filtres.period} action={actionDuFiltre} />
+      <FiltreSegmente libelle="La période observée" choix={fenetres} valeur={String(filtres.period)} />
     </>
   )
 }
@@ -234,7 +234,7 @@ export function EcranUsage({ resultat, fil, ...props }: EcranUsageProps) {
       />
       {/* Une seule lecture nourrit les îlots : son échec, ou la réserve d'un non-administrateur (AC1), se dit une fois. */}
       {resultat.error !== undefined ? (
-        <ErreurDeLecture message={resultat.error} href={props.hrefDeFenetre(props.filtres.periode)} Lien={props.Lien} />
+        <ErreurDeLecture message={resultat.error} href={props.hrefDeFenetre(props.filtres.period)} Lien={props.Lien} />
       ) : (
         <Usage donnees={resultat.data} {...props} />
       )}

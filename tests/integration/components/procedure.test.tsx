@@ -10,7 +10,7 @@ import { libellesDesChoix } from "../../helpers/liste-de-choix"
 
 // L'écran d'une procédure (E05-S04 ; M59, fiche D104) : celui d'une page, lecture et éditeur ; un bloc `call`
 // déjà écrit s'y lit et s'y écrit comme un texte ; restent l'aide du résumé et les refus de publication du
-// service ; puis la liste `/procedures`. `fetch` simulé pour `POST /api/plateforme/nodes`, relecture espionnée.
+// service ; puis la liste `/procedures`. `fetch` simulé pour `POST /api/platform/nodes`, relecture espionnée.
 
 const TABLE = "ventes/suivi_prospects"
 const CHEMIN = "ventes/qualifier_prospects"
@@ -369,7 +369,7 @@ const LISTE: ProcedureSummary[] = [
 ]
 
 describe("liste des procédures (AC9)", () => {
-  const hrefDeLaListe = ({ equipe }: { equipe?: string }) => (equipe ? `/procedures?equipe=${equipe}` : "/procedures")
+  const hrefDeLaListe = ({ team }: { team?: string }) => (team ? `/procedures?team=${team}` : "/procedures")
   const monter = (props: Partial<ComponentProps<typeof ListeDesProcedures>> = {}) =>
     render(
       <ListeDesProcedures
@@ -408,13 +408,13 @@ describe("liste des procédures (AC9)", () => {
     ])
     expect(screen.getByRole("link", { name: `Titre de ${CHEMIN}` })).toHaveAttribute("href", `/n/${CHEMIN}`)
     const filtre = screen.getByRole("combobox", { name: "Équipe" })
-    expect(filtre.closest("form")?.querySelector("input[type='hidden'][name='equipe']")).toHaveValue("")
+    expect(filtre.closest("form")?.querySelector("input[type='hidden'][name='team']")).toHaveValue("")
     expect(filtre.closest("form")).toHaveAttribute("method", "get")
     expect(filtre.closest("form")).toHaveAttribute("action", "/procedures")
     expect(options("Équipe")).toEqual(["Toutes les équipes", "Ventes", "Support"])
     cleanup()
 
-    monter({ filtre: { equipe: VENTES } })
+    monter({ filtre: { team: VENTES } })
     expect(screen.getByRole("combobox", { name: "Équipe" })).toHaveValue(VENTES)
     expect(lignes()).toEqual([[`Titre de ${CHEMIN}`, CHEMIN, "Ventes", "Publiée · rév. 4"]])
     cleanup()
@@ -422,7 +422,7 @@ describe("liste des procédures (AC9)", () => {
     monter({ resultat: { data: [] } })
     expect(screen.getByText("Aucune procédure ne vous est encore partagée.")).toBeInTheDocument()
     cleanup()
-    monter({ resultat: { data: [LISTE[0]] }, filtre: { equipe: SUPPORT } })
+    monter({ resultat: { data: [LISTE[0]] }, filtre: { team: SUPPORT } })
     expect(screen.getByText("Aucune procédure pour cette équipe.")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Retirer le filtre" })).toHaveAttribute("href", "/procedures")
   })
@@ -437,9 +437,9 @@ describe("liste des procédures (AC9)", () => {
     ["the procedures", { resultat: { error: "Une erreur est survenue. Réessayez." } }],
     ["the teams of the filter", { equipes: { error: "Une erreur est survenue. Réessayez." } }],
   ] as const)("should say a failed read of %s with « Réessayer » on the same address", (_lecture, enPanne) => {
-    monter({ filtre: { equipe: VENTES }, ...enPanne })
+    monter({ filtre: { team: VENTES }, ...enPanne })
     expect(screen.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/procedures?equipe=${VENTES}`)
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/procedures?team=${VENTES}`)
   })
 })
 

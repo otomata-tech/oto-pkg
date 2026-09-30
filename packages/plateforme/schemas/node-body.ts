@@ -1,4 +1,4 @@
-// Corps de `POST /api/plateforme/nodes` et entrée que `writeNode` valide pour ses deux portes (E03-S03,
+// Corps de `POST /api/platform/nodes` et entrée que `writeNode` valide pour ses deux portes (E03-S03,
 // N40, N45) : l'entrée de `write` (`writeNodeSchema`), dont chaque opération admet en plus `revision`
 // (la révision lue du bloc visé) et `input` (un bloc structuré au format de `blockInputSchema`), plus
 // `draft_stamp`, le tampon du brouillon lu par l'écran. Jamais servi au modèle.

@@ -2,7 +2,7 @@
 
 // « Déplacer » (E05-S02, AC20, AC21 ; H58, H71, P12) : au niveau gestion, un formulaire propose le nouveau
 // parent parmi l'arbre visible, annonce le nouveau chemin, l'alias de l'ancien, les sous-pages qui suivent
-// et le propriétaire hérité, puis envoie `POST /api/plateforme/nodes/move` (`moveNodeSchema`, E03-S07) ;
+// et le propriétaire hérité, puis envoie `POST /api/platform/nodes/move` (`moveNodeSchema`, E03-S07) ;
 // la nouvelle adresse s'ouvre ensuite (`prefixeDesPages`, chaîne reçue de l'hôte). Le dernier segment du
 // chemin est gardé (HN-E05S02-7). Sans lui, un nœud ne change de place que par le MCP admin (E08-S06).
 // AC-b7 (E05-S10) : le formulaire et l'envoi servent le « Déplacer » du rail (`coque/deplacement-dans-le-rail.tsx`).

@@ -48,7 +48,7 @@ async function nonMembre(session: PlatformSession): Promise<Etat> {
       marque: marqueDOrganisation(org),
     }
   } catch (error) {
-    console.error("aucune-organisation: lecture de l'organisation impossible", error)
+    console.error("no-organization: lecture de l'organisation impossible", error)
     return { resultat: { error: ERREUR }, marque: null }
   }
 }
@@ -68,7 +68,7 @@ export default async function AucuneOrganisationPage() {
   const session = await getPlatformSession()
   if (!session) redirect("/login")
 
-  const identite = await getPlatformIdentitySafely("aucune-organisation")
+  const identite = await getPlatformIdentitySafely("no-organization")
   // Membre de l'organisation de l'adresse : rien à faire ici.
   if (identite?.data) redirect("/")
   const { resultat, marque } = await etatPour(session, identite?.error?.code ?? null)

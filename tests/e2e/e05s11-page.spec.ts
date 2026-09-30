@@ -78,7 +78,7 @@ test.describe("page d'un nœud après les retours de JB (E05-S11, lot b)", () =>
         const retenue = new Promise<void>((resolve) => (relacher = resolve))
         // La seule écriture du bloc est retenue ; la publication qui la suit passe.
         await page.route(
-          "**/api/plateforme/nodes",
+          "**/api/platform/nodes",
           async (route) => {
             await retenue
             await route.continue()

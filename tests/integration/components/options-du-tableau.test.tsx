@@ -8,7 +8,7 @@ import { simulerLAPI } from "../../helpers/noeud"
 
 // Les réglages d'un tableau à l'écran (E11-S01, lot g : AC-g2, AC-g3, AC-g5, AC-g6, AC-g7), montés comme
 // l'en-tête d'écran les pose : sous la file d'opérations de la page, `fetch` simulé pour
-// `POST /api/plateforme/nodes`, relecture espionnée. Qui voit « Réglages » (AC-g1) et d'où vient le blocage
+// `POST /api/platform/nodes`, relecture espionnée. Qui voit « Réglages » (AC-g1) et d'où vient le blocage
 // (AC-g6, `vue.draft.meta`) : `ecran-de-noeud.test.tsx`.
 
 const CHEMIN = "ventes/suivi_prospects"

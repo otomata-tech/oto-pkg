@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { acceptInvitations, createPlatformDb } from "@otomata_tech/oto_platform/server"
-import ConfirmerPage from "@/app/auth/confirmer/page"
+import ConfirmerPage from "@/app/auth/confirm/page"
 import { GET } from "@/app/auth/callback/route"
 import { createClient } from "@/lib/supabase/server"
 
@@ -131,7 +131,7 @@ describe("GET /auth/callback with an error of the auth server", () => {
   })
 })
 
-describe("/auth/confirmer page", () => {
+describe("/auth/confirm page", () => {
   it("should verify nothing when it opens, and offer « Continuer » with the link fields", async () => {
     const searchParams = Promise.resolve({ token_hash: "hash-from-the-email", type: "email", next: "/" })
 

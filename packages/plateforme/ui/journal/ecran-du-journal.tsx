@@ -51,11 +51,11 @@ export type EcranDuJournalProps = {
 const ECHEC = messageDErreur({ code: "internal", statut: 0 })
 
 /** Les paramètres rattrapés que dit la phrase générale ; le curseur et le code ont la leur (AC6, AC7). */
-const FILTRES_DITS: readonly JournalParam[] = ["periode", "equipe", "personne", "erreurs", "appels"]
+const FILTRES_DITS: readonly JournalParam[] = ["period", "team", "person", "errors", "calls"]
 
 /** Équipe, personne ou erreurs seulement : la période n'est pas un filtre, l'état vide la nomme (AC2). */
 function filtrePose(filtres: JournalFilters): boolean {
-  return filtres.equipe !== undefined || filtres.personne !== undefined || filtres.erreurs !== undefined
+  return filtres.team !== undefined || filtres.person !== undefined || filtres.errors !== undefined
 }
 
 /**
@@ -64,17 +64,17 @@ function filtrePose(filtres: JournalFilters): boolean {
  * changer de période oublie la suite de la liste et la conversation ouverte.
  */
 function liensDe({ filtres, resultat, hrefDuJournal }: EcranDuJournalProps) {
-  const liste = { periode: String(filtres.periode), equipe: filtres.equipe, personne: filtres.personne, erreurs: filtres.erreurs }
-  const curseur = resultat.data?.restarted ? undefined : filtres.curseur
-  const ouverte = { conversation: filtres.conversation, appels: filtres.appels }
+  const liste = { period: String(filtres.period), team: filtres.team, person: filtres.person, errors: filtres.errors }
+  const cursor = resultat.data?.restarted ? undefined : filtres.cursor
+  const ouverte = { conversation: filtres.conversation, calls: filtres.calls }
   return {
-    ici: hrefDuJournal({ ...liste, curseur: filtres.curseur, ...ouverte }),
+    ici: hrefDuJournal({ ...liste, cursor: filtres.cursor, ...ouverte }),
     sansFiltre: hrefDuJournal({}),
-    fermer: hrefDuJournal({ ...liste, curseur }),
-    periode: (jours: number) => hrefDuJournal({ ...liste, periode: String(jours) }),
-    ouverture: (code: string) => hrefDuJournal({ ...liste, curseur, conversation: code }),
-    suite: (suivant: string) => hrefDuJournal({ ...liste, curseur: suivant, ...ouverte }),
-    appelsSuivants: (suivants: string) => hrefDuJournal({ ...liste, curseur, conversation: filtres.conversation, appels: suivants }),
+    fermer: hrefDuJournal({ ...liste, cursor }),
+    periode: (jours: number) => hrefDuJournal({ ...liste, period: String(jours) }),
+    ouverture: (code: string) => hrefDuJournal({ ...liste, cursor, conversation: code }),
+    suite: (suivant: string) => hrefDuJournal({ ...liste, cursor: suivant, ...ouverte }),
+    appelsSuivants: (suivants: string) => hrefDuJournal({ ...liste, cursor, conversation: filtres.conversation, calls: suivants }),
   }
 }
 
@@ -85,7 +85,7 @@ function liensDe({ filtres, resultat, hrefDuJournal }: EcranDuJournalProps) {
  */
 function Avertissements({ filtres, resultat }: Pick<EcranDuJournalProps, "filtres" | "resultat">) {
   const ignore = filtres.ignored.some((parametre) => FILTRES_DITS.includes(parametre))
-  const suitePerimee = filtres.ignored.includes("curseur") || resultat.data?.restarted === true
+  const suitePerimee = filtres.ignored.includes("cursor") || resultat.data?.restarted === true
   if (!ignore && !suitePerimee) return null
   return (
     <div className="oto-alert" data-tone="review">
@@ -121,7 +121,7 @@ export function EcranDuJournal(props: EcranDuJournalProps) {
         title={TITRE}
         icon={<Icon as={ClockCounterClockwise} size="sm" />}
         meta={meta(props)}
-        actions={<PeriodeDuJournal periodes={periodes} valeur={String(filtres.periode)} />}
+        actions={<PeriodeDuJournal periodes={periodes} valeur={String(filtres.period)} />}
       />
       <Island aria-label="Le journal des conversations">
         <IslandBody className="flex flex-col gap-4">

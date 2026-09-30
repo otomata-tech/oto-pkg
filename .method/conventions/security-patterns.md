@@ -189,7 +189,7 @@ comme un refus. **Vérifiable :** un test par service, avec une base qui rend de
 service les filtre, et qu'il refuse une écriture interdite sans envoyer la requête ; retirer du
 service ce filtre ou ce refus fait échouer ce test (ADR-012 § 3).
 
-**Porte sans session qui écrit.** Il n'y en a qu'une : `POST /api/plateforme/uploads/<jeton>`
+**Porte sans session qui écrit.** Il n'y en a qu'une : `POST /api/platform/uploads/<jeton>`
 (ADR-018, E10-S02 lot f). Le ticket prouve **qui** et **où**, jamais le droit : l'appartenance et chaque
 droit se relisent à l'envoi, comme sous une session. **Vérifiable :** un test retire le droit entre
 le lien et l'envoi, et l'envoi échoue sans rien écrire. Une autre route sans jeton de l'émetteur qui
@@ -246,4 +246,4 @@ const securityHeaders = [
 ]
 ```
 
-Exception : les deux routes HTML d'ADR-017 (`/api/plateforme/files/<id>/html`, `/api/plateforme/public/<jeton>/files/<id>/html`) sont exclues de `X-Frame-Options` et de la `Referrer-Policy` globale : l'iframe de la visionneuse les charge, et elles posent leurs propres en-têtes (`server/files/html.ts`).
+Exception : les deux routes HTML d'ADR-017 (`/api/platform/files/<id>/html`, `/api/platform/public/<jeton>/files/<id>/html`) sont exclues de `X-Frame-Options` et de la `Referrer-Policy` globale : l'iframe de la visionneuse les charge, et elles posent leurs propres en-têtes (`server/files/html.ts`).

@@ -107,7 +107,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       const node = await page(claire, path)
       const image = await attached(node, "plan.png", bytesOf("png"))
       const report = await attached(node, "rapport mars.pdf", null, { size: 1_200 })
-      const text = [`![Plan du site](https://ailleurs.example.invalid/api/plateforme/files/${image.toUpperCase()})`, `[le rapport (3 bytes, zip)](/api/plateforme/files/${report})`].join("\n\n")
+      const text = [`![Plan du site](https://ailleurs.example.invalid/api/platform/files/${image.toUpperCase()})`, `[le rapport (3 bytes, zip)](/api/platform/files/${report})`].join("\n\n")
 
       const written = await claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text }], publish: true })
       const read = await claire.call("read", { path })
@@ -118,7 +118,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         { type: "file", text: null, data: { file_id: report, name: "rapport mars.pdf", size: 1_200, mime: "application/pdf" } },
       ])
       expect(read.text).toContain(
-        `## Pièces\n\nIntro.\n\n![Plan du site](https://${o.host}/api/plateforme/files/${image})\n\n[rapport mars.pdf (1,200 bytes, pdf)](https://${o.host}/api/plateforme/files/${report})`,
+        `## Pièces\n\nIntro.\n\n![Plan du site](https://${o.host}/api/platform/files/${image})\n\n[rapport mars.pdf (1,200 bytes, pdf)](https://${o.host}/api/platform/files/${report})`,
       )
     })
 
@@ -133,9 +133,9 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       const created = `ventes/d_neuve_${hex(3)}`
 
       const refusals = await Promise.all(
-        [elsewhere, pending, unknown].map((id) => claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text: `[x](/api/plateforme/files/${id})` }] })),
+        [elsewhere, pending, unknown].map((id) => claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text: `[x](/api/platform/files/${id})` }] })),
       )
-      const onCreation = await claire.call("write", { path: created, title: "Neuve", summary: "Page neuve.", ops: [{ op: "add_section", section: "A", text: `![](/api/plateforme/files/${elsewhere})` }] })
+      const onCreation = await claire.call("write", { path: created, title: "Neuve", summary: "Page neuve.", ops: [{ op: "add_section", section: "A", text: `![](/api/platform/files/${elsewhere})` }] })
       const fence = await claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text: "```html\n<p>Rapport</p>\n```" }] })
       const [createdRow] = await fx.admin<{ n: number }[]>`select count(*)::int as n from platform.nodes where org_id = ${o.org.id} and path = ${created}`
 
@@ -159,12 +159,12 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       const output = await writeNode(
         db,
         identity,
-        { path, base_revision: 0, tolerant: true, ops: [{ op: "append", section: "Pièces", text: `[source.pdf (10 bytes, pdf)](/api/plateforme/files/${elsewhere})` }] },
+        { path, base_revision: 0, tolerant: true, ops: [{ op: "append", section: "Pièces", text: `[source.pdf (10 bytes, pdf)](/api/platform/files/${elsewhere})` }] },
         { kind: "human" },
       )
 
       expect(output.data).toMatchObject({ kept_as_text: 1 })
-      expect((await blocksOf(node, "published")).at(-1)).toEqual({ type: "code", text: `[source.pdf (10 bytes, pdf)](/api/plateforme/files/${elsewhere})`, data: {} })
+      expect((await blocksOf(node, "published")).at(-1)).toEqual({ type: "code", text: `[source.pdf (10 bytes, pdf)](/api/platform/files/${elsewhere})`, data: {} })
     })
 
     it("should refuse a file block whose file was cited only by an image and has no ready row, and keep it in a code block in tolerant mode", async () => {
@@ -175,7 +175,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       // bloc `file` qui en porterait les métadonnées.
       const pending = await attached(node, "plan.png", null, { status: "pending" })
       const { revision } = await fx.publishBlocks(node, [{ type: "image", data: { file_id: pending } }])
-      const op = { op: "add_section", section: "Pièces", text: `[x](/api/plateforme/files/${pending})` }
+      const op = { op: "add_section", section: "Pièces", text: `[x](/api/platform/files/${pending})` }
       const { db, identity } = as("claire")
 
       const strict = await claire.call("write", { path, base_revision: revision, ops: [op] })
@@ -183,7 +183,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
       expect([strict.isError, strict.text]).toEqual([true, `File ${pending} is not attached to ${path}: upload it to this page first.`])
       expect(tolerant.data).toMatchObject({ kept_as_text: 1 })
-      expect((await blocksOf(node, "published")).at(-1)).toEqual({ type: "code", text: `[x (1 byte, application/octet-stream)](/api/plateforme/files/${pending})`, data: {} })
+      expect((await blocksOf(node, "published")).at(-1)).toEqual({ type: "code", text: `[x (1 byte, application/octet-stream)](/api/platform/files/${pending})`, data: {} })
     })
   })
 
@@ -265,7 +265,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       const node = await page(claire, path)
       // Le mot seul avant l'extension : le parseur de la recherche lirait « <mot>.pdf » comme un seul jeton.
       const file = await attached(node, `${word} trimestre.pdf`, null, { size: 42 })
-      await claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text: `[x](/api/plateforme/files/${file})` }], publish: true })
+      await claire.call("write", { path, base_revision: 0, ops: [{ op: "append", section: "Pièces", text: `[x](/api/platform/files/${file})` }], publish: true })
 
       const found = await claire.call("find", { query: word })
 

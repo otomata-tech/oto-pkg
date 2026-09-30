@@ -45,7 +45,7 @@ describe.skipIf(!sqlConfigured)(
     }
 
     function request(method: string, path: string, body?: unknown) {
-      return new Request(`https://${host}/api/plateforme/${path}`, {
+      return new Request(`https://${host}/api/platform/${path}`, {
         method,
         body: body === undefined ? undefined : JSON.stringify(body),
         headers: {
@@ -131,7 +131,7 @@ describe.skipIf(!sqlConfigured)(
         })
         expect(otp).toHaveBeenCalledWith({
           email: address,
-          options: { shouldCreateUser: true, emailRedirectTo: `https://${host}/auth/confirmer?next=/` },
+          options: { shouldCreateUser: true, emailRedirectTo: `https://${host}/auth/confirm?next=/` },
         })
         expect(await journal("POST invitations", address)).toEqual([])
 

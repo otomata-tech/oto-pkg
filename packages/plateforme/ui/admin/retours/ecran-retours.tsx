@@ -156,11 +156,11 @@ type VueProps = Omit<EcranRetoursProps, "resultat" | "fil"> & { liste: FeedbackL
 
 /** L'état et le type, sur la barre d'outils de la liste : un choix de l'un garde l'autre et la fenêtre. */
 function Filtres({ filtres, hrefDeFiltre }: Pick<VueProps, "filtres" | "hrefDeFiltre">) {
-  const { etat, type, periode } = filtres
-  const etats = FILTRES_D_ETAT.map((filtre) => ({ valeur: filtre.etat, libelle: filtre.libelle, adresse: hrefDeFiltre({ etat: filtre.etat, type, periode }) }))
+  const { state: etat, type, period } = filtres
+  const etats = FILTRES_D_ETAT.map((filtre) => ({ valeur: filtre.etat, libelle: filtre.libelle, adresse: hrefDeFiltre({ state: filtre.etat, type, period }) }))
   const types = [
-    { valeur: TOUS_LES_TYPES, libelle: "Tous les types", adresse: hrefDeFiltre({ etat, periode }) },
-    ...feedbackTypeSchema.options.map((choix) => ({ valeur: choix, libelle: TYPES[choix], adresse: hrefDeFiltre({ etat, type: choix, periode }) })),
+    { valeur: TOUS_LES_TYPES, libelle: "Tous les types", adresse: hrefDeFiltre({ state: etat, period }) },
+    ...feedbackTypeSchema.options.map((choix) => ({ valeur: choix, libelle: TYPES[choix], adresse: hrefDeFiltre({ state: etat, type: choix, period }) })),
   ]
   return (
     <div className="oto-list-tools flex-wrap">
@@ -178,7 +178,7 @@ function Vide({ liste, filtres, Lien, hrefDeFiltre }: VueProps) {
     <EmptyState
       title={AUCUN_RETOUR_FILTRE}
       action={
-        <Lien href={hrefDeFiltre({ etat: "all", periode: filtres.periode })} className="oto-btn" data-variant="secondary" data-size="sm">
+        <Lien href={hrefDeFiltre({ state: "all", period: filtres.period })} className="oto-btn" data-variant="secondary" data-size="sm">
           Voir tous les retours
         </Lien>
       }
@@ -197,11 +197,11 @@ function Liste(props: VueProps) {
         <div className="flex flex-col gap-3">
           <TableServeur legende="Retours, le plus récent d'abord" colonnes={COLONNES}>
             {liste.tickets.map((retour) => (
-              <LigneDeRetour key={retour.ticket} retour={retour} periode={filtres.periode} Lien={Lien} hrefDeConversation={props.hrefDeConversation} />
+              <LigneDeRetour key={retour.ticket} retour={retour} periode={filtres.period} Lien={Lien} hrefDeConversation={props.hrefDeConversation} />
             ))}
           </TableServeur>
           {liste.nextCursor && (
-            <Lien href={props.hrefDeFiltre({ ...filtres, curseur: liste.nextCursor })} className="oto-list-more">
+            <Lien href={props.hrefDeFiltre({ ...filtres, cursor: liste.nextCursor })} className="oto-list-more">
               Voir les suivants
             </Lien>
           )}
@@ -213,9 +213,9 @@ function Liste(props: VueProps) {
 
 /** La fenêtre, dans les actions de l'en-tête : elle règle l'écran entier, l'état et le type gardés. */
 function Fenetre({ filtres, hrefDeFiltre }: Pick<VueProps, "filtres" | "hrefDeFiltre">) {
-  const { etat, type } = filtres
-  const fenetres = JOURNAL_PERIODS.map((jours) => ({ valeur: String(jours), libelle: `${jours} jours`, adresse: hrefDeFiltre({ etat, type, periode: jours }) }))
-  return <FiltreSegmente libelle="La période observée" choix={fenetres} valeur={String(filtres.periode)} />
+  const { state, type } = filtres
+  const fenetres = JOURNAL_PERIODS.map((jours) => ({ valeur: String(jours), libelle: `${jours} jours`, adresse: hrefDeFiltre({ state, type, period: jours }) }))
+  return <FiltreSegmente libelle="La période observée" choix={fenetres} valeur={String(filtres.period)} />
 }
 
 export function EcranRetours({ resultat, fil, ...props }: EcranRetoursProps) {

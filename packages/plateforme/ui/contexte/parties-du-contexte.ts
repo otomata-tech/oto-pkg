@@ -31,12 +31,14 @@ const SEPARATEUR = "\n\n"
 /** Le Contexte de Tout le monde, par son chemin (P39). */
 export const CONTEXTE_DE_TOUT_LE_MONDE = "contexte"
 
-/** Les ancres des blocs qui ne sont pas un Contexte, par leur nom servi (HN-E05S11-9, HN-E05S12-10). */
+/**
+ * Les ancres des blocs qui ne sont pas un Contexte, par leur nom servi (HN-E05S11-9, HN-E05S12-10), en anglais
+ * (E11-S07). Aucune pour le bloc `code`, que ni la vue ni l'encart n'affichent plus (HN-E11S07-11) : son rang suffit.
+ */
 const ANCRES_DES_BLOCS: Readonly<Record<string, string>> = {
-  code: "regles",
-  news: "nouveautes",
+  news: "news",
   procedures: "procedures",
-  "recent content": "contenus",
+  "recent content": "recent-content",
 }
 
 /**
@@ -62,16 +64,18 @@ export function cheminDuContexte(bloc: Pick<BlocServi, "name">): string | null {
 }
 
 /**
- * L'ancre stable d'une partie (HN-E05S11-9, AC-8) : un Contexte par sa portée (`contexte-tout-le-monde`,
- * `contexte-prive`, `contexte-<slug d'équipe>`), un autre bloc par son nom servi, un nom inconnu par son rang.
+ * L'ancre stable d'une partie (HN-E05S11-9, AC-8), en anglais (E11-S07) : un Contexte par sa portée
+ * (`everyone-context`, `private-context`, `context-<slug d'équipe>`), un autre bloc par son nom servi, un nom
+ * inconnu par son rang (`part-<n>`). Les deux ancres fixes ne commencent pas par `context-` : un slug d'équipe
+ * (`[a-z0-9_]`, sans tiret) ne peut pas les reproduire, une équipe `everyone` comprise.
  */
 export function ancreDeLaPartie(bloc: Pick<BlocServi, "name">, rang: number): string {
   if (estUnContexte(bloc.name)) {
-    if (bloc.name === CONTEXTE_DE_TOUT_LE_MONDE) return "contexte-tout-le-monde"
-    if (estLePrive(bloc.name)) return "contexte-prive"
-    return `contexte-${bloc.name.split("/")[0]}`
+    if (bloc.name === CONTEXTE_DE_TOUT_LE_MONDE) return "everyone-context"
+    if (estLePrive(bloc.name)) return "private-context"
+    return `context-${bloc.name.split("/")[0]}`
   }
-  return ANCRES_DES_BLOCS[bloc.name] ?? `partie-${rang + 1}`
+  return ANCRES_DES_BLOCS[bloc.name] ?? `part-${rang + 1}`
 }
 
 /**

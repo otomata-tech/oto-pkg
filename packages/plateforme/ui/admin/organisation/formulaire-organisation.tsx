@@ -1,7 +1,7 @@
 "use client"
 
 // « Réglages » de l'organisation (E08-S03, AC3) : le nom, validé par le schéma de l'API (`orgSettingsFormSchema`),
-// seul nom de l'entreprise (E05-S13, AC-3) ; il ne part à `PATCH /api/plateforme/admin/org` que changé. Le seuil et
+// seul nom de l'entreprise (E05-S13, AC-3) ; il ne part à `PATCH /api/platform/admin/org` que changé. Le seuil et
 // l'écart du routage (E05-S11, AC-23) et les domaines de travail (E05-S13, AC-1) ne sont plus à l'écran : l'API et
 // `admin_org` les règlent, et un envoi qui ne les porte pas les garde tels quels. Après un succès, le
 // formulaire reprend la réponse, dit « Enregistré » et la page se relit. L'îlot survit à la relecture :

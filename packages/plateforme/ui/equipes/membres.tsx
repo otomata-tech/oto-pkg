@@ -30,7 +30,7 @@ export type OngletMembresProps = {
   adresseAvec: (reglages: Partial<ReglagesDesListes>) => string
 }
 
-/** « /equipes?onglet=membres&sens=desc » : le chemin et ses paramètres, auxquels la recherche ajoute `q`. */
+/** « /teams?tab=members&order=desc » : le chemin et ses paramètres, auxquels la recherche ajoute `q`. */
 function decouper(adresse: string): { chemin: string; parametres: [string, string][] } {
   const [chemin, requete = ""] = adresse.split("?")
   return { chemin, parametres: [...new URLSearchParams(requete)] }
@@ -59,11 +59,11 @@ export function OngletMembres(props: OngletMembresProps) {
         nomOrganisation={nomOrganisation}
         personnes={membres.data.length}
         invitations={lues ? lues.invitations.length : null}
-        filtre={reglages.filtre}
+        filtre={reglages.filter}
         q={reglages.q}
         adresses={{
-          tous: adresseAvec({ ...reglages, filtre: undefined }),
-          invitations: adresseAvec({ ...reglages, filtre: "invitations" }),
+          tous: adresseAvec({ ...reglages, filter: undefined }),
+          invitations: adresseAvec({ ...reglages, filter: "invitations" }),
           recherche: decouper(adresseAvec({ ...reglages, q: "" })),
         }}
       />
@@ -75,9 +75,9 @@ export function OngletMembres(props: OngletMembresProps) {
         moi={moi}
         nomOrganisation={nomOrganisation}
         toutes={equipes.error === undefined ? equipes.data.map((equipe) => ({ id: equipe.id, nom: equipe.name })) : null}
-        sens={reglages.sens}
-        adresses={{ asc: adresseAvec({ ...reglages, sens: "asc" }), desc: adresseAvec({ ...reglages, sens: "desc" }), sansFiltre: adresseAvec({ sens: reglages.sens }) }}
-        filtrePose={reglages.q !== "" || reglages.filtre !== undefined}
+        sens={reglages.order}
+        adresses={{ asc: adresseAvec({ ...reglages, order: "asc" }), desc: adresseAvec({ ...reglages, order: "desc" }), sansFiltre: adresseAvec({ order: reglages.order }) }}
+        filtrePose={reglages.q !== "" || reglages.filter !== undefined}
         ancre={ANCRE_DES_PERSONNES}
       />
     </div>

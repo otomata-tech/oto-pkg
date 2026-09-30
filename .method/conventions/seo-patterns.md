@@ -212,7 +212,8 @@ Les agents IA sont des visiteurs. Ils lisent le HTML servi et ne cliquent nulle 
   le même HTML que la prod : sans garde, c'est du contenu dupliqué qui concurrence la prod.
   Poser `X-Robots-Tag: noindex` côté hébergeur, ou brancher `robots.ts` sur
   `process.env.VERCEL_ENV !== "production"`
-- **URL renommée ou supprimée** → redirection `permanent: true` (301) dans le bloc
-  `redirects()` de `next.config.ts`, source unique. Une 302 ne transmet pas le référencement
+- **URL renommée ou supprimée d'une page publique indexée** → redirection `permanent: true` (301)
+  dans `redirects()` de `next.config.ts`, source unique. Une 302 ne transmet pas le référencement ;
+  une page authentifiée ou `noindex` renommée répond 404, sans alias (ADR-020)
 - **Images** : toujours un `alt` descriptif
 - **Headings** : un seul `h1` par page, hiérarchie logique

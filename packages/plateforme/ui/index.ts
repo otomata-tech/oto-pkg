@@ -95,7 +95,7 @@ export { EcranDeLaCorbeille, EcranDeLaCorbeilleChargement } from "./corbeille/ec
 // E05-S10 (partie d, ADR-013) : la page publique d'un lien de partage, que l'hôte monte à `/p/<jeton>`, et son 404.
 export { PAGE_PUBLIQUE, PagePublique, PagePubliqueIntrouvable } from "./public/page-publique"
 export type { PagePubliqueProps } from "./public/page-publique"
-// E05-S11 (lot a) : l'écran « Profil », que l'hôte monte à `/profil`.
+// E05-S11 (lot a) : l'écran « Profil », que l'hôte monte à `/profile`.
 export { EcranProfil, EcranProfilChargement } from "./profil/ecran-profil"
 export type { EcranProfilProps } from "./profil/ecran-profil"
 // E05-S11 (lot e) : le titre montré d'un Contexte, « Contexte · <section> », que la page de l'hôte met dans le `<title>` (AC-17).

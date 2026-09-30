@@ -89,10 +89,10 @@ describe("/context page session (AC-e2)", () => {
     expect(metadata).toMatchObject({ title: "Contexte", robots: { index: false } })
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation, reading nothing", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization, reading nothing", async (code) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code } })
 
-    await expect(ContextePage()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(ContextePage()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(previewContext).not.toHaveBeenCalled()
   })
 
@@ -128,7 +128,7 @@ describe("/context page reads (AC-e2, AC-f7)", () => {
     expect(partie("Contexte : Tout le monde").queryByRole("textbox")).toBeNull()
     expect(partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie." })).toBeInTheDocument()
     // Administratrice, membre de la seule équipe Ventes : sa seule partie d'équipe, nommée par ses équipes (AC-f7).
-    expect(screen.getAllByRole("region", { name: /^Contexte : équipe/ }).map((region) => region.id)).toEqual(["contexte-ventes"])
+    expect(screen.getAllByRole("region", { name: /^Contexte : équipe/ }).map((region) => region.id)).toEqual(["context-ventes"])
   })
 
   // E05-S12 (AC-7, HN-E05S12-C10) : le Contexte d'une partie non servie se lit aussi ; absent (`not_found`), sa

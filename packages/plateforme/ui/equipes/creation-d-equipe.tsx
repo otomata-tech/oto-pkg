@@ -1,7 +1,7 @@
 "use client"
 
 // « Créer une équipe » (E05-S03, AC11 ; porté par E05-S09 partie d1) : l'action de l'en-tête de l'écran quand
-// l'onglet des équipes est ouvert, un dialogue, un nom, envoyé à `POST /api/plateforme/teams` sur le schéma
+// l'onglet des équipes est ouvert, un dialogue, un nom, envoyé à `POST /api/platform/teams` sur le schéma
 // partagé avec l'API (`createTeamSchema`), refusé sous le champ avant tout envoi. Le dossier et le Contexte de
 // l'équipe naissent en base (P39), rien ici. Porté d'oto-frontend (`create-team-dialog.tsx` et le bouton de
 // `settings.members.lazy.tsx`) : le champ « Nom de la nouvelle équipe », son exemple, le focus posé dans le

@@ -146,7 +146,7 @@ describe.skipIf(!sqlConfigured)(portable("usageSummary bound (AC8)"), { timeout:
     }))
     await ref.write({ journal })
 
-    const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { periode: 7 })
+    const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { period: 7 })
 
     expect(usage).toMatchObject({ truncated: true, coveredFrom: journal[1].ts, totals: { calls: 20_000, conversations: 1, people: 1, errors: 0 } })
   })

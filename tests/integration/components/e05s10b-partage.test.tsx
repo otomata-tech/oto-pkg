@@ -90,7 +90,7 @@ function reponse(status: number, body: unknown): Response {
 
 // La lecture du lien public, faite par « Partager sur le web » à l'ouverture du panneau (partie d) : « aucun
 // lien » ici, et hors des gestes comptés ; ses cas sont dans `e05s10d-partage-web.test.tsx`.
-const LECTURE_DU_LIEN_PUBLIC = "/api/plateforme/shares?"
+const LECTURE_DU_LIEN_PUBLIC = "/api/platform/shares?"
 
 const estLaLectureDuLien = (url: unknown) => String(url).startsWith(LECTURE_DU_LIEN_PUBLIC)
 
@@ -179,7 +179,7 @@ describe("Partager, adding someone (AC-b5)", () => {
     fireEvent.click(panneau().getByRole("option", { name: "Nora Écoffier" }))
 
     await waitFor(() => expect(panneau().getByRole("status")).toHaveTextContent("Nora Écoffier peut lire ce contenu."))
-    expect(envoye()).toEqual({ url: "/api/plateforme/rules", methode: "POST", corps: { path: "ventes/modele_relance", subject: { kind: "user", id: NORA }, level: "read" } })
+    expect(envoye()).toEqual({ url: "/api/platform/rules", methode: "POST", corps: { path: "ventes/modele_relance", subject: { kind: "user", id: NORA }, level: "read" } })
     expect(rafraichir).toHaveBeenCalledTimes(1)
     expect(champ).toHaveValue("")
 
@@ -199,13 +199,13 @@ describe("Partager, changing a level (AC-b5)", () => {
     const { panneau, relire } = ouvrir()
     choisirDansLaListe(panneau().getByRole("combobox", { name: "Accès de Léa Martin" }), "Peut modifier")
     await waitFor(() => expect(panneau().getByRole("status")).toHaveTextContent("Léa Martin : peut modifier."))
-    expect(envoye()).toEqual({ url: "/api/plateforme/rules", methode: "POST", corps: { path: "ventes/modele_relance", subject: { kind: "user", id: LEA }, level: "write" } })
+    expect(envoye()).toEqual({ url: "/api/platform/rules", methode: "POST", corps: { path: "ventes/modele_relance", subject: { kind: "user", id: LEA }, level: "write" } })
 
     const marc = panneau().getByRole("combobox", { name: "Accès de Marc Dupont" })
     marc.focus()
     choisirDansLaListe(marc, "Retirer")
     await waitFor(() => expect(panneau().getByRole("status")).toHaveTextContent("Marc Dupont n'a plus d'accès propre à ce contenu."))
-    expect(envoye(1)).toEqual({ url: `/api/plateforme/rules/${REGLE_MARC}`, methode: "DELETE", corps: undefined })
+    expect(envoye(1)).toEqual({ url: `/api/platform/rules/${REGLE_MARC}`, methode: "DELETE", corps: undefined })
     expect(rafraichir).toHaveBeenCalledTimes(2)
 
     // La relecture retire la ligne : le focus va à l'intitulé de la liste, jamais à `<body>`.

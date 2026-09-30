@@ -143,9 +143,9 @@ describe("ImportDeFichier — a CSV (AC-b1 to AC-b4)", () => {
     await waitFor(() => expect(termine).toHaveBeenCalledWith({ chemin: "ventes/prospects_2026_2", conserves: 0 }))
     // Chaque lot porte ses lignes : le corps est relu sans type.
     expect(envoyes.map(({ adresse, type, corps }) => [adresse, type, corps?.table, (corps?.rows as unknown[]).length, corps?.create !== undefined])).toEqual([
-      ["/api/plateforme/tables/import", "application/json", "ventes/prospects_2026", 500, true],
-      ["/api/plateforme/tables/import", "application/json", "ventes/prospects_2026_2", 500, true],
-      ["/api/plateforme/tables/import", "application/json", "ventes/prospects_2026_2", 1, false],
+      ["/api/platform/tables/import", "application/json", "ventes/prospects_2026", 500, true],
+      ["/api/platform/tables/import", "application/json", "ventes/prospects_2026_2", 500, true],
+      ["/api/platform/tables/import", "application/json", "ventes/prospects_2026_2", 1, false],
     ])
     expect(envoyes[1].corps).toMatchObject({
       file_name: "Prospects 2026.csv",
@@ -342,9 +342,9 @@ describe("EditeurDeBlocs — convert a simple table (AC-b7)", () => {
     })
     await waitFor(() => expect(rafraichir).toHaveBeenCalled())
     expect(envoyes.map(({ adresse, corps }) => [adresse, corps])).toEqual([
-      ["/api/plateforme/nodes?path=ventes%2Fmodele_relance", null],
+      ["/api/platform/nodes?path=ventes%2Fmodele_relance", null],
       [
-        "/api/plateforme/tables/import",
+        "/api/platform/tables/import",
         {
           table: "ventes/modele_relance/objet",
           converted_from: "ventes/modele_relance",
@@ -357,7 +357,7 @@ describe("EditeurDeBlocs — convert a simple table (AC-b7)", () => {
           rows: [["Atelier", "12,5"], ["Forge", "3"]],
         },
       ],
-      ["/api/plateforme/nodes", { path: "ventes/modele_relance", base_revision: 4, publish: false, ops: [{ op: "replace_block", block: tableau.id, input: { type: "reference", text: null, data: { path: "ventes/modele_relance/objet" } } }] }],
+      ["/api/platform/nodes", { path: "ventes/modele_relance", base_revision: 4, publish: false, ops: [{ op: "replace_block", block: tableau.id, input: { type: "reference", text: null, data: { path: "ventes/modele_relance/objet" } } }] }],
     ])
   })
 
@@ -378,11 +378,11 @@ describe("EditeurDeBlocs — convert a simple table (AC-b7)", () => {
     await convertir()
     await waitFor(() => expect(rafraichir).toHaveBeenCalled())
     expect(envoyes.map(({ adresse, corps }) => [adresse, corps?.table ?? corps?.path ?? null, corps?.create !== undefined])).toEqual([
-      ["/api/plateforme/nodes?path=ventes%2Fmodele_relance", null, false],
-      ["/api/plateforme/tables/import", "ventes/modele_relance/objet", true],
-      ["/api/plateforme/nodes?path=ventes%2Fmodele_relance", null, false],
-      ["/api/plateforme/tables/import", "ventes/modele_relance/objet", false],
-      ["/api/plateforme/nodes", "ventes/modele_relance", false],
+      ["/api/platform/nodes?path=ventes%2Fmodele_relance", null, false],
+      ["/api/platform/tables/import", "ventes/modele_relance/objet", true],
+      ["/api/platform/nodes?path=ventes%2Fmodele_relance", null, false],
+      ["/api/platform/tables/import", "ventes/modele_relance/objet", false],
+      ["/api/platform/nodes", "ventes/modele_relance", false],
     ])
   })
 })

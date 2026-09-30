@@ -1,11 +1,11 @@
-// La page `/admin/organisation` et ses liens publics (E05-S10, AC-d7) : lus par `listShares` pour qui administre
+// La page `/admin/organization` et ses liens publics (E05-S10, AC-d7) : lus par `listShares` pour qui administre
 // l'organisation, jamais pour un membre. Session de l'hôte et services du paquet simulés ; `isOrgAdmin` et
 // l'écran sont les vrais.
 import { act, cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { readOrgView } from "@otomata_tech/oto_platform/api"
 import { listShares, type Identity, type PlatformDb } from "@otomata_tech/oto_platform/server"
-import OrganisationPage from "@/app/(dashboard)/admin/organisation/page"
+import OrganisationPage from "@/app/(dashboard)/admin/organization/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
 vi.mock("@/lib/plateforme/session", () => ({ getPlatformIdentitySafely: vi.fn() }))
@@ -57,7 +57,7 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe("/admin/organisation public links (AC-d7)", () => {
+describe("/admin/organization public links (AC-d7)", () => {
   it("should read the public links with the session's client for an administrator", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: identite("admin"), session: SESSION } })
     const page = await OrganisationPage({ searchParams: Promise.resolve({}) })

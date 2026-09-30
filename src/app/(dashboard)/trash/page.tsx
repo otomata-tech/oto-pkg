@@ -17,9 +17,9 @@ const ECHEC = { error: "Une erreur est survenue. Réessayez." } as const
 export default async function CorbeillePage() {
   // La session et l'appartenance se revérifient ici, hors de tout `try` : le layout n'est pas une
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
-  const identite = await getPlatformIdentitySafely("corbeille")
+  const identite = await getPlatformIdentitySafely("trash")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   const resultat = identite ? await resultatDe(listTrash(identite.data.session.db, identite.data.identity)) : ECHEC
   return <EcranDeLaCorbeille resultat={resultat} prefixeDesPages="/n/" />

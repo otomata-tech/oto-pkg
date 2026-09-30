@@ -18,7 +18,7 @@ export const consentDecisionSchema = z.object({
 
 /**
  * L'échec d'une décision, que le service rend, que l'hôte met dans l'adresse de la page
- * (`?erreur=`) et que l'écran affiche : la seule liste, toute autre valeur de l'adresse est ignorée.
+ * (`?error=`) et que l'écran affiche : la seule liste, toute autre valeur de l'adresse est ignorée.
  */
 export const decisionErrorSchema = z.enum(["decision"])
 

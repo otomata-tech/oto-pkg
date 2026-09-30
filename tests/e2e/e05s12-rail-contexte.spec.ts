@@ -32,7 +32,7 @@ async function handleDuCompte(page: Page): Promise<string> {
 async function envoyer(page: Page, ressource: string, corps: Record<string, string>): Promise<number> {
   return page.evaluate(
     async ({ ressource: route, corps: envoye }) =>
-      (await fetch(`/api/plateforme/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(envoye) })).status,
+      (await fetch(`/api/platform/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(envoye) })).status,
     { ressource, corps },
   )
 }

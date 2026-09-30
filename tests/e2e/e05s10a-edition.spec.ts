@@ -139,7 +139,7 @@ test.describe("édition sans friction (E05-S10, partie a)", () => {
 
         // Publiée seule (AC-a6) : la version publiée porte le texte, sans qu'aucun bouton n'ait été pressé.
         await attendre(async () => {
-          expect(await lireLeHtml(page, `/n/${essai}?version=publiee`)).toContain(horodatage)
+          expect(await lireLeHtml(page, `/n/${essai}?version=published`)).toContain(horodatage)
         }).toPass({ timeout: 90_000 })
         await geste(page, page.getByRole("button", { name: /^Actions sur ce bloc — Voir Qualifier/ }), "Supprimer")
         await attendre(statut(page, "Enregistrement…")).toHaveCount(0)

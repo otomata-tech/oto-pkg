@@ -1,11 +1,11 @@
-// La page `/profil` (E05-S11, AC-3 ; HN-E05S11-30) : ouverte à tout membre, la session revérifiée par la page
+// La page `/profile` (E05-S11, AC-3 ; HN-E05S11-30) : ouverte à tout membre, la session revérifiée par la page
 // (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`), la fiche tirée de l'identité
 // par `readProfile` (le vrai service : il ne lit pas la base), son refus dit par la phrase de la page. Session
 // de l'hôte simulée ; l'écran est le vrai.
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { Identity, PlatformDb } from "@otomata_tech/oto_platform/server"
-import ProfilPage, { metadata } from "@/app/(dashboard)/profil/page"
+import ProfilPage, { metadata } from "@/app/(dashboard)/profile/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 import { libellesDesChoix } from "../../helpers/liste-de-choix"
 
@@ -41,16 +41,16 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("/profil page", () => {
+describe("/profile page", () => {
   it("should send a visitor without a session to /login, and stay out of the index", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code: "unauthenticated" } })
     await expect(ProfilPage()).rejects.toThrow("NEXT_REDIRECT:/login")
     expect(metadata).toMatchObject({ title: "Profil", robots: { index: false } })
   })
 
-  it("should send a person who is not a member of the organisation to /aucune-organisation", async () => {
+  it("should send a person who is not a member of the organisation to /no-organization", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code: "not_member" } })
-    await expect(ProfilPage()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(ProfilPage()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
   })
 
   it("should say the profile failed when the identity cannot be resolved", async () => {

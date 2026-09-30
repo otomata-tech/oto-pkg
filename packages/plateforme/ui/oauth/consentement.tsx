@@ -27,7 +27,7 @@ type ConsentementProps = {
   resultat: ResultatDeConsentement
   /** Server Action de l'hôte : reçoit `authorization_id` et `decision` (`approve` ou `deny`). */
   decider: (formData: FormData) => void | Promise<void>
-  /** Échec de la décision précédente, lu par l'hôte dans son adresse (`?erreur=`). */
+  /** Échec de la décision précédente, lu par l'hôte dans son adresse (`?error=`). */
   erreur?: ErreurDeDecision
 }
 

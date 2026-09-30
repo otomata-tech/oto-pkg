@@ -113,7 +113,7 @@ afterEach(cleanup)
 
 describe("EcranDuJournal header (AC4, AC-d1)", () => {
   it("should title the screen, count the conversations and calls of the period, and choose the period in the header", () => {
-    rendre({ periode: "30", personne: CLAIRE, curseur: "suite", conversation: "K7M2-9QXR" }, { conversation: { data: DETAIL } })
+    rendre({ period: "30", person: CLAIRE, cursor: "suite", conversation: "K7M2-9QXR" }, { conversation: { data: DETAIL } })
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Journal")
     expect(screen.getByText("3 conversations · 27 appels")).toBeInTheDocument()
@@ -125,7 +125,7 @@ describe("EcranDuJournal header (AC4, AC-d1)", () => {
     ])
     // Une autre période garde les filtres, oublie la suite de la liste et la conversation ouverte.
     fireEvent.click(periodes[2])
-    expect(naviguer).toHaveBeenCalledWith(`/journal?periode=90&personne=${CLAIRE}`)
+    expect(naviguer).toHaveBeenCalledWith(`/journal?period=90&person=${CLAIRE}`)
   })
 })
 
@@ -138,9 +138,9 @@ describe("EcranDuJournal states (AC2)", () => {
 
   // Chaque lecture en échec se dit à sa place, jamais en liste vide (`portage-ecrans.md § 4`).
   it.each(["resultat", "conversation", "equipes", "personnes"] as const)("should say a failed %s read, with « Réessayer » to the same address", (prop) => {
-    rendre({ periode: "30", erreurs: "1", conversation: "K7M2-9QXR" }, { conversation: { data: DETAIL }, [prop]: { error: ECHEC } })
+    rendre({ period: "30", errors: "1", conversation: "K7M2-9QXR" }, { conversation: { data: DETAIL }, [prop]: { error: ECHEC } })
     expect(screen.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(lien("Réessayer")).toHaveAttribute("href", "/journal?periode=30&erreurs=1&conversation=K7M2-9QXR")
+    expect(lien("Réessayer")).toHaveAttribute("href", "/journal?period=30&errors=1&conversation=K7M2-9QXR")
     if (prop === "resultat") expect(screen.queryByRole("table")).toBeNull()
   })
 
@@ -150,7 +150,7 @@ describe("EcranDuJournal states (AC2)", () => {
     expect(screen.queryByRole("link", { name: "Retirer les filtres" })).toBeNull()
     cleanup()
 
-    rendre({ equipe: VENTES }, { resultat: { data: VIDE } })
+    rendre({ team: VENTES }, { resultat: { data: VIDE } })
     const retraits = screen.getAllByRole("link", { name: "Retirer les filtres" })
     expect(retraits).toHaveLength(2)
     for (const retrait of retraits) expect(retrait).toHaveAttribute("href", "/journal")
@@ -159,7 +159,7 @@ describe("EcranDuJournal states (AC2)", () => {
 
 describe("EcranDuJournal list (AC3, AC14)", () => {
   it("should show one row per conversation with its start, person, host, served procedure or request, calls, errors and an « Ouvrir » link keeping the filters", () => {
-    rendre({ periode: "30", personne: CLAIRE })
+    rendre({ period: "30", person: CLAIRE })
     const tableau = screen.getByRole("table", { name: "Conversations, la plus récente d'abord" })
     expect(within(tableau).getAllByRole("columnheader").map((entete) => [entete.textContent, entete.getAttribute("scope")])).toEqual(
       ["Début", "Personne", "Hôte", "Procédure servie", "Appels", "Erreurs", "Détail"].map((nom) => [nom, "col"]),
@@ -180,23 +180,23 @@ describe("EcranDuJournal list (AC3, AC14)", () => {
     expect(within(demande).getAllByRole("cell")[3]).toHaveTextContent("Aucune « Combien de prospects à Valbrune ? »")
     expect(within(sansContexte).getAllByRole("cell").map(texte).slice(1, 6)).toEqual(["Personne retirée", "—", "—", "9", "Aucune"])
     // « Ouvrir » garde les filtres et ouvre le tiroir de la conversation.
-    expect(lien("Ouvrir la conversation K7M2-9QXR")).toHaveAttribute("href", `/journal?periode=30&personne=${CLAIRE}&conversation=K7M2-9QXR`)
+    expect(lien("Ouvrir la conversation K7M2-9QXR")).toHaveAttribute("href", `/journal?period=30&person=${CLAIRE}&conversation=K7M2-9QXR`)
   })
 })
 
 describe("EcranDuJournal filters (AC4)", () => {
   it("should offer a labelled GET form over the teams and members, keep the period, and say an address value it did not understand", () => {
-    rendre({ periode: "12", equipe: VENTES, erreurs: "1" })
+    rendre({ period: "12", team: VENTES, errors: "1" })
     const formulaire = screen.getByRole<HTMLFormElement>("form", { name: "Filtrer le journal" })
     expect(formulaire).toHaveAttribute("method", "get")
     expect(formulaire).toHaveAttribute("action", "/journal")
     // Les noms que le formulaire envoie sont les paramètres de l'adresse que la page lit ; la période 12,
     // illisible, repart à 7 jours, et l'écran le dit.
     expect([...new FormData(formulaire).entries()]).toEqual([
-      ["periode", "7"],
-      ["equipe", VENTES],
-      ["personne", ""],
-      ["erreurs", "1"],
+      ["period", "7"],
+      ["team", VENTES],
+      ["person", ""],
+      ["errors", "1"],
     ])
     expect(screen.getByRole("radio", { name: "7 jours" })).toHaveAttribute("aria-checked", "true")
     expect(screen.getByText("Un filtre de l'adresse n'a pas été compris : il est ignoré.")).toBeInTheDocument()
@@ -211,15 +211,15 @@ describe("EcranDuJournal filters (AC4)", () => {
 
 describe("EcranDuJournal bounds and cursor (AC6)", () => {
   it("should offer older conversations, say the 2,000-call bound, and say a stale cursor", () => {
-    rendre({ curseur: "perime", conversation: "K7M2-9QXR" }, { resultat: { data: { ...PAGE, truncated: true, restarted: true, nextCursor: "suite-2" } }, conversation: { data: DETAIL } })
-    expect(lien("Conversations plus anciennes")).toHaveAttribute("href", "/journal?periode=7&curseur=suite-2&conversation=K7M2-9QXR")
+    rendre({ cursor: "perime", conversation: "K7M2-9QXR" }, { resultat: { data: { ...PAGE, truncated: true, restarted: true, nextCursor: "suite-2" } }, conversation: { data: DETAIL } })
+    expect(lien("Conversations plus anciennes")).toHaveAttribute("href", "/journal?period=7&cursor=suite-2&conversation=K7M2-9QXR")
     expect(screen.getByRole("status")).toHaveTextContent(
       "Cette liste s'arrête avant la finLa période compte plus de 2 000 appels : seuls les plus récents sont regroupés ici. Réduisez la période ou filtrez.",
     )
     expect(screen.getByText("La suite demandée n'est plus valable : la liste repart du début.")).toBeInTheDocument()
     // Le curseur périmé n'est pas recopié dans l'adresse qui ferme la conversation.
     fireEvent.click(screen.getByRole("button", { name: "Fermer le détail" }))
-    expect(naviguer).toHaveBeenCalledWith("/journal?periode=7")
+    expect(naviguer).toHaveBeenCalledWith("/journal?period=7")
   })
 })
 
@@ -238,7 +238,7 @@ describe("EcranDuJournal conversation (AC7)", () => {
     }
     expect(within(second).getByText("Arguments").tagName).toBe("SUMMARY")
     expect(second.querySelector("details pre")?.textContent).toBe(JSON.stringify(DETAIL.calls[1].args, null, 2))
-    expect(tiroir.getByRole("link", { name: "Appels suivants" })).toHaveAttribute("href", "/journal?periode=7&conversation=K7M2-9QXR&appels=apres-12")
+    expect(tiroir.getByRole("link", { name: "Appels suivants" })).toHaveAttribute("href", "/journal?period=7&conversation=K7M2-9QXR&calls=apres-12")
   })
 
   it.each([

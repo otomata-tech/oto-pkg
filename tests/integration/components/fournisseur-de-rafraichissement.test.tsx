@@ -55,7 +55,7 @@ describe("FournisseurDeRafraichissement, the host lent to the rail (E05-S09, AC-
     return (
       <>
         <p>{`${hote.chemin} ${hote.Lien === Link ? "next/link" : "autre lien"}`}</p>
-        <button type="button" onClick={() => hote.naviguer("/equipes")}>
+        <button type="button" onClick={() => hote.naviguer("/teams")}>
           Équipes
         </button>
         <button type="button" onClick={() => hote.deconnecter?.()}>
@@ -74,7 +74,7 @@ describe("FournisseurDeRafraichissement, the host lent to the rail (E05-S09, AC-
 
     expect(screen.getByText("/n/ventes next/link")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Équipes" }))
-    expect(routeur.push).toHaveBeenCalledWith("/equipes")
+    expect(routeur.push).toHaveBeenCalledWith("/teams")
     fireEvent.click(screen.getByRole("button", { name: "Déconnexion" }))
     expect(logoutAction).toHaveBeenCalledTimes(1)
   })

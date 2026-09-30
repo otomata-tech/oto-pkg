@@ -7,7 +7,7 @@ Texte complet : `.method/conventions/forms-patterns.md`. La fiche suffit pour é
 - `useForm` avec `zodResolver` et `mode: "onBlur"`, envoi dans `startTransition`, erreur de l'action posée par `setError("root")`, bouton désactivé pendant l'envoi. § Pattern standard
 - Un formulaire simple s'écrit `<form action={…}>` avec `useActionState` ; `useFormStatus` vit dans un composant placé dans le `<form>`. § Formulaire progressif (sans JavaScript)
 - Une mutation part par `action={}` ou par `handleSubmit` et une Server Action, jamais par `onSubmit` et `fetch("/api/…")`. § Formulaire progressif (sans JavaScript)
-- Exception des écrans du paquet : `handleSubmit`, puis `appelerPlateforme` vers `/api/plateforme/<ressource>`, message par `messageDErreur` ; aucun `fetch` écrit à la main dans `ui/` hors `ui/api/client.ts`. § Formulaire progressif (sans JavaScript)
+- Exception des écrans du paquet : `handleSubmit`, puis `appelerPlateforme` vers `/api/platform/<ressource>`, message par `messageDErreur` ; aucun `fetch` écrit à la main dans `ui/` hors `ui/api/client.ts`. § Formulaire progressif (sans JavaScript)
 - La table de `messageDErreur` a une phrase pour `not_member`, `unknown_org` et le 401 ; chaque refus de `resolveIdentity` a son cas dans `tests/unit/ui-messages.test.ts`. § Formulaire progressif (sans JavaScript)
 - Une validation asynchrone est un confort, avec un debounce (~400 ms) ; l'unicité tient par un `UNIQUE` en base, et l'action traduit `23505` en message. § Validation asynchrone (unicité, disponibilité)
 - Une mise à jour optimiste appelle `addOptimistic` dans la transition, rend et affiche `{ error }` en cas d'échec, et se réserve aux actions rapides rarement en échec. § Mise à jour optimiste

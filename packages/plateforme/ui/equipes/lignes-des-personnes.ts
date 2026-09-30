@@ -86,9 +86,9 @@ function repond(ligne: LigneDePersonne, recherche: string): boolean {
  */
 export function lignesDesPersonnes(membres: MemberView[], invitations: InvitationsLues | null, moi: Moi, reglages: ReglagesDesListes): LigneDePersonne[] {
   const noms = new Map(membres.map((membre) => [membre.userId, membre.name]))
-  const deMembres = reglages.filtre === "invitations" ? [] : membres.map(versLigneDeMembre)
+  const deMembres = reglages.filter === "invitations" ? [] : membres.map(versLigneDeMembre)
   const dInvitations = invitations ? versLignesDInvitation(invitations, noms, moi) : []
-  const sens = reglages.sens === "desc" ? -1 : 1
+  const sens = reglages.order === "desc" ? -1 : 1
   return [...deMembres, ...dInvitations]
     .filter((ligne) => repond(ligne, reglages.q))
     .sort((a, b) => sens * nomDeLaLigne(a).localeCompare(nomDeLaLigne(b), "fr"))

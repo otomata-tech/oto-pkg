@@ -1,6 +1,6 @@
 // La liste des procédures (E05-S04, AC9) : un tableau des procédures que la personne lit
 // (`listProcedures`, E03-S06 : droits décidés par le service, tri par chemin), filtrées par l'équipe
-// propriétaire en formulaire GET (`?equipe=`), leur état en toutes lettres, et les quatre états.
+// propriétaire en formulaire GET (`?team=`), leur état en toutes lettres, et les quatre états.
 // Server Component : la navigation vient de l'hôte (`Lien`, `hrefDuChemin`, `hrefDeLaListe`). Sans lui,
 // une procédure ne se retrouve que par l'arbre.
 //
@@ -24,7 +24,7 @@ type ListeDesProceduresProps = {
   resultat: Resultat<ProcedureSummary[]>
   /** Les équipes de l'organisation (`listTeams`) : les choix du filtre. */
   equipes: Resultat<Equipe[]>
-  /** `?equipe=`, lu par `proceduresSearchSchema`. */
+  /** `?team=`, lu par `proceduresSearchSchema`. */
   filtre: ProceduresSearch
   Lien: LienDeLHote
   hrefDuChemin: (chemin: string) => string
@@ -44,7 +44,7 @@ function FiltreDEquipe({ equipes, equipe, action, ici, Lien }: FiltreProps) {
         // Revenue sans rechargement à la liste entière (« Retirer le filtre »), la liste se remet à l'adresse.
         key={equipe ?? ""}
         id="procedures-equipe"
-        nom="equipe"
+        nom="team"
         libelle={LISTE.equipe}
         tous={LISTE.toutes}
         options={optionsDe(equipes, (une) => ({ id: une.id, nom: une.name }))}
@@ -85,9 +85,9 @@ type ProceduresProps = Omit<ListeDesProceduresProps, "resultat" | "equipes"> & {
 
 /** La liste filtrée par l'équipe propriétaire effective (H52), ou l'un de ses deux états vides. */
 function Procedures({ procedures, filtre, Lien, hrefDuChemin, hrefDeLaListe }: ProceduresProps) {
-  const listees = filtre.equipe === undefined ? procedures : procedures.filter((procedure) => procedure.ownerTeam?.id === filtre.equipe)
+  const listees = filtre.team === undefined ? procedures : procedures.filter((procedure) => procedure.ownerTeam?.id === filtre.team)
   if (listees.length > 0) return <Tableau procedures={listees} Lien={Lien} hrefDuChemin={hrefDuChemin} />
-  if (filtre.equipe === undefined) return <p className="text-sm text-ink">{LISTE.aucune}</p>
+  if (filtre.team === undefined) return <p className="text-sm text-ink">{LISTE.aucune}</p>
   return (
     <div className="space-y-2">
       <p className="text-sm text-ink">{LISTE.aucunePourLEquipe}</p>
@@ -103,7 +103,7 @@ export function ListeDesProcedures({ resultat, equipes, ...props }: ListeDesProc
   return (
     <section className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight text-ink">{LISTE.titre}</h1>
-      <FiltreDEquipe equipes={equipes} equipe={props.filtre.equipe} action={props.hrefDeLaListe({})} ici={ici} Lien={props.Lien} />
+      <FiltreDEquipe equipes={equipes} equipe={props.filtre.team} action={props.hrefDeLaListe({})} ici={ici} Lien={props.Lien} />
       {resultat.error !== undefined ? <ErreurDeLecture message={resultat.error} href={ici} Lien={props.Lien} /> : <Procedures procedures={resultat.data} {...props} />}
     </section>
   )

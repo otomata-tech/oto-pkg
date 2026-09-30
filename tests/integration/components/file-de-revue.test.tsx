@@ -1,6 +1,6 @@
 // La file de revue d'un tableau (E07-S03, AC10 à AC14), portée sur l'îlot d'attente d'oto-frontend (E05-S09
 // partie c2, AC-c2) : `TableauDuNoeud` avec sa file, sous le fournisseur de relecture de l'hôte (espionné) ;
-// `fetch` simulé pour `POST /api/plateforme/tables/review`, presse-papiers simulé ; une relecture se joue en
+// `fetch` simulé pour `POST /api/platform/tables/review`, presse-papiers simulé ; une relecture se joue en
 // rerendant l'écran avec la file relue. Seule la date est figée.
 import type { ReactNode } from "react"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -249,7 +249,7 @@ describe("DecisionDeRevue, a decision (AC11)", () => {
     await act(async () => relacher())
     await waitFor(() => expect(statut()).toHaveTextContent("P-003 → qualifié."))
     expect(envoyes).toEqual([{ table: CHEMIN, key: "P-003", revision: 4, decision: "approve", reason: "Élus rencontrés" }])
-    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/plateforme/tables/review")
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/platform/tables/review")
     expect(rafraichir).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("region", { name: "À revoir" })))
     expect(raison()).toHaveValue("")

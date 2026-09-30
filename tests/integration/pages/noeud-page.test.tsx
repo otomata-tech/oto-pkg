@@ -127,9 +127,9 @@ describe("/n/[...chemin] page session and addresses (AC1)", () => {
     expect(loadNode).not.toHaveBeenCalled()
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation, reading nothing", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization, reading nothing", async (code) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code } })
-    await expect(page(["ventes"])).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(page(["ventes"])).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(loadNode).not.toHaveBeenCalled()
   })
 
@@ -165,13 +165,20 @@ describe("/n/[...chemin] page reads (AC9, AC19, AC22)", () => {
     expect(within(titre.closest("details") ?? document.body).getByRole("link", { name: /^Guide du conseil/ })).toHaveAttribute("href", "/n/conseil/guide")
   })
 
-  it("should show a writer the published version on ?version=publiee", async () => {
+  it("should show a writer the published version on ?version=published", async () => {
     const draft = { baseRevision: 4, savedAt: "2026-09-24T10:00:00Z", draftStamp: "2026-09-24T10:00:00.000000+00:00", blocks: PAGE, title: null, summary: null, kind: null, meta: null }
     vi.mocked(loadNode).mockResolvedValue(vueDuNoeud({ level: 2, draft }))
-    await monter(await page(["ventes", "modele_relance"], { version: "publiee" }))
+    await monter(await page(["ventes", "modele_relance"], { version: "published" }))
     expect(screen.getByText("Version publiée (révision 4).")).toBeInTheDocument()
     // La version publiée se lit : aucun champ de bloc (E05-S08, AC1).
     expect(screen.queryByRole("textbox", { name: /^Modifier / })).toBeNull()
+  })
+
+  it("should show the draft on the former French value of version, like any unknown value (E11-S07, AC-b5)", async () => {
+    const draft = { baseRevision: 4, savedAt: "2026-09-24T10:00:00Z", draftStamp: "2026-09-24T10:00:00.000000+00:00", blocks: PAGE, title: null, summary: null, kind: null, meta: null }
+    vi.mocked(loadNode).mockResolvedValue(vueDuNoeud({ level: 2, draft }))
+    await monter(await page(["ventes", "modele_relance"], { version: "publiee" }))
+    expect(screen.queryByText("Version publiée (révision 4).")).toBeNull()
   })
 
   // `gestionAccordable` vient du rôle : réduit à `true`, un responsable non administrateur accorderait l'accès complet.
@@ -213,10 +220,10 @@ describe("/n/[...chemin] page not found and failures (AC6, AC7)", () => {
     ["the members", "Ventes", () => vi.mocked(listMembers).mockRejectedValue(new Error("panne"))],
   ])("should say a failed read of %s in « Partager », with « Réessayer » on the same address", async (_lecture, section, enPanne) => {
     enPanne()
-    await monter(await page(["ventes", "modele_relance"], { version: "publiee" }))
+    await monter(await page(["ventes", "modele_relance"], { version: "published" }))
     const repli = ouvrirLePartage(section)
     expect(repli.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(repli.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=publiee")
+    expect(repli.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=published")
     expect(repli.queryByRole("combobox")).toBeNull()
   })
 
@@ -298,7 +305,7 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     expect(note.getByText(recu)).toBeInTheDocument()
     const encart = within(screen.getByRole("note", { name: "Voici ce que votre agent va lire" }))
     // E11-S10 (AC-e4, AC-g2) : chaque ligne mène à `/context#<ancre>`, sans « Règles Oto » ; l'ancre garde son rang d'origine.
-    expect(encart.getByRole("link", { name: /^Contexte : Tout le monde/ })).toHaveAttribute("href", "/context#contexte-tout-le-monde")
+    expect(encart.getByRole("link", { name: /^Contexte : Tout le monde/ })).toHaveAttribute("href", "/context#everyone-context")
     expect(encart.queryByRole("link", { name: "Règles Oto" })).toBeNull()
     expect(screen.queryByRole("region", { name: "Ma fiche" })).toBeNull()
   })

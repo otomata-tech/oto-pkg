@@ -14,7 +14,7 @@ import { identityOf } from "../helpers/reference-org"
 import { simulatedDb } from "../helpers/simulated-db"
 
 const root = path.resolve(__dirname, "../..")
-const GATES = ["src/app/api/mcp/route.ts", "src/app/api/mcp-admin/route.ts", "src/app/api/plateforme/[...route]/route.ts"]
+const GATES = ["src/app/api/mcp/route.ts", "src/app/api/mcp-admin/route.ts", "src/app/api/platform/[...route]/route.ts"]
 
 /** Une route qui monte une porte du paquet : elle importe sa face `mcp` ou `api`. */
 const mountsGate = (text: string) => /from\s+["']@otomata_tech\/oto_platform\/(?:mcp|api)["']/.test(text)

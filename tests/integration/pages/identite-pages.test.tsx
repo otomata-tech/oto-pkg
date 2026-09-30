@@ -1,13 +1,13 @@
 // Les écrans qui dépendent de l'identité par l'adresse (E02-S01, AC25, AC26), services du paquet et
 // session de l'hôte simulés : chaque branche de rendu et de redirection. La page de montage du
 // formulaire d'invitation d'E02-S01 (AC29) est retirée par E05-S03 : son formulaire vit dans l'onglet
-// « Membres » de `/equipes` (`tests/integration/components/ecran-equipes.test.tsx`).
+// « Membres » de `/teams` (`tests/integration/components/ecran-equipes.test.tsx`).
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { orgContact, resolveOrg, type Identity, type PlatformDb } from "@otomata_tech/oto_platform/server"
 import { useRafraichir } from "@otomata_tech/oto_platform/ui"
 import DashboardLayout from "@/app/(dashboard)/layout"
-import AucuneOrganisationPage, { metadata as aucuneOrganisationMetadata } from "@/app/aucune-organisation/page"
+import AucuneOrganisationPage, { metadata as aucuneOrganisationMetadata } from "@/app/no-organization/page"
 import { getPlatformIdentitySafely, getPlatformSession, type PlatformSession } from "@/lib/plateforme/session"
 
 vi.mock("@/lib/plateforme/session", () => ({
@@ -85,10 +85,10 @@ describe("(dashboard) layout (AC25)", () => {
     expect(menuDuCompte("claire")).toContain("Déconnexion")
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization", async (code) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code } })
 
-    await expect(DashboardLayout({ children: <p>Contenu</p> })).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(DashboardLayout({ children: <p>Contenu</p> })).rejects.toThrow("NEXT_REDIRECT:/no-organization")
   })
 
   it("should keep the rail without the organisation name, and say its tree, when the identity is unavailable", async () => {
@@ -125,7 +125,7 @@ describe("(dashboard) layout navigation and re-read (E05-S03, AC3 ; E05-S09, AC-
     expect(within(screen.getByRole("main")).getByText("Contenu")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /^Entreprise : Acme Énergies/ }))
     fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Équipes & accès" }))
-    expect(push).toHaveBeenCalledWith("/equipes")
+    expect(push).toHaveBeenCalledWith("/teams")
   })
 
   it("should have the host router re-read the page when an island of a screen asks for it", async () => {
@@ -138,7 +138,7 @@ describe("(dashboard) layout navigation and re-read (E05-S03, AC3 ; E05-S09, AC-
   })
 })
 
-describe("/aucune-organisation page (AC26)", () => {
+describe("/no-organization page (AC26)", () => {
   it("should send a member of the address back to /", async () => {
     vi.mocked(getPlatformSession).mockResolvedValue(SESSION)
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(membre())

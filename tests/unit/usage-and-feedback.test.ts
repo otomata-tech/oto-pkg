@@ -130,7 +130,7 @@ describe.skipIf(!sqlConfigured)(portable("usage and feedback services on a real 
     it("should count the window's calls of the organisation only, and name only the procedures the caller reads", async () => {
       await ref.write({ journal: usageLines() })
 
-      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { periode: 7 })
+      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { period: 7 })
 
       expect(usage).toMatchObject({ periode: 7, team: null, truncated: false, coveredFrom: null, totals: { calls: 3, conversations: 3, people: 3, errors: 0 } })
       // La procédure de l'espace de Claire est servie à Paul : ni nommée, ni comptée, ni « sans procédure ».
@@ -145,11 +145,11 @@ describe.skipIf(!sqlConfigured)(portable("usage and feedback services on a real 
       await ref.write({ journal: usageLines() })
       const db = await ref.db("ada")
 
-      const ventes = await usageSummary(db, ref.identityOf("ada"), { periode: 7, equipe: ref.id(TEAMS.ventes.id) })
+      const ventes = await usageSummary(db, ref.identityOf("ada"), { period: 7, team: ref.id(TEAMS.ventes.id) })
       expect(ref.readable(ventes.team)).toEqual({ id: TEAMS.ventes.id, name: "Ventes" })
       expect(ventes.totals).toMatchObject({ calls: 2, people: 2 })
 
-      const unknown = await usageSummary(db, ref.identityOf("ada"), { periode: 7, equipe: "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02" })
+      const unknown = await usageSummary(db, ref.identityOf("ada"), { period: 7, team: "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02" })
       expect(unknown.team).toBeNull()
       expect(unknown.totals.calls).toBe(3)
     })
@@ -179,7 +179,7 @@ describe.skipIf(!sqlConfigured)(portable("usage and feedback services on a real 
           }),
         ],
       })
-      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { periode: 7 })
+      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { period: 7 })
       expect(ref.readable(usage.unmatched.items.map((item) => [item.ctx, item.phrase]))).toEqual([
         ["CLA3-0001", "private/claire"],
         ["CLA1-0001", "Combien de prospects à Valbrune ?"],
@@ -203,7 +203,7 @@ describe.skipIf(!sqlConfigured)(portable("usage and feedback services on a real 
           },
         ],
       })
-      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { periode: 7 })
+      const usage = await usageSummary(await ref.db("ada"), ref.identityOf("ada"), { period: 7 })
       expect(usage.functions.map((entry) => [entry.name, entry.lastError?.message])).toEqual([
         ["table.rows", "not_found: Unknown table ventes/suivi. Tables you can read: private/lea, private/marc, ventes/prospects."],
       ])
@@ -359,7 +359,7 @@ describe.skipIf(!sqlConfigured)(portable("usage and feedback services on a real 
       const lea = ref.identityOf("lea")
       const who = "the administrators of Acme Test (Ada Martin)"
 
-      await expect(usageSummary(spy.db, lea, { periode: 30 })).rejects.toMatchObject({ code: "forbidden", message: `Reading the usage of Acme Test is reserved to ${who}. Ask them.` })
+      await expect(usageSummary(spy.db, lea, { period: 30 })).rejects.toMatchObject({ code: "forbidden", message: `Reading the usage of Acme Test is reserved to ${who}. Ask them.` })
       await expect(listFeedback(spy.db, lea, { days: 30 })).rejects.toMatchObject({ code: "forbidden" })
       await expect(setFeedbackState(spy.db, lea, { ticket: "FB-0001", state: "resolved" })).rejects.toMatchObject({ code: "forbidden" })
 

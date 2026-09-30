@@ -146,7 +146,7 @@ describe("/p/<jeton>/<chemin>?view=<id> (AC-c5)", () => {
   it("should read the blocks' files through the link's routes", async () => {
     vi.mocked(readPublicNode).mockResolvedValue(VUE)
     await monter(publique({}))
-    expect(screen.getByRole("link", { name: "Voir devis.pdf (nouvel onglet)" })).toHaveAttribute("href", `/api/plateforme/public/${JETON}/files/${ID}?disposition=inline`)
+    expect(screen.getByRole("link", { name: "Voir devis.pdf (nouvel onglet)" })).toHaveAttribute("href", `/api/platform/public/${JETON}/files/${ID}?disposition=inline`)
     expect(publicFileView).not.toHaveBeenCalled()
   })
 
@@ -156,7 +156,7 @@ describe("/p/<jeton>/<chemin>?view=<id> (AC-c5)", () => {
     await monter(publique({ view: ID }))
     expect(publicFileView).toHaveBeenCalledWith(HOTE, JETON, { path: "ventes/rapports", file: ID })
     expect(screen.getByRole("note")).toHaveTextContent("Contenu interactif publié par Démo. N'y saisissez jamais de mot de passe.")
-    expect(screen.getByTitle("rapport.html")).toHaveAttribute("src", `/api/plateforme/public/${JETON}/files/${ID}/html`)
+    expect(screen.getByTitle("rapport.html")).toHaveAttribute("src", `/api/platform/public/${JETON}/files/${ID}/html`)
     expect(screen.getByRole("link", { name: "Ouvrir la page Rapports" })).toHaveAttribute("href", `/p/${JETON}`)
   })
 

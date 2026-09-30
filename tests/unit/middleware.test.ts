@@ -61,16 +61,16 @@ describe("middleware without a session (AC7)", () => {
   })
 
   it("should keep the current redirect of a POST: /login, without way back", async () => {
-    const response = await middleware(requete("/plateforme/invitations", "POST"))
+    const response = await middleware(requete("/platform/invitations", "POST"))
 
     expect(response.status).toBe(307)
     expect(response.headers.get("location")).toBe(`${ORIGIN}/login`)
   })
 
   it("should keep the query of a POST on /login, as before", async () => {
-    const response = await middleware(requete("/plateforme/invitations?equipe=ventes", "POST"))
+    const response = await middleware(requete("/platform/invitations?team=ventes", "POST"))
 
-    expect(response.headers.get("location")).toBe(`${ORIGIN}/login?equipe=ventes`)
+    expect(response.headers.get("location")).toBe(`${ORIGIN}/login?team=ventes`)
   })
 
   // Redirigé, le POST de la Server Action serait rejoué sur `/login`, qui rend `{}` : page d'erreur
@@ -89,6 +89,8 @@ describe("middleware without a session (AC7)", () => {
   it.each([
     "/login?redirect=%2Foauth%2Fconsent",
     "/auth/callback?code=abc",
+    // E11-S07 (AC-a4) : le lien de l'email, sous son adresse anglaise.
+    "/auth/confirm?token_hash=abc&type=email&next=/",
     "/api/mcp",
     "/.well-known/oauth-protected-resource/api/mcp",
     "/.well-known/oauth-protected-resource",

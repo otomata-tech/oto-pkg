@@ -50,7 +50,7 @@ import { loginPath } from "@/lib/schemas/auth"
 
 // Les pages de l'arbre (E05-S02) : la page lit le nœud, l'arbre visible, les équipes, les membres et
 // les règles du nœud avec le jeton de la session, en parallèle, chacun par `resultatDe` ; l'écran
-// envoie ses écritures à `/api/plateforme/nodes` et demande la relecture au fournisseur du layout.
+// envoie ses écritures à `/api/platform/nodes` et demande la relecture au fournisseur du layout.
 // E05-S10 (partie b) : les règles, les équipes et les membres vont au panneau « Partager » de l'écran
 // (AC-b5) ; les liens du nœud (ses encarts, E11-S05, AC-e1), lus par `nodeLinks` dès le chemin connu, arrivent
 // après la page, sous leur `<Suspense>` (M58). E05-S10 (partie c) : l'arbre et les équipes sont ceux que le
@@ -272,11 +272,11 @@ export default async function NoeudPage({ params, searchParams }: Parametres) {
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
   const identite = await getPlatformIdentitySafely("n/[...chemin]")
   if (identite?.error?.code === "unauthenticated") redirect(loginPath(hrefDuChemin(segments.join("/"))))
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   const chemin = cheminDe(segments)
   const parametres = await searchParams
-  const versionPubliee = nodeVersionParamSchema.parse(parametres.version) === "publiee"
+  const versionPubliee = nodeVersionParamSchema.parse(parametres.version) === "published"
   const commun = { chemin: chemin ?? segments.join("/"), versionPubliee, Lien: Link, hrefDuChemin, prefixeDesPages: PREFIXE }
   if (!identite) return <EcranDeNoeud {...commun} nomOrganisation="l'organisation" handle={null} noeud={ECHEC} arbre={ECHEC} equipes={ECHEC} />
 
@@ -287,7 +287,7 @@ export default async function NoeudPage({ params, searchParams }: Parametres) {
   // montre alors pas ces liens.
   const liensLus = chemin ? resultatDe(sauf404(nodeLinks(session.db, identity, { path: chemin })).then((lus) => lus ?? {})) : undefined
   const lu = await lire(session.db, identity, chemin)
-  const ici = `${hrefDuChemin(commun.chemin)}${versionPubliee ? "?version=publiee" : ""}`
+  const ici = `${hrefDuChemin(commun.chemin)}${versionPubliee ? "?version=published" : ""}`
   const partage = lu.regles && lu.noeud.data ? { regles: lu.regles, sujets: sujetsDe(lu), gestionAccordable: identity.member.role === "admin", moi: identity.user.id } : undefined
   const vue = lu.noeud.data ?? null
   // La visionneuse d'un fichier joint (E10-S02, AC-c2) : le service décide ; un tableau n'a pas de fichier à voir.

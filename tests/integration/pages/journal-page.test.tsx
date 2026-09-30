@@ -70,18 +70,25 @@ describe("/journal page", () => {
 
   it("should say the list failed, with « Réessayer » to the same address, when the identity cannot be resolved (AC2)", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(null)
-    render(await page({ periode: "30" }))
+    render(await page({ period: "30" }))
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Journal")
     const alertes = screen.getAllByRole("alert")
     expect(alertes).toHaveLength(3)
     for (const alerte of alertes) expect(alerte).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(screen.getAllByRole("link", { name: "Réessayer" })[0]).toHaveAttribute("href", "/journal?periode=30")
+    expect(screen.getAllByRole("link", { name: "Réessayer" })[0]).toHaveAttribute("href", "/journal?period=30")
     expect(listConversations).not.toHaveBeenCalled()
+  })
+
+  it("should ignore a former French parameter like any unknown one, without a notice (E11-S07, AC-b3)", async () => {
+    vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: IDENTITE, session: SESSION } })
+    render(await page({ periode: "30", personne: CLAIRE, erreurs: "1" }))
+    expect(listConversations).toHaveBeenCalledWith(SESSION.db, IDENTITE, { periodDays: 7, teamId: undefined, userId: undefined, errorsOnly: false, cursor: undefined })
+    expect(screen.queryByText("Un filtre de l'adresse n'a pas été compris : il est ignoré.")).toBeNull()
   })
 
   it("should pass the filters of the address to the services, with the session's client (AC4)", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: IDENTITE, session: SESSION } })
-    render(await page({ periode: "30", equipe: VENTES, personne: CLAIRE, erreurs: "1", curseur: "c-2", conversation: "K7M2-9QXR", appels: "a-1" }))
+    render(await page({ period: "30", team: VENTES, person: CLAIRE, errors: "1", cursor: "c-2", conversation: "K7M2-9QXR", calls: "a-1" }))
     expect(listConversations).toHaveBeenCalledWith(SESSION.db, IDENTITE, { periodDays: 30, teamId: VENTES, userId: CLAIRE, errorsOnly: true, cursor: "c-2" })
     expect(getConversation).toHaveBeenCalledWith(SESSION.db, IDENTITE, "K7M2-9QXR", { cursor: "a-1" })
     expect(screen.getByRole("dialog", { name: "Conversation" })).toHaveTextContent("Cette conversation n'existe pas ou ne vous est pas visible.")

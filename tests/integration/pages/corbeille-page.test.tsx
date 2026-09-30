@@ -1,11 +1,11 @@
-// La page `/corbeille` (E05-S10, partie b2, AC-b11) : la session revérifiée par la page
+// La page `/trash` (E05-S10, partie b2, AC-b11) : la session revérifiée par la page
 // (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`), puis `listTrash` lu avec le
 // client de la session ; une panne de l'identité ou un refus du service se disent dans l'écran. Session de
 // l'hôte et service du paquet simulés ; l'écran est le vrai.
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { listTrash, PlatformError, type Identity, type PlatformDb } from "@otomata_tech/oto_platform/server"
-import CorbeillePage, { metadata } from "@/app/(dashboard)/corbeille/page"
+import CorbeillePage, { metadata } from "@/app/(dashboard)/trash/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
 vi.mock("@/lib/plateforme/session", () => ({ getPlatformIdentitySafely: vi.fn() }))
@@ -46,7 +46,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe("/corbeille page", () => {
+describe("/trash page", () => {
   it("should send a visitor without a session to /login, reading nothing, and stay out of the index", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code: "unauthenticated" } })
     await expect(CorbeillePage()).rejects.toThrow("NEXT_REDIRECT:/login")
@@ -54,9 +54,9 @@ describe("/corbeille page", () => {
     expect(metadata).toMatchObject({ title: "Corbeille", robots: { index: false } })
   })
 
-  it("should send a person who is not a member of the organisation to /aucune-organisation, reading nothing", async () => {
+  it("should send a person who is not a member of the organisation to /no-organization, reading nothing", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code: "not_member" } })
-    await expect(CorbeillePage()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(CorbeillePage()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(listTrash).not.toHaveBeenCalled()
   })
 

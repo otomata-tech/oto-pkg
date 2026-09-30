@@ -1,6 +1,6 @@
 // « Accès plateforme » du tableau de bord (E08-S03, AC9 ; fiche D2) : les accès de l'équipe plateforme à
 // l'organisation, révocables, et les membres qu'elle a ajoutés, par `AccesPlateforme` d'E05-S03, le même
-// panneau que l'onglet de `/equipes`. Server Component. Sans lui, la page de l'hôte composait elle-même
+// panneau que l'onglet de `/teams`. Server Component. Sans lui, la page de l'hôte composait elle-même
 // l'en-tête et l'îlot du design system, que `ui/` n'exporte pas.
 //
 // Absent d'oto-frontend, qui n'a pas de rôle plateforme : posé sur la grammaire de ses écrans de réglages

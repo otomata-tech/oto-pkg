@@ -69,7 +69,7 @@ export const PHRASE_MAX_CHARS = 2000
  */
 export const previewSearchSchema = z.object({ phrase: z.string().trim().min(1).max(PHRASE_MAX_CHARS).optional().catch(undefined) })
 
-/** `?equipe=` de la liste des procédures (E05-S04, AC9) : un identifiant d'équipe, ignoré s'il est illisible. */
-export const proceduresSearchSchema = z.object({ equipe: z.uuid().optional().catch(undefined) })
+/** `?team=` de la liste des procédures (E05-S04, AC9 ; en anglais, E11-S07) : un identifiant d'équipe, ignoré s'il est illisible. */
+export const proceduresSearchSchema = z.object({ team: z.uuid().optional().catch(undefined) })
 
 export type ProceduresSearch = z.output<typeof proceduresSearchSchema>

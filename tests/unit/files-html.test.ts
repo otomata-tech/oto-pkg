@@ -71,7 +71,7 @@ describe("routes served before the session token (AC-c3, AC-c5)", () => {
 
   it("should answer 401 forbidden in plain text, with the isolation headers, to a request without a session, verifying nothing", async () => {
     const verifyToken = vi.fn()
-    const response = await fileHtmlResponse(new Request(`https://demo.oto.test/api/plateforme/files/${FICHIER}/html`), { accessToken: null, host: "demo.oto.test", verifyToken }, ["files", FICHIER, "html"])
+    const response = await fileHtmlResponse(new Request(`https://demo.oto.test/api/platform/files/${FICHIER}/html`), { accessToken: null, host: "demo.oto.test", verifyToken }, ["files", FICHIER, "html"])
     expect({ status: response.status, body: await response.text(), headers: Object.fromEntries(response.headers) }).toEqual({
       status: 401,
       body: "forbidden: Authentication required.",
@@ -82,7 +82,7 @@ describe("routes served before the session token (AC-c3, AC-c5)", () => {
 
   it("should answer 401 in plain text to a token that does not verify", async () => {
     const response = await fileHtmlResponse(
-      new Request(`https://demo.oto.test/api/plateforme/files/${FICHIER}/html`),
+      new Request(`https://demo.oto.test/api/platform/files/${FICHIER}/html`),
       { accessToken: "jeton-refuse", host: "demo.oto.test", verifyToken: async () => undefined },
       ["files", FICHIER, "html"],
     )

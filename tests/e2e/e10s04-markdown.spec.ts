@@ -29,11 +29,11 @@ const COMPTE_RENDU = [
 /** Les marques qui ne doivent jamais se lire à l'écran. */
 const BALISAGE = ["~~", "<br", "| :---", "<details", "<summary", "###", "**", "\\|"]
 
-/** Écrit et publie la page par `POST /api/plateforme/nodes`, depuis la page connectée (même origine, même session). */
+/** Écrit et publie la page par `POST /api/platform/nodes`, depuis la page connectée (même origine, même session). */
 async function ecrireLaPage(page: Page, chemin: string): Promise<void> {
   const issue = await page.evaluate(
     async (corps) => {
-      const reponse = await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+      const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
       return reponse.ok ? "écrite" : await reponse.text()
     },
     { path: chemin, title: "Compte rendu en markdown", summary: "Page jetable du contrôle visuel d'E10-S04.", publish: true, ops: [{ op: "add_section", section: "Réunion", text: COMPTE_RENDU }] },
@@ -58,7 +58,7 @@ test.describe("page écrite en markdown par un assistant (E10-S04)", () => {
         await seConnecterSurLEspace(page, { email, password })
         const chemin = `${EQUIPE.slug}/essai_e10s04_${randomBytes(3).toString("hex")}`
         await ecrireLaPage(page, chemin)
-        await page.goto(`${ESPACE.adresse}/n/${chemin}?version=publiee`)
+        await page.goto(`${ESPACE.adresse}/n/${chemin}?version=published`)
         const tableau = page.getByRole("table")
         await attendre(tableau).toBeVisible()
 

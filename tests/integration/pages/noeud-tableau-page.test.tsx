@@ -113,7 +113,7 @@ afterEach(() => {
 
 describe("/n/[...chemin] page of a table (AC1, AC4 à AC8, AC10)", () => {
   it("should read the rows, the summary and the queue with the settings of the address, and show the meta, the queue and the grid", async () => {
-    await montrer(await page(["ventes", "suivi_prospects"], { q: "valbrune", tri: "-montant_estime", f: "ville:contient:Valbrune", n: "40" }))
+    await montrer(await page(["ventes", "suivi_prospects"], { q: "valbrune", sort: "-montant_estime", f: "ville:contains:Valbrune", n: "40" }))
 
     const lecture = [SESSION.db, IDENTITE] as const
     const selection = { table: TABLEAU, filter: { ville: { contains: "Valbrune" } }, q: "valbrune" }
@@ -153,8 +153,8 @@ describe("/n/[...chemin] page of a table (AC1, AC4 à AC8, AC10)", () => {
   })
 
   it("should rewrite the fields of a « Filtrer » form into f by a redirection, and read no queue without review", async () => {
-    await expect(page(["ventes", "suivi_prospects"], { tri: "ref", colonne: "ville", contient: "Valbrune", presence: "" })).rejects.toThrow(
-      "NEXT_REDIRECT:/n/ventes/suivi_prospects?tri=ref&f=ville%3Acontient%3AValbrune",
+    await expect(page(["ventes", "suivi_prospects"], { sort: "ref", column: "ville", contains: "Valbrune", presence: "" })).rejects.toThrow(
+      "NEXT_REDIRECT:/n/ventes/suivi_prospects?sort=ref&f=ville%3Acontains%3AValbrune",
     )
     expect(tableGridRows).not.toHaveBeenCalled()
     vi.mocked(loadNode).mockResolvedValue(tableau({ meta: { ...ENTETE, lifecycle: { column: "statut", states: STATES, working: "en cours" } } }))
@@ -215,7 +215,7 @@ describe("/n/[...chemin] page with reference blocks (AC15, AC16)", () => {
     expect(screen.getByRole("link", { name: "Autre grille" })).toHaveAttribute("href", "/n/conseil/autre_grille")
     cleanup()
 
-    render(await page(["ventes", "prospects_valbrune"], { version: "publiee" }))
+    render(await page(["ventes", "prospects_valbrune"], { version: "published" }))
     expect(resolveReferencesForScreen).toHaveBeenLastCalledWith(SESSION.db, IDENTITE, [publie])
     vi.mocked(loadNode).mockResolvedValue(vueDuNoeud({ level: 2 }))
     vi.mocked(resolveReferencesForScreen).mockClear()

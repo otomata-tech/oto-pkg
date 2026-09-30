@@ -30,7 +30,7 @@ const champsDeConnexion = loginSchema.pick({ email: true, password: true })
 type ChampsDeConnexion = z.infer<typeof champsDeConnexion>
 
 type FormulaireDeConnexionProps = {
-  /** `error=auth_callback_error` : `/auth/confirmer` ou `/auth/callback` a refusé le lien de l'email. */
+  /** `error=auth_callback_error` : `/auth/confirm` ou `/auth/callback` a refusé le lien de l'email. */
   searchParams?: Promise<{ error?: string | string[] }>
   /** La page où revenir après la connexion, déjà validée par la page serveur (E02-S02). */
   retour?: string

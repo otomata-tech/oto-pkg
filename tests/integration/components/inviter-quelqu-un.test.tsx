@@ -79,7 +79,7 @@ describe("InviterQuelquUn submission", () => {
     )
     expect(screen.getByLabelText("Adresse email")).toHaveValue("")
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe("/api/plateforme/invitations")
+    expect(url).toBe("/api/platform/invitations")
     expect(init?.method).toBe("POST")
     expect(JSON.parse(String(init?.body))).toEqual({ email: "new@x.test", role: "member", teamId: SUPPORT.id })
   })

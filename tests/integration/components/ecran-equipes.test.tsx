@@ -72,20 +72,20 @@ function LienDeTest({ href, children, ...props }: AnchorHTMLAttributes<HTMLAncho
 
 /** L'adresse d'un onglet, réglages compris, comme la page de l'hôte la construit. */
 function hrefDOnglet(onglet: string, reglages: Partial<ReglagesDesListes> = {}): string {
-  const recherche = new URLSearchParams({ onglet })
+  const recherche = new URLSearchParams({ tab: onglet })
   if (reglages.q) recherche.set("q", reglages.q)
-  if (reglages.filtre) recherche.set("filtre", reglages.filtre)
-  if (reglages.tri) recherche.set("tri", reglages.tri)
-  if (reglages.sens === "desc") recherche.set("sens", "desc")
-  return `/equipes?${recherche.toString()}`
+  if (reglages.filter) recherche.set("filter", reglages.filter)
+  if (reglages.sort) recherche.set("sort", reglages.sort)
+  if (reglages.order === "desc") recherche.set("order", "desc")
+  return `/teams?${recherche.toString()}`
 }
 
 function rendre(props: Partial<EcranEquipesProps> = {}) {
   return render(
     <CoquilleOto pleinePage>
-      <ContexteDeLHote.Provider value={{ Lien: LienDeTest, chemin: "/equipes", naviguer: hote.naviguer }}>
+      <ContexteDeLHote.Provider value={{ Lien: LienDeTest, chemin: "/teams", naviguer: hote.naviguer }}>
         <EcranEquipes
-          onglet="membres"
+          onglet="members"
           nomOrganisation="Démo"
           moi={ADMIN}
           membres={{ data: MEMBRES }}
@@ -141,7 +141,7 @@ describe("EcranEquipes header and tabs (AC1, AC-d1)", () => {
     expect(equipes).toHaveFocus()
     expect(hote.naviguer).not.toHaveBeenCalled()
     fireEvent.click(equipes)
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes?onglet=equipes")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams?tab=teams")
   })
 
   it("should give a non-administrator the same two tabs, no rules nor platform access tab (E05-S13, AC-5)", () => {
@@ -154,7 +154,7 @@ describe("EcranEquipes header and tabs (AC1, AC-d1)", () => {
     expect(screen.getByText("2 personnes · 1 invitation")).toBeInTheDocument()
 
     cleanup()
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
     expect(screen.getByText("2 équipes")).toBeInTheDocument()
   })
 
@@ -183,11 +183,11 @@ describe("EcranEquipes header and tabs (AC1, AC-d1)", () => {
     expect(screen.queryByRole("button", { name: "Inviter quelqu'un" })).toBeNull()
 
     cleanup()
-    rendre({ onglet: "equipes", moi: SIMPLE_MEMBRE })
+    rendre({ onglet: "teams", moi: SIMPLE_MEMBRE })
     expect(screen.queryByRole("button", { name: "Créer une équipe" })).toBeNull()
 
     cleanup()
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
     expect(screen.getByRole("button", { name: "Créer une équipe" })).toBeInTheDocument()
   })
 })
@@ -204,7 +204,7 @@ describe("EcranEquipes states (AC2)", () => {
     rendre({ membres: { error: ECHEC } })
 
     expect(screen.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/equipes?onglet=membres")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/teams?tab=members")
     expect(screen.queryByRole("table")).toBeNull()
   })
 
@@ -219,10 +219,10 @@ describe("EcranEquipes states (AC2)", () => {
 
   // Chaque lecture d'un onglet, en échec, se dit avec « Réessayer » vers la même adresse (portage § 4).
   const LECTURES_EN_ECHEC: [string, Partial<EcranEquipesProps>, string][] = [
-    ["the pending invitations", { invitations: { error: ECHEC } }, "/equipes?onglet=membres"],
-    ["the invitation options", { optionsDInvitation: { error: ECHEC } }, "/equipes?onglet=membres"],
-    ["the teams of the teams tab", { onglet: "equipes", equipes: { error: ECHEC } }, "/equipes?onglet=equipes"],
-    ["the people of the teams tab", { onglet: "equipes", membres: { error: ECHEC } }, "/equipes?onglet=equipes"],
+    ["the pending invitations", { invitations: { error: ECHEC } }, "/teams?tab=members"],
+    ["the invitation options", { optionsDInvitation: { error: ECHEC } }, "/teams?tab=members"],
+    ["the teams of the teams tab", { onglet: "teams", equipes: { error: ECHEC } }, "/teams?tab=teams"],
+    ["the people of the teams tab", { onglet: "teams", membres: { error: ECHEC } }, "/teams?tab=teams"],
   ]
 
   it.each(LECTURES_EN_ECHEC)("should say a failed read of %s with « Réessayer » to the same address", (_lecture, echec, adresse) => {
@@ -253,7 +253,7 @@ describe("EcranEquipes people table (AC4 to AC7, AC-d1)", () => {
   })
 
   it("should sort by name in the order of the address, and ask the host for the other order", () => {
-    rendre({ reglages: { q: "", sens: "desc" } })
+    rendre({ reglages: { q: "", order: "desc" } })
 
     expect(lignes("Les personnes de Démo").map((ligne) => cellules(ligne)[0])).toEqual([
       "new@demo.testinvitée par Ada Martin",
@@ -262,11 +262,11 @@ describe("EcranEquipes people table (AC4 to AC7, AC-d1)", () => {
     ])
     expect(screen.getByRole("columnheader", { name: /Personne/ })).toHaveAttribute("aria-sort", "descending")
     fireEvent.click(screen.getByRole("button", { name: "Trier sur Personne" }))
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes?onglet=membres")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams?tab=members")
   })
 
   it("should count the people and the invitations in tiles that filter the table through the address", () => {
-    rendre({ reglages: { q: "", sens: "asc", filtre: "invitations" } })
+    rendre({ reglages: { q: "", order: "asc", filter: "invitations" } })
 
     const tuiles = within(screen.getByRole("group", { name: "Les personnes en chiffres" })).getAllByRole("button")
     expect(tuiles.map((tuile) => [tuile.textContent, tuile.getAttribute("aria-pressed")])).toEqual([
@@ -275,22 +275,22 @@ describe("EcranEquipes people table (AC4 to AC7, AC-d1)", () => {
     ])
     expect(lignes("Les personnes de Démo").map((ligne) => cellules(ligne)[1])).toEqual(["Invitée"])
     fireEvent.click(tuiles[0])
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes?onglet=membres")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams?tab=members")
   })
 
   it("should search a name or an address on submit, and say when nobody matches with a way back to everyone", () => {
-    rendre({ reglages: { q: "claire", sens: "asc" } })
+    rendre({ reglages: { q: "claire", order: "asc" } })
 
     expect(lignes("Les personnes de Démo").map((ligne) => cellules(ligne)[0])).toEqual(["Claire Morelclaire@demo.test"])
     const champ = screen.getByRole("searchbox", { name: "Chercher une personne" })
     fireEvent.change(champ, { target: { value: "Émile" } })
     fireEvent.submit(champ)
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes?onglet=membres&q=%C3%89mile")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams?tab=members&q=%C3%89mile")
 
     cleanup()
-    rendre({ reglages: { q: "personne", sens: "asc" } })
+    rendre({ reglages: { q: "personne", order: "asc" } })
     expect(screen.getByText("Personne ne correspond")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Voir tout le monde" })).toHaveAttribute("href", "/equipes?onglet=membres")
+    expect(screen.getByRole("link", { name: "Voir tout le monde" })).toHaveAttribute("href", "/teams?tab=members")
   })
 
   it("should give a plain member no gesture on the people", () => {
@@ -334,7 +334,7 @@ describe("EcranEquipes teams table (AC10 to AC14)", () => {
   it("should show each team, its leads or none, its people, and those in no team (E05-S13, AC-24)", () => {
     // Paul, membre sans équipe, que le compte au-dessus du tableau annonce.
     const paul: MemberView = { userId: PAUL, email: "paul@demo.test", name: "Paul Roux", role: "member", teams: [], lastSignInAt: null, isSelf: false }
-    rendre({ onglet: "equipes", membres: { data: [...MEMBRES, paul] } })
+    rendre({ onglet: "teams", membres: { data: [...MEMBRES, paul] } })
 
     expect(screen.getByText("1 personne dans aucune équipe")).toBeInTheDocument()
     const [support, ventes] = lignes("Les équipes de Démo")
@@ -343,21 +343,21 @@ describe("EcranEquipes teams table (AC10 to AC14)", () => {
   })
 
   it("should sort the teams by their number of people when the address asks", () => {
-    rendre({ onglet: "equipes", reglages: { q: "", sens: "desc", tri: "personnes" } })
+    rendre({ onglet: "teams", reglages: { q: "", order: "desc", sort: "people" } })
     expect(lignes("Les équipes de Démo").map((ligne) => cellules(ligne)[0])).toEqual(["Ventes", "Support"])
     fireEvent.click(screen.getByRole("button", { name: "Trier sur Équipe" }))
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes?onglet=equipes")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams?tab=teams")
   })
 
   it("should give the administrator composition, renaming and deletion in the menu of a team he does not lead, no « Changer de responsable… » (AC-24)", () => {
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     fireEvent.click(screen.getByRole("button", { name: "Gérer Support" }))
     expect(items()).toEqual(["Ajouter quelqu'un…", "Renommer…", "Supprimer l'équipe"])
   })
 
   it("should let a lead compose the team he leads only, and show the people of any team to anyone (AC13)", () => {
-    rendre({ onglet: "equipes", moi: { userId: CLAIRE, estAdmin: false, equipesDirigees: [SUPPORT] } })
+    rendre({ onglet: "teams", moi: { userId: CLAIRE, estAdmin: false, equipesDirigees: [SUPPORT] } })
 
     expect(screen.queryByRole("button", { name: "Gérer Ventes" })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Gérer Support" }))
@@ -371,14 +371,14 @@ describe("EcranEquipes teams table (AC10 to AC14)", () => {
   })
 
   it("should say there is no team yet", () => {
-    rendre({ onglet: "equipes", equipes: { data: [] } })
+    rendre({ onglet: "teams", equipes: { data: [] } })
     expect(screen.getByText("Aucune équipe pour l'instant")).toBeInTheDocument()
   })
 })
 
 describe("EcranEquipes accessibility (AC-x3)", () => {
   it("should give every field a label and every button a name, on every tab", () => {
-    for (const vue of [{}, { onglet: "equipes" as const }]) {
+    for (const vue of [{}, { onglet: "teams" as const }]) {
       const { container, unmount } = rendre(vue)
       // Hors des dialogues fermés, que personne n'atteint.
       const visibles = (selecteur: string) => [...container.querySelectorAll(selecteur)].filter((element) => !element.closest("dialog:not([open])"))

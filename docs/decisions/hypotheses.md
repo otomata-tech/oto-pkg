@@ -20,10 +20,10 @@
 |---|---|
 | H01 | Le schéma `platform` n'évolue que par les migrations du paquet ; un service qui ne fait que lire et calculer n'ajoute ni migration ni fonction SQL : une lecture bornée, puis un calcul pur dans le service. |
 | H02 | Les schémas Zod partagés vivent dans `packages/plateforme/schemas/`, exporté par `./schemas` et importable par toutes les faces, `ui/` compris : du Zod pur, sans client de base, ni Next, ni autre face. |
-| H03 | Un écran du paquet reçoit ses données de la page serveur de l'hôte, qui appelle `server/` pour l'appelant de la session ; ses mutations passent par `/api/plateforme/<ressource>` (hôte, puis `api/`, puis `server/`), réponse `{ data }` ou `{ error }`. |
+| H03 | Un écran du paquet reçoit ses données de la page serveur de l'hôte, qui appelle `server/` pour l'appelant de la session ; ses mutations passent par `/api/platform/<ressource>` (hôte, puis `api/`, puis `server/`), réponse `{ data }` ou `{ error }`. |
 | H04 | Les services lèvent `PlatformError` avec un code de la liste fermée `PLATFORM_ERROR_CODES` (`server/errors.ts`) et son statut HTTP ; message anglais au MCP, français dans `ui/` ; un test vérifie toujours le code. |
 | H05 | Les identifiants sont en anglais dans `server/`, `mcp/`, `api/`, `schemas/` et le SQL ; les composants et écrans de `ui/` sont en français. |
-| H06 | L'hôte monte `/api/mcp`, `/api/mcp-admin` et `/api/plateforme/[...route]` en routes statiques, et les pages de l'arbre sous `/n/[...chemin]` ; pas de route `api/[transport]`. |
+| H06 | L'hôte monte `/api/mcp`, `/api/mcp-admin` et `/api/platform/[...route]` en routes statiques, et les pages de l'arbre sous `/n/[...chemin]` ; pas de route `api/[transport]`. |
 | H07 | Les portes écrivent le journal après la réponse, sous l'appelant : une ligne par appel MCP, une par mutation de l'API ; arguments bornés à 2 048 caractères, clés de secret masquées ; une panne du journal ne change jamais la réponse. |
 | H10 | L'organisation vient de l'adresse appelée : `org_domains(host)` range un nom d'hôte en minuscules, sans port, et chaque hôte désigne une seule organisation ; en local, le script Démo pose `localhost` et `demo.localhost`. |
 | H11 | En mode Supabase, l'inscription est ouverte mais filtrée par `platform.hook_before_user_created` (adresses invitées seules) ; l'invitation est le lien magique (`signInWithOtp`, clé publique) ; `accept_invitations()` crée les appartenances au retour. |
@@ -110,7 +110,7 @@
 | Id | Règle |
 |---|---|
 | P10 | Les états de décision d'un cycle avec revue sont réservés à la revue humaine : ni `table.write` ni `table.release` ne les posent, sauf sur un tableau dont la revue déclare `agents_may_decide` (E11-S01, fiche D132 ; provenance `agent`). |
-| P12 | Le déplacement d'un nœud passe par la route `POST /api/plateforme/nodes/move` et l'action « Déplacer… » de l'écran, au niveau gestion ; aucun des six outils ne déplace. |
+| P12 | Le déplacement d'un nœud passe par la route `POST /api/platform/nodes/move` et l'action « Déplacer… » de l'écran, au niveau gestion ; aucun des six outils ne déplace. |
 | P13 | Les alias d'un déplacement sont écrits en base par le déclencheur `nodes_aliases_on_move`, pour tous les nœuds déplacés, invisibles compris ; l'alias qu'un nœud reprend est retiré. |
 | P14 | Tout texte servi au modèle (description, refus, consigne d'un résultat MCP) se teste mot pour mot ; un message interne ne se compare jamais. |
 | P16 | Une page de montage et ses données d'exemple partent dès que l'écran réel existe : un client ne voit jamais de données fictives. |
@@ -301,16 +301,16 @@
 
 | Id | Règle |
 |---|---|
-| N1 | Le lien d'invitation de Supabase porte `token_hash` (modèles d'email) et n'est vérifié par `verifyOtp` qu'au clic sur `/auth/confirmer`, jamais à l'ouverture ; `code` (PKCE) reste pour la réinitialisation et OAuth. |
+| N1 | Le lien d'invitation de Supabase porte `token_hash` (modèles d'email) et n'est vérifié par `verifyOtp` qu'au clic sur `/auth/confirm`, jamais à l'ouverture ; `code` (PKCE) reste pour la réinitialisation et OAuth. |
 | N2 | Le lien d'invitation ramène à l'adresse d'où l'on invite, pas à `NEXT_PUBLIC_SITE_URL` ; la liste des adresses de retour de Supabase, sans motif attrape-tout, est un contrôle de sécurité et porte chaque adresse d'organisation. |
 | N3 | Les invitations en attente sont acceptées au retour de connexion (callback) et après `loginAction` ; un échec ne bloque pas la connexion. |
 | N4 | La page de connexion propose « Recevoir un lien de connexion » (`signInWithOtp`, même réponse pour toute adresse) : il sert l'invitation dont le lien (1 h) a expiré alors qu'elle vit 7 jours. |
 | N5 | Pas de refus d'invitation par l'invité : `declined_at` reste sans policy ni service. |
 | N8 | `teams.lead_user_id` est la seule source du responsable d'une équipe ; le rôle d'équipe de l'identité (`lead` ou `member`) en est dérivé. |
 | N9 | Sans session, l'API répond 401 avec le code `forbidden` ; le statut porte la différence. |
-| N12 | `/aucune-organisation` se calcule depuis l'hôte de la requête, sans paramètre d'URL. |
+| N12 | `/no-organization` se calcule depuis l'hôte de la requête, sans paramètre d'URL. |
 | N17 | `unique_handle` translittère aussi les majuscules accentuées avant `lower()` : sous une ctype `C`, `lower()` ne touche que l'ASCII. |
-| N27 | `/auth/confirmer` rend le bouton « Continuer » même sans paramètres ; c'est `confirmerLienAction` qui renvoie alors vers `/login?error=auth_callback_error`. |
+| N27 | `/auth/confirm` rend le bouton « Continuer » même sans paramètres ; c'est `confirmerLienAction` qui renvoie alors vers `/login?error=auth_callback_error`. |
 | N41 | Supabase Auth garde « Confirm email » actif (`mailer_autoconfirm: false`, `enable_confirmations` en local) : sans lui, une inscription à une adresse invitée serait confirmée d'office et acceptée. |
 
 ### E02-S02 — Connexion des assistants : ressource OAuth, découverte, consentement
@@ -318,7 +318,7 @@
 | Id | Règle |
 |---|---|
 | HN-E02S02-2 | Une organisation non déterminée n'empêche pas le consentement : le jeton n'ouvre rien sans appartenance revérifiée à chaque appel. |
-| HN-E02S02-3 | Approuver ou refuser passe par une Server Action de l'hôte, pas par `/api/plateforme` : la décision exige la session à cookies. |
+| HN-E02S02-3 | Approuver ou refuser passe par une Server Action de l'hôte, pas par `/api/platform` : la décision exige la session à cookies. |
 | HN-E02S02-8 | Les quatre scopes connus ont un libellé français ; un scope inconnu s'affiche tel quel. |
 | HN-E02S02-9 | Un non-membre est prévenu à l'écran de consentement, pas bloqué : ses appels à cette organisation seront refusés. |
 | HN-E02S02-12 | Seuls `consentRequest` et `consentDecision` rendent les clés françaises de l'écran (`DemandeDeConsentement`), que l'hôte passe telles quelles ; noms de fonctions et de types restent anglais. |
@@ -539,7 +539,7 @@
 | N2 | `team` désigne une équipe de la personne, par slug ou par nom (sans casse ni accent) ; sinon `not_found` qui liste ses équipes. |
 | N3 | `account` désigne un compte visible du connecteur par libellé (sans casse ni accent) ou identifiant ; libellé partagé → `ambiguous_account`, niveau insuffisant → `forbidden`, désactivé → `not_enabled` ; jamais de repli. |
 | N5 | Pas de choix silencieux entre comptes : deux comptes utilisables à la même étape → `ambiguous_account`, qui demande `account`. |
-| N6 | Aucun compte visible → `not_enabled` avec le lien `<origin>/admin/connecteurs` ; comptes visibles sous le niveau exigé → `forbidden`, qui dit à qui demander. |
+| N6 | Aucun compte visible → `not_enabled` avec le lien `<origin>/admin/connectors` ; comptes visibles sous le niveau exigé → `forbidden`, qui dit à qui demander. |
 | N7 | Un compte `disabled` ou `error` n'est jamais résolu. |
 | N8 | Ligne d'un connecteur dans le bloc `team` : équipe, `(write)` pour ce que la personne peut faire, compte et mode (`simulated`, `sandbox`, `live`). |
 | N9 | Les connecteurs actifs se relisent à chaque requête (`tools/list`, `find`, `call`, `context`, `read`), sans cache : une activation vaut dès la requête suivante. |
@@ -576,7 +576,7 @@
 | HN-E05S02-1 | Le texte d'un bloc part à la sortie du champ, sur ⌘S ou après 1 200 ms sans frappe ; la structure part aussitôt ; une file unique (éditeur, en-tête, publication) envoie une opération après l'autre et adopte `id`, révision et tampon rendus. |
 | HN-E05S02-4 | Un titre de bloc se rend en `<h2>` quel que soit son niveau écrit, sous le `<h1>` du titre du nœud. |
 | HN-E05S02-6 | `replace_block` et `delete_block` portent la révision lue du bloc, `move_block` aucune ; après un refus, l'écran relit la page et met en conflit le bloc dont la révision a changé ou qui a disparu, sinon c'est un conflit de page. |
-| HN-E05S02-7 | Déplacer un nœud change son parent et garde son dernier segment (`POST /api/plateforme/nodes/move`) ; la nouvelle adresse s'ouvre ensuite par `window.location.assign`, sur le préfixe reçu de l'hôte en chaîne. |
+| HN-E05S02-7 | Déplacer un nœud change son parent et garde son dernier segment (`POST /api/platform/nodes/move`) ; la nouvelle adresse s'ouvre ensuite par `window.location.assign`, sur le préfixe reçu de l'hôte en chaîne. |
 | HN-E05S02-8 | L'arbre se range en sections par premier segment du chemin : « Tout le monde », une par équipe (nom lu par `listTeams`), puis « Privé » ; le Contexte ouvre chaque section ; racine, dossiers d'équipe et espace personnel ne sont pas des lignes. |
 | HN-E05S02-13 | « Annuler » une suppression réinsère le bloc tel qu'il était (forme, texte, données, clé) sous un nouvel `id` fabriqué par le serveur : un lien `[[chemin#clé]]` le retrouve, un lien à l'ancien `id` non. |
 | HN-E05S02-17 | L'écran écrit des blocs structurés (`input` au format de `blockInputSchema`, clé comprise), jamais du markdown : un Texte servi qui commence par « - » reste un Texte. |
@@ -609,7 +609,7 @@
 |---|---|
 | HN-E05S04-1 | « Tester une phrase » est un formulaire GET (`?phrase=`, 2 000 caractères au plus) calculé par la page serveur avec `previewContext` (procédure servie, score, candidats) ; aucune route API d'aperçu. |
 | HN-E05S04-2 | Les refus du contrôle d'une procédure se disent un par un : emplacement (section, rang, étape, sinon « Avant le premier titre » ou « Procédure »), genre traduit, lien vers le bloc, texte anglais sous « Détail technique ». |
-| HN-E05S04-4 | « Ma fiche » s'écrit par `PATCH /api/plateforme/profile`, puis `update_my_profile(p_org, p_patch)` : seuls les champs changés partent ; une personne peut vider un champ, un agent non. |
+| HN-E05S04-4 | « Ma fiche » s'écrit par `PATCH /api/platform/profile`, puis `update_my_profile(p_org, p_patch)` : seuls les champs changés partent ; une personne peut vider un champ, un agent non. |
 | HN-E05S04-5 | Les langues de la fiche sont `fr` et `en`. |
 | HN-E05S04-6 | Un Contexte s'édite sur son écran de nœud (`/n/<chemin>`), ses annexes à droite (qui le reçoit, ce que le modèle recevra) ; aucune route `/contexte`, aucun lien de navigation « Contexte ». |
 | HN-E05S04-7 | « Ma fiche » vit dans les annexes du Contexte Perso de la personne, sur le sien seulement. |
@@ -769,7 +769,7 @@
 |---|---|
 | HN-E07S03-1 | La file de revue sert le nombre de lignes à l'état de revue et les 20 premières dans l'ordre croissant des clés, provenance comprise. |
 | HN-E07S03-2 | Une décision de revue, approbation comme refus, prend une raison facultative de 500 caractères au plus, rangée en `comment` de la provenance de la colonne d'état. |
-| HN-E07S03-3 | La décision de revue passe par une route dédiée, `POST /api/plateforme/tables/review`, pas par `table.write` : la garde porte sur la révision lue et sur l'état attendu de la ligne. |
+| HN-E07S03-3 | La décision de revue passe par une route dédiée, `POST /api/platform/tables/review`, pas par `table.write` : la garde porte sur la révision lue et sur l'état attendu de la ligne. |
 | HN-E07S03-4 | La grille lit ses réglages dans l'adresse : `q`, `tri` (`-` pour décroissant), `f` répété `<colonne>:<opération>:<valeur>` (`contient`, `egal`, `min`, `max`, `vide`, `rempli`), `n` de 20 à 200 par 20. |
 | HN-E07S03-5 | Les blocs `reference` d'un nœud sont résolus côté serveur, désignés par leur `id` de bloc, 10 au plus rendus en place ; les suivants gardent leur lien. |
 | HN-E07S03-6 | Le résumé d'une revue, en français, se calcule dans l'îlot à partir des décisions de la session ; il n'est pas stocké. |
@@ -833,14 +833,14 @@
 | NH4 | L'état de la cellule ne dépend d'aucune organisation : jeton, puis `is_staff()`, sans appartenance ni identité par l'adresse. |
 | NH5 | Santé = base joignable (durée d'`applied_migrations()`) et présence, jamais la valeur, des variables requises du mode de l'hôte : Supabase (URL, clé anon, `NEXT_PUBLIC_SITE_URL`) ou OIDC (émetteur, audience, SMTP, expéditeur, `NEXT_PUBLIC_SITE_URL`). |
 | NH9 | Plus en vigueur : `setFlag` décide par `isOrgAdmin` (administrateur, ou staff avec un accès en cours, membre simple compris), plus par `member.role`. |
-| NH11 | `GET /api/plateforme/cell` est reconnu par `isCellRoute`, hors de `RESOURCES`, après le jeton et avant l'identité par l'adresse ; `GET` sans paramètre seulement (sinon `404 not_found`) ; aucune ligne de journal. |
+| NH11 | `GET /api/platform/cell` est reconnu par `isCellRoute`, hors de `RESOURCES`, après le jeton et avant l'identité par l'adresse ; `GET` sans paramètre seulement (sinon `404 not_found`) ; aucune ligne de journal. |
 
 ### E08-S05 — Fonctions métier d'un ERP au catalogue
 
 | Id | Règle |
 |---|---|
 | NH1 | `registerFunctions` remplace à chaque appel toute la source ERP (une seule liste, déclarée dans `src/lib/fonctions-metier.ts`) : un rechargement à chaud ne crée pas de doublon. |
-| NH2 | `src/lib/fonctions-metier.ts` est importé pour son effet par chaque route de l'hôte qui monte une porte du paquet (`/api/mcp`, `/api/plateforme/[...route]`, `/api/mcp-admin`) ; un test le vérifie. |
+| NH2 | `src/lib/fonctions-metier.ts` est importé pour son effet par chaque route de l'hôte qui monte une porte du paquet (`/api/mcp`, `/api/platform/[...route]`, `/api/mcp-admin`) ; un test le vérifie. |
 | NH3 | Une inscription ERP invalide lève `CatalogRegistrationError` au chargement de la route et n'inscrit rien : une erreur de développeur casse la route au lieu de servir un contrat faux. |
 | NH4 | Une fonction ERP reçoit `{ db, identity, accessToken }` : elle construit son client de l'ERP sur le jeton vérifié de l'appelant, donc sous la RLS de l'ERP ; sans jeton, rien ne court. |
 | NH6 | La description de `call` ne cite jamais une fonction ERP (exemples : connecteurs activés, puis `table.rows`) ; une fonction ERP se trouve par `find` et par les étapes des procédures. |
@@ -880,7 +880,7 @@
 | N4 | Le filtre d'équipe de l'usage retient les lignes des personnes membres de l'équipe aujourd'hui (le journal ne porte l'équipe que pour les appels de connecteur). |
 | N5 | Retours : « à traiter » (ouverts et pris en compte) par défaut ; quatre états, toute transition permise ; décliner exige un motif de 3 à 2 000 caractères ; le retour à `open` efface la décision ; « Traité par » est montré. |
 | N6 | Usage et retours sont réservés à qui administre l'organisation : pas de vue du responsable pour son équipe en V1. |
-| N7 | Paramètres d'URL de l'usage et des retours en français, comme `/journal` (`periode`, `equipe` = identifiant d'équipe, `etat`, `type`, `curseur`) ; leurs valeurs sont celles des schémas, sans table de traduction. |
+| N7 | Paramètres d'URL de l'usage et des retours en anglais, comme ceux de `/journal` (`period`, `team`, `state`, `type`, `cursor`) ; un ancien nom est ignoré comme tout paramètre inconnu (E11-S07, ADR-020). |
 | N9 | `usageSummary`, `listFeedback` et `setFeedbackState` exigent `isOrgAdmin` avant toute lecture ou écriture ; sinon `forbidden` « Reading the usage of <org> is reserved to <qui>. Ask them. » ou « Handling the feedback of <org> … ». |
 | N10 | Un `call` sans cible compte dans les totaux de l'usage, pas dans « Erreurs par fonction » : il ne nomme aucune fonction. |
 | N27 | La demande et le host d'une conversation sans procédure se lisent sur sa première demande (ligne `<préfixe>_context` sans erreur et à cible), pas sur sa première ligne `context`. |
@@ -1040,14 +1040,14 @@ Les hypothèses HN-E10S02-1 à 23, prises au cadrage, se lisent dans la story.
 | HN-E10S02-66 | La spec e2e d'AC-c6 (`e10s02-voir`) dépose ses fichiers par les routes du paquet et se saute quand le serveur n'a pas de stockage (`GET files` → `enabled: false`). |
 | HN-E10S02-67 | Un fichier se rend `[<nom> (<taille>, <type>)](<route>/<id>)` : nom tel quel, taille en octets exacts (`fileSizeText` : « 1,200 bytes », « 1 byte »), type par l'extension (le `mime` de la ligne sans extension admise) ; `parseMarkdown` relit la ligne de droite à gauche (dernière `](`, dernière ` (`). |
 | HN-E10S02-68 | `<origine>` est celle de la porte MCP (`McpDeps.origin`, lue par `webUrl`), sinon la route relative ; seul `read` la reçoit : `context`, `staleState`, le `.md` d'une page et la visionneuse servent la route relative, que `parseMarkdown` relit aussi. |
-| HN-E10S02-69 | Une ligne seule `[<étiquette>](<origine facultative>/api/plateforme/files/<uuid>)` est un bloc `file`, en strict comme en tolérant, uuid en minuscules ; une étiquette hors forme donne nom = étiquette, taille 1, `application/octet-stream`, que la ligne relue remplace ; un lien public ou d'une sous-route reste un paragraphe. |
+| HN-E10S02-69 | Une ligne seule `[<étiquette>](<origine facultative>/api/platform/files/<uuid>)` est un bloc `file`, en strict comme en tolérant, uuid en minuscules ; une étiquette hors forme donne nom = étiquette, taille 1, `application/octet-stream`, que la ligne relue remplace ; un lien public ou d'une sous-route reste un paragraphe. |
 | HN-E10S02-70 | `writeNode` ne relit que les fichiers que le document (brouillon, sinon publié) ne citait pas encore (`ready`, joint au nœud) ; un fichier déjà cité par un bloc `file` passe avec ses métadonnées (restreinte par HN-E10S02-82). |
 | HN-E10S02-71 | Une création qui cite un fichier est refusée avant l'insertion du nœud (phrase d'AC-d3) ; le dépôt par lien crée la page, puis joint le fichier par une seconde écriture. |
 | HN-E10S02-72 | En mode tolérant, un fichier non joint à la page devient un bloc `code` qui porte son markdown, compté dans `kept_as_text`. |
 | HN-E10S02-73 | Une image jointe réécrite sans largeur garde la largeur du bloc qui citait le même fichier. |
 | HN-E10S02-74 | `writeNode` admet un bloc `file` ou une image jointe dans tout nœud à blocs (page, procédure, Contexte), jamais dans un tableau ; l'écran les propose partout où il écrit des blocs. |
 | HN-E10S02-75 | `read {file}` avec `section`, `outline`, `since_revision` ou `draft` : « Give only one of section, outline, since_revision or file; file reads the text of a file, without draft. » ; `refs` ignoré ; en-tête `<nom> (<taille>)`, données `{ path, file: { id, name, size, type } }`, sans `next_actions` ; tout nœud visible, publié ou non ; `file` n'entre dans la clé du curseur que donné. |
-| HN-E10S02-76 | La description de `read` finit par « To read an attached html, md, txt or csv file, give file = the id from its link /api/plateforme/files/<id>. » |
+| HN-E10S02-76 | La description de `read` finit par « To read an attached html, md, txt or csv file, give file = the id from its link /api/platform/files/<id>. » |
 | HN-E10S02-77 | `readFileText` dit « only html, md, txt and csv files are read as text. » ; le refus de taille garde « a text file (html, md, txt, csv) ». |
 | HN-E10S02-78 | Créer un tableau par import (AC-b5, AC-b6, `upload.link` `csv create`) n'exige que l'écriture sur le parent (D150) ; le bloc écrit après `complete` et celui du dépôt par lien sont publiés aussitôt, sauf `publish: false` (D135). |
 | HN-E10S02-79 | Un fichier lâché ou collé sur le Texte local d'une page vide se joint après ce Texte, qui reste. |
@@ -1066,7 +1066,7 @@ Les hypothèses HN-E10S02-1 à 23, prises au cadrage, se lisent dans la story.
 | HN-E10S02-92 | La purge supprime les lignes `files` dans la même instruction que les nœuds (deux `delete` en `with`), limitée aux nœuds vraiment emportés ; les objets partent après le commit (`removeObjects`). |
 | HN-E10S02-93 | Le filtre `ready` de l'export s'écrit dans la carte (`TableSpec.only`, lu par `orgRowsSql`) ; l'empreinte d'E09-S04 désigne un fichier par `file:<chemin de son nœud>/<nom>` ; `transferEnv` lit les cinq variables en facultatives, masquées. |
 | HN-E10S02-94 | Le lien public d'une copie sert le fichier copié, jamais celui de l'original. |
-| HN-E10S02-95 | Le formulaire de dépôt est une page de l'hôte, `/upload/<token>` sous `(dashboard)`, qui monte `EcranDeDepot`, et une route à session, `POST /api/plateforme/uploads/<jeton>/form`, servie avant la table de dispatch, sous le contrôle d'origine des mutations (D146). |
+| HN-E10S02-95 | Le formulaire de dépôt est une page de l'hôte, `/upload/<token>` sous `(dashboard)`, qui monte `EcranDeDepot`, et une route à session, `POST /api/platform/uploads/<jeton>/form`, servie avant la table de dispatch, sous le contrôle d'origine des mutations (D146). |
 | HN-E10S02-96 | `form_url` est rendu par chaque `upload.link`, pas seulement quand `source_url` échoue. |
 | HN-E10S02-97 | L'identité d'un envoi se reconstruit par `identityInOrg(db, org, { userId, email })` sur l'organisation lue à l'adresse ; un e-mail absent vaut `""` ; `not_member` : « The person who asked for this link is no longer a member of <organisation>: nothing was written. » |
 | HN-E10S02-98 | `WriteOrigin` (agent) gagne `file?: { replace }`, posé par le seul service du dépôt : un `.md` déposé se lit en tolérant sous la provenance `agent` ; `replace` applique les opérations à une page vide ; `wholeFile` d'`applyOps` saute `SECTION_MAX`, `OP_TEXT_MAX` tenu par des morceaux de 40 000 caractères ; `PAGE_MAX` et `BLOCKS_MAX` restent. |
@@ -1262,7 +1262,7 @@ organisation qui compte beaucoup de membres sans email.
 | HN-E11S02-22 | Refus de publication : brouillon gardé, `isError` avec son code (N28). |
 | HN-E11S02-23 | Contextes et espaces créés par la base restent à la révision 0 jusqu'à leur première écriture. |
 | HN-E11S02-24 | Fil d'accueil inchangé pour l'écriture : `publish: true` explicite donne « publié », sinon « créé » ou « modifié ». |
-| HN-E11S02-25 | `?version=publiee`, `read draft: true` et `node.discard_draft` restent pour les brouillons rares ; le lien « Voir la version publiée » part avec le bandeau. |
+| HN-E11S02-25 | `?version=published`, `read draft: true` et `node.discard_draft` restent pour les brouillons rares ; le lien « Voir la version publiée » part avec le bandeau. |
 | HN-E11S02-26 | Aucun filtre des contenus « Sans titre » vides. |
 | HN-E11S02-27 | La ligne de publication de `write` donne la révision de la prochaine écriture (« Next write: base_revision N. »). |
 | HN-E11S02-28 | Le Contexte suit la règle : écrire le publie. |
@@ -1313,6 +1313,25 @@ organisation qui compte beaucoup de membres sans email.
 | HN-E11S06-13 | Le panneau du lien n'emploie pas React Hook Form. |
 | HN-E11S06-14 | Un lien écrit sans libellé : le champ du panneau montre le titre de la page choisie, et l'écriture garde `[[chemin]]`. |
 | HN-E11S06-15 | Dans une liste, le curseur, la relecture et le clic lisent la ligne de l'élément. |
+
+### E11-S07 — Adresses en anglais : routes, paramètres, ancres, préfixe d'API
+
+| Id | Règle |
+|---|---|
+| HN-E11S07-1 | Une adresse est ce qui s'écrit dans la barre d'adresse ou dans un lien ; un `id` qu'aucun lien ne vise, un identifiant de code et un nom de dossier entre crochets n'en sont pas (ADR-020 § 1). |
+| HN-E11S07-2 | `/journal` reste : « journal » est un mot anglais, déjà chemin MCP (`JOURNAL_PATH`) et table `platform.journal` ; `/log` écarté. Validée (2026-09-29). |
+| HN-E11S07-3 | Les adresses suivent l'orthographe américaine : `/admin/organization`, `/no-organization`, et `organization` pour toute adresse future ; les textes servis en anglais gardent `organisation`, incohérence assumée ; britannique écarté. Tranchée par le responsable d'Oto (2026-09-29). |
+| HN-E11S07-4 | Un nom nouveau reprend celui que l'API ou le service donne déjà (`trash`, `feedback`, `connectors`, `profile`, `teams`, `sort` de H96, opérateurs de H95) ; `sens` devient `order`. |
+| HN-E11S07-5 | Les anciennes adresses répondent 404, sans alias ni redirection ; les trois pages de redirection d'`/admin` et la redirection de `/plateforme/invitations` sont retirées ; la redirection de `seo-patterns.md § Règles SEO` ne vaut que pour une page publique indexée. |
+| HN-E11S07-6 | Un ancien nom de paramètre est ignoré comme tout paramètre inconnu, sans refus. |
+| HN-E11S07-7 | La garde des routes est une liste de segments admis (`SEGMENTS_ADMIS`), celle des paramètres une liste d'anciens noms refusés, dans `scripts/check-framework-invariants.mjs`. |
+| HN-E11S07-8 | `/plateforme` (`PlateformeHome`) se renomme `/platform` ; son retrait serait une décision produit. |
+| HN-E11S07-9 | Un nouvel ADR (ADR-020) plutôt qu'un amendement d'ADR-015, qui reste « Proposé » pour la version qui traduira les écrans. |
+| HN-E11S07-10 | Préfixe d'API en une constante, `PLATFORM_API_PREFIX` dans `schemas/api.ts`, réexportée par `./schemas` ; renommer les littéraux en place écarté. Validée (2026-09-29, refacto accepté). |
+| HN-E11S07-11 | Ancre `recent-content` pour le bloc servi « recent content » ; aucune ancre pour le bloc `code`, que la vue n'affiche plus ; `procedures` inchangée. |
+| HN-E11S07-12 | Les écrans retirés (Marque, Drapeaux, Accès plateforme) restent exportés par le paquet (M65) ; leurs tests les montent sous des adresses fictives en anglais (`/admin/brand`, `/admin/flags`, `/admin/access`), qu'aucune route ne sert. |
+| HN-E11S07-13 | Les ancres fixes des Contextes sont `everyone-context` et `private-context` : elles ne commencent pas par `context-`, qu'aucun slug d'équipe (`context-<slug>`) ne peut donc produire. |
+| HN-E11S07-14 | La garde des anciens noms refuse aussi les routes retirées (`/admin/acces`, `/admin/marque`, `/admin/drapeaux`) ; elle ne contrôle pas les opérations écrites dans la valeur de `f=` (`f=nom:contient:x`), que `reglagesDepuisLAdresse` écarte à la lecture. |
 
 ### Tâches de suite
 

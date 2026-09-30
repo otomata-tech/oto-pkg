@@ -1,5 +1,5 @@
 // Fixtures de l'écran de nœud (E05-S02) : blocs et nœud tels que `loadNode` les sert (E03-S03, AC35),
-// et l'API simulée de `POST /api/plateforme/nodes` (réponse d'E03-S03, AC37 : `touched[].blocks`,
+// et l'API simulée de `POST /api/platform/nodes` (réponse d'E03-S03, AC37 : `touched[].blocks`,
 // `draft_stamp`), partagées par les tests de l'écran, de l'éditeur et de l'en-tête. Sans elles, trois
 // fichiers réécrivaient la même page et la même API.
 import { vi } from "vitest"
@@ -65,7 +65,7 @@ function reponse(status: number, body: unknown): Response {
 }
 
 /**
- * `fetch` simulé pour `POST /api/plateforme/nodes` : chaque corps envoyé est gardé ; une écriture rend
+ * `fetch` simulé pour `POST /api/platform/nodes` : chaque corps envoyé est gardé ; une écriture rend
  * les blocs écrits (`id`, référence, révision + 1 au remplacement, 1 à l'insertion) et un tampon neuf ;
  * une publication rend la révision suivante, sans tampon. `refuser` et `couper` visent l'appel suivant ;
  * `retenir` le laisse en vol jusqu'à ce qu'on le relâche.

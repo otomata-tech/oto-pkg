@@ -1,7 +1,7 @@
 "use client"
 
 // Le formulaire de la page « Profil » (E05-S11, AC-3 ; H31, P39) : prénom, nom, langue et couleur de la
-// personne, envoyés à `PATCH /api/plateforme/profile` sur le schéma de l'API (`profilePatchSchema`) : seuls
+// personne, envoyés à `PATCH /api/platform/profile` sur le schéma de l'API (`profilePatchSchema`) : seuls
 // les champs changés partent, un champ vidé part vide (la clé est retirée), « Enregistrer » est désactivé tant
 // que rien ne change, un refus se dit par la table des messages. Prénom et nom partent ensemble : le service
 // recompose de leurs deux valeurs le nom que lisent l'annuaire, le rail et l'assistant (HN-E05S11-2). La

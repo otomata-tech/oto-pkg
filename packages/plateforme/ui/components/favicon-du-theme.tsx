@@ -36,7 +36,7 @@ export function FaviconDuTheme() {
   useEffect(() => {
     const dessiner = (): void => {
       // La première racine du document est la coquille de la page : elle précède les pastilles de
-      // thème qu'elle contient (`/admin/marque`).
+      // thème qu'elle contient (l'écran de la marque).
       const racine = document.querySelector(".oto")
       if (racine === null) return
       const style = getComputedStyle(racine)

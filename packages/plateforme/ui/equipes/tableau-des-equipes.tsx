@@ -32,7 +32,7 @@ import { SuppressionDEquipe } from "./suppression-d-equipe"
 import type { Moi } from "./types"
 
 type Geste = "personnes" | "nom" | "supprimer"
-type Tri = "equipe" | "personnes"
+type Tri = "team" | "people"
 
 export type TableauDesEquipesProps = {
   /** Les équipes, déjà triées par la page selon l'adresse. */
@@ -62,10 +62,10 @@ function itemsDeLEquipe(equipe: TeamView, moi: Moi, ouvrir: (geste: Geste) => vo
 
 function colonnes(moi: Moi, ouvrir: (equipe: TeamView, geste: Geste) => void): Column<TeamView>[] {
   const communes: Column<TeamView>[] = [
-    { key: "equipe", header: "Équipe", primary: true, sortable: true, render: (equipe) => equipe.name },
+    { key: "team", header: "Équipe", primary: true, sortable: true, render: (equipe) => equipe.name },
     { key: "responsables", header: RESPONSABLES.colonne, render: (equipe) => equipe.leadName ?? RESPONSABLES.aucun },
     {
-      key: "personnes",
+      key: "people",
       header: "Personnes",
       sortable: true,
       // Un bouton, jamais une cellule cliquable : le clic sur le « ⋯ » ne doit pas l'armer aussi.
@@ -130,7 +130,7 @@ export function TableauDesEquipes({ equipes, personnes, moi, nomOrganisation, tr
         getRowId={(ligne) => ligne.id}
         sort={{ key: tri.cle, dir: tri.sens }}
         onSortChange={({ key, dir }) => {
-          if (key === "equipe" || key === "personnes") naviguer(adresses[key][dir])
+          if (key === "team" || key === "people") naviguer(adresses[key][dir])
         }}
         empty={
           <EmptyState icon={<AnimatedIcon as={UsersThree} size="lg" />} title="Aucune équipe pour l'instant">

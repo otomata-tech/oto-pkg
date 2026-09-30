@@ -1,4 +1,4 @@
-// Lecture publique d'un lien (E05-S10 partie d, ADR-013 § 4, § 5) : `GET /api/plateforme/public/<jeton>`,
+// Lecture publique d'un lien (E05-S10 partie d, ADR-013 § 4, § 5) : `GET /api/platform/public/<jeton>`,
 // et `?path=` pour un contenu dessous. Servie par la porte avant le jeton de session, sans identité ni
 // journal : le lecteur est anonyme, seul le jeton le désigne, et l'organisation est celle de l'adresse.
 // Adaptateur mince : `readPublicNode` (`server/shares.ts`) décide. Toujours `X-Robots-Tag: noindex,

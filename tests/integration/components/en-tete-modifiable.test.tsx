@@ -10,7 +10,7 @@ import { ResumeModifiable, TitreModifiable } from "../../../packages/plateforme/
 import { PAGE, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 // Le titre et le résumé écrits en place (E05-S02, AC16 ; E05-S10, AC-a1, AC-a10), sous la file d'écriture de
-// l'écran : `fetch` simulé pour `POST /api/plateforme/nodes`, relecture espionnée ; une relecture se joue en
+// l'écran : `fetch` simulé pour `POST /api/platform/nodes`, relecture espionnée ; une relecture se joue en
 // rerendant avec la lecture relue. Les champs sont montés comme l'en-tête les pose : le titre dans le `<h1>`,
 // le résumé à la place du résumé lu, avec l'éditeur de la page sous la même file.
 

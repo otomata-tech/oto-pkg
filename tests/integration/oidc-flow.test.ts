@@ -13,13 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import { acceptInvitations, createPlatformDb, resolveIdentity } from "@otomata_tech/oto_platform/server"
 import DashboardPage from "@/app/(dashboard)/page"
-import PlateformePage from "@/app/(dashboard)/plateforme/page"
+import PlateformePage from "@/app/(dashboard)/platform/page"
 import ForgotPasswordPage from "@/app/(auth)/forgot-password/page"
 import LoginPage from "@/app/(auth)/login/page"
 import ResetPasswordPage from "@/app/(auth)/reset-password/page"
-import { GET as apiRoute } from "@/app/api/plateforme/[...route]/route"
+import { GET as apiRoute } from "@/app/api/platform/[...route]/route"
 import { GET as supabaseCallback } from "@/app/auth/callback/route"
-import ConfirmerPage from "@/app/auth/confirmer/page"
+import ConfirmerPage from "@/app/auth/confirm/page"
 import { GET as callbackRoute } from "@/app/auth/oidc/callback/route"
 import { GET as loginRoute } from "@/app/auth/oidc/login/route"
 import { POST as logoutRoute } from "@/app/auth/oidc/logout/route"
@@ -117,7 +117,7 @@ describe("sign-in at the issuer (AC-b1)", () => {
     const issuer = await oidcHost()
 
     const opened = await middleware(request("/n/contexte"))
-    const posted = await middleware(request("/plateforme/invitations", new Map(), { method: "POST" }))
+    const posted = await middleware(request("/platform/invitations", new Map(), { method: "POST" }))
     const login = await loginRoute(request("/auth/oidc/login?redirect=%2Fn%2Fcontexte"))
 
     expect(opened.headers.get("location")).toBe(`${ORIGIN}/auth/oidc/login?redirect=%2Fn%2Fcontexte`)
@@ -431,7 +431,7 @@ describe("the rest of the host in both modes (AC-b6)", () => {
     const pages = [await DashboardPage(), await PlateformePage()]
     // La personne dont l'accueil résout l'identité, à l'hôte de la requête.
     const resolved = vi.mocked(resolveIdentity).mock.lastCall?.slice(1)
-    await apiRoute(new Request(`${ORIGIN}/api/plateforme/teams`))
+    await apiRoute(new Request(`${ORIGIN}/api/platform/teams`))
     return { user: session?.user, host: session?.host, caller, resolved, pages, token: vi.mocked(handlePlateforme).mock.lastCall?.[1].accessToken }
   }
 

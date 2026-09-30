@@ -85,7 +85,7 @@ export function ContactForm() {
 
 **Exception écrite — écrans du paquet.** Un écran de `packages/plateforme/ui/` ne connaît ni
 `server/` ni les Server Actions de l'hôte (`CLAUDE.md § Invariants techniques`, ADR-008 § 4) : sa
-mutation part de `handleSubmit` vers `/api/plateforme/<ressource>` par `appelerPlateforme`
+mutation part de `handleSubmit` vers `/api/platform/<ressource>` par `appelerPlateforme`
 (`packages/plateforme/ui/api/client.ts`), qui lit l'enveloppe `{ data }` / `{ error }` ; le
 message affiché vient de `messageDErreur` (`ui/api/messages.ts`). Le schéma reste unique : il vit
 dans `packages/plateforme/schemas/`, lu par le formulaire et par l'API. **Vérifiable :** aucun

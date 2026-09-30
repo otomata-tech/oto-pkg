@@ -37,7 +37,7 @@ test.describe.configure({ mode: "serial" })
 /** Le chemin courant d'un nœud lu par un chemin peut-être ancien (E03-S07) : `GET nodes?path=` le rend. */
 async function cheminCourant(page: Page, chemin: string): Promise<string> {
   return page.evaluate(async (lu) => {
-    const reponse = await fetch(`/api/plateforme/nodes?path=${encodeURIComponent(lu)}`)
+    const reponse = await fetch(`/api/platform/nodes?path=${encodeURIComponent(lu)}`)
     const corps: { data?: { path?: string } } = await reponse.json()
     return corps.data?.path ?? ""
   }, chemin)
@@ -49,7 +49,7 @@ async function remettreEnPlace(page: Page, chemin: string): Promise<void> {
   expect(courant).not.toBe("")
   if (courant === chemin) return
   const reponse = await page.evaluate(
-    async (corps) => (await fetch("/api/plateforme/nodes/move", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
+    async (corps) => (await fetch("/api/platform/nodes/move", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
     { path: courant, new_path: chemin },
   )
   expect(reponse).toBe(200)
@@ -207,7 +207,7 @@ test.describe("page d'un nœud", () => {
       await attendre(page.getByText(/^Brouillon non publié/)).toHaveCount(0)
       await capturer(page, testInfo, `publication-${mode}`)
       await attendre(async () => {
-        await page.goto(`${ESPACE.adresse}/n/${essai}?version=publiee`)
+        await page.goto(`${ESPACE.adresse}/n/${essai}?version=published`)
         await expect(page.getByText(`Essai ${horodatage}`)).toBeVisible()
       }).toPass({ timeout: 90_000 })
       await attendre(page.getByText(/^Version publiée \(révision \d+\)\.$/)).toBeVisible()
@@ -278,7 +278,7 @@ test.describe("page d'un nœud", () => {
         // Une page vide déjà titrée s'ouvre le focus dans son Texte (AC-g2).
         await attendre(page.getByRole("textbox", { name: /^Modifier ce texte — / })).toBeFocused()
         await attendre(async () => {
-          await page.goto(`${ESPACE.adresse}/n/${cree}?version=publiee`)
+          await page.goto(`${ESPACE.adresse}/n/${cree}?version=published`)
           await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Créée ${horodatage}`)
         }).toPass({ timeout: 90_000 })
         await capturer(page, testInfo, `creee-publiee-${mode}`)
@@ -286,7 +286,7 @@ test.describe("page d'un nœud", () => {
         // AC-g1 : une publication refusée pour son en-tête (réponse du service simulée, `details.reason`) le dit en
         // alerte, sans « Réessayer » ; les écritures du brouillon passent.
         await page.goto(`${ESPACE.adresse}/n/${cree}`)
-        await page.route("**/api/plateforme/nodes", async (route) => {
+        await page.route("**/api/platform/nodes", async (route) => {
           const corps: unknown = route.request().postDataJSON()
           if (route.request().method() !== "POST" || !(typeof corps === "object" && corps !== null && "publish" in corps && corps.publish === true)) return route.continue()
           return route.fulfill({
@@ -303,10 +303,10 @@ test.describe("page d'un nœud", () => {
         await attendre(alerte).toHaveText("Ce changement d'en-tête est refusé : demandez à votre assistant d'abandonner le brouillon.")
         await expect(page.getByRole("button", { name: "Réessayer" })).toHaveCount(0)
         await capturer(page, testInfo, `en-tete-refuse-${mode}`)
-        await page.unroute("**/api/plateforme/nodes")
+        await page.unroute("**/api/platform/nodes")
       } finally {
         const statutDeLaCorbeille = await page.evaluate(
-          async (corps) => (await fetch("/api/plateforme/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
+          async (corps) => (await fetch("/api/platform/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
           { path: cree },
         )
         expect(statutDeLaCorbeille).toBe(200)

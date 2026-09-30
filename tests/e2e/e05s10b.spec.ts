@@ -32,12 +32,12 @@ const MOBILE = "Mobile d'essai"
 async function deplacerParLAPI(page: Page, chemin: string, nouveauChemin: string): Promise<void> {
   const statut = await page.evaluate(
     async ({ lu, cible }) => {
-      const tete = await fetch(`/api/plateforme/nodes?path=${encodeURIComponent(lu)}`)
+      const tete = await fetch(`/api/platform/nodes?path=${encodeURIComponent(lu)}`)
       if (tete.status === 404) return 200
       const courant: string = (await tete.json()).data?.path ?? ""
       if (courant === cible) return 200
       const corps = JSON.stringify({ path: courant, new_path: cible })
-      return (await fetch("/api/plateforme/nodes/move", { method: "POST", headers: { "content-type": "application/json" }, body: corps })).status
+      return (await fetch("/api/platform/nodes/move", { method: "POST", headers: { "content-type": "application/json" }, body: corps })).status
     },
     { lu: chemin, cible: nouveauChemin },
   )

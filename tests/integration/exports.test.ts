@@ -51,7 +51,7 @@ describe.skipIf(!sqlConfigured)(portable("the exports of a page and of a table")
   }, SEED_TIMEOUT)
 
   async function exported(routes: { GET?: Route | readonly Route[] }, person: Person, path: string, identity?: Identity) {
-    const request = new Request(`https://acme.test/api/plateforme/x/export?path=${encodeURIComponent(path)}`)
+    const request = new Request(`https://acme.test/api/platform/x/export?path=${encodeURIComponent(path)}`)
     const context = { db: await ref.db(person), identity: identity ?? acmeIdentity(ref, person), request, params: ["export"], body: undefined, origin: "https://acme.test" }
     return exportRoute(routes).handle(context).catch((error: unknown) => error)
   }

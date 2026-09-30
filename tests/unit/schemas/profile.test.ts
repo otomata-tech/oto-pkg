@@ -3,7 +3,7 @@ import { profilePatchSchema } from "../../../packages/plateforme/schemas"
 
 // La fiche qu'une personne écrit (E05-S04, AC13 ; H31, P39 ; E05-S11, AC-3, AC-5) : ses noms, sa langue et sa
 // couleur, aux bornes d'`update_my_profile` (migration `20260928110000_platform_profil.sql`), lus par la page
-// « Profil » et par `PATCH /api/plateforme/profile`.
+// « Profil » et par `PATCH /api/platform/profile`.
 
 describe("profilePatchSchema (AC13, AC-5)", () => {
   it("should accept names of 80 characters at most, the language fr or en and one of the eight themes, an empty string removing the key", () => {

@@ -160,6 +160,63 @@ describe("check-framework on a throwaway repository", { timeout: 30_000 }, () =>
     expect(result.status, result.output).toBe(0)
   })
 
+  // E11-S07 (AC-d1) : un segment de route de `src/app` est pris dans la liste des segments admis, en anglais.
+  const PAGE = "export default function Page() {\n  return null\n}\n"
+
+  it.each<[string, string]>([
+    ["a French route folder", "src/app/(dashboard)/equipes/page.tsx"],
+    ["a route folder in British spelling", "src/app/(dashboard)/admin/organisation/page.tsx"],
+  ])("should report %s, naming the file and the segment", (_cas, fichier) => {
+    const result = checkFramework(repo({ [fichier]: PAGE }))
+    const segment = fichier.split("/").at(-2)
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain(`✖  ${fichier} : segment de route « ${segment} » absent de SEGMENTS_ADMIS`)
+  })
+
+  it("should let English route folders, groups, parameters, private folders, slots and dot folders through", () => {
+    const result = checkFramework(
+      repo({
+        "src/app/(dashboard)/admin/organization/page.tsx": PAGE,
+        "src/app/(dashboard)/n/[...chemin]/page.tsx": PAGE,
+        "src/app/(dashboard)/_composants/bouton.tsx": PAGE,
+        "src/app/@apercu/default.tsx": PAGE,
+        "src/app/.well-known/oauth-protected-resource/route.ts": "export const GET = () => new Response()\n",
+      }),
+    )
+    expect(result.status, result.output).toBe(0)
+  })
+
+  // E11-S07 (AC-d2) : aucun ancien nom français en position d'adresse, avec le fichier, la ligne et le nouveau nom.
+  it.each<[string, string, string]>([
+    ["the former API prefix", 'await fetch("/api/plateforme/x")', "« api/plateforme » — écrire « /api/platform »"],
+    ["a French parameter", 'const adresse = "/teams?onglet=members"', "« ?onglet= » — écrire « ?tab= »"],
+    ["the British spelling in an address", 'redirect("/admin/organisation")', "« /admin/organisation » — écrire « /admin/organization »"],
+    ["a French parameter set on URLSearchParams", 'recherche.set("onglet", "members")', '« .set("onglet" » — écrire « tab »'],
+    ["a French parameter appended to URLSearchParams", "recherche.append('curseur', suivant)", "« .append('curseur' » — écrire « cursor »"],
+    ["a French GET form field", '<input type="hidden" name="periode" value="7" />', '« name="periode" » — écrire « period »'],
+    ["a French filter choice", '<ChoixDuFiltre nom={"equipe"} />', '« nom={"equipe" » — écrire « team »'],
+    ["a French key of URLSearchParams", 'new URLSearchParams({ etat: "open" })', "« URLSearchParams({ etat: » — écrire « state »"],
+    ["a French shorthand key after another", "new URLSearchParams({ tab, sens })", "« URLSearchParams({ tab, sens } » — écrire « order »"],
+    ["the former anchor of Everyone's Context", 'href="/context#contexte-tout-le-monde"', "« #contexte-tout-le-monde » — écrire « #everyone-context »"],
+  ])("should report %s written in an address", (_cas, ligne, erreur) => {
+    const result = checkFramework(repo({ "src/lib/adresse.ts": `// Une adresse.\n${ligne}\n` }))
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain(`✖  src/lib/adresse.ts:2 : ancien nom d'adresse ${erreur}`)
+  })
+
+  it.each<[string, string]>([
+    ["a French word in a comment", "// Restaurer depuis la corbeille.\n"],
+    ["a module path", 'import { EcranOrganisation } from "./admin/organisation/ecran-organisation"\n'],
+    ["the British spelling in an English text", 'const texte = "Ask an administrator of the organisation."\n'],
+    ["the presence parameter, kept", 'recherche.set("presence", "empty")\n'],
+    ["English parameters with French values", 'new URLSearchParams({ tab: "etat", period: String(7) }).set("filter", "tri")\n'],
+    ["French words in a screen text", '<Select name="team" label="Équipe">Le tri, le sens et la période de l\'état</Select>\n'],
+    ["a Map keyed by a variable", "etats.set(etat, 1)\n"],
+  ])("should let %s through", (_cas, contenu) => {
+    const result = checkFramework(repo({ "src/lib/texte.ts": contenu }))
+    expect(result.status, result.output).toBe(0)
+  })
+
   it("should not stat the entries of .claude/worktrees/, which vanish when a worktree is removed", () => {
     const at = repo()
     // Un lien vers un dossier absent (junction sous Windows) : readdirSync le liste, statSync lève

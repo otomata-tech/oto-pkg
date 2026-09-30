@@ -1,4 +1,4 @@
-// Les pages `/admin/usage` et `/admin/retours` (E08-S09, AC1) et les entrées d'administration du
+// Les pages `/admin/usage` et `/admin/feedback` (E08-S09, AC1) et les entrées d'administration du
 // layout `(dashboard)` (E08-S03 N9) : l'accès décidé par l'identité, avant tout appel de service. E05-S13 :
 // l'usage caché (AC-8), les retours au membre de l'équipe plateforme qui administre l'organisation (AC-9),
 // « Journal » dans les réglages et un seul groupe sans sous-titre pour le client (AC-10). Session de l'hôte et
@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { listFeedback, listTeams, usageSummary, type Identity, type PlatformDb } from "@otomata_tech/oto_platform/server"
 import DashboardLayout from "@/app/(dashboard)/layout"
-import RetoursPage, { metadata as retoursMetadata } from "@/app/(dashboard)/admin/retours/page"
+import RetoursPage, { metadata as retoursMetadata } from "@/app/(dashboard)/admin/feedback/page"
 import UsagePage from "@/app/(dashboard)/admin/usage/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
@@ -61,7 +61,7 @@ function identite(profil: Profil): Identity {
 
 const connecte = (profil: Profil) => ({ data: { identity: identite(profil), session: SESSION } })
 
-const retours = () => RetoursPage({ searchParams: Promise.resolve({ periode: "7", etat: "all" }) })
+const retours = () => RetoursPage({ searchParams: Promise.resolve({ period: "7", state: "all" }) })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -83,7 +83,7 @@ describe("/admin/usage, hidden (E05-S13, AC-8)", () => {
   })
 })
 
-describe("/admin/retours, reserved to the platform team (E08-S09, AC1 ; E05-S13, AC-9)", () => {
+describe("/admin/feedback, reserved to the platform team (E08-S09, AC1 ; E05-S13, AC-9)", () => {
   // Chaque branche de `handlesFeedback` seule fausse : pas de l'équipe plateforme (administrateur, membre), de
   // l'équipe plateforme sans accès en cours ni rôle d'administrateur.
   it.each(["admin", "member", "staff-without-access"] as const)("should render not found to %s, calling no service", async (profil) => {
@@ -100,7 +100,7 @@ describe("/admin/retours, reserved to the platform team (E08-S09, AC1 ; E05-S13,
     expect(listFeedback).toHaveBeenCalledWith(SESSION.db, identite("staff-member"), { state: undefined, type: undefined, days: 7, cursor: undefined })
     expect(screen.queryByRole("alert")).toBeNull()
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Retours des assistants")
-    expect(within(screen.getByRole("navigation", { name: "Chemin" })).getByRole("link", { name: "Suivi de l’entreprise" })).toHaveAttribute("href", "/admin/retours")
+    expect(within(screen.getByRole("navigation", { name: "Chemin" })).getByRole("link", { name: "Suivi de l’entreprise" })).toHaveAttribute("href", "/admin/feedback")
   })
 
   it("should send a visitor without a session to /login, and say a failed identity", async () => {

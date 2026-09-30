@@ -73,7 +73,7 @@ const verifyToken: VerifyToken = async () => ({ token: "token", clientId: "", sc
 
 function request(method: string, path: string, body?: unknown) {
   const host = admin.orgs.acme.host
-  return new Request(`https://${host}/api/plateforme/${path}`, {
+  return new Request(`https://${host}/api/platform/${path}`, {
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: { "x-forwarded-proto": "https", origin: `https://${host}`, "content-type": "application/json" },

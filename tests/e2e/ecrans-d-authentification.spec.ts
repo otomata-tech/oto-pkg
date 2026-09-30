@@ -35,7 +35,7 @@ const ECRANS: Ecran[] = [
   },
   {
     nom: "confirmation",
-    chemin: "/auth/confirmer?token_hash=e2e&type=email&next=/",
+    chemin: "/auth/confirm?token_hash=e2e&type=email&next=/",
     titre: "Connexion",
     onglet: "Ouvrir votre session | Oto",
   },
@@ -142,7 +142,7 @@ test.describe("aucune organisation (E05-S07, AC10, AC14)", () => {
         const page = await ouvrir(browser, undefined, { largeur, schema })
         await seConnecter(page, { baseURL: adresse.origin, email, password })
 
-        await expect(page).toHaveURL(/\/aucune-organisation$/)
+        await expect(page).toHaveURL(/\/no-organization$/)
         await expect(page).toHaveTitle("Aucune organisation | Oto")
         await expect(page.locator(".oto")).toHaveCount(1)
         await expect(page.locator(".oto")).toHaveAttribute("data-oto-theme", "cobalt")

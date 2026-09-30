@@ -37,7 +37,7 @@ describe.skipIf(!sqlConfigured)(
     async function call(place: Place, who: Who, request: { method: string; path: string; body?: unknown }): Promise<Answer> {
       const tasks: Task[] = []
       const response = await handlePlateforme(
-        new Request(`https://${place.host}/api/plateforme/${request.path}`, {
+        new Request(`https://${place.host}/api/platform/${request.path}`, {
           method: request.method,
           body: request.body === undefined ? undefined : JSON.stringify(request.body),
           headers: { origin: `https://${place.host}`, "x-forwarded-proto": "https", "user-agent": USER_AGENT, "content-type": "application/json" },

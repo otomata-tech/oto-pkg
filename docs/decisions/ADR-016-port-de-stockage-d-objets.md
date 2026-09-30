@@ -60,7 +60,7 @@ Postgres (`bytea`) et contre Supabase Storage.
    Le quota compte les lignes `pending` et `ready`, et se lit sous un verrou de l'organisation. Une
    ligne `pending` de plus d'une heure est purgée, objet compris, au début de chaque demande
    d'envoi de l'organisation et au passage de la corbeille.
-5. **Lecture par une route du paquet** : `GET /api/plateforme/files/<id>`. Le service vérifie la
+5. **Lecture par une route du paquet** : `GET /api/platform/files/<id>`. Le service vérifie la
    lecture sur le nœud du fichier, puis redirige vers une URL présignée de 60 secondes. Le type et
    la disposition sont fixés **dans l'URL signée** (`response-content-type`,
    `response-content-disposition`), jamais lus de l'objet :
@@ -77,7 +77,7 @@ Postgres (`bytea`) et contre Supabase Storage.
    E05-S10) supprime les objets des nœuds purgés, après le commit. **Dupliquer** une page copie ses
    objets (`copy`) sous des identifiants neufs, et réécrit les blocs de la copie : un fichier
    n'appartient jamais à deux nœuds (fiche D118).
-7. **Partage public** (ADR-013) : `GET /api/plateforme/public/<jeton>/files/<id>`, par une fonction
+7. **Partage public** (ADR-013) : `GET /api/platform/public/<jeton>/files/<id>`, par une fonction
    `security definer` exécutée sous `anon`, sans fichier de l'hôte. Elle ne sert qu'un fichier cité
    par un bloc **publié** d'un nœud couvert par le lien, sous la règle du contenu : ce que l'auteur
    du lien lit à cet instant.

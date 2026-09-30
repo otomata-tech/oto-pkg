@@ -288,7 +288,7 @@ describe("auth:settings arguments and token", () => {
     },
   )
 
-  it.each(["http://localhost:3000/**", "http://*.localhost:3000/**", "https://*.example.test/**", REDIRECT, `${SITE}/auth/confirmer`])(
+  it.each(["http://localhost:3000/**", "http://*.localhost:3000/**", "https://*.example.test/**", REDIRECT, `${SITE}/auth/confirm`])(
     "should take %s for an address of the application, not a catch-all",
     (pattern) => {
       expect(catchAll(pattern)).toBe(false)

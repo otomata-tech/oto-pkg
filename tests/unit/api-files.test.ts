@@ -44,7 +44,7 @@ const verifyToken = vi.fn<VerifyToken>()
 type Task = () => Promise<void>
 
 function request(method: string, path: string, body?: string) {
-  return new Request(`${ORIGIN}/api/plateforme/${path}`, { method, body, headers: { "x-forwarded-proto": "https", origin: ORIGIN } })
+  return new Request(`${ORIGIN}/api/platform/${path}`, { method, body, headers: { "x-forwarded-proto": "https", origin: ORIGIN } })
 }
 
 async function call(req: Request, accessToken: string | null = "token") {

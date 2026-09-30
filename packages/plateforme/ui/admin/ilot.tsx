@@ -63,7 +63,7 @@ export function Chargement({ texte }: { texte: string }) {
   )
 }
 
-/** Le chargement de `/admin/acces`, qui monte `AccesPlateforme` d'E05-S03 dans l'écran d'administration. */
+/** Le chargement de l'écran des accès plateforme, qui monte `AccesPlateforme` d'E05-S03 dans l'écran d'administration. */
 export function AccesPlateformeChargement() {
   return <Chargement texte="Chargement des accès plateforme…" />
 }

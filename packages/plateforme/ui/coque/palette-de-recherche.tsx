@@ -4,7 +4,7 @@
 // ouvrent — les écrans fixes sous « Aller à », puis l'arbre du rail aplati et groupé par NATURE (on
 // cherche « la page des garanties », pas « ce qu'il y a dans Ventes »), recherche floue sur les noms,
 // sans requête ; un choix ouvre sa destination. Changé : la palette cherche aussi dans le CONTENU, par
-// le service de `find` (`GET /api/plateforme/search`, AC-a7) : les pages trouvées s'ajoutent sous « Dans
+// le service de `find` (`GET /api/platform/search`, AC-a7) : les pages trouvées s'ajoutent sous « Dans
 // le contenu », avec leur extrait. Retiré : exécutions, agents, connecteurs de la coquille d'Oto.
 import { useRechercheDeContenus, type RechercheDeContenus } from "../api/use-recherche-de-contenus"
 import { natureDuGenre, titreDeContexte } from "../arbre/depuis-l-arbre"

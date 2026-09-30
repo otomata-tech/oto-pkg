@@ -34,14 +34,14 @@ const ADRESSES: AdressesDuRail = {
   pages: "/n/",
   journal: "/journal",
   usage: "/admin/usage",
-  retours: "/admin/retours",
-  organisation: "/admin/organisation",
-  equipes: "/equipes",
+  retours: "/admin/feedback",
+  organisation: "/admin/organization",
+  equipes: "/teams",
   // Servies ici pour prouver qu'elles ne sont plus des frères (E05-S11, AC-31, AC-32).
-  marque: "/admin/marque",
-  drapeaux: "/admin/drapeaux",
-  acces: "/admin/acces",
-  connecteurs: "/admin/connecteurs",
+  marque: "/admin/brand",
+  drapeaux: "/admin/flags",
+  acces: "/admin/access",
+  connecteurs: "/admin/connectors",
 }
 
 function bloc(rang: number, type: BlockView["type"], text: string): BlockView {
@@ -66,9 +66,9 @@ type Options = Pick<EcranOrganisationProps, "marque" | "enregistre" | "contexte"
 function ecran(organisation: OrgView | { error: string } = DEMO, { administre = true, ...props }: Options = {}) {
   const resultat = "error" in organisation ? organisation : { data: organisation }
   return (
-    <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/organisation", naviguer }}>
+    <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/organization", naviguer }}>
       <ContexteDeRafraichissement.Provider value={rafraichir}>
-        <EcranOrganisation resultat={resultat} Lien={Lien} ici="/admin/organisation" hrefGuide="/n/contexte" fil={{ adresses: ADRESSES, administre }} {...props} />
+        <EcranOrganisation resultat={resultat} Lien={Lien} ici="/admin/organization" hrefGuide="/n/contexte" fil={{ adresses: ADRESSES, administre }} {...props} />
       </ContexteDeRafraichissement.Provider>
     </ContexteDeLHote.Provider>
   )
@@ -95,7 +95,7 @@ beforeEach(() => {
   rafraichir.mockReset()
   naviguer.mockReset()
   vi.stubGlobal("fetch", fetchMock)
-  vi.stubGlobal("location", { ...window.location, pathname: "/admin/organisation", assign })
+  vi.stubGlobal("location", { ...window.location, pathname: "/admin/organization", assign })
 })
 
 afterEach(() => {
@@ -145,7 +145,7 @@ describe("EcranOrganisation, the brand (E05-S11, AC-22)", () => {
     expect(couleur.getByText("La couleur de chaque compte qui n'a pas choisi la sienne dans son profil.")).toBeInTheDocument()
   })
 
-  it("should write the whole brand by PATCH /api/plateforme/brand, the former display name removed, then come back to the screen with ?enregistre=1", async () => {
+  it("should write the whole brand by PATCH /api/platform/brand, the former display name removed, then come back to the screen with ?saved=1", async () => {
     const marque = { theme: "foret", logo_url: "https://example.com/logo.png", display_name: null }
     fetchMock.mockResolvedValue(reponse(200, { data: marque }))
     render(ecran(DEMO, { marque: MARQUE }))
@@ -153,8 +153,8 @@ describe("EcranOrganisation, the brand (E05-S11, AC-22)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Forêt" }))
     fireEvent.click(within(screen.getByRole("region", { name: "La couleur" })).getByRole("button", { name: "Enregistrer" }))
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/admin/organisation?enregistre=1"))
-    expect(envoi()).toEqual({ url: "/api/plateforme/brand", methode: "PATCH", corps: marque })
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/admin/organization?saved=1"))
+    expect(envoi()).toEqual({ url: "/api/platform/brand", methode: "PATCH", corps: marque })
   })
 
   it("should say the brand was saved when the screen comes back from it", () => {
@@ -186,7 +186,7 @@ describe("EcranOrganisation, the Contexte of Tout le monde (E05-S11, AC-24)", ()
   it("should say a failed read, with a way to retry", async () => {
     const contexte = await avecLeContexte(Promise.resolve({ error: "Une erreur est survenue. Réessayez." }))
     expect(contexte.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(contexte.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organisation")
+    expect(contexte.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organization")
   })
 })
 
@@ -195,7 +195,7 @@ describe("EcranOrganisation, the trail of the settings (E05-S09, AC-d2 ; setting
     render(ecran())
 
     const fil = within(screen.getByRole("navigation", { name: "Chemin" }))
-    expect(fil.getByRole("link", { name: "Réglages de l’entreprise" })).toHaveAttribute("href", "/admin/organisation")
+    expect(fil.getByRole("link", { name: "Réglages de l’entreprise" })).toHaveAttribute("href", "/admin/organization")
     const courant = fil.getByRole("button", { name: "Organisation" })
     expect(courant).toHaveAttribute("aria-current", "page")
     fireEvent.click(courant)
@@ -207,7 +207,7 @@ describe("EcranOrganisation, the trail of the settings (E05-S09, AC-d2 ; setting
       ["Journal", "false"],
     ])
     fireEvent.click(freres[1])
-    expect(naviguer).toHaveBeenCalledWith("/equipes")
+    expect(naviguer).toHaveBeenCalledWith("/teams")
   })
 
   it("should show no trail to a person who does not administer the organisation", () => {
@@ -228,7 +228,7 @@ describe("EcranOrganisation, settings (AC3)", () => {
     fireEvent.click(enregistrer())
 
     await waitFor(() => expect(enregistrer()).toHaveTextContent("Enregistrement…"))
-    expect(envoi()).toEqual({ url: "/api/plateforme/admin/org", methode: "PATCH", corps: { name: "Démo Énergie" } })
+    expect(envoi()).toEqual({ url: "/api/platform/admin/org", methode: "PATCH", corps: { name: "Démo Énergie" } })
     await act(async () => repondre(reponse(200, { data: { org: { ...DEMO, name: "Démo Énergie" } } })))
 
     expect(await screen.findByRole("status")).toHaveTextContent("Enregistré")
@@ -284,7 +284,7 @@ describe("EcranOrganisation, states (AC12)", () => {
     render(ecran({ error: "Cette page est réservée aux administrateurs de Démo." }, { marque: MARQUE }))
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Organisation")
     expect(screen.getByRole("alert")).toHaveTextContent("Cette page est réservée aux administrateurs de Démo.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organisation")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organization")
     expect(screen.queryByRole("heading", { level: 2 })).toBeNull()
   })
 })

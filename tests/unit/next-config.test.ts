@@ -24,7 +24,7 @@ async function entetesDe(chemin: string): Promise<Record<string, string>> {
 
 describe("next.config.ts headers (AC20)", () => {
   it("should deny framing on every path, the consent page included", async () => {
-    for (const chemin of ["/oauth/consent", "/n/ventes", `/api/plateforme/files/${FICHIER}`, `/api/plateforme/files/${FICHIER}/markdown`, `/p/${JETON}`]) {
+    for (const chemin of ["/oauth/consent", "/n/ventes", `/api/platform/files/${FICHIER}`, `/api/platform/files/${FICHIER}/markdown`, `/p/${JETON}`]) {
       expect(await entetesDe(chemin)).toEqual({
         "X-Frame-Options": "DENY",
         "X-Content-Type-Options": "nosniff",
@@ -35,18 +35,17 @@ describe("next.config.ts headers (AC20)", () => {
   })
 
   it("should leave out X-Frame-Options and the global Referrer-Policy on the two isolated HTML routes only (E10-S02, AC-c3)", async () => {
-    for (const chemin of [`/api/plateforme/files/${FICHIER}/html`, `/api/plateforme/public/${JETON}/files/${FICHIER}/html`]) {
+    for (const chemin of [`/api/platform/files/${FICHIER}/html`, `/api/platform/public/${JETON}/files/${FICHIER}/html`]) {
       expect(await entetesDe(chemin)).toEqual({ "X-Content-Type-Options": "nosniff", "Permissions-Policy": "camera=(), microphone=(), geolocation=()" })
     }
-    expect(Object.keys(await entetesDe(`/api/plateforme/files/${FICHIER}/html/suite`))).toContain("X-Frame-Options")
+    expect(Object.keys(await entetesDe(`/api/platform/files/${FICHIER}/html/suite`))).toContain("X-Frame-Options")
   })
 })
 
-// Les redirections de l'hôte (`seo-patterns.md § Règles SEO`) : un favori d'une page retirée mène à
-// celle qui la remplace, jamais à une 404.
+// E11-S07 (HN-E11S07-5) : une adresse renommée ou retirée répond 404, sans alias ni redirection, tant qu'aucune page
+// publique indexée n'est en cause (`seo-patterns.md § Règles SEO`).
 describe("next.config redirects", () => {
-  it("should send the invitation page removed by E05-S03 to /equipes, permanently", async () => {
-    const redirections = (await nextConfig.redirects?.()) ?? []
-    expect(redirections).toContainEqual({ source: "/plateforme/invitations", destination: "/equipes", permanent: true })
+  it("should declare no redirect (E11-S07, AC-a1)", () => {
+    expect(nextConfig.redirects).toBeUndefined()
   })
 })

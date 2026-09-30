@@ -2,7 +2,7 @@
 
 // « @ » dans un bloc (E05-S10, AC-a9, décision de JB du 2026-09-27) : un « @ » tapé en début de texte ou après
 // un blanc ouvre, sous le champ, la liste des contenus que la personne peut lire, cherchés par le service de
-// l'outil `find` (`GET /api/plateforme/search`, la recherche de la palette ⌘K, `useRechercheDeContenus`) dès deux lettres ; le choix remplace
+// l'outil `find` (`GET /api/platform/search`, la recherche de la palette ⌘K, `useRechercheDeContenus`) dès deux lettres ; le choix remplace
 // « @… » par le lien `[[chemin|titre]]` existant, que la publication écrit dans `links` et que l'écran rend par
 // son titre. Aucun type de bloc nouveau. Les flèches parcourent la liste, Entrée ou Tab choisit, Échap ferme ;
 // le focus reste dans le champ, qui désigne l'option active (`aria-activedescendant`). Sans lui, citer un

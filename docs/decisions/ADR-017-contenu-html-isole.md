@@ -29,7 +29,7 @@ l'application (`uploads-patterns.md § Validation`), et le bucket sert un fichie
 1. **Rendu dans un iframe de la visionneuse**, jamais dans le DOM d'un écran. « Voir » ouvre la
    visionneuse à l'adresse du contenu (`?view=<id>`) : un en-tête hors du contenu, la bannière
    (§ 5), puis un iframe qui occupe la hauteur de la fenêtre. L'iframe charge une route du paquet,
-   `GET /api/plateforme/files/<id>/html`, servie par une branche avant la table de dispatch, qui lit
+   `GET /api/platform/files/<id>/html`, servie par une branche avant la table de dispatch, qui lit
    le fichier dans le bucket par le serveur. Elle n'utilise pas `srcdoc`, qui hériterait de la
    politique et de l'origine de la page parente.
    - **Contrôles** : la route vérifie la lecture sur le nœud du fichier. Elle refuse par
@@ -78,7 +78,7 @@ l'application (`uploads-patterns.md § Validation`), et le bucket sert un fichie
 4. **Publication** : la règle existante des contenus s'applique (fiche D135) ; un fichier joint
    n'est servi par un lien public que s'il est cité par un bloc publié (ADR-016 § 7).
 5. **Partage public** (ADR-013), servi (JB, 2026-09-28, fiche D112) :
-   - le fichier se lit par `GET /api/plateforme/public/<jeton>/files/<id>/html`, sans fichier de
+   - le fichier se lit par `GET /api/platform/public/<jeton>/files/<id>/html`, sans fichier de
      l'hôte, par la fonction `platform.public_file_by_token` exécutée sous `anon` : seulement un
      fichier cité par un bloc publié du périmètre partagé, avec les mêmes en-têtes, le même
      `sandbox`, la même règle `Sec-Fetch-Dest` et, en plus, `X-Robots-Tag: noindex, nofollow` ;

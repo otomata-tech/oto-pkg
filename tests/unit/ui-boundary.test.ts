@@ -69,7 +69,7 @@ describe("ui/ boundary (eslint.config.mjs)", { timeout: 30_000 }, () => {
   })
 
   it("should accept a ui/ file that talks to api/ over HTTP", async () => {
-    const code = `export async function loadVersion() {\n  return fetch("/api/plateforme/version")\n}\n`
+    const code = `export async function loadVersion() {\n  return fetch("/api/platform/version")\n}\n`
     expect(await boundaryErrors(code)).toEqual([])
   })
 })

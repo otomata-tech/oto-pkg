@@ -46,23 +46,23 @@ function simulerLeStockage({ actif = true, refus, disponible = true, octets = ""
       const url = String(adresse)
       const corps = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : null
       appels.push({ methode, adresse: url, corps })
-      if (url === "/api/plateforme/files" && methode === "GET") return reponse(200, { data: { enabled: actif } })
-      if (url === "/api/plateforme/files") {
+      if (url === "/api/platform/files" && methode === "GET") return reponse(200, { data: { enabled: actif } })
+      if (url === "/api/platform/files") {
         if (refus) return reponse(refus.statut, { error: { code: refus.code, message: "refused", ...(refus.details ? { details: refus.details } : {}) } })
         return reponse(201, { data: { id: ID_FICHIER, upload: { url: "https://stockage.test/objet-signe", headers: { "content-type": String(corps?.mime) } } } })
       }
       if (url.endsWith("/complete")) {
         // La ligne confirmée : le nom et la taille demandés, le type de l'extension (HN-E10S02-25).
-        const demande = appels.find((un) => un.adresse === "/api/plateforme/files" && un.methode === "POST")?.corps
+        const demande = appels.find((un) => un.adresse === "/api/platform/files" && un.methode === "POST")?.corps
         const nom = String(demande?.name)
         const type = fileTypeOf(nom)
         return reponse(200, { data: { id: ID_FICHIER, name: nom, size: demande?.size, mime: type ? FILE_TYPES[type] : "" } })
       }
-      if (url.startsWith("/api/plateforme/files/") && url.endsWith("?check")) {
+      if (url.startsWith("/api/platform/files/") && url.endsWith("?check")) {
         if (disponible === "not_found") return reponse(404, { error: { code: "not_found", message: "Unknown file." } })
         return reponse(200, { data: { available: disponible } })
       }
-      if (url.startsWith("/api/plateforme/files/")) return new Response(octets, { status: 200 })
+      if (url.startsWith("/api/platform/files/")) return new Response(octets, { status: 200 })
       if (url.endsWith("/tables/import")) return reponse(200, { data: { path: corps?.table, created: 2, updated: 0, unchanged: 0, ignored: [] } })
       // Une écriture de la page : chaque insertion reçoit un `id` neuf, chaque remplacement garde le sien.
       const ops = Array.isArray(corps?.ops) ? (corps.ops as { op: string; block?: string }[]) : []
@@ -76,7 +76,7 @@ function simulerLeStockage({ actif = true, refus, disponible = true, octets = ""
       return reponse(200, { data: { path: corps?.path, revision: 4, status: "published", has_draft: true, touched, draft_stamp: "2026-09-29T10:00:00.000000+00:00" } })
     }),
   )
-  return { appels, ecritures: () => appels.filter((un) => un.adresse === "/api/plateforme/nodes").map((un) => un.corps?.ops) }
+  return { appels, ecritures: () => appels.filter((un) => un.adresse === "/api/platform/nodes").map((un) => un.corps?.ops) }
 }
 
 /** L'envoi au stockage (`XMLHttpRequest`) : gardé à l'envoi ; le test joue sa progression, sa réponse ou son annulation. */
@@ -199,7 +199,7 @@ describe("EditeurDeBlocs — an image (AC-b1)", () => {
     await waitFor(() => expect(EnvoiSimule.envois).toHaveLength(1))
     const [envoi] = EnvoiSimule.envois
     expect([envoi.methode, envoi.adresse, envoi.entetes, envoi.corps instanceof File]).toEqual(["PUT", "https://stockage.test/objet-signe", { "content-type": "image/png" }, true])
-    expect(appels.find((un) => un.adresse === "/api/plateforme/files" && un.methode === "POST")?.corps).toEqual({ node: "ventes/modele_relance", name: "plan.png", mime: "image/png", size: 4 })
+    expect(appels.find((un) => un.adresse === "/api/platform/files" && un.methode === "POST")?.corps).toEqual({ node: "ventes/modele_relance", name: "plan.png", mime: "image/png", size: 4 })
     expect(document.querySelector('img[src="blob:apercu"]')).not.toBeNull()
     act(() => envoi.progresser(2, 4))
     expect(screen.getByRole("progressbar", { name: (nom) => nom.startsWith(FICHIERS.envoi("plan.png")) })).toHaveAttribute("value", "0.5")
@@ -207,7 +207,7 @@ describe("EditeurDeBlocs — an image (AC-b1)", () => {
     await act(async () => envoi.repondre(200))
     await waitFor(() => expect(ecritures()).toHaveLength(1))
     expect(ecritures()).toEqual([[{ op: "insert_after", block: ID.objet, input: { type: "image", data: { file_id: ID_FICHIER } } }]])
-    expect(document.querySelector(`img[src="/api/plateforme/files/${ID_FICHIER}"]`)).not.toBeNull()
+    expect(document.querySelector(`img[src="/api/platform/files/${ID_FICHIER}"]`)).not.toBeNull()
     expect(document.querySelector('img[src="blob:apercu"]')).toBeNull()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:apercu")
   })
@@ -261,8 +261,8 @@ describe("EditeurDeBlocs — a file (AC-b2)", () => {
     await waitFor(() => expect(ecritures()).toHaveLength(1))
     expect(ecritures()).toEqual([[{ op: "insert_after", block: ID.objet, input: { type: "file", data: { file_id: ID_FICHIER, name: "rapport.pdf", size: 12_800, mime: "application/pdf" } } }]])
     const voir = await screen.findByRole("link", { name: FICHIERS.voirNom("rapport.pdf") })
-    expect([voir.getAttribute("href"), voir.getAttribute("target"), voir.getAttribute("rel")]).toEqual([`/api/plateforme/files/${ID_FICHIER}?disposition=inline`, "_blank", "noopener noreferrer"])
-    expect(screen.getByRole("link", { name: FICHIERS.telechargerNom("rapport.pdf") })).toHaveAttribute("href", `/api/plateforme/files/${ID_FICHIER}`)
+    expect([voir.getAttribute("href"), voir.getAttribute("target"), voir.getAttribute("rel")]).toEqual([`/api/platform/files/${ID_FICHIER}?disposition=inline`, "_blank", "noopener noreferrer"])
+    expect(screen.getByRole("link", { name: FICHIERS.telechargerNom("rapport.pdf") })).toHaveAttribute("href", `/api/platform/files/${ID_FICHIER}`)
     expect(screen.getByText(tailleLisible(12_800))).toBeInTheDocument()
   })
 
@@ -300,7 +300,7 @@ describe("EditeurDeBlocs — width and enlargement (AC-b3)", () => {
     act(() => image.focus())
     fireEvent.click(image)
     const dialogue = screen.getByRole("dialog", { name: "Plan" })
-    expect(within(dialogue).getByRole("img", { name: "Plan" })).toHaveAttribute("src", `/api/plateforme/files/${ID_FICHIER}`)
+    expect(within(dialogue).getByRole("img", { name: "Plan" })).toHaveAttribute("src", `/api/platform/files/${ID_FICHIER}`)
     // Échap : l'événement `cancel` du dialogue natif.
     fireEvent(dialogue, new Event("cancel"))
     expect(screen.queryByRole("dialog")).toBeNull()
@@ -397,7 +397,7 @@ describe("EditeurDeBlocs — a joined CSV (AC-b6)", () => {
       fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: FICHIERS.convertir }))
     })
     await screen.findByRole("table", { name: IMPORT.apercu(2, "2") })
-    expect(appels.some((un) => un.adresse === `/api/plateforme/files/${ID_FICHIER}`)).toBe(true)
+    expect(appels.some((un) => un.adresse === `/api/platform/files/${ID_FICHIER}`)).toBe(true)
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: IMPORT.importer }))
     })
@@ -413,7 +413,7 @@ describe("EditeurDeBlocs — files disabled (AC-b7)", () => {
     render(<Editeur blocs={[...PAGE, EXTERNE]} />)
     const plus = screen.getByRole("button", { name: "Ajouter un bloc après — Objet de la relance" })
     act(() => plus.focus())
-    await waitFor(() => expect(appels.some((un) => un.adresse === "/api/plateforme/files" && un.methode === "GET")).toBe(true))
+    await waitFor(() => expect(appels.some((un) => un.adresse === "/api/platform/files" && un.methode === "GET")).toBe(true))
     fireEvent.click(plus)
     const menu = within(screen.getByRole("menu"))
     expect([menu.queryByRole("menuitem", { name: FICHIERS.image }), menu.queryByRole("menuitem", { name: FICHIERS.fichier })]).toEqual([null, null])
@@ -442,7 +442,7 @@ describe("RenduDUnBloc — an unavailable file (AC-b8)", () => {
     expect(screen.queryByRole("link", { name: FICHIERS.telechargerNom("rapport.pdf") })).toBeNull()
     expect([screen.getByText("rapport.pdf"), screen.getByText("Suite de la page")].every((element) => element.isConnected)).toBe(true)
     // La carte lit la réponse JSON de sa route, jamais la redirection vers le stockage (HN-E10S02-43).
-    expect(appels.filter((un) => un.adresse.startsWith("/api/plateforme/files/")).map((un) => [un.methode, un.adresse])).toEqual([["GET", `/api/plateforme/files/${ID_FICHIER}?check`]])
+    expect(appels.filter((un) => un.adresse.startsWith("/api/platform/files/")).map((un) => [un.methode, un.adresse])).toEqual([["GET", `/api/platform/files/${ID_FICHIER}?check`]])
   })
 
   it("should say « Fichier indisponible » for a card whose check answers not_found (a file no longer readable)", async () => {

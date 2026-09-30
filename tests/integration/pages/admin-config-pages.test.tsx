@@ -1,7 +1,7 @@
 // Les pages `/admin/*` du tableau de bord (E08-S03, AC1) : l'accès décidé par `isOrgAdmin` de
 // l'identité, avant tout appel de service ; le même droit pose le fil de l'en-tête (E05-S09 partie d2).
 // « Organisation » porte aussi la marque et le Contexte de Tout le monde (E05-S11, AC-22, AC-24) ; « Drapeaux »
-// et « Accès plateforme » redirigent (`e05s11-redirections-admin.test.tsx`).
+// et « Accès plateforme » n'ont plus d'adresse : 404 (E11-S07, `tests/e2e/e11s07-adresses.spec.ts`).
 // Session de l'hôte et services du paquet simulés ; `isOrgAdmin`, `readBrand` et les écrans sont les vrais.
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -18,8 +18,8 @@ import {
   type Identity,
   type PlatformDb,
 } from "@otomata_tech/oto_platform/server"
-import ConnecteursPage, { metadata as connecteursMetadata } from "@/app/(dashboard)/admin/connecteurs/page"
-import OrganisationPage, { metadata as organisationMetadata } from "@/app/(dashboard)/admin/organisation/page"
+import ConnecteursPage, { metadata as connecteursMetadata } from "@/app/(dashboard)/admin/connectors/page"
+import OrganisationPage, { metadata as organisationMetadata } from "@/app/(dashboard)/admin/organization/page"
 import AdminPage from "@/app/(dashboard)/admin/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
@@ -75,7 +75,7 @@ function identite(profil: Profil, brand: Identity["org"]["brand"] = {}): Identit
 
 const connecte = (profil: Profil, brand: Identity["org"]["brand"] = {}) => ({ data: { identity: identite(profil, brand), session: SESSION } })
 const fil = () => screen.queryByRole("navigation", { name: "Chemin" })
-const organisation = (enregistre?: string) => OrganisationPage({ searchParams: Promise.resolve(enregistre ? { enregistre } : {}) })
+const organisation = (saved?: string) => OrganisationPage({ searchParams: Promise.resolve(saved ? { saved } : {}) })
 
 // Le Contexte de Tout le monde, tel que `loadNode` le rend, réduit à son chemin et ses blocs publiés : la page
 // n'en lit que les blocs, d'où l'assertion sur un nœud partiel.
@@ -88,8 +88,8 @@ const SERVICES = [readOrgView, listConnectorsForOrg, listOrgAccounts, listTeams,
 
 // `fil` : Connecteurs n'est plus rangé dans le menu de l'entreprise mais au pied du rail (E05-S11, AC-32) : sans groupe, sans fil.
 const PAGES = [
-  { nom: "/admin/organisation", rendre: () => organisation(), titre: "Organisation", lecture: readOrgView, fil: true },
-  { nom: "/admin/connecteurs", rendre: ConnecteursPage, titre: "Connecteurs", lecture: listConnectorsForOrg, fil: false },
+  { nom: "/admin/organization", rendre: () => organisation(), titre: "Organisation", lecture: readOrgView, fil: true },
+  { nom: "/admin/connectors", rendre: ConnecteursPage, titre: "Connecteurs", lecture: listConnectorsForOrg, fil: false },
 ]
 
 beforeEach(() => {
@@ -145,7 +145,7 @@ describe("/admin/* pages of the dashboard (AC1)", () => {
     expect(fil() !== null).toBe(avecFil)
   })
 
-  it("should give an administrator of /admin/organisation the brand of the identity, and say it was saved on ?enregistre=1 (E05-S11, AC-22)", async () => {
+  it("should give an administrator of /admin/organization the brand of the identity, and say it was saved on ?saved=1 (E05-S11, AC-22 ; E11-S07, AC-b6)", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("admin", { theme: "lagune", logo_url: "https://example.com/logo.png" }))
     await act(async () => {
       render(await organisation("1"))
@@ -194,7 +194,7 @@ describe("/admin/* pages of the dashboard (AC1)", () => {
   })
 
   it("should open /admin on the organisation, and title the pages out of the index", () => {
-    expect(() => AdminPage()).toThrow("NEXT_REDIRECT:/admin/organisation")
+    expect(() => AdminPage()).toThrow("NEXT_REDIRECT:/admin/organization")
     for (const [metadata, titre] of [
       [organisationMetadata, "Organisation"],
       [connecteursMetadata, "Connecteurs"],

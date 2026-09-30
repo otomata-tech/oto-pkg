@@ -7,7 +7,7 @@ import { ESPACE, idDeLEspace, SANS_ESPACE } from "./fixtures/espace"
 // Contrôle visuel connecté de « Équipes & accès », porté d'oto-frontend (E05-S09 partie d1 : AC-d1, AC-x1,
 // AC-x3 ; E05-S03 : AC22) : le compte E2E, administrateur de l'organisation de la campagne et responsable de son
 // équipe (`espace.ts`), en clair puis en sombre ; les deux onglets, Membres et Équipes, en tête d'un îlot
-// (parcourus aux flèches, l'anneau de focus visible), `?onglet=regles` et `?onglet=acces` ouvrant Membres (E05-S13,
+// (parcourus aux flèches, l'anneau de focus visible), `?tab=regles` et `?tab=acces` ouvrant Membres (E05-S13,
 // AC-5), le tableau des personnes et le dialogue « Inviter quelqu'un » (la capture de référence
 // `membres-final.png`) ; une équipe jetable `e2e_<hex>` créée par le dialogue de l'en-tête (son dossier et son
 // Contexte naissent, P39), renommée par son menu « ⋯ », puis sa suppression refusée avec ce qu'elle possède
@@ -80,7 +80,7 @@ test.describe("équipes et droits", () => {
       const page = await browser.newPage({ colorScheme: mode, viewport: { width: 1440, height: 900 } })
       try {
         await seConnecterSurLEspace(page, { email, password })
-        await page.goto(`${ADRESSE}/equipes`)
+        await page.goto(`${ADRESSE}/teams`)
         await expect(page.getByRole("heading", { level: 1 })).toHaveText("Équipes & accès")
         const onglets = page.getByRole("tablist", { name: "Onglets de l'écran" }).getByRole("tab")
         await expect(onglets).toHaveText([/^Membres\d+$/, /^Équipes\d+$/])
@@ -101,7 +101,7 @@ test.describe("équipes et droits", () => {
         expect(await onglets.nth(1).evaluate((onglet) => onglet.matches(":focus-visible") && getComputedStyle(onglet).boxShadow !== "none")).toBe(true)
 
         await onglets.nth(1).click()
-        await expect(page).toHaveURL(`${ADRESSE}/equipes?onglet=equipes`)
+        await expect(page).toHaveURL(`${ADRESSE}/teams?tab=teams`)
         await page.getByRole("button", { name: "Créer une équipe" }).click()
         const creation = page.getByRole("dialog", { name: "Créer une équipe" })
         await creation.getByLabel("Nom de la nouvelle équipe").fill(slug)
@@ -129,12 +129,12 @@ test.describe("équipes et droits", () => {
 
         // Les onglets retirés ouvrent Membres (E05-S13, AC-5).
         for (const retire of ["regles", "acces"]) {
-          await page.goto(`${ADRESSE}/equipes?onglet=${retire}`)
+          await page.goto(`${ADRESSE}/teams?tab=${retire}`)
           await expect(onglets.first()).toHaveAttribute("aria-selected", "true")
           await expect(page.getByRole("table", { name: `Les personnes de ${ESPACE.nom}` })).toBeVisible()
         }
 
-        await page.goto(`${ADRESSE}/equipes`)
+        await page.goto(`${ADRESSE}/teams`)
         await expect(page.getByRole("table", { name: `Les personnes de ${ESPACE.nom}` })).toBeVisible()
         for (const theme of THEMES) {
           await page.evaluate((cle) => document.querySelector(".oto")?.setAttribute("data-oto-theme", cle), theme)

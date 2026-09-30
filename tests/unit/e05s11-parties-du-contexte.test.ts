@@ -145,20 +145,23 @@ describe("partiesDuContexte, the head of a part (E05-S12, AC-4, AC-7)", () => {
   })
 })
 
-describe("ancreDeLaPartie (AC-11, HN-E05S11-9 ; E05-S12, AC-8, HN-E05S12-10)", () => {
+describe("ancreDeLaPartie (AC-11, HN-E05S11-9 ; E05-S12, AC-8, HN-E05S12-10 ; E11-S07, AC-c1)", () => {
   it.each([
-    [{ name: "code" }, "regles"],
-    [{ name: "news" }, "nouveautes"],
+    [{ name: "news" }, "news"],
     [{ name: "procedures" }, "procedures"],
-    [{ name: "recent content" }, "contenus"],
+    [{ name: "recent content" }, "recent-content"],
     // Une partie de Contexte par son nom, servie ou non.
-    [{ name: "contexte" }, "contexte-tout-le-monde"],
-    [{ name: "private/lea/contexte" }, "contexte-prive"],
-    [{ name: "private" }, "contexte-prive"],
-    [{ name: "ventes/contexte" }, "contexte-ventes"],
-    // Les anciens blocs n'ont plus d'ancre propre ; un nom inconnu, son rang.
-    [{ name: "person" }, "partie-5"],
-    [{ name: "calendar" }, "partie-5"],
+    [{ name: "contexte" }, "everyone-context"],
+    [{ name: "private/lea/contexte" }, "private-context"],
+    [{ name: "private" }, "private-context"],
+    [{ name: "ventes/contexte" }, "context-ventes"],
+    // Une équipe au slug `everyone` ne prend pas l'ancre de Tout le monde.
+    [{ name: "everyone/contexte" }, "context-everyone"],
+    // Le bloc `code`, que rien n'affiche plus (HN-E11S07-11), et les anciens blocs n'ont plus d'ancre propre ; un nom
+    // inconnu, son rang.
+    [{ name: "code" }, "part-5"],
+    [{ name: "person" }, "part-5"],
+    [{ name: "calendar" }, "part-5"],
   ])("should anchor %o at #%s", (bloc, ancre) => {
     expect(ancreDeLaPartie(bloc, 4)).toBe(ancre)
   })

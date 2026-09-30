@@ -40,7 +40,7 @@ const USAGE = 'Usage : pnpm auth:settings --to <ref> --site-url <url> [--redirec
 
 const HOOK_URI = 'pg-functions://postgres/platform/hook_before_user_created'
 const HOOK_FUNCTION = /create (?:or replace )?function platform\.hook_before_user_created\(/i
-// Modèles d'E02-S01 (action JB 3, N1) : le lien porte `token_hash` jusqu'à `/auth/confirmer` (fiche
+// Modèles d'E02-S01 (action JB 3, N1) : le lien porte `token_hash` jusqu'à `/auth/confirm` (fiche
 // D11). Les modèles par défaut de Supabase n'y mènent pas : l'invitation serait cassée.
 const LINK = '{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email'
 const CONFIRMATION = `<p>Vous êtes invité·e à rejoindre votre organisation.</p><p><a href="${LINK}">Rejoindre</a></p><p>Ce lien ne sert qu'une fois. Si vous n'attendiez pas cette invitation, ignorez ce message.</p>`

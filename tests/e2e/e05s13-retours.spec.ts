@@ -148,7 +148,7 @@ test.describe("E05-S13 : les retours du soir", () => {
         }
 
         // AC-4 : l'encart « Contexte · Tout le monde » d'Organisation porte, sous les blocs, les pages que ce Contexte cite.
-        await page.goto(`${ESPACE.adresse}/admin/organisation`)
+        await page.goto(`${ESPACE.adresse}/admin/organization`)
         const encart = page.getByRole("region", { name: "Contexte · Tout le monde" })
         await attendre(encart.getByRole("list", { name: "Pages citées" })).toBeVisible()
         await expect(encart.getByRole("list", { name: "Pages citées" }).locator(`a[href="/n/${CHEMINS.grilleTarifaire}"]`)).toBeVisible()
@@ -156,7 +156,7 @@ test.describe("E05-S13 : les retours du soir", () => {
         await capturer(page, testInfo, `organisation-encart-${nom}`)
 
         // AC-24 : les responsables d'une équipe, « — » sans responsable, plus de « Changer de responsable… ».
-        await page.goto(`${ESPACE.adresse}/equipes?onglet=equipes`)
+        await page.goto(`${ESPACE.adresse}/teams?tab=teams`)
         const equipes = page.getByRole("table", { name: `Les équipes de ${ESPACE.nom}` })
         await attendre(equipes.getByRole("columnheader", { name: "Responsables" })).toBeVisible()
         await expect(equipes.getByRole("row").filter({ hasText: AUTRE_EQUIPE.nom })).toContainText("—")

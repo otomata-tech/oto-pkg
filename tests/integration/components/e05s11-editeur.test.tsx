@@ -12,7 +12,7 @@ import { bloc, PAGE, simulerLAPI } from "../../helpers/noeud"
 // L'éditeur d'une page après les retours de JB (E05-S11, lot b) : l'indication d'enregistrement dans la carte du
 // document, qui se tait 5 s après la dernière écriture réussie, titre compris (AC-1, AC-2) ; les pages citées lues
 // dans la phrase au repos (AC-26, AC-27) ; tout le texte d'un bloc sélectionné ouvre le menu de sa poignée, sans
-// prendre le focus (AC-28). Sous la file d'écriture, `fetch` simulé pour `POST /api/plateforme/nodes`. La position
+// prendre le focus (AC-28). Sous la file d'écriture, `fetch` simulé pour `POST /api/platform/nodes`. La position
 // de l'indication (rien ne bouge) se mesure dans un navigateur : `tests/e2e/e05s11-page.spec.ts`.
 
 const rafraichir = vi.fn()

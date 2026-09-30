@@ -46,11 +46,11 @@ utilisateurs [`docs/pilote/guide-installation.md`](docs/pilote/guide-installatio
 |---|---|---|---|
 | `/api/mcp` | `src/app/api/mcp/route.ts` | MCP des organisations (`handleMcpPost`, `makeVerifyToken()`) | les deux |
 | `/api/mcp-admin` | `src/app/api/mcp-admin/route.ts` | MCP de l'équipe plateforme (`handleAdminMcp`) | les deux |
-| `/api/plateforme/*` | `src/app/api/plateforme/[...route]/route.ts` | API des écrans (`handlePlateforme`), jeton lu dans la session de l'hôte | les deux |
+| `/api/platform/*` | `src/app/api/platform/[...route]/route.ts` | API des écrans (`handlePlateforme`), jeton lu dans la session de l'hôte | les deux |
 | `/.well-known/oauth-protected-resource/*` | `src/app/.well-known/oauth-protected-resource/[[...chemin]]/route.ts` | Métadonnées de ressource protégée (racine et forme suffixée) | les deux |
 | `/auth/oidc/login`, `/callback`, `/logout` | `src/app/auth/oidc/*/route.ts` | Connexion chez l'émetteur, rappel, déconnexion (`POST`) | OIDC (404 sinon) |
-| `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/auth/confirmer`, `/oauth/consent` | `src/app/(auth)/…`, `src/app/auth/…`, `src/app/oauth/consent/` | Écrans de Supabase Auth ; `/login` renvoie à `/auth/oidc/login` en mode OIDC | Supabase (404 en OIDC, § 4.3) |
-| `/aucune-organisation` | `src/app/aucune-organisation/page.tsx` | Personne connectée sans appartenance | les deux |
+| `/login`, `/forgot-password`, `/reset-password`, `/auth/callback`, `/auth/confirm`, `/oauth/consent` | `src/app/(auth)/…`, `src/app/auth/…`, `src/app/oauth/consent/` | Écrans de Supabase Auth ; `/login` renvoie à `/auth/oidc/login` en mode OIDC | Supabase (404 en OIDC, § 4.3) |
+| `/no-organization` | `src/app/no-organization/page.tsx` | Personne connectée sans appartenance | les deux |
 | `/p/<jeton>` | page publique de l'hôte de référence | Lien de partage public, hors session, `noindex, nofollow` (ADR-013) | les deux |
 | écrans | `src/app/(dashboard)/…` | Coque, rail, pages ; `CoquilleOto` au thème de l'organisation | les deux |
 

@@ -131,7 +131,7 @@ describe("magicLinkAction", () => {
     expect(result).toEqual({ data: { message: MAGIC_LINK_MESSAGE } })
     expect(auth.signInWithOtp).toHaveBeenCalledWith({
       email: "claire@acme.test",
-      options: { shouldCreateUser: true, emailRedirectTo: "https://acme.test/auth/confirmer?next=/" },
+      options: { shouldCreateUser: true, emailRedirectTo: "https://acme.test/auth/confirm?next=/" },
     })
   })
 
@@ -154,12 +154,12 @@ describe("magicLinkAction", () => {
 })
 
 describe("confirmerLienAction", () => {
-  const LINK = { token_hash: "hash-from-the-email", type: "email", next: "/plateforme" }
+  const LINK = { token_hash: "hash-from-the-email", type: "email", next: "/platform" }
 
   it("should verify the token, accept invitations, then go to next", async () => {
     auth.verifyOtp.mockResolvedValue({ data: { session: SESSION }, error: null })
 
-    await expect(confirmerLienAction(form(LINK))).rejects.toThrow("NEXT_REDIRECT:/plateforme")
+    await expect(confirmerLienAction(form(LINK))).rejects.toThrow("NEXT_REDIRECT:/platform")
     expect(auth.verifyOtp).toHaveBeenCalledWith({ type: "email", token_hash: "hash-from-the-email" })
     expect(createPlatformDb).toHaveBeenCalledWith(SESSION_DB)
     expect(acceptInvitations).toHaveBeenCalledTimes(1)
@@ -204,8 +204,8 @@ describe("confirmerLienAction", () => {
   it("should keep the query and the fragment of a path of the site", async () => {
     auth.verifyOtp.mockResolvedValue({ data: { session: SESSION }, error: null })
 
-    await expect(confirmerLienAction(form({ ...LINK, next: "/plateforme?onglet=equipes#membres" }))).rejects.toThrow(
-      /^NEXT_REDIRECT:\/plateforme\?onglet=equipes#membres$/,
+    await expect(confirmerLienAction(form({ ...LINK, next: "/teams?tab=teams#news" }))).rejects.toThrow(
+      /^NEXT_REDIRECT:\/teams\?tab=teams#news$/,
     )
   })
 })
@@ -407,7 +407,7 @@ describe("way back after sign-in (E02-S02)", () => {
 
     expect(auth.signInWithOtp).toHaveBeenCalledWith({
       email: "claire@acme.test",
-      options: { shouldCreateUser: true, emailRedirectTo: `https://acme.test/auth/confirmer?next=${NEXT}` },
+      options: { shouldCreateUser: true, emailRedirectTo: `https://acme.test/auth/confirm?next=${NEXT}` },
     })
   })
 
@@ -416,6 +416,6 @@ describe("way back after sign-in (E02-S02)", () => {
 
     await magicLinkAction(form({ email: "claire@acme.test", redirect: hostile }))
 
-    expect(auth.signInWithOtp.mock.calls[0][0].options.emailRedirectTo).toBe("https://acme.test/auth/confirmer?next=/")
+    expect(auth.signInWithOtp.mock.calls[0][0].options.emailRedirectTo).toBe("https://acme.test/auth/confirm?next=/")
   })
 })

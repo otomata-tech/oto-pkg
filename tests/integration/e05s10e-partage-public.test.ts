@@ -282,7 +282,7 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
   it("should serve the public route without a session, never indexed, 404 alike for an unknown or malformed token, extra parameters ignored (AC-d5, AC-d6)", async () => {
     const token = await sharedTree("pub_j", false)
     const get = (value: string) =>
-      handlePlateforme(new Request(`https://${o.host}/api/plateforme/public/${value}`), { accessToken: null, host: o.host })
+      handlePlateforme(new Request(`https://${o.host}/api/platform/public/${value}`), { accessToken: null, host: o.host })
     const found = await get(`${token}?utm_source=lettre`)
     expect([found.status, found.headers.get("x-robots-tag"), ((await found.json()) as { data: { node: { path: string } } }).data.node.path]).toEqual([
       200,

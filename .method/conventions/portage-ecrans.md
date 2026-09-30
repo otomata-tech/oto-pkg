@@ -32,7 +32,7 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
   qu'aucune fonction ni aucun composant ne traverse, et une fonction qui construit l'adresse (`hrefDuNoeud`), plus l'état courant
   (`cheminActif`). Il n'importe aucun routeur : `next/navigation`, `next/link` et `@tanstack/*`
   sont refusés par ESLint dans `ui/` (test : `tests/unit/ui-boundary.test.ts`).
-- L'hôte monte l'écran dans **sa** route (`src/app/(dashboard)/plateforme/<écran>/page.tsx`) et y
+- L'hôte monte l'écran dans **sa** route (`src/app/(dashboard)/<route>/page.tsx`, segment en anglais : ADR-020) et y
   lit ses paramètres ; l'état partageable reste dans l'URL de l'hôte (`state-management.md`).
 - **Vérifiable :** un `Link` d'oto-frontend devient `<Lien href={…}>` ; une valeur de
   `useParams`/`useSearch` devient une prop.

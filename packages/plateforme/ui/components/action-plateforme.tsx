@@ -7,7 +7,7 @@
 // l'hôte : la ligne, ou le bouton, part avec la relecture. Un refus `not_found` dit que la cible est
 // déjà partie (AC6 : invitation acceptée ou annulée ailleurs) : l'alerte est rendue, le focus va à
 // l'ancre, puis la page se relit (HN-E05S03-31). Sans lui, cinq gestes destructeurs de l'écran
-// `/equipes` réécrivaient chacun la même confirmation.
+// `/teams` réécrivaient chacun la même confirmation.
 //
 // Porté d'oto-frontend (`components/settings/team-people-rows.tsx`, `AnnulationDeLInvitation` ;
 // `member-actions.tsx` l. 74-81, `replierLeFocusSur`). Repris : la confirmation sur place, « Garder »

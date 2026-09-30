@@ -1,6 +1,6 @@
 "use client"
 
-// « Restaurer » d'une ligne de la corbeille (E05-S10, partie b2, AC-b11) : `POST /api/plateforme/trash/restore`
+// « Restaurer » d'une ligne de la corbeille (E05-S10, partie b2, AC-b11) : `POST /api/platform/trash/restore`
 // remet le contenu à sa place (sous son parent, ou son plus proche ancêtre vivant, HN-E05S10e-4) avec ce qui
 // était parti avec lui ; le contenu restauré s'ouvre, à l'adresse que le service rend, et la page se relit
 // (le rail le montre). Un refus se dit sous le bouton ; un contenu déjà sorti de la corbeille (`not_found`)

@@ -48,7 +48,7 @@ const pagesSousLaCoquille = fichiersTsx(dashboardDir).filter((f) => f !== path.j
 
 // Les écrans d'authentification de l'hôte, rendus sous la `CoquilleOto` que chaque page pose en
 // `pleinePage` (E05-S07) : formulaires, pages et chaînes de classes ; le consentement OAuth aussi (E02-S02).
-const ecransDAuthentification = ["src/app/(auth)", "src/app/auth/confirmer", "src/app/aucune-organisation", "src/app/oauth"].flatMap(
+const ecransDAuthentification = ["src/app/(auth)", "src/app/auth/confirm", "src/app/no-organization", "src/app/oauth"].flatMap(
   (dossier) => fichiersTsEtTsx(path.join(root, dossier)),
 )
 
@@ -145,8 +145,8 @@ describe("authentication screens under the page's CoquilleOto (E05-S07, AC11)", 
     // Garde contre un chemin mort : un dossier renommé viderait la liste sans bruit.
     expect(relatifs).toContain("src/app/(auth)/login/formulaire-de-connexion.tsx")
     expect(relatifs).toContain("src/app/(auth)/classes-oto.ts")
-    expect(relatifs).toContain("src/app/auth/confirmer/page.tsx")
-    expect(relatifs).toContain("src/app/aucune-organisation/page.tsx")
+    expect(relatifs).toContain("src/app/auth/confirm/page.tsx")
+    expect(relatifs).toContain("src/app/no-organization/page.tsx")
     expect(relatifs).toContain("src/app/oauth/consent/page.tsx")
   })
 

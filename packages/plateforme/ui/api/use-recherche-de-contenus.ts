@@ -1,7 +1,7 @@
 "use client"
 
 // La recherche des contenus que la personne peut lire, par le service de l'outil `find`
-// (`GET /api/plateforme/search`) : une seule lecture pour la palette ⌘K (`coque/palette-de-recherche.tsx`) et
+// (`GET /api/platform/search`) : une seule lecture pour la palette ⌘K (`coque/palette-de-recherche.tsx`) et
 // pour « @ » dans un bloc (E05-S10, AC-a9, `noeud/editeur/citer.tsx`). Sans lui, les deux écrans refont la
 // même requête, la même pause de frappe et le même rejet d'une réponse dépassée (`coding-standards.md § DRY`).
 import { useRef, useState } from "react"

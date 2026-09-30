@@ -3,6 +3,7 @@
 // porte sans session (`api/uploads.ts`) et le formulaire de dépôt (`ui/depot/`). Sans lui, chaque face tiendrait sa
 // forme de jeton et sa borne de 1 Mo.
 import * as z from "zod/v4"
+import { PLATFORM_API_PREFIX } from "./api"
 import { fileNameSchema } from "./files"
 import { NODE_HEAD_MAX, nodePathSchema } from "./nodes"
 
@@ -19,7 +20,7 @@ export const UPLOAD_BYTES_MAX = 1_048_576
 export const UPLOAD_TTL_MINUTES = 15
 
 /** La porte sans session où `curl` envoie le fichier : `<route>/<jeton>` (ADR-018 § 1). */
-export const UPLOADS_ROUTE = "/api/plateforme/uploads"
+export const UPLOADS_ROUTE = `${PLATFORM_API_PREFIX}uploads`
 
 /** La page du formulaire de dépôt de l'hôte : `<route>/<jeton>`, en anglais (AC-f15, E11-S07). */
 export const UPLOAD_FORM_ROUTE = "/upload"

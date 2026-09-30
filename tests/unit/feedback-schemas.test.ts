@@ -8,27 +8,35 @@ const VENTES = "0e8e5a3c-7f10-4a5b-8d3b-2b1c4d5e6f70"
 
 describe("usageQuerySchema (AC2)", () => {
   it("should default to 30 days, fall back to 30 on an unknown window, and drop a malformed team", () => {
-    expect(usageQuerySchema.parse({})).toEqual({ periode: 30, equipe: undefined })
-    expect(usageQuerySchema.parse({ periode: "45", equipe: "ventes" })).toEqual({ periode: 30, equipe: undefined })
-    expect(usageQuerySchema.parse({ periode: "7", equipe: VENTES })).toEqual({ periode: 7, equipe: VENTES })
-    expect(usageQuerySchema.parse({ periode: ["7", "90"], equipe: "" })).toEqual({ periode: 30, equipe: undefined })
+    expect(usageQuerySchema.parse({})).toEqual({ period: 30, team: undefined })
+    expect(usageQuerySchema.parse({ period: "45", team: "ventes" })).toEqual({ period: 30, team: undefined })
+    expect(usageQuerySchema.parse({ period: "7", team: VENTES })).toEqual({ period: 7, team: VENTES })
+    expect(usageQuerySchema.parse({ period: ["7", "90"], team: "" })).toEqual({ period: 30, team: undefined })
+  })
+
+  it("should ignore the former French names like any unknown parameter (E11-S07, AC-b3)", () => {
+    expect(usageQuerySchema.parse({ periode: "7", equipe: VENTES })).toEqual({ period: 30, team: undefined })
   })
 })
 
 describe("feedbackListQuerySchema (AC9)", () => {
   it("should default to the tickets to handle over 30 days, and fall back to each default on an unknown value", () => {
-    expect(feedbackListQuerySchema.parse({})).toEqual({ etat: "to_handle", type: undefined, periode: 30, curseur: undefined })
-    expect(feedbackListQuerySchema.parse({ etat: "archived", type: "idea", periode: "12", curseur: "" })).toEqual({
-      etat: "to_handle",
+    expect(feedbackListQuerySchema.parse({})).toEqual({ state: "to_handle", type: undefined, period: 30, cursor: undefined })
+    expect(feedbackListQuerySchema.parse({ state: "archived", type: "idea", period: "12", cursor: "" })).toEqual({
+      state: "to_handle",
       type: undefined,
-      periode: 30,
-      curseur: undefined,
+      period: 30,
+      cursor: undefined,
     })
-    expect(feedbackListQuerySchema.parse({ etat: "declined", type: "gap", periode: "90", curseur: "c-2" })).toEqual({
-      etat: "declined",
+    expect(feedbackListQuerySchema.parse({ state: "declined", type: "gap", period: "90", cursor: "c-2" })).toEqual({
+      state: "declined",
       type: "gap",
-      periode: 90,
-      curseur: "c-2",
+      period: 90,
+      cursor: "c-2",
     })
+  })
+
+  it("should ignore the former French names like any unknown parameter (E11-S07, AC-b3)", () => {
+    expect(feedbackListQuerySchema.parse({ etat: "all", periode: "7", curseur: "c-2" })).toEqual({ state: "to_handle", type: undefined, period: 30, cursor: undefined })
   })
 })

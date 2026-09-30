@@ -228,6 +228,8 @@ export type { TableImportArgs, TableImportBody } from "./table-write"
 export { CONTEXT_INDEX } from "./context-index"
 // E05-S13 (AC-16) : les formats des blocs servis que la vue « Contexte » relit pour les dire en français.
 export { SERVED_BUDGET, SERVED_NEWS, SERVED_PROCEDURES, SERVED_RECENT, SERVED_RULES } from "./context-index"
+// E11-S07 : le préfixe de l'API des écrans, contrat de montage entre l'hôte et le paquet.
+export { PLATFORM_API_PREFIX } from "./api"
 // E10-S02 (lot a) : les fichiers joints à un nœud. Types admis, limites et corps des routes `files`.
 export { FILE_MAX_BYTES, FILE_TYPES, fileIdSchema, fileReadQuerySchema, fileRequestSchema, fileTypeOf, IMAGE_TYPES, ORG_QUOTA_BYTES, TEXT_FILE_MAX_BYTES, TEXT_TYPES } from "./files"
 export type { FileAvailability, FileReady, FileStorageState, FileType, FileUpload } from "./files"

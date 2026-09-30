@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { safeNextPath } from "@/lib/utils/safe-next-path"
 
 // Retour d'un lien PKCE (`?code=`) : réinitialisation du mot de passe, Google et Microsoft (E09-S03).
-// Le lien d'invitation et de connexion porte `token_hash`, vérifié au clic sur `/auth/confirmer` (D11).
+// Le lien d'invitation et de connexion porte `token_hash`, vérifié au clic sur `/auth/confirm` (D11).
 // Propre à Supabase Auth : en mode OIDC, le retour est `/auth/oidc/callback`, celle-ci n'existe pas
 // (AC-b5 d'E01-S11).
 export async function GET(request: Request) {

@@ -4,6 +4,7 @@
 // que Windows annonce `application/vnd.ms-excel` reste un CSV. Sans lui, service et écran tiendraient chacun
 // leur liste de types et leurs limites.
 import * as z from "zod/v4"
+import { PLATFORM_API_PREFIX } from "./api"
 import { fileExtension } from "./csv"
 import { nodePathSchema } from "./nodes"
 
@@ -94,14 +95,14 @@ export const fileIdSchema = z.uuid()
 export const fileReadQuerySchema = z.object({ disposition: z.literal("inline").optional() })
 
 /** Les routes des fichiers d'une personne connectée : `<route>/<id>`, `…/html`, `…/markdown`. */
-export const FILES_ROUTE = "/api/plateforme/files"
+export const FILES_ROUTE = `${PLATFORM_API_PREFIX}files`
 
 /**
- * Les routes des fichiers d'un lien public (E10-S02, AC-c5, ADR-016 § 7) : `/api/plateforme/public/<jeton>/files`,
+ * Les routes des fichiers d'un lien public (E10-S02, AC-c5, ADR-016 § 7) : `/api/platform/public/<jeton>/files`,
  * auxquelles la page publique rapporte ses fichiers, comme `FILES_ROUTE` hors lien.
  */
 export function publicFilesRoute(token: string): string {
-  return `/api/plateforme/public/${token}/files`
+  return `${PLATFORM_API_PREFIX}public/${token}/files`
 }
 
 /**

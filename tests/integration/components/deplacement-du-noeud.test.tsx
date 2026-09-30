@@ -8,7 +8,7 @@ import { choisirDansLaListe, libellesDesChoix } from "../../helpers/liste-de-cho
 // « Déplacer » (E05-S02, AC20, AC21) : le formulaire et l'envoi, que le « Déplacer » du rail monte (E05-S10,
 // AC-b7 ; le parcours du rail : `rail-application.test.tsx`). E05-S13 (AC-20) : le bouton d'en-tête
 // (`DeplacementDuNoeud`) est retiré ; le formulaire se monte ici seul, destinations calculées depuis l'arbre
-// visible, `fetch` simulé pour `POST /api/plateforme/nodes/move`.
+// visible, `fetch` simulé pour `POST /api/platform/nodes/move`.
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -103,7 +103,7 @@ describe("envoyerLeDeplacement (AC21)", () => {
     // Le nom est pris sous `conseil` (fiche D125) : le service rend le premier chemin libre.
     fetchMock.mockResolvedValueOnce(reponse(200, { data: { path: "conseil/modele_relance_2", moves: [] } }))
     expect(await envoyerLeDeplacement(CHEMIN, "conseil/modele_relance")).toEqual({ chemin: "conseil/modele_relance_2" })
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/plateforme/nodes/move")
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/platform/nodes/move")
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ path: CHEMIN, new_path: "conseil/modele_relance" })
   })
 

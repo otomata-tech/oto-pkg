@@ -143,7 +143,7 @@ describe("Select in a form (AC-20)", () => {
   })
 
   it("should show and send the first available choice when the value names no choice, as a native list does", () => {
-    // Une adresse périmée (`?equipe=<équipe supprimée>`), puis une relecture qui retire le choix courant.
+    // Une adresse périmée (`?team=<équipe supprimée>`), puis une relecture qui retire le choix courant.
     const { rerender } = render(<FormulaireGet defaut="supprimee" options={[NIVEAUX[3], ...NIVEAUX.slice(0, 3)]} />)
     expect(niveau()).toHaveTextContent("Accès complet")
     expect(envoi()).toEqual([["niveau", "manage"]])

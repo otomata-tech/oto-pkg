@@ -64,9 +64,9 @@ function ecran(props: Partial<EcranEquipesProps> = {}) {
   return (
     <CoquilleOto pleinePage>
       <ContexteDeRafraichissement.Provider value={rafraichir}>
-        <ContexteDeLHote.Provider value={{ Lien, chemin: "/equipes", naviguer }}>
+        <ContexteDeLHote.Provider value={{ Lien, chemin: "/teams", naviguer }}>
           <EcranEquipes
-            onglet="membres"
+            onglet="members"
             nomOrganisation="Démo"
             moi={{ userId: ADA, estAdmin: true, equipesDirigees: [] }}
             membres={{ data: MEMBRES }}
@@ -74,7 +74,7 @@ function ecran(props: Partial<EcranEquipesProps> = {}) {
             optionsDInvitation={{ data: null }}
             equipes={{ data: EQUIPES }}
             Lien={Lien}
-            hrefDOnglet={(onglet) => `/equipes?onglet=${onglet}`}
+            hrefDOnglet={(onglet) => `/teams?tab=${onglet}`}
             {...props}
           />
         </ContexteDeLHote.Provider>
@@ -122,7 +122,7 @@ describe("member gestures (AC6 to AC9)", () => {
     choisir("Gérer Ada Martin", "menuitemradio", "Membre")
 
     expect(await screen.findByRole("alert")).toHaveTextContent("C'est le dernier administrateur de Démo : nommez-en un autre avant.")
-    expect(envoi()).toEqual({ url: `/api/plateforme/members/${ADA}`, methode: "PATCH", corps: { role: "member" } })
+    expect(envoi()).toEqual({ url: `/api/platform/members/${ADA}`, methode: "PATCH", corps: { role: "member" } })
     expect(rafraichir).not.toHaveBeenCalled()
   })
 
@@ -154,13 +154,13 @@ describe("member gestures (AC6 to AC9)", () => {
 
     choisir("Régler les équipes de Ada Martin", "menuitemcheckbox", "Ventes")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: `/api/plateforme/teams/${VENTES}/members`, methode: "POST", corps: { userId: ADA } })
+    expect(envoi()).toEqual({ url: `/api/platform/teams/${VENTES}/members`, methode: "POST", corps: { userId: ADA } })
 
     fetchMock.mockResolvedValueOnce(refus(403, "forbidden"))
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     choisir("Régler les équipes de Claire Morel", "menuitemcheckbox", "Ventes")
     expect(await screen.findByRole("alert")).toHaveTextContent("Vous n'avez pas le droit de faire cela.")
-    expect(envoi(1)).toMatchObject({ url: `/api/plateforme/teams/${VENTES}/members/${CLAIRE}`, methode: "DELETE" })
+    expect(envoi(1)).toMatchObject({ url: `/api/platform/teams/${VENTES}/members/${CLAIRE}`, methode: "DELETE" })
   })
 
   it("should ask before removing someone, and say what falls with them", () => {
@@ -180,7 +180,7 @@ describe("member gestures (AC6 to AC9)", () => {
     fireEvent.click(question.getByRole("button", { name: "Retirer de Démo" }))
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toMatchObject({ url: `/api/plateforme/members/${ADA}`, methode: "DELETE" })
+    expect(envoi()).toMatchObject({ url: `/api/platform/members/${ADA}`, methode: "DELETE" })
   })
 
   it("should say in a second dialog that the last administrator of the organisation stays (AC9)", async () => {
@@ -204,7 +204,7 @@ describe("member gestures (AC6 to AC9)", () => {
 
     const echec = within(await screen.findByRole("dialog", { name: "Annuler l'invitation de new@demo.test" }))
     expect(echec.getByRole("alert")).toHaveTextContent("Cette invitation n'est plus en attente : elle a été acceptée ou annulée.")
-    expect(envoi()).toMatchObject({ url: `/api/plateforme/invitations/${INVITATION}`, methode: "DELETE" })
+    expect(envoi()).toMatchObject({ url: `/api/platform/invitations/${INVITATION}`, methode: "DELETE" })
     // Le bouton du pied ; celui de l'en-tête (la croix) porte le même nom.
     fireEvent.click(echec.getAllByRole("button", { name: "Fermer" }).at(-1) ?? document.body)
     expect(rafraichir).toHaveBeenCalledTimes(1)
@@ -213,7 +213,7 @@ describe("member gestures (AC6 to AC9)", () => {
 
 describe("team gestures (AC11 to AC14)", () => {
   function ouvrirLaCreation() {
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
     fireEvent.click(screen.getByRole("button", { name: "Créer une équipe" }))
     return dialogue("Créer une équipe")
   }
@@ -246,7 +246,7 @@ describe("team gestures (AC11 to AC14)", () => {
 
     const erreur = await creation.findByText(message)
     expect(creation.getByLabelText("Nom de la nouvelle équipe")).toHaveAttribute("aria-describedby", erreur.id)
-    expect(envoi()).toEqual({ url: "/api/plateforme/teams", methode: "POST", corps: { name: "Conseil" } })
+    expect(envoi()).toEqual({ url: "/api/platform/teams", methode: "POST", corps: { name: "Conseil" } })
   })
 
   it("should create a team, close the dialog and have the page re-read", async () => {
@@ -263,7 +263,7 @@ describe("team gestures (AC11 to AC14)", () => {
 
   it("should rename a team, sending its name only, and keep a refused name to correct it, without re-reading (AC12)", async () => {
     fetchMock.mockResolvedValue(refus(409, "conflict", "name_taken"))
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     choisir("Gérer Ventes", "menuitem", "Renommer…")
     const renommage = dialogue("Renommer Ventes")
@@ -272,18 +272,18 @@ describe("team gestures (AC11 to AC14)", () => {
     fireEvent.click(renommage.getByRole("button", { name: "Enregistrer" }))
 
     expect(await renommage.findByText("Une équipe de Démo porte déjà ce nom.")).toBeInTheDocument()
-    expect(envoi()).toEqual({ url: `/api/plateforme/teams/${VENTES}`, methode: "PATCH", corps: { name: "Support" } })
+    expect(envoi()).toEqual({ url: `/api/platform/teams/${VENTES}`, methode: "PATCH", corps: { name: "Support" } })
     expect(renommage.getByLabelText("Nom de l'équipe")).toHaveValue("Support")
     expect(rafraichir).not.toHaveBeenCalled()
   })
 
   it("should show a team renamed elsewhere once the page is re-read, and send nothing the admin did not change (AC12)", async () => {
-    const vue = rendre({ onglet: "equipes" })
+    const vue = rendre({ onglet: "teams" })
     choisir("Gérer Ventes", "menuitem", "Renommer…")
     expect(dialogue("Renommer Ventes").getByLabelText("Nom de l'équipe")).toHaveValue("Ventes")
 
     const [support, ventes] = EQUIPES
-    vue.rerender(ecran({ onglet: "equipes", equipes: { data: [support, { ...ventes, name: "Ventes Europe" }] } }))
+    vue.rerender(ecran({ onglet: "teams", equipes: { data: [support, { ...ventes, name: "Ventes Europe" }] } }))
     const renommage = dialogue("Renommer Ventes Europe")
     expect(renommage.getByLabelText("Nom de l'équipe")).toHaveValue("Ventes Europe")
     fireEvent.click(renommage.getByRole("button", { name: "Enregistrer" }))
@@ -295,24 +295,24 @@ describe("team gestures (AC11 to AC14)", () => {
   // E05-S13 (AC-24) : une équipe a zéro, un ou plusieurs responsables ; l'administrateur les nomme un à un.
   it("should name a member lead and remove a lead from the leads, from the people of a team, then re-read (AC-24)", async () => {
     fetchMock.mockResolvedValueOnce(reponse(200, { data: { membership: {} } })).mockResolvedValueOnce(reponse(200, { data: { membership: {} } }))
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Ventes" }))
     fireEvent.click(dialogue("Les personnes de Ventes").getByRole("button", { name: "Retirer des responsables : Claire Morel" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: `/api/plateforme/teams/${VENTES}/members/${CLAIRE}`, methode: "PATCH", corps: { role: "member" } })
+    expect(envoi()).toEqual({ url: `/api/platform/teams/${VENTES}/members/${CLAIRE}`, methode: "PATCH", corps: { role: "member" } })
     fireEvent.click(dialogue("Les personnes de Ventes").getAllByRole("button", { name: "Fermer" }).at(-1) ?? document.body)
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Support" }))
     fireEvent.click(dialogue("Les personnes de Support").getByRole("button", { name: "Nommer responsable : Claire Morel" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(2))
-    expect(envoi(1)).toEqual({ url: `/api/plateforme/teams/${SUPPORT}/members/${CLAIRE}`, methode: "PATCH", corps: { role: "lead" } })
+    expect(envoi(1)).toEqual({ url: `/api/platform/teams/${SUPPORT}/members/${CLAIRE}`, methode: "PATCH", corps: { role: "lead" } })
   })
 
   it("should let a lead who is not an administrator remove members, never name nor remove a lead (HN-E05S13-20)", () => {
     const ada = { userId: ADA, name: "Ada Martin", email: "ada@demo.test", role: "member" as const }
     const ventes = { ...EQUIPES[1], members: [...EQUIPES[1].members, ada] }
-    rendre({ onglet: "equipes", moi: { userId: CLAIRE, estAdmin: false, equipesDirigees: [VENTES] }, equipes: { data: [EQUIPES[0], ventes] } })
+    rendre({ onglet: "teams", moi: { userId: CLAIRE, estAdmin: false, equipesDirigees: [VENTES] }, equipes: { data: [EQUIPES[0], ventes] } })
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Ventes" }))
     const personnes = dialogue("Les personnes de Ventes")
@@ -323,13 +323,13 @@ describe("team gestures (AC11 to AC14)", () => {
 
   it("should add a person to the team and remove one, a lead included (AC13, AC-22)", async () => {
     fetchMock.mockResolvedValueOnce(reponse(200, { data: { membership: {} } }))
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Ventes" }))
     const personnes = dialogue("Les personnes de Ventes")
     fireEvent.click(personnes.getByRole("button", { name: "Ajouter Ada Martin à cette équipe" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: `/api/plateforme/teams/${VENTES}/members`, methode: "POST", corps: { userId: ADA } })
+    expect(envoi()).toEqual({ url: `/api/platform/teams/${VENTES}/members`, methode: "POST", corps: { userId: ADA } })
 
     fetchMock.mockResolvedValueOnce(reponse(200, { data: { membership: {} } }))
     fireEvent.click(personnes.getByRole("button", { name: "Retirer Claire Morel de cette équipe" }))
@@ -338,12 +338,12 @@ describe("team gestures (AC11 to AC14)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     fireEvent.click(question.getByRole("button", { name: "Retirer de l'équipe" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(2))
-    expect(envoi(1)).toMatchObject({ url: `/api/plateforme/teams/${VENTES}/members/${CLAIRE}`, methode: "DELETE" })
+    expect(envoi(1)).toMatchObject({ url: `/api/platform/teams/${VENTES}/members/${CLAIRE}`, methode: "DELETE" })
     expect(screen.queryByRole("dialog", { name: "Retirer Claire Morel de l'équipe Ventes ?" })).toBeNull()
   })
 
   it("should send nothing when the removal from a team is cancelled, and give the focus back to its trigger (M36)", async () => {
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Ventes" }))
     const retirer = dialogue("Les personnes de Ventes").getByRole("button", { name: "Retirer Claire Morel de cette équipe" })
@@ -362,7 +362,7 @@ describe("team gestures (AC11 to AC14)", () => {
   it("should say what the team still owns, by name, and keep the page as it is (AC14)", async () => {
     const details = { reason: "team_owns_objects", nodes: ["ventes/devis", "ventes/suivi_prospects"], accounts: ["Mail Ventes"], nodesTotal: 2, accountsTotal: 1 }
     fetchMock.mockResolvedValue(reponse(409, { error: { code: "conflict", message: "server text", details } }))
-    rendre({ onglet: "equipes" })
+    rendre({ onglet: "teams" })
 
     choisir("Gérer Ventes", "menuitem", "Supprimer l'équipe")
     const suppression = dialogue("Supprimer Ventes")
@@ -371,7 +371,7 @@ describe("team gestures (AC11 to AC14)", () => {
     expect((await suppression.findByRole("alert")).textContent).toBe(
       "Ventes possède encore : ventes/devis, ventes/suivi_prospects (nœuds) ; Mail Ventes (compte). Transférez-les ou supprimez-les avant de supprimer l'équipe.",
     )
-    expect(envoi()).toMatchObject({ url: `/api/plateforme/teams/${VENTES}`, methode: "DELETE" })
+    expect(envoi()).toMatchObject({ url: `/api/platform/teams/${VENTES}`, methode: "DELETE" })
     expect(rafraichir).not.toHaveBeenCalled()
   })
 })
@@ -465,19 +465,19 @@ describe("focus after a gesture that takes its trigger away (AC20, accessibility
 
   it("should give the focus to the teams table once a deleted team leaves", async () => {
     fetchMock.mockResolvedValue(reponse(200, { data: {} }))
-    const vue = rendre({ onglet: "equipes" })
+    const vue = rendre({ onglet: "teams" })
 
     choisir("Gérer Ventes", "menuitem", "Supprimer l'équipe")
     fireEvent.click(dialogue("Supprimer Ventes").getByRole("button", { name: "Supprimer l'équipe" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    vue.rerender(ecran({ onglet: "equipes", equipes: { data: [EQUIPES[0]] } }))
+    vue.rerender(ecran({ onglet: "teams", equipes: { data: [EQUIPES[0]] } }))
 
     await waitFor(() => expect(document.getElementById("equipes-liste")).toHaveFocus())
   })
 
   it("should give the focus to the dialog once the last candidate added leaves the list of people to add", async () => {
     fetchMock.mockResolvedValue(reponse(200, { data: { membership: {} } }))
-    const vue = rendre({ onglet: "equipes" })
+    const vue = rendre({ onglet: "teams" })
 
     fireEvent.click(screen.getByRole("button", { name: "Voir les personnes de Ventes" }))
     const ajouter = dialogue("Les personnes de Ventes").getByRole("button", { name: "Ajouter Ada Martin à cette équipe" })
@@ -485,7 +485,7 @@ describe("focus after a gesture that takes its trigger away (AC20, accessibility
     fireEvent.click(ajouter)
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     const ventesAvecAda: TeamView = { ...EQUIPES[1], members: [...EQUIPES[1].members, { userId: ADA, name: "Ada Martin", email: "ada@demo.test", role: "member" }] }
-    vue.rerender(ecran({ onglet: "equipes", equipes: { data: [EQUIPES[0], ventesAvecAda] } }))
+    vue.rerender(ecran({ onglet: "teams", equipes: { data: [EQUIPES[0], ventesAvecAda] } }))
 
     await waitFor(() => expect(document.getElementById("equipe-composition")).toHaveFocus())
     expect(dialogue("Les personnes de Ventes").getByText("Tout le monde y est déjà")).toBeInTheDocument()
@@ -503,8 +503,8 @@ describe("platform access gesture (AC18)", () => {
     render(
       <CoquilleOto pleinePage>
         <ContexteDeRafraichissement.Provider value={rafraichir}>
-          <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/acces", naviguer }}>
-            <AccesPlateforme resultat={{ data: acces }} nomOrganisation="Démo" Lien={Lien} ici="/admin/acces" />
+          <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/access", naviguer }}>
+            <AccesPlateforme resultat={{ data: acces }} nomOrganisation="Démo" Lien={Lien} ici="/admin/access" />
           </ContexteDeLHote.Provider>
         </ContexteDeRafraichissement.Provider>
       </CoquilleOto>,
@@ -515,7 +515,7 @@ describe("platform access gesture (AC18)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Révoquer l'accès" }))
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: "/api/plateforme/platform-access/a1/revoke", methode: "POST", corps: {} })
+    expect(envoi()).toEqual({ url: "/api/platform/platform-access/a1/revoke", methode: "POST", corps: {} })
     expect(screen.getByRole("heading", { name: "Accès de l'équipe plateforme à Démo" })).toHaveFocus()
   })
 })

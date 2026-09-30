@@ -145,7 +145,7 @@ maison divergera de celui des 34 composants existants.
 
 Une région n'annonce que ce qui change **après son montage** : elle se monte vide, le message
 arrive ensuite. Un message déjà présent dans le HTML du serveur (retour d'un rechargement, tiré de
-l'URL comme `?enregistre=1`) s'affiche sans être dit : il s'écrit après l'hydratation
+l'URL comme `?saved=1`) s'affiche sans être dit : il s'écrit après l'hydratation
 (`StatutDEnregistrement`, `packages/plateforme/ui/marque/`). **Vérifiable :** aucune région
 `role="status"` ne reçoit au rendu serveur un message tiré de l'URL.
 
@@ -256,7 +256,7 @@ monte les écrans du paquet, jamais un composant de `@/components/`. **Vérifiab
 
 La même règle couvre les **écrans d'authentification**, rendus sous la `CoquilleOto` que chaque
 page pose en `pleinePage` : fichiers `.ts` et `.tsx` de `src/app/(auth)/`,
-`src/app/auth/confirmer/`, `src/app/aucune-organisation/` et `src/app/oauth/` (consentement OAuth),
+`src/app/auth/confirm/`, `src/app/no-organization/` et `src/app/oauth/` (consentement OAuth),
 sous la même garde (plus aucune classe `border-<couleur>`). Sous `.oto`, une boîte d'alerte ou de statut s'écrit en `text-ink` sur
 `bg-card` (l'`Alert` du design system, `ui/ds/react/primitives.tsx`, région de `IlotDAuthentification`) : plus de
 10:1 sur les huit thèmes, jour et nuit.

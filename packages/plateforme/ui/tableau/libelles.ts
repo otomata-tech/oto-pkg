@@ -48,7 +48,7 @@ export const GRILLE = {
 } as const
 
 /** Les opérations d'un filtre de colonne (AC6), dans l'ordre du formulaire. */
-export const OPERATIONS_LUES = { contient: "Contient", egal: "Égal à", min: "Au moins", max: "Au plus", vide: "Vide", rempli: "Rempli" } as const
+export const OPERATIONS_LUES = { contains: "Contient", eq: "Égal à", gte: "Au moins", lte: "Au plus", empty: "Vide", not_empty: "Rempli" } as const
 
 export const TEXTES_DE_CELLULE = { vide: "—", verifieVide: "vérifié vide", oui: "Oui", non: "Non", ouvrirLeLien: "Ouvrir le lien" } as const
 

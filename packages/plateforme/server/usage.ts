@@ -248,10 +248,10 @@ function teamOf(roster: Roster, names: ReadonlyMap<string, string>, teamId: stri
  */
 export async function usageSummary(db: PlatformDb, identity: Identity, query: UsageQuery): Promise<UsageSummary> {
   if (!isOrgAdmin(identity)) throw await reserved(db, identity)
-  const since = new Date(Date.now() - query.periode * DAY_MS).toISOString()
-  const [directory, roster] = await Promise.all([memberDirectory(db, identity.org.id), query.equipe ? teamRoster(db, identity.org.id) : null])
+  const since = new Date(Date.now() - query.period * DAY_MS).toISOString()
+  const [directory, roster] = await Promise.all([memberDirectory(db, identity.org.id), query.team ? teamRoster(db, identity.org.id) : null])
   const names = new Map(directory.map((person) => [person.userId, person.name]))
-  const team = roster && query.equipe ? teamOf(roster, names, query.equipe) : null
+  const team = roster && query.team ? teamOf(roster, names, query.team) : null
   const read = await windowLines(db, identity, { since, userIds: team?.userIds ?? null })
   const truncated = read.length > USAGE_MAX_LINES
   const lines = read.slice(0, USAGE_MAX_LINES)
@@ -261,7 +261,7 @@ export async function usageSummary(db: PlatformDb, identity: Identity, query: Us
   const seen = lines.map((line) => ({ ...line, error: errorFor(reader, line.user_id, line.error) }))
   const aggregate = aggregateUsage(seen, procedures, identity.org.prefix, hidden)
   return {
-    periode: query.periode,
+    periode: query.period,
     team: team ? { id: team.id, name: team.name } : null,
     truncated,
     coveredFrom: truncated ? (lines.at(-1)?.ts ?? null) : null,

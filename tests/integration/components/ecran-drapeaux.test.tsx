@@ -27,7 +27,7 @@ function Lien({ children, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & 
 function rendre(resultat: { data: FlagView[] } | { error: string } = { data: DRAPEAUX }) {
   return render(
     <ContexteDeRafraichissement.Provider value={rafraichir}>
-      <EcranDrapeaux resultat={resultat} Lien={Lien} ici="/admin/drapeaux" />
+      <EcranDrapeaux resultat={resultat} Lien={Lien} ici="/admin/flags" />
     </ContexteDeRafraichissement.Provider>,
   )
 }
@@ -59,7 +59,7 @@ describe("EcranDrapeaux (AC8)", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Drapeaux de l'organisation" })).toHaveFocus()
     const [url, init] = fetchMock.mock.calls[0]
     expect({ url, methode: init?.method, corps: JSON.parse(String(init?.body)) }).toEqual({
-      url: "/api/plateforme/admin/flags",
+      url: "/api/platform/admin/flags",
       methode: "PATCH",
       corps: { name: "nouvelle_grille", enabled: true },
     })
@@ -87,6 +87,6 @@ describe("EcranDrapeaux, states (AC12)", () => {
     cleanup()
     rendre({ error: "Une erreur est survenue. Réessayez." })
     expect(screen.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/drapeaux")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/flags")
   })
 })

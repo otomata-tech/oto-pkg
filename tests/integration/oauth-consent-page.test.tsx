@@ -169,7 +169,7 @@ describe("page /oauth/consent", () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     mocks.getAuthorizationDetails.mockResolvedValue({ data: null, error: DECIDED })
 
-    render(await page({ authorization_id: ID, erreur: "decision" }))
+    render(await page({ authorization_id: ID, error: "decision" }))
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Autorisation impossible")
     expect(screen.getByRole("alert")).toHaveTextContent(TRANCHEE)
@@ -180,7 +180,7 @@ describe("page /oauth/consent", () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     mocks.getAuthorizationDetails.mockResolvedValue({ data: null, error: DECIDED })
 
-    render(await page({ authorization_id: ID, erreur: "autre" }))
+    render(await page({ authorization_id: ID, error: "autre" }))
 
     expect(screen.getByRole("alert")).toHaveTextContent(EXPIREE)
   })
@@ -280,7 +280,7 @@ describe.skipIf(!projectConfigured)(
 
     // Échec passager : la demande est toujours en attente, la page la remontre avec l'alerte.
     it("should show the request again, with the decision alert, after a transient failure (AC17)", async () => {
-      render(await page({ authorization_id: await pending(), erreur: "decision" }))
+      render(await page({ authorization_id: await pending(), error: "decision" }))
 
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Claude demande l'accès à votre compte")
       expect(screen.getByRole("alert")).toHaveTextContent("La décision n'a pas abouti. Rechargez la page, puis réessayez.")
@@ -289,7 +289,7 @@ describe.skipIf(!projectConfigured)(
     it.each<string | string[]>(["autre", "", "deja_autorise", ["decision", "decision"]])(
       "should ignore the error %j, out of the closed list",
       async (erreur) => {
-        render(await page({ authorization_id: await pending(), erreur }))
+        render(await page({ authorization_id: await pending(), error: erreur }))
 
         expect(screen.queryByRole("alert")).toBeNull()
       },
@@ -314,24 +314,24 @@ describe("deciderConsentementAction", () => {
     expect(mocks.denyAuthorization).toHaveBeenCalledWith(ID, { skipBrowserRedirect: true })
   })
 
-  it("should come back to the request with erreur=decision when the SDK fails (AC17)", async () => {
+  it("should come back to the request with error=decision when the SDK fails (AC17)", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     mocks.approveAuthorization.mockResolvedValue({ data: null, error: { status: 500, message: "boom" } })
 
     await expect(deciderConsentementAction(form({ authorization_id: ID, decision: "approve" }))).rejects.toThrow(
-      `NEXT_REDIRECT:${CONSENT}&erreur=decision`,
+      `NEXT_REDIRECT:${CONSENT}&error=decision`,
     )
   })
 
   // État mesuré (HN-E02S02-20) : relecture et décision en 400 pour une demande tranchée ailleurs.
-  it.each(["deny", "approve"])("should come back with erreur=decision on %s once another tab decided (AC17)", async (decision) => {
+  it.each(["deny", "approve"])("should come back with error=decision on %s once another tab decided (AC17)", async (decision) => {
     vi.spyOn(console, "error").mockImplementation(() => {})
     mocks.getAuthorizationDetails.mockResolvedValue({ data: null, error: DECIDED })
     mocks.approveAuthorization.mockResolvedValue({ data: null, error: DECIDED })
     mocks.denyAuthorization.mockResolvedValue({ data: null, error: DECIDED })
 
     await expect(deciderConsentementAction(form({ authorization_id: ID, decision }))).rejects.toThrow(
-      `NEXT_REDIRECT:${CONSENT}&erreur=decision`,
+      `NEXT_REDIRECT:${CONSENT}&error=decision`,
     )
   })
 
@@ -340,7 +340,7 @@ describe("deciderConsentementAction", () => {
     mocks.approveAuthorization.mockResolvedValue({ data: { redirect_url: RETURN_SCRIPT }, error: null })
 
     await expect(deciderConsentementAction(form({ authorization_id: ID, decision: "approve" }))).rejects.toThrow(
-      `NEXT_REDIRECT:${CONSENT}&erreur=decision`,
+      `NEXT_REDIRECT:${CONSENT}&error=decision`,
     )
   })
 

@@ -2,7 +2,7 @@
 
 // « Créer un compte » (E08-S03, AC6) : un compte simulé de l'organisation ou d'une équipe, pour un
 // connecteur activable, actif ou non (un compte se prépare avant l'activation, E04-S01), envoyé à
-// `POST /api/plateforme/admin/accounts` sur le schéma de l'API (`createAccountSchema`). Un compte
+// `POST /api/platform/admin/accounts` sur le schéma de l'API (`createAccountSchema`). Un compte
 // personnel se crée par son propriétaire, jamais ici (N11). Après un succès, la page se relit.
 //
 // Absent d'oto-frontend, dont les comptes naissent d'une connexion réelle (V2) : écrit sur le modèle de

@@ -1,5 +1,5 @@
 // « Équipes & accès » (E05-S03, AC1 à AC3 ; titre d'E05-S11, AC-33) : une route, deux onglets portés par
-// l'adresse de l'hôte (`?onglet=`), un Server Component qui aiguille ; seuls les gestes sont des îlots client.
+// l'adresse de l'hôte (`?tab=`), un Server Component qui aiguille ; seuls les gestes sont des îlots client.
 // Chaque donnée arrive en `resultat` (`{ data }` ou `{ error }`, portage § 4) ; la navigation vient de
 // l'hôte (`Lien`, `hrefDOnglet`), `ui/` n'importe aucun routeur.
 //
@@ -43,7 +43,7 @@ export type EcranEquipesProps = {
   hrefDOnglet: (onglet: EquipesTab, reglages?: Partial<ReglagesDesListes>) => string
 }
 
-const PAR_DEFAUT: ReglagesDesListes = { q: "", sens: "asc" }
+const PAR_DEFAUT: ReglagesDesListes = { q: "", order: "asc" }
 
 /** Le compte d'un onglet, en badge, quand sa lecture l'a servi : rien pendant une panne. */
 function compte(resultat: Resultat<unknown[]> | undefined) {
@@ -53,7 +53,7 @@ function compte(resultat: Resultat<unknown[]> | undefined) {
 /** La méta de l'en-tête suit l'onglet, et ses nombres viennent de ce que la page a lu. */
 function meta(props: EcranEquipesProps): string | undefined {
   const { onglet, membres, invitations, equipes } = props
-  if (onglet === "equipes") return equipes.data && pluriel(equipes.data.length, "équipe", "équipes")
+  if (onglet === "teams") return equipes.data && pluriel(equipes.data.length, "équipe", "équipes")
   if (!membres.data) return undefined
   const gens = pluriel(membres.data.length, "personne", "personnes")
   return invitations.data && invitations.data.length > 0 ? `${gens} · ${pluriel(invitations.data.length, "invitation", "invitations")}` : gens
@@ -61,11 +61,11 @@ function meta(props: EcranEquipesProps): string | undefined {
 
 /** L'action de l'en-tête suit l'onglet : on invite depuis les personnes, on crée une équipe depuis les équipes. */
 function action({ onglet, moi, nomOrganisation, optionsDInvitation }: EcranEquipesProps) {
-  if (onglet === "membres" && optionsDInvitation.data) {
+  if (onglet === "members" && optionsDInvitation.data) {
     const options = optionsDInvitation.data
     return <BoutonDInvitation equipes={options.teams.map((equipe) => ({ id: equipe.id, nom: equipe.name }))} rolesPermis={options.roles} equipeObligatoire={options.teamRequired} />
   }
-  if (onglet === "equipes" && moi.estAdmin) return <CreationDEquipe nomOrganisation={nomOrganisation} />
+  if (onglet === "teams" && moi.estAdmin) return <CreationDEquipe nomOrganisation={nomOrganisation} />
   return undefined
 }
 
@@ -73,7 +73,7 @@ function Contenu(props: EcranEquipesProps & { reglages: ReglagesDesListes }) {
   const { onglet, moi, nomOrganisation, Lien, reglages } = props
   const adresseAvec = (autres: Partial<ReglagesDesListes>) => props.hrefDOnglet(onglet, autres)
   const navigation: Navigation = { Lien, ici: props.hrefDOnglet(onglet, reglages) }
-  if (onglet === "equipes") {
+  if (onglet === "teams") {
     return <OngletEquipes nomOrganisation={nomOrganisation} moi={moi} equipes={props.equipes} membres={props.membres} reglages={reglages} navigation={navigation} adresseAvec={adresseAvec} />
   }
   return (
@@ -93,7 +93,7 @@ function Contenu(props: EcranEquipesProps & { reglages: ReglagesDesListes }) {
 
 export function EcranEquipes(props: EcranEquipesProps) {
   const reglages = props.reglages ?? PAR_DEFAUT
-  const badges: Partial<Record<EquipesTab, ReturnType<typeof compte>>> = { membres: compte(props.membres), equipes: compte(props.equipes) }
+  const badges: Partial<Record<EquipesTab, ReturnType<typeof compte>>> = { members: compte(props.membres), teams: compte(props.equipes) }
   const onglets = ONGLETS.map((onglet) => ({ ...onglet, href: props.hrefDOnglet(onglet.cle), badge: badges[onglet.cle] }))
   return (
     <>

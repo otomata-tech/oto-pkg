@@ -67,7 +67,7 @@ async function clesARevoir(): Promise<Set<string>> {
 
 async function alaCorbeille(page: Page, chemin: string): Promise<void> {
   const statut = await page.evaluate(
-    async (corps) => (await fetch("/api/plateforme/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
+    async (corps) => (await fetch("/api/platform/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
     { path: chemin },
   )
   expect(statut).toBe(200)
@@ -100,7 +100,7 @@ test.describe("écrans d'un contenu (E11-S05)", () => {
         // Un chemin par passage : un nœud à la corbeille garde le sien, et une création sur ce chemin est refusée.
         const citant = `private/${handle}/essai_e11s05_citant_${Date.now().toString(36)}`
         const creee = await page.evaluate(
-          async (corps) => (await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
+          async (corps) => (await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })).status,
           { path: citant, title: "Essai citant", summary: "Page jetable qui cite.", publish: true, ops: [{ op: "insert_after", input: { type: "paragraph", text: `Voir [[${essai}]].` } }] },
         )
         expect(creee).toBe(200)

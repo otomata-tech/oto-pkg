@@ -19,7 +19,7 @@ import type { ResultatDeMarque } from "./types"
 
 type EcranMarqueProps = {
   resultat: ResultatDeMarque
-  /** La page revient d'un enregistrement (`?enregistre=1` de l'hôte). */
+  /** La page revient d'un enregistrement (`?saved=1` de l'hôte). */
   enregistre: boolean
   /**
    * Le lien de l'hôte et l'adresse de l'écran : « Réessayer » d'une lecture en échec ; sans eux, le message seul.

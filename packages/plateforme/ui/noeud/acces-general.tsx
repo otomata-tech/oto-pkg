@@ -2,7 +2,7 @@
 
 // « Accès général » du panneau « Partager » (E05-S10, AC-b13 ; ADR-014) : toute l'organisation, à un niveau
 // (« Peut lire », « Peut modifier », « Accès complet » pour l'administrateur), ou seulement les personnes
-// ajoutées ; lu dans `general` de `listNodeRules`, changé par `POST /api/plateforme/nodes/access` (le service
+// ajoutées ; lu dans `general` de `listNodeRules`, changé par `POST /api/platform/nodes/access` (le service
 // décide : la gestion du nœud, l'administrateur pour l'accès complet, jamais dans Privé). Ce que l'espace donne
 // déjà se dit à côté : dans Tout le monde chaque membre lit, l'équipe propriétaire modifie. Sans lui, l'accès
 // général se lisait sans se changer (HN-E05S10b-6). Un fichier à lui : `partage-du-noeud.tsx` touchait la borne

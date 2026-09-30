@@ -117,7 +117,7 @@ test.describe("E05-S10 partie b2 : les gestes du rail", () => {
         rail = await ouvrirLeRail(page, largeur)
         await rail.getByRole("button", { name: /^Compte : / }).click()
         await page.getByRole("menu").getByRole("menuitem", { name: "Corbeille" }).click()
-        await attendre(page).toHaveURL(`${ESPACE.adresse}/corbeille`)
+        await attendre(page).toHaveURL(`${ESPACE.adresse}/trash`)
         await expect(page.getByRole("heading", { level: 1, name: "Corbeille" })).toBeVisible()
         const restaurer = page.getByRole("button", { name: `Restaurer « ${RENOMMEE} »` }).first()
         await expect(restaurer).toBeVisible()
@@ -126,7 +126,7 @@ test.describe("E05-S10 partie b2 : les gestes du rail", () => {
         await attendre(page).toHaveURL(new RegExp(`/n/private/${handle}/${RENOMMEE.replace(" ", "_")}(_\\d+)?$`))
         const restauree = new URL(page.url()).pathname.slice("/n/".length)
         const statut = await page.evaluate(
-          async (path) => (await fetch("/api/plateforme/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) })).status,
+          async (path) => (await fetch("/api/platform/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) })).status,
           restauree,
         )
         expect(statut).toBe(200)

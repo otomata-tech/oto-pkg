@@ -9,7 +9,7 @@ import { MESSAGES_DU_BLOC } from "../../../packages/plateforme/ui/noeud/editeur/
 import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur des blocs de page (E10-S06) : le choix du « + » et de « / », le séparateur, les préfixes, les niveaux de
-// liste, le tableau simple et le repli, sous la file d'écriture (`fetch` simulé pour `POST /api/plateforme/nodes`).
+// liste, le tableau simple et le repli, sous la file d'écriture (`fetch` simulé pour `POST /api/platform/nodes`).
 // « Ailleurs » est un bouton hors de l'éditeur : le focus qui y va quitte le bloc. `apres` dit ce qui suit l'éditeur.
 
 const rafraichir = vi.fn()

@@ -413,7 +413,7 @@ describe("EcranDeNoeud, états (AC6, AC7)", () => {
 
     rendre({ noeud: { error: "Une erreur est survenue. Réessayez." }, arbre: { error: "Une erreur est survenue. Réessayez." }, versionPubliee: true })
     expect(screen.getByRole("alert")).toHaveTextContent("Ce contenu n'a pas pu être chargéUne erreur est survenue. Réessayez.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=publiee")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=published")
     cleanup()
 
     // Les équipes illisibles : la page le dit, le fil ne devine pas la section d'équipe.
@@ -527,7 +527,7 @@ describe("EcranDeNoeud, contrôles selon le niveau (AC8, AC20)", () => {
 })
 
 describe("EcranDeNoeud, brouillon (AC9 ; E11-S02, AC-c3)", () => {
-  it("should show the pending draft without banner, notice or link, at every writing level, and the published version on ?version=publiee; a reader sees neither", () => {
+  it("should show the pending draft without banner, notice or link, at every writing level, and the published version on ?version=published; a reader sees neither", () => {
     const blocsDuBrouillon = [bloc(ID.objet, "paragraph", "Texte du brouillon")]
     // Un brouillon laissé par un assistant (`publish: false`) ou refusé : rien ne le signale ; la frappe suivante le publie.
     for (const level of [2, 3] as const) {
@@ -623,7 +623,7 @@ describe("EcranDeNoeud, accès et partage (AC19 ; E05-S10, AC-b5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Partager · Ventes" }))
     const panneau = within(screen.getByRole("dialog", { name: "Partager — Ventes" }))
     expect(panneau.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(panneau.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=publiee")
+    expect(panneau.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/modele_relance?version=published")
     expect(panneau.queryByRole("combobox")).toBeNull()
   })
 })
@@ -655,7 +655,7 @@ describe("EcranDeNoeud, réglages d'un tableau (E11-S01, AC-g1, AC-g6)", () => {
     }
   })
 
-  it("should give no « Réglages » to a reader, on ?version=publiee, or to a page, a procedure or a Contexte", () => {
+  it("should give no « Réglages » to a reader, on ?version=published, or to a page, a procedure or a Contexte", () => {
     rendre({ noeud: { data: tableau({ level: 1 }) }, partage })
     expect(reglages()).toBeNull()
     cleanup()
@@ -727,7 +727,7 @@ describe("EcranDeNoeud, télécharger (E11-S05, AC-c1 to AC-c3)", () => {
     const bouton = screen.getByRole("button", { name: "Télécharger en .csv" })
 
     fireEvent.click(bouton)
-    expect(requetes).toHaveBeenCalledWith("/api/plateforme/tables/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
+    expect(requetes).toHaveBeenCalledWith("/api/platform/tables/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
     await waitFor(() => expect(bouton).toBeDisabled())
     await act(async () => {
       repondre(new Response(JSON.stringify({ data: { filename: "modele_relance.csv", content: "nom\r\n" } }), { status: 200 }))
@@ -742,7 +742,7 @@ describe("EcranDeNoeud, télécharger (E11-S05, AC-c1 to AC-c3)", () => {
     rendre()
     fireEvent.click(screen.getByRole("button", { name: "Télécharger en .md" }))
     expect(await screen.findByRole("alert")).toHaveTextContent("Ce tableau a trop de lignes pour un export : filtrez-le, ou demandez à un assistant de le lire par pages.")
-    expect(requetes).toHaveBeenLastCalledWith("/api/plateforme/nodes/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
+    expect(requetes).toHaveBeenLastCalledWith("/api/platform/nodes/export?path=ventes%2Fmodele_relance", expect.objectContaining({ method: "GET" }))
     expect(clic).toHaveBeenCalledTimes(1)
   })
 })

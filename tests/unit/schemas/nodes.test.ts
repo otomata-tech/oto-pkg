@@ -101,7 +101,7 @@ describe("read and write input schemas, extended by additions only (AC1)", () =>
     })
     expect(properties.file).toEqual({
       description:
-        "Id of one text file attached to the page (html, md, txt, csv), from a file link /api/plateforme/files/<id>, to read its text alone (default: the whole page).",
+        "Id of one text file attached to the page (html, md, txt, csv), from a file link /api/platform/files/<id>, to read its text alone (default: the whole page).",
       type: "string",
       minLength: 1,
       maxLength: 100,

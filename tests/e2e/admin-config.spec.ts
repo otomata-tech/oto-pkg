@@ -12,8 +12,8 @@ import { EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 // le nom de l'organisation, seul champ de « L'entreprise », sans « Domaines de travail » ni « Nom affiché »
 // (E05-S13, AC-1, AC-3), relit la page, puis remet l'ancien nom ; il ouvre la question de la désactivation de
 // `mail` et garde le connecteur. « Organisation » porte la marque et le Contexte de Tout le monde, sans seuils ni
-// annexes (E05-S11, AC-22 à AC-24) ; `/admin/marque`, `/admin/drapeaux` et `/admin/acces` répondent 308 (AC-25 ;
-// `/admin/acces` vers `/equipes`, E05-S13, AC-5). Le nom d'avant est remis par la connexion d'administration si
+// annexes (E05-S11, AC-22 à AC-24) ; les adresses des écrans retirés répondent 404 depuis E11-S07
+// (`e11s07-adresses.spec.ts`). Le nom d'avant est remis par la connexion d'administration si
 // le parcours échoue en route. Une capture par page et par mode dans `test-results/`, « Organisation » à 375 et
 // 1 280 px, et dans les huit thèmes, posés sur la racine `.oto` de la page sans écrire la marque (AC-x1, AC-x3).
 
@@ -94,22 +94,8 @@ async function connecteurs({ page, capturer }: Parcours) {
   await expect(page.getByText(/^Actif depuis le /)).toBeVisible()
 }
 
-/**
- * Les écrans retirés (E05-S11, AC-25) : une redirection permanente, lue sur la chaîne de la navigation, puis suivie.
- * Par le navigateur : `page.request`, côté Node, ne résout pas `t<hex>.localhost` sous Windows (`lireLeHtml`).
- */
-async function redirections({ page, capturer }: Parcours) {
-  const REDIRECTIONS = [
-    ["/admin/marque", "/admin/organisation"],
-    ["/admin/drapeaux", "/admin/organisation"],
-    ["/admin/acces", "/equipes"],
-  ] as const
-  for (const [ancienne, nouvelle] of REDIRECTIONS) {
-    const arrivee = await page.goto(`${ADRESSE}${ancienne}`)
-    const redirection = await arrivee?.request().redirectedFrom()?.response()
-    expect(redirection?.status(), ancienne).toBe(308)
-    expect(page.url(), ancienne).toBe(`${ADRESSE}${nouvelle}`)
-  }
+/** Le fil des réglages ; les écrans retirés (E05-S11, AC-25) n'ont plus d'adresse, 404 (E11-S07, `e11s07-adresses.spec.ts`). */
+async function filDesReglages({ page, capturer }: Parcours) {
   // Le maillon courant du fil ouvre ses frères (settings-shell) : les réglages, Journal compris (E05-S11, AC-33 ;
   // E05-S13, AC-10), puis « Équipes & accès », sans onglet d'accès plateforme (E05-S13, AC-5).
   await ouvrir(page, "Organisation")
@@ -119,7 +105,7 @@ async function redirections({ page, capturer }: Parcours) {
   await expect(freres.getByRole("menuitemradio")).toHaveText(["Organisation", "Équipes & accès", "Journal"])
   await capturer("fil-des-reglages")
   await freres.getByRole("menuitemradio", { name: "Équipes & accès" }).click()
-  await expect(page).toHaveURL(`${ADRESSE}/equipes`)
+  await expect(page).toHaveURL(`${ADRESSE}/teams`)
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Équipes & accès")
   await expect(page.getByRole("tab", { name: "Accès plateforme" })).toHaveCount(0)
   await capturer("equipes")
@@ -146,7 +132,7 @@ test.describe("tableau de bord : configuration", () => {
       const capturer = (nom: string) => page.screenshot({ path: testInfo.outputPath(`${nom}-${mode}.png`), fullPage: true, caret: "initial" }).then(() => undefined)
       try {
         await seConnecterSurLEspace(page, { email, password })
-        for (const etape of [organisation, connecteurs, redirections]) await etape({ page, capturer })
+        for (const etape of [organisation, connecteurs, filDesReglages]) await etape({ page, capturer })
 
         await ouvrir(page, "Organisation")
         for (const theme of THEMES) {

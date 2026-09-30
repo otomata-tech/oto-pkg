@@ -44,6 +44,7 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - `call upload.link` gives a one-time link (15 minutes, 1 MB) to put a file on your disk in a page, or a `.md` or a CSV in a page or a table: send it with the curl command it returns.
 - Without a shell, `upload.link` takes `source_url`, a public https address the server downloads; otherwise give the person `form_url`, a one-time upload form.
 - `find` finds an attached file by its name.
+- File links served by `read` and upload links from `upload.link` now use `/api/platform/…`; a link given before this version no longer opens.
 
 ### Hosts
 - Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
@@ -90,6 +91,15 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - UI: add the page `/upload/<token>` under the session: it passes `uploadForm(db, identity, token)` to `EcranDeDepot` (example: `src/app/(dashboard)/upload/[token]/page.tsx`); its form posts to `POST uploads/<token>/form`.
 - MCP: `read` gains the optional field `file` and `upload.link` joins the `call` catalogue; the descriptions of `read` and `call` grow by one sentence: refresh the tool list in each host after upgrading (six tools, unchanged).
 - CLI: `pnpm org:export` and `pnpm org:import` need the five storage variables when the organisation has attached files, and carry their bytes in `<file>.files/`.
+- Install: addresses are in English, without alias or redirect, and an old one answers 404 (ADR-020): rename the route folders `/equipes` to `/teams`, `/profil` to `/profile`, `/corbeille` to `/trash`, `/plateforme` to `/platform`, `/aucune-organisation` to `/no-organization`, `/auth/confirmer` to `/auth/confirm`, `/admin/organisation` to `/admin/organization`, `/admin/connecteurs` to `/admin/connectors`, `/admin/retours` to `/admin/feedback`, and every address the host gives the screens or passes to `redirect()`.
+- Install: drop the pages `/admin/acces`, `/admin/marque` and `/admin/drapeaux` and the `/plateforme/invitations` redirect of `next.config.ts`; `/journal` keeps its name.
+- Install: mount the screens' API on `app/api/platform/[...route]/route.ts` (`PLATFORM_API_PREFIX`, exported by `./schemas`); `/api/plateforme/*` now answers 404, so every screen mutation fails until the route moves.
+- Install: move the exclusion from `X-Frame-Options` and `Referrer-Policy` to `api/platform/(?:public/[^/]+/)?files/[^/]+/html` (source `/((?!api/platform/(?:public/[^/]+/)?files/[^/]+/html/?$).*)` in the reference `next.config.ts`).
+- Install: add `/auth/confirm` to the Supabase Auth redirect URLs (`pnpm auth:settings --redirect`, then remove the `/auth/confirmer` one) and to the middleware's public routes; an invitation sent before this version leads to a 404: send it again.
+- MCP: the `not_enabled` refusal links `<origin>/admin/connectors` and `node.trash` points to `<origin>/trash`: the host serves both routes; the tool list and schemas are unchanged.
+- Schemas: URL keys renamed in place, an old name ignored like any unknown parameter: `equipesSearchSchema.tab` (`members`, `teams`); `equipesListesSchema` `filter`, `sort` (`team`, `people`), `order`; `journalFiltersSchema` `period`, `team`, `person`, `errors`, `cursor`, `calls`; `feedbackListQuerySchema` `state`, `period`, `cursor`; `usageQuerySchema` `period`, `team`; `proceduresSearchSchema.team`; `tableScreenParamsSchema.sort`; `nodeVersionParamSchema` takes `published`.
+- UI: a grid's `f=` clause is `<column>:<contains|eq|gte|lte|empty|not_empty>:<value>`, a boolean `true|false`, and the « Filtrer » form sends `column`, `contains`, `eq`, `min`, `max`, `presence` (`empty`, `not_empty`); an older clause is dropped and said; `Operation` takes these names, `CHAMP_DE_L_OPERATION` maps them to the form fields.
+- UI: the brand form returns to `?saved=1` (the host reads it for `enregistre`), a consent to redo carries `?error=decision`; anchors are `news`, `recent-content`, `everyone-context`, `private-context`, `context-<slug>` and `part-<n>`.
 
 ## 1.0.0 — 2026-09-28
 

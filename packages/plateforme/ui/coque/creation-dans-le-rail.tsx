@@ -3,7 +3,7 @@
 // Porté d'oto-frontend (src/components/coque/creation-dans-le-rail.tsx et page-privee-dans-le-rail.tsx) :
 // le « + » du rail, un seul menu pour tous les « + », la destination portée par le geste (« Dans … »),
 // aucun optimiste — on attend la réponse, puis on ouvre la page créée ; l'échec se dit sans rien
-// déplacer. Changé : l'API du paquet (`POST /api/plateforme/nodes`, le service de `write`) ; le menu
+// déplacer. Changé : l'API du paquet (`POST /api/platform/nodes`, le service de `write`) ; le menu
 // propose page, tableau et procédure (AC-a4), partout, Privé comprise (E05-S11, AC-34), chacun à son glyphe
 // du rail (`GLYPHES`, AC-35).
 // E05-S10 (partie b, AC-b3) : plus de dialogue, comme oto-frontend — le nœud naît tout de suite, « Sans

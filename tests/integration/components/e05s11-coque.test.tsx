@@ -34,7 +34,7 @@ const PROPS: RailApplicationProps = {
   handle: "claire",
   compte: "Claire Morel",
   administre: true,
-  adresses: { pages: "/n/", accueil: "/", journal: "/journal", equipes: "/equipes", usage: "/admin/usage", organisation: "/admin/organisation", connecteurs: "/admin/connecteurs", corbeille: "/corbeille", profil: "/profil" },
+  adresses: { pages: "/n/", accueil: "/", journal: "/journal", equipes: "/teams", usage: "/admin/usage", organisation: "/admin/organization", connecteurs: "/admin/connectors", corbeille: "/trash", profil: "/profile" },
 }
 
 function Lien({ href, children, ...reste }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children?: ReactNode }) {

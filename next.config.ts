@@ -9,15 +9,9 @@ const nextConfig: NextConfig = {
   // serveur, et tout `useId` de la page change (« attributes didn't match » : contrôle visuel d'E05-S02,
   // un thème sur deux). Développement seulement : la production ne rend pas ces enveloppes.
   experimental: { devtoolSegmentExplorer: false },
-  // Une page retirée garde son adresse par une redirection permanente, jamais une 404 sur un favori
-  // (`seo-patterns.md § Règles SEO`) : la page d'invitation d'E02-S01 est devenue l'onglet « Membres »
-  // de `/equipes` (E05-S03).
-  async redirects() {
-    return [{ source: "/plateforme/invitations", destination: "/equipes", permanent: true }]
-  },
   // ADR à rouvrir le jour où une vue s'intègre en cadre chez un client (E09).
-  // E10-S02 (AC-c3, ADR-017 § 1) : la route isolée d'un fichier HTML, `/api/plateforme/files/<id>/html` et
-  // `/api/plateforme/public/<jeton>/files/<id>/html`, se charge dans l'iframe de la visionneuse et pose elle-même sa
+  // E10-S02 (AC-c3, ADR-017 § 1) : la route isolée d'un fichier HTML, `/api/platform/files/<id>/html` et
+  // `/api/platform/public/<jeton>/files/<id>/html`, se charge dans l'iframe de la visionneuse et pose elle-même sa
   // politique (`frame-ancestors 'self'`, `Referrer-Policy: no-referrer`) : ni `X-Frame-Options` ni la
   // `Referrer-Policy` globale ne s'y appliquent. Toute autre adresse les garde.
   async headers() {
@@ -30,7 +24,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/((?!api/plateforme/(?:public/[^/]+/)?files/[^/]+/html/?$).*)",
+        source: "/((?!api/platform/(?:public/[^/]+/)?files/[^/]+/html/?$).*)",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

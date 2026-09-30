@@ -45,7 +45,7 @@ describe("the Contexte of Tout le monde on Organisation (AC-4)", () => {
 
   async function monter(servi: Promise<{ data: DonneesDeLApercu } | { error: string }>, lecture: Promise<{ data: BlockView[] } | { error: string }> = Promise.resolve({ data: BLOCS })) {
     await act(async () => {
-      render(<ContexteDeLEntreprise lecture={lecture} apercu={servi} prefixeDesPages="/n/" Lien={LienDeTest} ici="/admin/organisation" hrefDuContexte="/n/contexte" />)
+      render(<ContexteDeLEntreprise lecture={lecture} apercu={servi} prefixeDesPages="/n/" Lien={LienDeTest} ici="/admin/organization" hrefDuContexte="/n/contexte" />)
     })
     return within(screen.getByRole("region", { name: "Contexte · Tout le monde" }))
   }
@@ -84,7 +84,7 @@ describe("the Contexte of Tout le monde on Organisation (AC-4)", () => {
     const encart = await monter(Promise.resolve({ error: ECHEC }))
     expect(encart.getByText("Nous vendons des pompes.")).toBeInTheDocument()
     expect(encart.getByRole("alert")).toHaveTextContent(`Les contenus liés n'ont pas pu être lus.${ECHEC}`)
-    expect(encart.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organisation")
+    expect(encart.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organization")
   })
 })
 

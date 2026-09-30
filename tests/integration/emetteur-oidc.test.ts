@@ -109,7 +109,7 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? "issuer wired to the gates (E01-
   function viaApi(bearer: string, method = "GET", body?: unknown) {
     const origin = `https://${org.host}`
     const headers = { "x-forwarded-proto": "https", origin, "content-type": "application/json" }
-    const request = new Request(`${origin}/api/plateforme/invitations`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    const request = new Request(`${origin}/api/platform/invitations`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
     return handlePlateforme(request, { accessToken: bearer, host: org.host, defer: () => {} })
   }
 

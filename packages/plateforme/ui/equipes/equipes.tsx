@@ -27,10 +27,10 @@ type OngletEquipesProps = {
 }
 
 /** Le tri sur les équipes reçues : par nom, ou par nombre de personnes (puis par nom). */
-function trierLesEquipes(equipes: TeamView[], cle: "equipe" | "personnes", sens: "asc" | "desc"): TeamView[] {
+function trierLesEquipes(equipes: TeamView[], cle: "team" | "people", sens: "asc" | "desc"): TeamView[] {
   const signe = sens === "asc" ? 1 : -1
   const parNom = (a: TeamView, b: TeamView) => a.name.localeCompare(b.name, "fr")
-  return [...equipes].sort((a, b) => signe * (cle === "personnes" ? a.members.length - b.members.length || parNom(a, b) : parNom(a, b)))
+  return [...equipes].sort((a, b) => signe * (cle === "people" ? a.members.length - b.members.length || parNom(a, b) : parNom(a, b)))
 }
 
 /** « 1 personne dans aucune équipe », ou rien : une ligne qui annonce une absence prend la place de ce qu'on vient lire. */
@@ -42,19 +42,19 @@ function personnesSansEquipe(membres: MemberView[]): string | undefined {
 export function OngletEquipes({ nomOrganisation, moi, equipes, membres, reglages, navigation, adresseAvec }: OngletEquipesProps) {
   if (equipes.error !== undefined) return <ErreurDeLecture message={equipes.error} href={navigation.ici} Lien={navigation.Lien} />
   if (membres.error !== undefined) return <ErreurDeLecture message={membres.error} href={navigation.ici} Lien={navigation.Lien} />
-  const cle = reglages.tri ?? "equipe"
+  const cle = reglages.sort ?? "team"
   const seules = personnesSansEquipe(membres.data)
-  const adresse = (tri: "equipe" | "personnes", sens: "asc" | "desc") => adresseAvec({ tri: tri === "equipe" ? undefined : tri, sens })
+  const adresse = (tri: "team" | "people", sens: "asc" | "desc") => adresseAvec({ sort: tri === "team" ? undefined : tri, order: sens })
   return (
     <div id={ANCRE_DES_EQUIPES} tabIndex={-1} className="flex flex-col gap-3">
       {seules && <p className="oto-caption">{seules}</p>}
       <TableauDesEquipes
-        equipes={trierLesEquipes(equipes.data, cle, reglages.sens)}
+        equipes={trierLesEquipes(equipes.data, cle, reglages.order)}
         personnes={membres.data.map((membre) => ({ id: membre.userId, nom: membre.name, email: membre.email }))}
         moi={moi}
         nomOrganisation={nomOrganisation}
-        tri={{ cle, sens: reglages.sens }}
-        adresses={{ equipe: { asc: adresse("equipe", "asc"), desc: adresse("equipe", "desc") }, personnes: { asc: adresse("personnes", "asc"), desc: adresse("personnes", "desc") } }}
+        tri={{ cle, sens: reglages.order }}
+        adresses={{ team: { asc: adresse("team", "asc"), desc: adresse("team", "desc") }, people: { asc: adresse("people", "asc"), desc: adresse("people", "desc") } }}
         ancre={ANCRE_DES_EQUIPES}
       />
     </div>

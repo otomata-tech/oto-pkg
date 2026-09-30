@@ -41,7 +41,7 @@ test.describe("aucune organisation", () => {
       await page.emulateMedia({ colorScheme: theme })
       await seConnecter(page, { baseURL: adresseDeLHote(org.slug), email, password })
 
-      await expect(page).toHaveURL(/\/aucune-organisation$/)
+      await expect(page).toHaveURL(/\/no-organization$/)
       // Le titre de l'état est le `h2` de l'îlot ; le `h1` est le produit (E05-S07, AC10).
       await expect(page.getByRole("heading", { level: 2 })).toHaveText(`Vous n'êtes pas membre de ${org.name}`)
       await expect(page.getByText(`demandez à Contact E2E (${contact.email}) de vous inviter`)).toBeVisible()
@@ -53,7 +53,7 @@ test.describe("aucune organisation", () => {
       await page.emulateMedia({ colorScheme: theme })
       await seConnecter(page, { baseURL: "http://127.0.0.1:3000", email, password })
 
-      await expect(page).toHaveURL(/\/aucune-organisation$/)
+      await expect(page).toHaveURL(/\/no-organization$/)
       await expect(page.getByRole("heading", { level: 2 })).toHaveText("Adresse inconnue")
       await page.screenshot({ path: testInfo.outputPath(`adresse-inconnue-${theme}.png`), fullPage: true })
     })

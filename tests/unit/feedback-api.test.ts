@@ -1,5 +1,5 @@
 // @vitest-environment node
-// `PATCH /api/plateforme/feedback/<ticket>` (E08-S09, AC13) : la porte entière, `handlePlateforme`, sur une
+// `PATCH /api/platform/feedback/<ticket>` (E08-S09, AC13) : la porte entière, `handlePlateforme`, sur une
 // base réelle (E01-S10, lot t1-e2a) : l'organisation O de la fixture (`seedReferenceOrg`), son ticket
 // FB-0012 écrit avant chaque test ; identité résolue par l'adresse jetable de O, service réel, ligne de
 // journal relue par la connexion d'administration. Seuls le client de la porte (celui de la personne sur la
@@ -54,7 +54,7 @@ function ticketRow(number: number): Row {
 
 function patch(ticket: string, body: unknown) {
   const host = ref.org.host
-  return new Request(`https://${host}/api/plateforme/feedback/${ticket}`, {
+  return new Request(`https://${host}/api/platform/feedback/${ticket}`, {
     method: "PATCH",
     body: JSON.stringify(body),
     headers: { "x-forwarded-proto": "https", origin: `https://${host}`, "content-type": "application/json" },
@@ -88,7 +88,7 @@ async function ticket(number: number): Promise<Row[]> {
 
 const writesFeedback = (request: SpiedRequest) => request.write && request.tables.includes("feedback")
 
-describe.skipIf(!sqlConfigured)(portable("PATCH /api/plateforme/feedback/<ticket> (AC13)"), { timeout: NETWORK_TIMEOUT }, () => {
+describe.skipIf(!sqlConfigured)(portable("PATCH /api/platform/feedback/<ticket> (AC13)"), { timeout: NETWORK_TIMEOUT }, () => {
   beforeAll(async () => {
     seed = seedWithAdmin()
     ref = await seedReferenceOrg(seed)

@@ -18,7 +18,7 @@ describe("EcranDeLaCorbeille, the purge column (AC-11)", () => {
     const item = { path: "conseil", title: "Conseil", kind: "page" as const, deletedAt: "2026-09-20T08:00:00Z", count: 1, purgeAt: "2026-10-20T08:00:00Z" }
     render(
       <CoquilleOto>
-        <ContexteDeLHote.Provider value={{ Lien: "a", chemin: "/corbeille", naviguer: vi.fn() }}>
+        <ContexteDeLHote.Provider value={{ Lien: "a", chemin: "/trash", naviguer: vi.fn() }}>
           <EcranDeLaCorbeille resultat={{ data: [item] }} prefixeDesPages="/n/" />
         </ContexteDeLHote.Provider>
       </CoquilleOto>,

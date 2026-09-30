@@ -5,7 +5,7 @@
 // `navigation.jsx`) : `tablist` / `tab` / `tabpanel`, un seul onglet dans la tabulation, les flèches, Début
 // et Fin ; `data-island-head` sur la barre et sur le panneau, le CSS dessine l'en-tête de l'îlot ; le compte
 // d'un onglet dans son bouton, donc dans son nom accessible. Changé : l'onglet est dans l'adresse de l'hôte
-// (`?onglet=`) ; choisir un onglet l'ouvre par `useHote().naviguer`, et le panneau rend le contenu que la page
+// (`?tab=`) ; choisir un onglet l'ouvre par `useHote().naviguer`, et le panneau rend le contenu que la page
 // a lu pour lui. Chaque onglet étant une lecture du serveur, l'activation est manuelle (motif APG) : les
 // flèches déplacent le focus, Entrée ou Espace ouvre l'onglet. Retiré : Radix, absent du paquet.
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react"

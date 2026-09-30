@@ -32,7 +32,7 @@ import type { Row } from "../helpers/simulated-db"
 import { asCaller, seedWithAdmin, spyDb, SQL_SKIP_REASON, sqlConfigured, writesOf, type SeededData, type SentQuery } from "../helpers/sql"
 
 const NETWORK_TIMEOUT = 60_000
-const REDIRECT = { redirectTo: "https://acme.test/auth/confirmer?next=/" }
+const REDIRECT = { redirectTo: "https://acme.test/auth/confirm?next=/" }
 const NOW = Date.now()
 /** Il y a `minutes` minutes ; plus c'est petit, plus l'invitation est récente. */
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString()

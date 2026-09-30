@@ -2,7 +2,7 @@
 
 // La file des écritures d'un nœud (E05-S02, AC10 à AC18 ; HN-E05S02-1, HN-E05S02-18) : une seule, posée
 // par l'écran autour de la colonne de la page, servant l'éditeur, l'en-tête et la publication. Elle
-// envoie une écriture après l'autre, dans l'ordre des gestes, à `POST /api/plateforme/nodes`, avec la
+// envoie une écriture après l'autre, dans l'ordre des gestes, à `POST /api/platform/nodes`, avec la
 // révision publiée lue ; l'en-tête et la publication partent avec le dernier tampon du brouillon. Elle
 // adopte la révision et le tampon de chaque réponse, reprend ceux d'une relecture quand rien n'est en
 // vol, s'arrête au premier refus et repart de l'écriture refusée. Sans elle, deux gestes rapides
@@ -23,7 +23,7 @@ import { appelerPlateforme, type ErreurPlateforme } from "../../api/client"
 /** Le corps d'une écriture, sans le chemin, la révision publiée ni le tampon, que la file pose. */
 export type CorpsDEnvoi = Omit<WriteNodeBody, "path" | "base_revision" | "draft_stamp">
 
-/** Ce que rend `POST /api/plateforme/nodes` (E03-S03, AC37) et que l'écran lit. */
+/** Ce que rend `POST /api/platform/nodes` (E03-S03, AC37) et que l'écran lit. */
 export type ReponseDEcriture = {
   revision: number
   status: string

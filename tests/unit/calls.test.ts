@@ -255,7 +255,7 @@ describe.skipIf(!sqlConfigured)(portable("runCall on a real database"), { timeou
       await expect(notEnabled).rejects.toMatchObject({
         code: "not_enabled",
         message:
-          "No mail account is connected for you (the organisation). Ask an administrator of Acme Test (Ada Martin) to connect one on the dashboard: https://acme.test/admin/connecteurs.",
+          "No mail account is connected for you (the organisation). Ask an administrator of Acme Test (Ada Martin) to connect one on the dashboard: https://acme.test/admin/connectors.",
       })
       const refusals = await Promise.all([forbidden, notEnabled].map((refused) => refused.then(() => "", (error: unknown) => String(error))))
       for (const refused of refusals) expect(hidden.filter((label) => refused.includes(label))).toEqual([])

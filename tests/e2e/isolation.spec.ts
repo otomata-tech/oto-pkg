@@ -19,7 +19,7 @@ const password = process.env.E2E_USER_PASSWORD ?? ""
 async function ouvrirLesEquipes(browser: Browser, adresse: string): Promise<Page> {
   const page = await browser.newPage()
   await seConnecter(page, { baseURL: adresse, email, password })
-  await page.goto(`${adresse}/equipes?onglet=equipes`)
+  await page.goto(`${adresse}/teams?tab=teams`)
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Équipes & accès")
   return page
 }
@@ -84,7 +84,7 @@ test.describe("isolation by the address", () => {
 
     const surC = await browser.newPage()
     await seConnecter(surC, { baseURL: adresseDeLHote(c.slug), email, password })
-    await expect(surC).toHaveURL(/\/aucune-organisation$/)
+    await expect(surC).toHaveURL(/\/no-organization$/)
     // Le titre de l'état est le `h2` de l'îlot ; le `h1` est le produit (E05-S07, AC10).
     await expect(surC.getByRole("heading", { level: 2 })).toHaveText(`Vous n'êtes pas membre de ${c.name}`)
     await capturer(surC, testInfo, "non-membre-c")

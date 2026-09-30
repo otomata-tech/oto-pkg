@@ -4,7 +4,7 @@
 // L'application de base n'a pas d'ERP : sa liste est vide.
 //
 // Ce fichier est importé, pour son effet, en tête de chaque route qui monte une porte du paquet
-// (`src/app/api/mcp/route.ts`, `src/app/api/plateforme/[...route]/route.ts`,
+// (`src/app/api/mcp/route.ts`, `src/app/api/platform/[...route]/route.ts`,
 // `src/app/api/mcp-admin/route.ts`) : l'état d'un module vit dans chaque bundle serverless, et une route
 // qui ne l'importe pas sert un catalogue sans ces fonctions (garde :
 // `tests/unit/fonctions-metier-imports.test.ts`). `registerFunctions` remplace toute la liste à chaque

@@ -60,7 +60,7 @@ function ContexteLu({ lecture }: { lecture: Promise<DonneesDuContexteServi> }) {
 export default async function ContextePage() {
   const identite = await getPlatformIdentitySafely("context")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
   // Une panne de la résolution de l'identité : l'écran la dit une fois, avec « Réessayer ».
   if (!identite) return <EcranDuContexte resultat={ECHEC} Lien={Link} prefixeDesPages="/n/" ici={ICI} />
   const { session, identity } = identite.data

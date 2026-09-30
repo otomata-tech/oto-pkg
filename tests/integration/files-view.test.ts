@@ -114,11 +114,11 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
     return { type: "file" as const, data: { file_id: id, name: row.name, size: Number(row.size), mime: row.mime } }
   }
 
-  /** `GET /api/plateforme/<chemin>` par la porte, sous la session de `person` (sans elle : `null`). */
+  /** `GET /api/platform/<chemin>` par la porte, sous la session de `person` (sans elle : `null`). */
   function get(path: string, options: { person?: Person | null; host?: string; dest?: string } = {}) {
     const headers = new Headers(options.dest === undefined ? {} : { "sec-fetch-dest": options.dest })
     const person = options.person === undefined ? "claire" : options.person
-    return handlePlateforme(new Request(`https://${options.host ?? o.host}/api/plateforme/${path}`, { headers }), {
+    return handlePlateforme(new Request(`https://${options.host ?? o.host}/api/platform/${path}`, { headers }), {
       accessToken: person === null ? null : as(person).token,
       host: options.host ?? o.host,
       verifyToken: fx.verifyToken,

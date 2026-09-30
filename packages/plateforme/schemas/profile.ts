@@ -1,5 +1,5 @@
 // La fiche d'une personne (E05-S04, AC13 ; H31, P39 ; E05-S11, AC-3, AC-5) : ce qu'elle écrit elle-même par
-// `PATCH /api/plateforme/profile`, lu par le formulaire de la page « Profil » et par `updateProfile`. Mêmes
+// `PATCH /api/platform/profile`, lu par le formulaire de la page « Profil » et par `updateProfile`. Mêmes
 // champs et bornes que `update_my_profile` (migration `20260928110000_platform_profil.sql`) : le nom, le
 // prénom et le nom de famille (80 caractères chacun), la langue (`fr`, `en`) et la couleur (un des huit
 // thèmes) ; une chaîne vide retire la clé ; écrire le prénom ou le nom de famille recompose le nom. Ni

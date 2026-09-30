@@ -36,10 +36,10 @@ export default async function ConnectPage() {
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
   const identite = await getPlatformIdentity()
   if (identite.error?.code === "unauthenticated") redirect(loginPath(ICI))
-  if (identite.error) redirect("/aucune-organisation")
+  if (identite.error) redirect("/no-organization")
   // L'identité vient de l'hôte de la requête : sans hôte, elle n'aurait pas été résolue.
   const origine = await getRequestOrigin()
-  if (!origine) redirect("/aucune-organisation")
+  if (!origine) redirect("/no-organization")
 
   const { identity, session } = identite.data
   // Deux lectures indépendantes, en parallèle ; chacune se dit seule quand elle échoue (AC-13).

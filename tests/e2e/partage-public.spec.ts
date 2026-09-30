@@ -30,13 +30,13 @@ async function handleDuCompte(page: Page): Promise<string> {
 }
 
 /**
- * Crée un nœud jetable publié par `POST /api/plateforme/nodes` (`publish: true`) ; son titre donne le dernier
+ * Crée un nœud jetable publié par `POST /api/platform/nodes` (`publish: true`) ; son titre donne le dernier
  * segment de son chemin (l'adresse suit le titre, AC-b12). Déjà là : `stale_revision`, gardé tel quel.
  */
 async function assurerPublie(page: Page, chemin: string, titre: string, texte: string): Promise<void> {
   const issue = await page.evaluate(
     async (corps) => {
-      const reponse = await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+      const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
       const lu: { error?: { code?: string } } = await reponse.json()
       return reponse.ok ? "créée" : (lu.error?.code ?? String(reponse.status))
     },
@@ -152,7 +152,7 @@ test.describe("E05-S10 partie d : le partage public", () => {
         await capturer(lecteur, testInfo, `page-publique-enfant-${suffixe}`)
 
         // AC-d7 : le lien paraît dans l'administration de l'organisation.
-        await page.goto(`${ESPACE.adresse}/admin/organisation`)
+        await page.goto(`${ESPACE.adresse}/admin/organization`)
         const liens = page.getByRole("region", { name: "Liens publics" })
         await attendre(liens.getByRole("link", { name: "e05s10d partage" })).toBeVisible()
         await capturer(page, testInfo, `admin-liens-publics-${suffixe}`)

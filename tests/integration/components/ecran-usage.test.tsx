@@ -44,10 +44,10 @@ function LienDeTest({ children, ...props }: AnchorHTMLAttributes<HTMLAnchorEleme
 }
 
 function hrefDeFenetre(filtres: UsageQuery) {
-  return (periode: UsagePeriod) => (filtres.equipe ? `/admin/usage?periode=${periode}&equipe=${filtres.equipe}` : `/admin/usage?periode=${periode}`)
+  return (periode: UsagePeriod) => (filtres.team ? `/admin/usage?period=${periode}&team=${filtres.team}` : `/admin/usage?period=${periode}`)
 }
 
-function rendre(resultat: EcranUsageProps["resultat"], adresse: Record<string, string> = { periode: "7", equipe: VENTES }) {
+function rendre(resultat: EcranUsageProps["resultat"], adresse: Record<string, string> = { period: "7", team: VENTES }) {
   const filtres = usageQuerySchema.parse(adresse)
   return render(
     <ContexteDeLHote.Provider value={{ Lien: LienDeTest, chemin: "/admin/usage", naviguer }}>
@@ -56,7 +56,7 @@ function rendre(resultat: EcranUsageProps["resultat"], adresse: Record<string, s
         filtres={filtres}
         Lien={LienDeTest}
         hrefDuNoeud={(chemin) => `/n/${chemin}`}
-        hrefDeConversation={(code, periode) => `/journal?conversation=${code}&periode=${periode}`}
+        hrefDeConversation={(code, periode) => `/journal?conversation=${code}&period=${periode}`}
         hrefDeFenetre={hrefDeFenetre(filtres)}
         actionDuFiltre="/admin/usage"
       />
@@ -81,7 +81,7 @@ describe("EcranUsage states (AC15)", () => {
     rendre({ error: ECHEC })
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Usage des assistants")
     expect(screen.getByRole("alert")).toHaveTextContent(ECHEC)
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/admin/usage?periode=7&equipe=${VENTES}`)
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", `/admin/usage?period=7&team=${VENTES}`)
     expect(screen.queryByRole("table")).toBeNull()
     expect(screen.queryByRole("radiogroup")).toBeNull()
   })
@@ -98,7 +98,7 @@ describe("EcranUsage window and team (AC2)", () => {
       ["90 jours", "false"],
     ])
     fireEvent.click(fenetres[2])
-    expect(naviguer).toHaveBeenCalledWith(`/admin/usage?periode=90&equipe=${VENTES}`)
+    expect(naviguer).toHaveBeenCalledWith(`/admin/usage?period=90&team=${VENTES}`)
   })
 
   it("should be reached once by Tab and moved by the arrows, like a radio group (E05-S09, AC-x3)", () => {
@@ -107,7 +107,7 @@ describe("EcranUsage window and team (AC2)", () => {
     expect(fenetres.map((fenetre) => fenetre.tabIndex)).toEqual([0, -1, -1])
     fenetres[0].focus()
     fireEvent.keyDown(fenetres[0], { key: "ArrowRight" })
-    expect(naviguer).toHaveBeenCalledWith(`/admin/usage?periode=30&equipe=${VENTES}`)
+    expect(naviguer).toHaveBeenCalledWith(`/admin/usage?period=30&team=${VENTES}`)
     expect(fenetres[1]).toHaveFocus()
   })
 
@@ -120,13 +120,13 @@ describe("EcranUsage window and team (AC2)", () => {
     expect(equipe).toHaveValue(VENTES)
     expect(equipe).toHaveTextContent("Ventes")
     expect(libellesDesChoix(equipe)).toEqual(["Toutes les équipes", "Ventes"])
-    expect(formulaire.querySelector('input[type="hidden"][name="equipe"]')).toHaveValue(VENTES)
-    expect(formulaire.querySelector('input[type="hidden"][name="periode"]')).toHaveValue("7")
+    expect(formulaire.querySelector('input[type="hidden"][name="team"]')).toHaveValue(VENTES)
+    expect(formulaire.querySelector('input[type="hidden"][name="period"]')).toHaveValue("7")
     expect(within(formulaire).getByRole("button", { name: "Filtrer" })).toHaveAttribute("type", "submit")
   })
 
   it("should show « Toutes les équipes » and no team in the heading when the service ignored the team", () => {
-    rendre(donnees(VIDE), { periode: "7", equipe: "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02" })
+    rendre(donnees(VIDE), { period: "7", team: "0b6f1f0e-1c1a-4a8e-9a51-0d7c1a2b3c02" })
     expect(screen.getByText("Sur les 7 derniers jours")).toBeInTheDocument()
     expect(screen.getByRole("combobox", { name: "Équipe" })).toHaveValue("")
   })
@@ -166,7 +166,7 @@ describe("EcranUsage islands (AC3 to AC6, AC8)", () => {
     expect(sansProcedure.getByText("Ces demandes n'ont trouvé ni procédure ni appel : elles nourrissent le titre et le résumé des procédures.")).toBeInTheDocument()
     const [demande] = sansProcedure.getAllByRole("row").slice(1)
     expect(cellules(demande)).toEqual(["23 septembre 2026 à 15:00", "Personne retirée", "Prépare le planning des tournées de la semaine (conversation DEMO-0004)", "—"])
-    expect(within(demande).getByRole("link")).toHaveAttribute("href", "/journal?conversation=DEMO-0004&periode=7")
+    expect(within(demande).getByRole("link")).toHaveAttribute("href", "/journal?conversation=DEMO-0004&period=7")
   })
 
   it("should say each empty island, and « — » for an error rate without calls", () => {

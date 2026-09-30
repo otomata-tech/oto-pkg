@@ -10,7 +10,7 @@ import { bloc, simulerLAPI } from "../../helpers/noeud"
 // L'éditeur après les retours de la démo (E11-S06) : une puce, un numéro ou une case par élément d'une liste, portés
 // par la copie de ses éléments (lot a) ; le panneau « Lien » ouvert par le curseur dans un lien ou par un clic sur un
 // lien au repos, qui réécrit le lien seul par une frappe (lot b). Sous la file d'écriture, `fetch` simulé pour
-// `POST /api/plateforme/nodes`. La place des repères sur les lignes repliées se mesure dans un navigateur :
+// `POST /api/platform/nodes`. La place des repères sur les lignes repliées se mesure dans un navigateur :
 // `tests/e2e/e11s06-editeur.spec.ts`.
 
 const ID = {
@@ -109,7 +109,7 @@ function simulerLaRecherche() {
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (adresse, init) => {
-      if (!String(adresse).includes("/api/plateforme/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
+      if (!String(adresse).includes("/api/platform/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
       return new Response(JSON.stringify({ data: { matches: TROUVES, more: 0 } }), { status: 200, headers: { "content-type": "application/json" } })
     }),
   )

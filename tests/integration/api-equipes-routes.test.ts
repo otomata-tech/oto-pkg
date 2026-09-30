@@ -75,7 +75,7 @@ beforeEach(() => {
 })
 
 function request(method: string, path: string, body?: unknown) {
-  return new Request(`https://${HOST}/api/plateforme/${path}`, {
+  return new Request(`https://${HOST}/api/platform/${path}`, {
     method,
     body: body === undefined ? undefined : JSON.stringify(body),
     headers: { "x-forwarded-proto": "https", origin: `https://${HOST}`, "content-type": "application/json" },

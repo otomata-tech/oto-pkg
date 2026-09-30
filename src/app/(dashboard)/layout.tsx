@@ -28,19 +28,19 @@ const ADRESSES: AdressesDuRail = {
   pages: "/n/",
   accueil: "/",
   journal: "/journal",
-  equipes: "/equipes",
+  equipes: "/teams",
   brancher: "/connect",
-  organisation: "/admin/organisation",
-  connecteurs: "/admin/connecteurs",
-  corbeille: "/corbeille",
-  profil: "/profil",
+  organisation: "/admin/organization",
+  connecteurs: "/admin/connectors",
+  corbeille: "/trash",
+  profil: "/profile",
   // E11-S10 (AC-e1) : la vue « Contexte », en tête du menu du compte.
   contexte: "/context",
 }
 
 /** Les adresses du rail de la personne : les Retours au membre de l'équipe plateforme qui administre l'organisation. */
 function adressesDe(identity: Identity | undefined): AdressesDuRail {
-  return identity && handlesFeedback(identity) ? { ...ADRESSES, retours: "/admin/retours" } : ADRESSES
+  return identity && handlesFeedback(identity) ? { ...ADRESSES, retours: "/admin/feedback" } : ADRESSES
 }
 
 /** Une lecture impossible sans identité (panne de sa résolution) : le rail la dit à sa place. */
@@ -56,7 +56,7 @@ export default async function DashboardLayout({
   // nom d'organisation ni arbre — au lieu de faire tomber chaque page du groupe.
   const resultat = await getPlatformIdentitySafely("(dashboard) layout")
   if (resultat?.error?.code === "unknown_org" || resultat?.error?.code === "not_member") {
-    redirect("/aucune-organisation")
+    redirect("/no-organization")
   }
   const lu = resultat?.data
   const identity = lu?.identity

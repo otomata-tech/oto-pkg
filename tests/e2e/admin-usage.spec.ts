@@ -7,7 +7,7 @@ import { ESPACE, SANS_ESPACE } from "./fixtures/espace"
 // Contrôle visuel connecté de l'usage et des retours (E08-S09, AC14, AC15), sur les écrans portés
 // d'oto-frontend (E05-S09 partie d2) : le compte E2E, administrateur de l'organisation de la campagne
 // (`espace.ts`, semée par les sections `journal` et `usage`) et de l'équipe plateforme, en clair puis en sombre.
-// `/admin/usage` est caché : la page répond 404 (E05-S13, AC-8). `/admin/retours`, réservé au staff (E05-S13,
+// `/admin/usage` est caché : la page répond 404 (E05-S13, AC-8). `/admin/feedback`, réservé au staff (E05-S13,
 // AC-9), sous « Tous » : les trois tickets, « Prendre en compte » sur le ticket ouvert puis « Rouvrir », qui rend
 // l'état semé. Une capture par écran et par mode dans `test-results/`, et les retours dans les huit thèmes, posés
 // sur la racine `.oto` (AC-x1, AC-x3). En série : les deux modes changent le même ticket.
@@ -28,8 +28,8 @@ test.describe("admin usage and feedback", () => {
   test.beforeAll(async () => {
     const { error } = await clientAuth().auth.signInWithPassword({ email, password })
     test.skip(error !== null, "E2E account missing from the Supabase project: run pnpm demo:seed (E01-S05)")
-    // `/admin/retours` est réservé au staff (E05-S13, AC-9) : un compte E2E hors de l'équipe plateforme n'y entre pas.
-    test.skip(!(await compteDuStaff(email)), "E2E account is not platform staff: /admin/retours is staff-only (E05-S13, AC-9)")
+    // `/admin/feedback` est réservé au staff (E05-S13, AC-9) : un compte E2E hors de l'équipe plateforme n'y entre pas.
+    test.skip(!(await compteDuStaff(email)), "E2E account is not platform staff: /admin/feedback is staff-only (E05-S13, AC-9)")
   })
 
   for (const mode of MODES) {
@@ -42,11 +42,11 @@ test.describe("admin usage and feedback", () => {
       await seConnecterSurLEspace(page, { email, password })
 
       // L'usage est caché : la page n'existe plus pour personne, staff compris (E05-S13, AC-8).
-      expect((await page.goto(`${adresse}/admin/usage?periode=7`))?.status()).toBe(404)
+      expect((await page.goto(`${adresse}/admin/usage?period=7`))?.status()).toBe(404)
       await expect(page.getByRole("heading", { level: 1, name: "Usage des assistants" })).toHaveCount(0)
       await capturer("usage-cache")
 
-      await page.goto(`${adresse}/admin/retours?etat=all`)
+      await page.goto(`${adresse}/admin/feedback?state=all`)
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Retours des assistants")
       await expect(page.getByRole("radiogroup", { name: "Filtrer par état" }).getByRole("radio", { name: "Tous" })).toHaveAttribute("aria-checked", "true")
       const ouvert = page.getByRole("row").filter({ hasText: OUVERT })

@@ -42,13 +42,13 @@ async function capturer(page: Page, testInfo: TestInfo, nom: string): Promise<vo
 }
 
 /**
- * Crée la procédure jetable par `POST /api/plateforme/nodes` (E03-S03), depuis la page connectée : même
+ * Crée la procédure jetable par `POST /api/platform/nodes` (E03-S03), depuis la page connectée : même
  * origine, même session. Une procédure qui existe déjà rend `stale_revision`, faute de révision lue :
  * elle est gardée telle quelle.
  */
 async function assurerLaProcedure(page: Page, chemin: string): Promise<void> {
   const issue = await page.evaluate(async (chemin) => {
-    const reponse = await fetch("/api/plateforme/nodes", {
+    const reponse = await fetch("/api/platform/nodes", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -95,7 +95,7 @@ async function supprimerLeBloc(page: Page, mots: string): Promise<void> {
 async function attendreLaPublication(page: Page, chemin: string, texte: string, present: boolean): Promise<void> {
   await expect(page.getByRole("button", { name: "Publier", exact: true })).toHaveCount(0)
   await attendre(async () => {
-    expect((await lireLeHtml(page, `/n/${chemin}?version=publiee`)).includes(`>${texte}<`)).toBe(present)
+    expect((await lireLeHtml(page, `/n/${chemin}?version=published`)).includes(`>${texte}<`)).toBe(present)
   }).toPass({ timeout: 90_000 })
 }
 
@@ -142,7 +142,7 @@ test.describe("procédure et contexte", () => {
 
       // Sa version publiée se lit comme une page : chaque appel en une ligne de texte (ses clés dans l'ordre de
       // `jsonb`, qui n'est pas celui de l'écriture).
-      await page.goto(`${ADRESSE}/n/${PROCEDURE}?version=publiee`)
+      await page.goto(`${ADRESSE}/n/${PROCEDURE}?version=published`)
       await attendre(page.getByText(new RegExp(`^Appel de table\\.claim : \\{ .*"table": "${CHEMINS.tableau}"`))).toBeVisible()
       await expect(page.getByRole("textbox", { name: /^Modifier ce texte/ })).toHaveCount(0)
       await capturer(page, testInfo, `procedure-lue-${theme}`)
@@ -191,7 +191,7 @@ test.describe("procédure et contexte", () => {
       await attendre((await ouvrirAQuoiSert(page)).getByText(/vous seul le recevez\.$/)).toBeVisible()
       await expect(page.getByRole("region", { name: "Ma fiche" })).toHaveCount(0)
       await page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("link", { name: /^Contexte : Privé/ }).click()
-      await attendre(page).toHaveURL(`${ADRESSE}/context#contexte-prive`)
+      await attendre(page).toHaveURL(`${ADRESSE}/context#private-context`)
       // L'adresse change aussitôt, la vue paraît quand ses lectures finissent (aperçu du Contexte compris,
       // `<Suspense>`) : 2,8 s au calme, 3,9 s sous une campagne complète, au-delà de 5 s au plus chargé (mesuré).
       await attendre(page.getByRole("heading", { level: 1, name: "Contexte" })).toBeVisible()

@@ -1,7 +1,7 @@
 "use client"
 
 // Ce qu'un déplacement change pour qui voit le contenu (E05-S10, partie b2, AC-b7) : l'aperçu du service
-// (`GET /api/plateforme/nodes/impact`, `moveImpact` : chaque membre, son niveau avant et après, et le
+// (`GET /api/platform/nodes/impact`, `moveImpact` : chaque membre, son niveau avant et après, et le
 // propriétaire), lu avant l'envoi ; sans changement, le déplacement part sans question ; sinon un
 // `ConfirmDialog` nomme ceux qui gagnent, perdent ou changent d'accès, avec les mots de « Partager ». Sans
 // lui, la confirmation ne voyait que l'espace du chemin (HN-E05S10b-9) : une page rangée sous une page aux

@@ -160,11 +160,11 @@ describe.skipIf(!sqlConfigured)(portable("the human review of a table"), { timeo
     })
   })
 
-  describe("POST /api/plateforme/tables/review (AC11)", () => {
+  describe("POST /api/platform/tables/review (AC11)", () => {
     it("should answer the outcome and journal POST tables/review on the table, with its team and the key and decision", async () => {
       await freshTable(seed, ref)
       const tasks: (() => Promise<void>)[] = []
-      const request = new Request(`https://${ref.org.host}/api/plateforme/tables/review`, {
+      const request = new Request(`https://${ref.org.host}/api/platform/tables/review`, {
         method: "POST",
         body: JSON.stringify({ ...CLINIQUE, decision: "approve" }),
         headers: { "x-forwarded-proto": "https", origin: `https://${ref.org.host}`, "content-type": "application/json" },

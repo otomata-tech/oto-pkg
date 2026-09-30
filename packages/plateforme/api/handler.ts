@@ -1,8 +1,9 @@
-// Porte HTTP du paquet : `/api/plateforme/<ressource>[/<paramètres>]` (H03, H06). La route de
+// Porte HTTP du paquet : `/api/platform/<ressource>[/<paramètres>]` (H03, H06). La route de
 // l'hôte délègue ici avec le jeton de sa session ; chaque ressource délègue à ses services.
 // Réponses `{ data }` ou `{ error: { code, message, details? } }`, au statut de `HTTP_STATUS`
 // (H04). Une ligne de journal par mutation, écrite après la réponse (H07).
 import type { VerifyToken } from "../mcp/auth"
+import { PLATFORM_API_PREFIX } from "../schemas/api"
 import type { Json } from "../server/database"
 import type { PlatformDb } from "../server/db"
 import { PlatformError } from "../server/errors"
@@ -123,7 +124,7 @@ type PlatformRequestOptions = {
   verifyToken?: VerifyToken
 }
 
-const PREFIX = "/api/plateforme/"
+const PREFIX = PLATFORM_API_PREFIX
 const MUTATIONS: ReadonlySet<string> = new Set(["POST", "PATCH", "DELETE"])
 
 /** `tool` : le nom de la ligne de journal, « <VERBE> <ressource>[/<segment fixe>] » (H07). */
@@ -138,14 +139,14 @@ function fits(route: Route, segments: string[]): boolean {
   return Object.entries(route.fixed ?? {}).every(([at, segment]) => segments[Number(at)] === segment)
 }
 
-/** Segments du chemin après `/api/plateforme/`, encore encodés ; aucun hors de ce préfixe. */
+/** Segments du chemin après `/api/platform/`, encore encodés ; aucun hors de ce préfixe. */
 function routeSegments(request: Request): string[] {
   const { pathname } = new URL(request.url)
   const at = pathname.indexOf(PREFIX)
   return at === -1 ? [] : pathname.slice(at + PREFIX.length).split("/").filter(Boolean)
 }
 
-/** `GET /api/plateforme/cell`, sans paramètre : servie hors de `RESOURCES` (NH11). */
+/** `GET /api/platform/cell`, sans paramètre : servie hors de `RESOURCES` (NH11). */
 function isCellRoute(segments: readonly string[], method: string): boolean {
   return method === "GET" && segments.length === 1 && segments[0] === "cell"
 }

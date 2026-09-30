@@ -2,7 +2,7 @@
 
 // « Dupliquer » et « Supprimer » du « ⋯ » d'une ligne du rail (E05-S10, partie b2, AC-b8, AC-b10, AC-b11),
 // où ils remplacent « Renommer » (le titre s'écrit dans la page, AC-a1). « Dupliquer » envoie
-// `POST /api/plateforme/nodes/duplicate` : la copie, « <titre> (copie) » juste sous l'original, s'ouvre et
+// `POST /api/platform/nodes/duplicate` : la copie, « <titre> (copie) » juste sous l'original, s'ouvre et
 // reste sélectionnée dans le rail. « Supprimer » demande d'abord, par un `ConfirmDialog`, en disant combien
 // de sous-contenus partent avec (l'arbre visible les compte : le service refuse un sous-arbre qui porte un
 // contenu que la personne ne voit pas, HN-E05S10e-3), puis envoie `POST trash` ; la page ouverte partie avec

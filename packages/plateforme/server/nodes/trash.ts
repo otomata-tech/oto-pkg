@@ -253,7 +253,7 @@ export async function restoreNode(db: PlatformDb, identity: Identity, input: unk
 
 /** « A manager can restore it… » : où restaurer, par l'écran Corbeille de l'adresse appelée (AC-e1, AC-e2). */
 function restoreHint(context: FunctionContext): string {
-  return `A manager can restore it for ${TRASH_DAYS} days from the Trash screen (${context.origin ?? ""}/corbeille); after that it is erased.`
+  return `A manager can restore it for ${TRASH_DAYS} days from the Trash screen (${context.origin ?? ""}/trash); after that it is erased.`
 }
 
 /** « with 3 pages under it » : le compte des descendants. */

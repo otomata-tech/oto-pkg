@@ -1,6 +1,6 @@
 // L'onglet « Accès plateforme » (E05-S03, AC18 ; fiches D2 et D17) : les accès de l'équipe plateforme
 // à l'organisation, datés, révocables par l'administrateur ; à côté, les membres ajoutés par le
-// staff, qu'une révocation ne retire pas. Server Component, réutilisable par `/admin/acces`
+// staff, qu'une révocation ne retire pas. Server Component, réutilisable par l'écran d'administration des accès
 // (E08-S03) ; la révocation est un geste confirmé.
 //
 // Absent d'oto-frontend, qui n'a pas de rôle plateforme : écrit d'après H73 et la fiche D2, une ligne

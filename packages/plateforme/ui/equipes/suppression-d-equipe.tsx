@@ -1,7 +1,7 @@
 "use client"
 
 // La confirmation avant de supprimer une équipe (E05-S03, AC14 ; portée par E05-S09 partie d1) : elle nomme
-// l'équipe et ce qui tombe, et c'est elle qui envoie `DELETE /api/plateforme/teams/<id>`. Portée d'oto-frontend
+// l'équipe et ce qui tombe, et c'est elle qui envoie `DELETE /api/platform/teams/<id>`. Portée d'oto-frontend
 // (`delete-team-dialog.tsx`) : « Annuler » face à « Supprimer l'équipe », le geste destructeur ni bouton par
 // défaut ni autofocus, « Suppression… » pendant l'envoi, le refus dit dans le dialogue (`role="alert"`),
 // l'annulation impossible dite. Changé : ce qui tombe est ce que la plateforme retire (ses membres la quittent,

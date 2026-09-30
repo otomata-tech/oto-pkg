@@ -80,7 +80,7 @@ function token(key: CryptoKey) {
 }
 
 async function call(accessToken: string, verifyToken?: VerifyToken) {
-  const req = new Request(`https://${HOST}/api/plateforme/invitations`, { headers: { "x-forwarded-proto": "https" } })
+  const req = new Request(`https://${HOST}/api/platform/invitations`, { headers: { "x-forwarded-proto": "https" } })
   const response = await handlePlateforme(req, { accessToken, host: HOST, defer: () => {}, verifyToken })
   return { req, response, body: await response.json() }
 }

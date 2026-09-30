@@ -77,7 +77,7 @@ function api(repondre: (appel: Appel) => Response) {
 
 const appels = (): Appel[] => fetchMock.mock.calls.map(([url, init]) => ({ url: String(url), methode: init?.method ?? "GET", corps: init?.body ? JSON.parse(String(init.body)) : undefined }))
 
-const LECTURE = `/api/plateforme/shares?path=${encodeURIComponent(CHEMIN)}`
+const LECTURE = `/api/platform/shares?path=${encodeURIComponent(CHEMIN)}`
 
 beforeEach(() => {
   fetchMock.mockReset()
@@ -115,7 +115,7 @@ describe("Partager sur le web (AC-d1)", () => {
     await waitFor(() => expect(interrupteur).toBeChecked())
     // Désactivé pendant l'envoi, l'interrupteur reprend le focus une fois le lien créé.
     await waitFor(() => expect(document.activeElement).toBe(interrupteur))
-    expect(appels()[1]).toEqual({ url: "/api/plateforme/shares", methode: "POST", corps: { path: CHEMIN } })
+    expect(appels()[1]).toEqual({ url: "/api/platform/shares", methode: "POST", corps: { path: CHEMIN } })
     expect(panneau().getByText(`${window.location.origin}/p/${JETON}`)).toBeInTheDocument()
     expect(panneau().getByRole("button", { name: "Copier le lien" })).toBeInTheDocument()
     expect(panneau().getByText("Lien public créé : copiez-le pour le partager.")).toHaveAttribute("role", "status")
@@ -125,7 +125,7 @@ describe("Partager sur le web (AC-d1)", () => {
     sousContenus.focus()
     fireEvent.click(sousContenus)
     await waitFor(() => expect(sousContenus).toBeChecked())
-    expect(appels()[2]).toEqual({ url: "/api/plateforme/shares", methode: "POST", corps: { path: CHEMIN, include_children: true } })
+    expect(appels()[2]).toEqual({ url: "/api/platform/shares", methode: "POST", corps: { path: CHEMIN, include_children: true } })
     await waitFor(() => expect(document.activeElement).toBe(interrupteur))
 
     // « Garder » referme la question et rend le focus à l'interrupteur, sans rien envoyer.
@@ -139,7 +139,7 @@ describe("Partager sur le web (AC-d1)", () => {
     const question = panneau().getByRole("group", { name: /Désactiver ce lien/ })
     fireEvent.click(within(question).getByRole("button", { name: "Désactiver le lien" }))
     await waitFor(() => expect(interrupteur).not.toBeChecked())
-    expect(appels()[3]).toEqual({ url: `/api/plateforme/shares/${LIEN_ID}`, methode: "DELETE", corps: undefined })
+    expect(appels()[3]).toEqual({ url: `/api/platform/shares/${LIEN_ID}`, methode: "DELETE", corps: undefined })
     expect(panneau().queryByText(`${window.location.origin}/p/${JETON}`)).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(interrupteur))
   })
@@ -204,7 +204,7 @@ describe("Partager, general access (AC-b13)", () => {
 
     choisirDansLaListe(qui, "Toute l'organisation Démo")
     await waitFor(() => expect(panneau().getAllByRole("status").at(-1)).toHaveTextContent("Toute l'organisation : peut lire."))
-    expect(posts()[0]).toEqual({ url: "/api/plateforme/nodes/access", methode: "POST", corps: { path: CHEMIN, access: "organisation", level: "read" } })
+    expect(posts()[0]).toEqual({ url: "/api/platform/nodes/access", methode: "POST", corps: { path: CHEMIN, access: "organisation", level: "read" } })
     expect(rafraichir).toHaveBeenCalledTimes(1)
 
     relire(partage({ id: "r1", level: "read" }))

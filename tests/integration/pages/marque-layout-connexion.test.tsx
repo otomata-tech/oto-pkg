@@ -1,6 +1,6 @@
 // La marque là où la personne la voit (E09-S01) : layout `(dashboard)` (AC3, AC4), page de
 // connexion (AC5) ; la marque se règle dans « Organisation » depuis E05-S11 (AC-22 :
-// `admin-config-pages.test.tsx`), `/admin/marque` y redirige. Session de l'hôte, en-têtes et services
+// `admin-config-pages.test.tsx`), l'ancienne adresse de la marque répond 404 (E11-S07). Session de l'hôte, en-têtes et services
 // du paquet simulés ; `readBrand` reste le vrai. Ce que prouvent déjà les composants et les aides
 // (thème par défaut : `server-brand.test.ts` ; première lettre et attributs du logo :
 // `logo-d-organisation.test.tsx` ; lecture de la marque en panne, bornée à 1 000 ms, signal
@@ -161,7 +161,7 @@ describe("(dashboard) layout brand (AC3, AC4)", () => {
 
     render(await DashboardLayout({ children: <p>Contenu</p> }))
 
-    expect(screen.getByRole("link", { name: "Connecteurs" })).toHaveAttribute("href", "/admin/connecteurs")
+    expect(screen.getByRole("link", { name: "Connecteurs" })).toHaveAttribute("href", "/admin/connectors")
     fireEvent.click(screen.getByRole("button", { name: /^Compte : / }))
     expect(within(screen.getByRole("menu")).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Contexte", "Profil", "Brancher mon Claude, ChatGPT ou Mistral", "Corbeille", "Déconnexion"])
   })

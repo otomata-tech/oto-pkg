@@ -23,14 +23,14 @@ import { ADRESSES } from "../adresses"
 // « Connecteurs » (E08-S03) : réservée à qui administre l'organisation de l'adresse, décidé ici par
 // `isOrgAdmin` avant tout appel (AC1, N1) ; chaque service redécide son droit. La page lit le
 // catalogue, les comptes et les équipes avec le jeton de la session, puis l'impact de la désactivation
-// de chaque connecteur actif ; l'écran écrit par `/api/plateforme/admin/*`.
+// de chaque connecteur actif ; l'écran écrit par `/api/platform/admin/*`.
 export const metadata: Metadata = {
   title: "Connecteurs",
   robots: { index: false },
 }
 
 const ECHEC = { error: "Une erreur est survenue. Réessayez." } as const
-const ICI = "/admin/connecteurs"
+const ICI = "/admin/connectors"
 
 async function lire(db: PlatformDb, identity: Identity): Promise<DonneesDesConnecteurs> {
   // Trois lectures indépendantes, en parallèle (`performance-patterns.md § Data Fetching Performance`).
@@ -43,9 +43,9 @@ async function lire(db: PlatformDb, identity: Identity): Promise<DonneesDesConne
 export default async function ConnecteursPage() {
   // La session et l'appartenance se revérifient ici, hors de tout `try` : le layout n'est pas une
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
-  const identite = await getPlatformIdentitySafely("admin/connecteurs")
+  const identite = await getPlatformIdentitySafely("admin/connectors")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   const administre = identite ? isOrgAdmin(identite.data.identity) : false
   let resultat: EcranConnecteursProps["resultat"] = ECHEC

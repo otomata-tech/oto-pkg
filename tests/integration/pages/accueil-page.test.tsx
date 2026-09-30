@@ -88,17 +88,17 @@ describe("/ page session", () => {
     expect(metadata).toMatchObject({ title: "Accueil", robots: { index: false } })
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation, reading nothing", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization, reading nothing", async (code) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ error: { code } })
 
-    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(listActivities).not.toHaveBeenCalled()
   })
 
-  it("should send a request without origin to /aucune-organisation, as /connect does, reading nothing", async () => {
+  it("should send a request without origin to /no-organization, as /connect does, reading nothing", async () => {
     vi.mocked(getRequestOrigin).mockResolvedValue(null)
 
-    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(page()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(listActivities).not.toHaveBeenCalled()
   })
 })
@@ -147,10 +147,10 @@ describe("/ page reads (AC-b1)", () => {
   })
 })
 
-// E11-S10 (AC-e3) : `/?onglet=contexte` rend l'accueil comme `/`, sans rien lire du Contexte.
+// E11-S10 (AC-e3) : l'ancien onglet « Contexte » de l'accueil ne se lit plus ; l'accueil se rend sans rien lire du Contexte.
 describe("/ page without tabs (E11-S10, AC-e3)", () => {
   it("should read no parameter of its address, show « Activités » without tabs, and read nothing of the Contexte", async () => {
-    // La page ne prend plus `searchParams` : `?onglet=contexte` ne l'atteint pas.
+    // La page ne prend plus `searchParams` : aucun paramètre de l'adresse ne l'atteint.
     expect(AccueilPage.length).toBe(0)
     await montrer(await page())
 

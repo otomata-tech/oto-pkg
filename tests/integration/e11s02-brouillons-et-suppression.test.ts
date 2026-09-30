@@ -23,7 +23,7 @@ const SETUP_TIMEOUT = 180_000
 const ORIGIN = "https://acme.test"
 const NOTHING_SENT = "Nothing was sent. Show this to the user and ask for explicit approval, then call again with confirm: true."
 const AGENT = { kind: "agent" as const, ctx: null }
-const RESTORE = `A manager can restore it for 30 days from the Trash screen (${ORIGIN}/corbeille); after that it is erased.`
+const RESTORE = `A manager can restore it for 30 days from the Trash screen (${ORIGIN}/trash); after that it is erased.`
 
 /** `discard_draft` pas encore appliquée au projet : ses cas se sautent, la version nommée (`database-patterns.md § Règles`). */
 const discardPending = (await pendingMigrations()).includes(DISCARD_DRAFT_VERSION)

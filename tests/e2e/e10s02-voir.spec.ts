@@ -75,12 +75,12 @@ async function joindre(page: Page, depot: Depot): Promise<string> {
       if (!reponse.ok) throw new Error(`${adresse}: ${JSON.stringify(lu.error)}`)
       return lu.data
     }
-    const demande = await envoyer("/api/plateforme/files", { node: chemin, name: nom, mime, size: octets.byteLength })
+    const demande = await envoyer("/api/platform/files", { node: chemin, name: nom, mime, size: octets.byteLength })
     const envoi = await fetch(demande.upload.url, { method: "PUT", headers: demande.upload.headers, body: octets })
     if (!envoi.ok) throw new Error(`upload: ${envoi.status}`)
-    await envoyer(`/api/plateforme/files/${demande.id}/complete`, {})
-    const tete = await (await fetch(`/api/plateforme/nodes?path=${encodeURIComponent(chemin)}`)).json()
-    await envoyer("/api/plateforme/nodes", {
+    await envoyer(`/api/platform/files/${demande.id}/complete`, {})
+    const tete = await (await fetch(`/api/platform/nodes?path=${encodeURIComponent(chemin)}`)).json()
+    await envoyer("/api/platform/nodes", {
       path: chemin,
       base_revision: tete.data.revision,
       ...(tete.data.draft ? { draft_stamp: tete.data.draft.stamp } : {}),
@@ -186,7 +186,7 @@ test.describe("E10-S02 lot c : « Voir » et l'isolation d'un fichier HTML", () 
   test("open an HTML file and a .md file in the viewer, check the headers received, close F1 to F16 and name O1 to O7", async ({ page, context, browser }, testInfo) => {
     test.setTimeout(600_000)
     await seConnecterSurLEspace(page, { email, password })
-    const actif = await page.evaluate(async () => ((await (await fetch("/api/plateforme/files")).json()) as { data: { enabled: boolean } }).data.enabled)
+    const actif = await page.evaluate(async () => ((await (await fetch("/api/platform/files")).json()) as { data: { enabled: boolean } }).data.enabled)
     test.skip(!actif, SANS_STOCKAGE)
     const href = await page.locator('a[href^="/n/private/"][href$="/contexte"]').first().getAttribute("href")
     const handle = /^\/n\/private\/([^/]+)\/contexte$/.exec(href ?? "")?.[1] ?? ""
@@ -195,7 +195,7 @@ test.describe("E10-S02 lot c : « Voir » et l'isolation d'un fichier HTML", () 
     await assurerLeNoeud(page, { chemin, titre: "e10s02 voir", resume: "Page jetable du contrôle d'E10-S02, lot c." })
     const html = await joindre(page, { chemin, nom: "essai.html", contenu: fichierDEssai(ext), mime: "text/html" })
     const md = await joindre(page, { chemin, nom: "notes.md", contenu: "## Notes\n\nUn paragraphe **gras**.\n", mime: "text/markdown" })
-    const route = `/api/plateforme/files/${html}/html`
+    const route = `/api/platform/files/${html}/html`
     const requetes = requetesDuFichier(context)
     const telechargements: string[] = []
     page.on("download", (telechargement) => telechargements.push(telechargement.url()))
@@ -245,13 +245,13 @@ test.describe("E10-S02 lot c : « Voir » et l'isolation d'un fichier HTML", () 
           }
         })
       return {
-        fetch: await issue(fetch("/api/plateforme/nodes?path=contexte")),
-        depot: await issue(fetch(`/api/plateforme/uploads/${"A".repeat(43)}`, { method: "POST", body: "x" })),
+        fetch: await issue(fetch("/api/platform/nodes?path=contexte")),
+        depot: await issue(fetch(`/api/platform/uploads/${"A".repeat(43)}`, { method: "POST", body: "x" })),
         xhr: await evenement((ouvert, echec) => {
           const xhr = new XMLHttpRequest()
           xhr.onload = ouvert
           xhr.onerror = echec
-          xhr.open("GET", "/api/plateforme/files")
+          xhr.open("GET", "/api/platform/files")
           xhr.send()
         }),
         socket: await evenement((ouvert, echec) => {
@@ -431,7 +431,7 @@ test.describe("E10-S02 lot c : « Voir » et l'isolation d'un fichier HTML", () 
 
     // AC-c5 : la même visionneuse par un lien public, hors session, avec la même bannière ; la route reçue `noindex`.
     const partage = await page.evaluate(async (cible) => {
-      const reponse = await fetch("/api/plateforme/shares", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: cible, include_children: false }) })
+      const reponse = await fetch("/api/platform/shares", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: cible, include_children: false }) })
       return ((await reponse.json()) as { data: { share: { id: string; token: string } } }).data.share
     }, chemin)
     const visiteur = await (await browser.newContext()).newPage()
@@ -453,7 +453,7 @@ test.describe("E10-S02 lot c : « Voir » et l'isolation d'un fichier HTML", () 
       await capturer(visiteur, testInfo, "visionneuse-publique")
     } finally {
       await visiteur.context().close()
-      await page.evaluate(async (id) => fetch(`/api/plateforme/shares/${id}`, { method: "DELETE" }), partage.id)
+      await page.evaluate(async (id) => fetch(`/api/platform/shares/${id}`, { method: "DELETE" }), partage.id)
     }
   })
 })

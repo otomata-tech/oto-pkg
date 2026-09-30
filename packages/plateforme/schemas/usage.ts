@@ -11,16 +11,16 @@ import { journalPeriodSchema } from "./journal"
 export const USAGE_MAX_LINES = 20_000
 
 /**
- * `periode` et `equipe`, noms des paramètres de `/journal` (E05-S05, N7) : 30 jours par défaut et pour
- * toute valeur inconnue (N3) ; un identifiant d'équipe mal formé est ignoré (AC2).
+ * `period` et `team`, noms des paramètres de `/journal` (E05-S05 ; en anglais, E11-S07) : 30 jours par défaut et
+ * pour toute valeur inconnue (N3) ; un identifiant d'équipe mal formé est ignoré (AC2).
  */
 export const usageQuerySchema = z.object({
-  periode: journalPeriodSchema.catch(30),
-  equipe: z.uuid().optional().catch(undefined),
+  period: journalPeriodSchema.catch(30),
+  team: z.uuid().optional().catch(undefined),
 })
 
 export type UsageQuery = z.output<typeof usageQuerySchema>
-export type UsagePeriod = UsageQuery["periode"]
+export type UsagePeriod = UsageQuery["period"]
 
 /** Le tableau de bord d'usage (AC3 à AC8), sur les lignes `tools/call` de la fenêtre. */
 export type UsageSummary = {

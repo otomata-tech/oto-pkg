@@ -40,7 +40,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
     const tokens = new Map<Caller, string>()
 
     function request(method: string, path: string, body?: unknown) {
-      return new Request(`https://${o.host}/api/plateforme/${path}`, {
+      return new Request(`https://${o.host}/api/platform/${path}`, {
         method,
         body: body === undefined ? undefined : JSON.stringify(body),
         headers: { origin: `https://${o.host}`, "x-forwarded-proto": "https", "user-agent": USER_AGENT, "content-type": "application/json" },

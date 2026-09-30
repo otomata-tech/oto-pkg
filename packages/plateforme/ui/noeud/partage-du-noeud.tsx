@@ -4,7 +4,7 @@
 // nœud, à la façon de Notion : un champ pour ajouter une personne ou une équipe, la liste de ceux qui ont
 // un accès propre, chacun avec son niveau dans un menu (« Accès complet », « Peut modifier », « Peut
 // lire », « Retirer »), puis l'accès général (toute l'organisation, ADR-014). Les niveaux et les services ne
-// changent pas (E05-S03) : ajouter ou changer part à `POST /api/plateforme/rules` (`setNodeRuleSchema`),
+// changent pas (E05-S03) : ajouter ou changer part à `POST /api/platform/rules` (`setNodeRuleSchema`),
 // retirer à `DELETE rules/<id>` ; le service décide (N6 : l'accès complet ne s'accorde que par un
 // administrateur). Le mot « règle » ne s'écrit plus à l'écran. Sans lui, « Partager » ouvrait le tableau
 // des règles d'E05-S03.

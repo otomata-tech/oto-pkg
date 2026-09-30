@@ -1,4 +1,4 @@
-// `write` et `POST /api/plateforme/nodes` (E03-S03, AC19 à AC34) : création, opérations par section et
+// `write` et `POST /api/platform/nodes` (E03-S03, AC19 à AC34) : création, opérations par section et
 // par bloc, brouillon partagé (`open_draft`, blocs `draft`, `node_drafts`), garde de révision, genre,
 // provenance, publication par `publishNode`, par défaut (écrire publie, fiche D135, E11-S02 ; `publish:
 // false` garde le brouillon). L'écriture est exigée sur le nœud, ou sur le parent pour

@@ -1,7 +1,7 @@
 "use client"
 
 // Poser ou remplacer une règle sur un nœud (E05-S03, AC17, fiche D4) : une équipe ou un membre de
-// l'organisation, et un niveau, envoyés à `POST /api/plateforme/rules` après le schéma partagé avec
+// l'organisation, et un niveau, envoyés à `POST /api/platform/rules` après le schéma partagé avec
 // l'API (`setNodeRuleSchema`). « Règle enregistrée. » se dit dans une région `status` montée vide.
 // Une règle qui vise la personne qui regarde, ou l'une de ses équipes, peut lui retirer la gestion
 // (`node_level_for`) : la relecture retire alors le formulaire, et le focus va au titre du panneau ;

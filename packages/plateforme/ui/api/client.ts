@@ -1,6 +1,7 @@
 // Client HTTP de l'API du paquet, même origine, avec la session de l'utilisateur (ADR-008 § 4,
 // H03). Sans lui, chaque écran à mutation recoderait l'appel et la lecture de l'enveloppe
 // `{ data }` / `{ error }` (E05-S03 le réutilise).
+import { PLATFORM_API_PREFIX } from "../../schemas/api"
 import type { FileAvailability } from "../../schemas/files"
 
 type MethodeHttp = "GET" | "POST" | "PATCH" | "DELETE"
@@ -49,7 +50,7 @@ export async function appelerPlateforme<T>({
   const body = corps === undefined ? undefined : JSON.stringify(corps)
   const garder = keepalive === true && new TextEncoder().encode(body ?? "").byteLength <= CORPS_KEEPALIVE_MAX_OCTETS
   try {
-    reponse = await fetch(`/api/plateforme/${ressource}`, {
+    reponse = await fetch(`${PLATFORM_API_PREFIX}${ressource}`, {
       method: methode,
       credentials: "same-origin",
       headers: corps === undefined ? undefined : { "content-type": "application/json" },
@@ -117,7 +118,7 @@ export async function fichierDisponible(id: string): Promise<boolean> {
 export async function deposerParLeLien<T>(jeton: string, fichier: Blob): Promise<ReponsePlateforme<T>> {
   let reponse: Response
   try {
-    reponse = await fetch(`/api/plateforme/uploads/${encodeURIComponent(jeton)}/form`, { method: "POST", credentials: "same-origin", body: fichier })
+    reponse = await fetch(`${PLATFORM_API_PREFIX}uploads/${encodeURIComponent(jeton)}/form`, { method: "POST", credentials: "same-origin", body: fichier })
   } catch {
     return { erreur: { code: "reseau", statut: 0 } }
   }

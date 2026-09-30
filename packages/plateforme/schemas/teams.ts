@@ -1,6 +1,6 @@
 // Équipes, membres et accès plateforme (E05-S03) : un schéma pour le formulaire (ui/), l'API (api/)
 // et les services (server/) — un schéma, une source de vérité (H02). Les types de sortie sont ceux
-// que les services rendent et que l'écran `/equipes` reçoit tels quels.
+// que les services rendent et que l'écran `/teams` reçoit tels quels.
 import * as z from "zod/v4"
 
 /** Nom d'une équipe : 60 caractères au plus, espaces retirés (AC11). */
@@ -32,15 +32,15 @@ export const teamRoleSchema = z.object({ role: z.enum(["lead", "member"]) })
 export const updateMemberSchema = z.object({ role: z.enum(["admin", "member"]) })
 
 /** Les onglets d'« Équipes & accès » (E05-S13, AC-5 : « Règles d'accès » et « Accès plateforme » retirés). */
-const EQUIPES_TABS = ["membres", "equipes"] as const
+const EQUIPES_TABS = ["members", "teams"] as const
 
 /**
- * Paramètres de l'adresse `/equipes`, lus par la page, jamais passés bruts à une requête
+ * Paramètres de l'adresse `/teams`, en anglais (E11-S07), lus par la page, jamais passés bruts à une requête
  * (`api-patterns.md § Search & Filter`). Une valeur illisible retombe sur le défaut : un onglet
- * inconnu, ou retiré (`regles`, `acces`), montre « Membres » (AC1, AC-5).
+ * inconnu, ou retiré, montre « Membres » (AC1, AC-5).
  */
 export const equipesSearchSchema = z.object({
-  onglet: z.enum(EQUIPES_TABS).catch("membres"),
+  tab: z.enum(EQUIPES_TABS).catch("members"),
 })
 
 export type EquipesTab = (typeof EQUIPES_TABS)[number]

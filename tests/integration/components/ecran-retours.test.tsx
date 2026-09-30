@@ -54,22 +54,22 @@ function LienDeTest({ children, ...props }: AnchorHTMLAttributes<HTMLAnchorEleme
 }
 
 function hrefDeFiltre(parametres: FeedbackListQuery): string {
-  const recherche = new URLSearchParams({ etat: parametres.etat, periode: String(parametres.periode) })
+  const recherche = new URLSearchParams({ state: parametres.state, period: String(parametres.period) })
   if (parametres.type) recherche.set("type", parametres.type)
-  if (parametres.curseur) recherche.set("curseur", parametres.curseur)
-  return `/admin/retours?${recherche}`
+  if (parametres.cursor) recherche.set("cursor", parametres.cursor)
+  return `/admin/feedback?${recherche}`
 }
 
 function rendre(resultat: EcranRetoursProps["resultat"], adresse: Record<string, string> = {}) {
   return render(
-    <ContexteDeLHote.Provider value={{ Lien: LienDeTest, chemin: "/admin/retours", naviguer }}>
+    <ContexteDeLHote.Provider value={{ Lien: LienDeTest, chemin: "/admin/feedback", naviguer }}>
       <ContexteDeRafraichissement.Provider value={rafraichir}>
         <EcranRetours
           resultat={resultat}
           filtres={feedbackListQuerySchema.parse(adresse)}
           Lien={LienDeTest}
           hrefDeFiltre={hrefDeFiltre}
-          hrefDeConversation={(code, periode) => `/journal?conversation=${code}&periode=${periode}`}
+          hrefDeConversation={(code, periode) => `/journal?conversation=${code}&period=${periode}`}
         />
       </ContexteDeRafraichissement.Provider>
     </ContexteDeLHote.Provider>,
@@ -104,10 +104,10 @@ describe("EcranRetours states (AC15)", () => {
   })
 
   it("should say a failed read once, with « Réessayer » to the same address", () => {
-    rendre({ error: "Une erreur est survenue. Réessayez." }, { etat: "all", type: "gap", periode: "7" })
+    rendre({ error: "Une erreur est survenue. Réessayez." }, { state: "all", type: "gap", period: "7" })
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Retours des assistants")
     expect(screen.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/retours?etat=all&periode=7&type=gap")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/feedback?state=all&period=7&type=gap")
     expect(screen.queryByRole("radiogroup")).toBeNull()
   })
 })
@@ -124,16 +124,16 @@ describe("EcranRetours list (AC9)", () => {
       ["Déclinés", "false"],
       ["Tous", "false"],
     ])
-    expect(adresseDuChoix("Filtrer par état", "Déclinés")).toBe("/admin/retours?etat=declined&periode=30&type=error")
+    expect(adresseDuChoix("Filtrer par état", "Déclinés")).toBe("/admin/feedback?state=declined&period=30&type=error")
     expect(choix("Filtrer par type")).toEqual([
       ["Tous les types", "false"],
       ["Friction", "false"],
       ["Manque", "false"],
       ["Erreur", "true"],
     ])
-    expect(adresseDuChoix("Filtrer par type", "Tous les types")).toBe("/admin/retours?etat=to_handle&periode=30")
+    expect(adresseDuChoix("Filtrer par type", "Tous les types")).toBe("/admin/feedback?state=to_handle&period=30")
     expect(choix("La période observée")[1]).toEqual(["30 jours", "true"])
-    expect(adresseDuChoix("La période observée", "7 jours")).toBe("/admin/retours?etat=to_handle&periode=7&type=error")
+    expect(adresseDuChoix("La période observée", "7 jours")).toBe("/admin/feedback?state=to_handle&period=7&type=error")
 
     const tableau = screen.getByRole("table", { name: "Retours, le plus récent d'abord" })
     expect(within(tableau).getAllByRole("columnheader").map((entete) => entete.textContent)).toEqual([
@@ -161,7 +161,7 @@ describe("EcranRetours list (AC9)", () => {
       "—",
       "Voir la conversation du retour FB-0012",
     ])
-    expect(within(ligne("FB-0012")).getByRole("link", { name: "Voir la conversation du retour FB-0012" })).toHaveAttribute("href", "/journal?conversation=DEMO-0003&periode=30")
+    expect(within(ligne("FB-0012")).getByRole("link", { name: "Voir la conversation du retour FB-0012" })).toHaveAttribute("href", "/journal?conversation=DEMO-0003&period=30")
     // Au-delà de 200 caractères : un aperçu, puis « Lire tout ».
     const pris = within(ligne("FB-0011")).getAllByRole("cell")
     expect(pris[5].querySelector("details summary")).toHaveTextContent("Lire tout")
@@ -172,7 +172,7 @@ describe("EcranRetours list (AC9)", () => {
       "Hors périmètre du pilote.",
       "Hors de l'organisation, le 24 septembre 2026",
     ])
-    expect(screen.getByRole("link", { name: "Voir les suivants" })).toHaveAttribute("href", "/admin/retours?etat=to_handle&periode=30&type=error&curseur=suite-2")
+    expect(screen.getByRole("link", { name: "Voir les suivants" })).toHaveAttribute("href", "/admin/feedback?state=to_handle&period=30&type=error&cursor=suite-2")
   })
 
   it("should say an empty period without a filter, and offer every ticket when a filter hides them", () => {
@@ -183,7 +183,7 @@ describe("EcranRetours list (AC9)", () => {
 
     rendre({ data: { ...RIEN, counts: { ...RIEN.counts, resolved: 2 } } })
     expect(screen.getByText("Aucun retour ne correspond à ce filtre.")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Voir tous les retours" })).toHaveAttribute("href", "/admin/retours?etat=all&periode=30")
+    expect(screen.getByRole("link", { name: "Voir tous les retours" })).toHaveAttribute("href", "/admin/feedback?state=all&period=30")
   })
 })
 
@@ -211,7 +211,7 @@ describe("EcranRetours gestures (AC10)", () => {
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect([url, init?.method, init?.body]).toEqual(["/api/plateforme/feedback/FB-0012", "PATCH", JSON.stringify({ state: "acknowledged" })])
+    expect([url, init?.method, init?.body]).toEqual(["/api/platform/feedback/FB-0012", "PATCH", JSON.stringify({ state: "acknowledged" })])
     expect(focusALaRelecture).toBe(titreDeLaListe())
   })
 
@@ -235,7 +235,7 @@ describe("EcranRetours gestures (AC10)", () => {
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect([url, init?.method, init?.body]).toEqual(["/api/plateforme/feedback/FB-0012", "PATCH", JSON.stringify({ state: "declined", resolution: "Hors périmètre du pilote." })])
+    expect([url, init?.method, init?.body]).toEqual(["/api/platform/feedback/FB-0012", "PATCH", JSON.stringify({ state: "declined", resolution: "Hors périmètre du pilote." })])
     expect(focusALaRelecture).toBe(titreDeLaListe())
   })
 

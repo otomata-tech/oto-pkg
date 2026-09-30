@@ -99,7 +99,7 @@ describe("/upload/<token> (AC-f15)", () => {
     fireEvent.change(champ(), { target: { files: [fichier] } })
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Déposé dans ventes/rapports/mars."))
-    expect(envoi).toHaveBeenCalledWith(`/api/plateforme/uploads/${JETON}/form`, { method: "POST", credentials: "same-origin", body: fichier })
+    expect(envoi).toHaveBeenCalledWith(`/api/platform/uploads/${JETON}/form`, { method: "POST", credentials: "same-origin", body: fichier })
     expect(document.querySelector('input[type="file"]')).toBeNull()
     // La zone qui tenait le focus est partie : il va à l'annonce, jamais à <body> (M4).
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("status")))

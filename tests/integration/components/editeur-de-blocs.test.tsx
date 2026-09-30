@@ -10,7 +10,7 @@ import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur de blocs (E05-S08, champs toujours montés ; E05-S02 pour ce qui ne dépend pas du mode ; E05-S10,
 // partie a : menu de la poignée, glisser-déposer, blocs vides, un seul titre, publication seule, liens), sous
-// sa file d'écriture : `fetch` simulé pour `POST /api/plateforme/nodes`, relecture de la page espionnée ; une
+// sa file d'écriture : `fetch` simulé pour `POST /api/platform/nodes`, relecture de la page espionnée ; une
 // relecture se joue en rerendant l'éditeur avec les blocs relus. « Ailleurs » est un bouton hors de
 // l'éditeur : le focus qui y va quitte le champ et sa rangée, comme en suivant un lien.
 
@@ -712,7 +712,7 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async (adresse, init) => {
-        if (!String(adresse).includes("/api/plateforme/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
+        if (!String(adresse).includes("/api/platform/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
         recherches.push(String(adresse))
         const matches = [
           { path: "ventes/grille_tarifaire", kind: "page", title: "Grille tarifaire", snippet: null },
@@ -728,7 +728,7 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     fireEvent.change(texte, { target: { value: "Voir @gri" } })
     const options = await screen.findAllByRole("option")
     expect(options.map((option) => option.textContent)).toEqual(["Grille tarifaireventes/grille_tarifaire", "Grille des remisesventes/grille_remises"])
-    expect(recherches).toEqual(["/api/plateforme/search?q=gri"])
+    expect(recherches).toEqual(["/api/platform/search?q=gri"])
     expect(texte).toHaveAttribute("aria-activedescendant", options[0].id)
     fireEvent.keyDown(texte, { key: "ArrowDown" })
     expect(texte).toHaveAttribute("aria-activedescendant", options[1].id)
@@ -753,7 +753,7 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async (adresse, init) => {
-        if (!String(adresse).includes("/api/plateforme/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
+        if (!String(adresse).includes("/api/platform/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
         return new Response(JSON.stringify({ data: { matches, more: 0 } }), { status: 200, headers: { "content-type": "application/json" } })
       }),
     )

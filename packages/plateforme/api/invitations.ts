@@ -21,7 +21,7 @@ export const invitationsRoutes: ResourceRoutes = {
     },
     async handle({ db, identity, body, origin }) {
       // Le lien ramène à l'adresse d'où l'on invite : le cookie de session y sera posé (N2).
-      const created = await inviteMember(db, identity, body, { redirectTo: `${origin}/auth/confirmer?next=/` })
+      const created = await inviteMember(db, identity, body, { redirectTo: `${origin}/auth/confirm?next=/` })
       return {
         status: 201,
         data: created,

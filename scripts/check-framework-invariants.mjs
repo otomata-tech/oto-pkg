@@ -9,7 +9,7 @@
  * branchées ? » de l'autre. Le second est le seul à pouvoir échouer sur un projet dont la
  * documentation est parfaite.
  */
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
@@ -18,6 +18,7 @@ import { join } from 'node:path'
  */
 export function verifierInvariants({ ROOT, read, walk, err, warn }) {
   invariantsDeCode({ ROOT, read, walk, err })
+  adressesEnAnglais({ ROOT, read, walk, err })
   chaineDApplication({ ROOT, read, err, warn })
 }
 
@@ -92,6 +93,163 @@ function invariantsDeCode({ ROOT, read, walk, err }) {
           }
         })
     }
+  }
+}
+
+// ------------------------------------------ les adresses sont en anglais (E11-S07)
+// « Jamais de français dans une URL » (ADR-020) : une consigne que rien ne gardait, et que chaque nouvelle
+// route aurait pu défaire en silence. Deux gardes (HN-E11S07-7) : les segments de route de `src/app` sont
+// pris dans une liste fermée (un segment nouveau s'y ajoute, visible en revue) ; les anciens noms français
+// d'une adresse (route, préfixe d'API, paramètre, valeur, ancre) sont refusés partout où une adresse s'écrit.
+
+/** Les segments de route admis : anglais (ou neutres), orthographe américaine (`organization`, HN-E11S07-3). */
+const SEGMENTS_ADMIS = [
+  'admin',
+  'api',
+  'auth',
+  'callback',
+  'confirm',
+  'connect',
+  'connectors',
+  'consent',
+  'context',
+  'feedback',
+  'forgot-password',
+  'journal',
+  'login',
+  'logout',
+  'mcp',
+  'mcp-admin',
+  'n',
+  'no-organization',
+  'oauth',
+  'oauth-protected-resource',
+  'oidc',
+  'organization',
+  'p',
+  'platform',
+  'profile',
+  'reset-password',
+  'teams',
+  'trash',
+  'upload',
+  'usage',
+]
+
+const PARAMETRES = {
+  onglet: 'tab',
+  periode: 'period',
+  equipe: 'team',
+  personne: 'person',
+  erreurs: 'errors',
+  curseur: 'cursor',
+  appels: 'calls',
+  etat: 'state',
+  filtre: 'filter',
+  tri: 'sort',
+  sens: 'order',
+  colonne: 'column',
+  egal: 'eq',
+  contient: 'contains',
+  enregistre: 'saved',
+  erreur: 'error',
+}
+
+const ROUTES = {
+  'admin/organisation': '/admin/organization',
+  'admin/connecteurs': '/admin/connectors',
+  'admin/retours': '/admin/feedback',
+  'admin/acces': '/teams (écran retiré, 404)',
+  'admin/marque': '/admin/organization (écran retiré, 404)',
+  'admin/drapeaux': '/admin/organization (écran retiré, 404)',
+  'aucune-organisation': '/no-organization',
+  'auth/confirmer': '/auth/confirm',
+  equipes: '/teams',
+  profil: '/profile',
+  corbeille: '/trash',
+  plateforme: '/platform',
+}
+
+const NOMS_DE_PARAMETRES = Object.keys(PARAMETRES).join('|')
+
+const ANCRES = { nouveautes: '#news', contenus: '#recent-content', regles: 'aucune ancre (HN-E11S07-11)' }
+
+/**
+ * Les anciens noms en position d'adresse, et le nom qui les remplace. Une adresse commence par `/` hors d'un
+ * chemin de module (précédé d'une lettre, d'un chiffre, de `.`, `-` ou `_`) : `ui/admin/organisation/`,
+ * `./admin/organisation/…` et « an organisation » passent.
+ */
+const ANCIENS_NOMS = [
+  [/api\\?\/plateforme(?![\w-])/g, () => '/api/platform'],
+  [
+    /(?<![\w.-])\\?\/(admin\\?\/(?:organisation|connecteurs|retours|acces|marque|drapeaux)|aucune-organisation|auth\\?\/confirmer|equipes|profil|corbeille|plateforme)(?![\w-])/g,
+    (m) => ROUTES[m[1].replaceAll('\\', '')],
+  ],
+  [/(?<![\w.-])\/(?:[a-z0-9-]+\/)*(?:[a-z0-9]+-)*organisation(?![\w-])/g, () => 'organization, orthographe américaine (HN-E11S07-3)'],
+  [new RegExp(`[?&](${NOMS_DE_PARAMETRES})=`, 'g'), (m) => `${m[0][0]}${PARAMETRES[m[1]]}=`],
+  // Les autres façons d'écrire un paramètre : `URLSearchParams.set` / `append`, un champ de formulaire GET ou la
+  // prop `nom` de `ChoixDuFiltre`, une clé de l'objet passé à `URLSearchParams`.
+  [new RegExp(String.raw`\.(?:set|append)\(\s*["'](${NOMS_DE_PARAMETRES})["']`, 'g'), (m) => PARAMETRES[m[1]]],
+  [new RegExp(String.raw`\b(?:name|nom)=\{?["'](${NOMS_DE_PARAMETRES})["']`, 'g'), (m) => PARAMETRES[m[1]]],
+  [new RegExp(String.raw`URLSearchParams\(\{(?:[^}]*,)?\s*["']?(${NOMS_DE_PARAMETRES})["']?\s*[:,}]`, 'g'), (m) => PARAMETRES[m[1]]],
+  [/\bpresence=(vide|rempli)\b/g, (m) => `presence=${m[1] === 'vide' ? 'empty' : 'not_empty'}`],
+  [/\bversion=publiee\b/g, () => 'version=published'],
+  [/#(nouveautes|contenus|regles)(?![\w-])/g, (m) => ANCRES[m[1]]],
+  [/#contexte-([a-z0-9_-]+)/g, (m) => (m[1] === 'tout-le-monde' ? '#everyone-context' : m[1] === 'prive' ? '#private-context' : `#context-${m[1]}`)],
+  [/#partie-(\d+)/g, (m) => `#part-${m[1]}`],
+]
+
+/** Où une adresse s'écrit ; seuls la garde, son test et la spec d'AC-a1, qui citent les anciens noms, en sont exclus. */
+const LIEUX_DES_ADRESSES = ['src', 'packages/plateforme', 'scripts', 'tests', 'next.config.ts']
+const CITENT_LES_ANCIENS_NOMS = new Set([
+  'scripts/check-framework-invariants.mjs',
+  'tests/unit/check-framework.test.ts',
+  'tests/e2e/e11s07-adresses.spec.ts',
+  'packages/plateforme/CHANGELOG.md',
+])
+const TEXTE = /\.(?:[cm]?[jt]sx?|json|md|css|snap|sql|html|txt|ya?ml)$/
+
+function adressesEnAnglais({ ROOT, read, walk, err }) {
+  // AC-d1 : chaque dossier de route de `src/app`, hors groupes `(…)`, paramètres `[…]`, dossiers privés `_…`, slots
+  // `@…` et dossiers en `.` : aucun n'est un segment d'adresse.
+  const appDir = join(ROOT, 'src/app')
+  if (existsSync(appDir)) {
+    const signales = new Set()
+    for (const p of walk(appDir)) {
+      const rel = p.slice(appDir.length + 1)
+      const dossiers = rel.split('/').slice(0, -1)
+      dossiers.forEach((segment, rang) => {
+        if (/^\(.*\)$/.test(segment) || /^\[.*\]$/.test(segment) || /^[._@]/.test(segment) || SEGMENTS_ADMIS.includes(segment)) return
+        const dossier = dossiers.slice(0, rang + 1).join('/')
+        if (signales.has(dossier)) return
+        signales.add(dossier)
+        err(
+          `src/app/${rel} : segment de route « ${segment} » absent de SEGMENTS_ADMIS (scripts/check-framework-invariants.mjs) — une adresse est en anglais (ADR-020) ; un segment anglais s'y ajoute.`
+        )
+      })
+    }
+  }
+
+  // AC-d2 : aucun ancien nom français en position d'adresse.
+  const fichiers = LIEUX_DES_ADRESSES.map((lieu) => join(ROOT, lieu))
+    .filter(existsSync)
+    .flatMap((p) => (statSync(p).isDirectory() ? walk(p) : [p.replaceAll('\\', '/')]))
+  for (const p of fichiers) {
+    const rel = p.slice(ROOT.length + 1)
+    if (CITENT_LES_ANCIENS_NOMS.has(rel) || !TEXTE.test(rel)) continue
+    read(p)
+      .split('\n')
+      .forEach((ligne, i) => {
+        // Un ancien nom que deux motifs reconnaissent (`/admin/organisation`) n'est dit qu'une fois.
+        const vus = new Set()
+        for (const [motif, nouveau] of ANCIENS_NOMS) {
+          for (const m of ligne.matchAll(motif)) {
+            if (vus.has(m.index)) continue
+            vus.add(m.index)
+            err(`${rel}:${i + 1} : ancien nom d'adresse « ${m[0]} » — écrire « ${nouveau(m)} » (adresses en anglais, ADR-020).`)
+          }
+        }
+      })
   }
 }
 

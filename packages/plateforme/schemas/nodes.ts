@@ -7,6 +7,7 @@
 // uniques, 40 000 caractères par opération, 50 opérations, bornes de la page, champs propres à chaque
 // opération), pour que le JSON Schema servi ne change que par les ajouts de la story.
 import * as z from "zod/v4"
+import { PLATFORM_API_PREFIX } from "./api"
 import type { BlockType } from "./blocks"
 
 export const NODE_PATH_PATTERN = /^[a-z0-9_]+(\/[a-z0-9_]+)*$/
@@ -151,7 +152,7 @@ export const readNodeSchema = z.object({
     .max(100)
     .optional()
     .describe(
-      "Id of one text file attached to the page (html, md, txt, csv), from a file link /api/plateforme/files/<id>, to read its text alone (default: the whole page).",
+      `Id of one text file attached to the page (html, md, txt, csv), from a file link ${PLATFORM_API_PREFIX}files/<id>, to read its text alone (default: the whole page).`,
     ),
 })
 
@@ -201,7 +202,7 @@ export type WriteNodeInput = z.infer<typeof writeNodeSchema>
 
 /**
  * Le déplacement d'un nœud (E03-S07, AC14, P12) : un seul schéma pour la route
- * `POST /api/plateforme/nodes/move`, le formulaire « Déplacer… » d'E05-S02 et `moveNode`. Sans lui,
+ * `POST /api/platform/nodes/move`, le formulaire « Déplacer… » d'E05-S02 et `moveNode`. Sans lui,
  * la route et le formulaire valideraient chacun leur chemin.
  */
 export const moveNodeSchema = z.strictObject({ path: nodePathSchema, new_path: nodePathSchema })
@@ -258,8 +259,8 @@ export type NodeView = {
 export type TreeNode = { path: string; title: string; kind: NodeKind; status: "draft" | "published"; children: TreeNode[] }
 
 /**
- * Le paramètre `version` de la page d'un nœud (E05-S02, AC9) : `publiee` montre la version publiée à
+ * Le paramètre `version` de la page d'un nœud (E05-S02, AC9) : `published` (E11-S07) montre la version publiée à
  * un rédacteur ; toute autre valeur, ou son absence, le brouillon. Sans lui, la page lirait un
  * paramètre d'adresse sans schéma (`api-patterns.md § Search & Filter`).
  */
-export const nodeVersionParamSchema = z.enum(["publiee"]).optional().catch(undefined)
+export const nodeVersionParamSchema = z.enum(["published"]).optional().catch(undefined)

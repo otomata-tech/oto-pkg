@@ -1,10 +1,10 @@
 "use client"
 
 // Formulaire de marque (E09-S01, AC6 à AC10) : huit thèmes et adresse du logo, envoyés
-// à `PATCH /api/plateforme/brand` sur le schéma partagé avec l'API (`schemas/brand.ts`). E05-S13 (AC-3,
+// à `PATCH /api/platform/brand` sur le schéma partagé avec l'API (`schemas/brand.ts`). E05-S13 (AC-3,
 // HN-E05S13-2) : plus de « Nom affiché », le nom de l'entreprise est celui de « L'entreprise » ; l'envoi retire
 // l'ancien (`display_name: null`), que `readBrand` ne lit plus ; l'îlot devient « Le logo ». Après un
-// succès, la page se recharge (`?enregistre=1`) : le layout de l'hôte reprend alors le thème, et
+// succès, la page se recharge (`?saved=1`) : le layout de l'hôte reprend alors le thème, et
 // `ui/` n'importe aucun routeur.
 //
 // Porté d'oto-frontend (`routes/settings.appearance.lazy.tsx`, `ThemePicker` de
@@ -134,7 +134,7 @@ export function FormulaireDeMarque({ marque, nomOrganisation, enregistre }: Form
       form.setError("root", { type: "server", message: messageDErreur(reponse.erreur) })
       return
     }
-    window.location.assign(`${window.location.pathname}?enregistre=1`)
+    window.location.assign(`${window.location.pathname}?saved=1`)
   }
 
   return (

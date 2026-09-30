@@ -77,7 +77,7 @@ type Task = () => Promise<void>
 const verifyToken = vi.fn<VerifyToken>()
 
 function request(method: string, path: string, init: { body?: string; headers?: Record<string, string> } = {}) {
-  return new Request(`https://${HOST}/api/plateforme/${path}`, {
+  return new Request(`https://${HOST}/api/platform/${path}`, {
     method,
     body: init.body,
     headers: { "x-forwarded-proto": "https", origin: ORIGIN, "user-agent": "api-test", ...init.headers },

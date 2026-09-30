@@ -21,7 +21,7 @@ export async function deciderConsentementAction(formData: FormData): Promise<nev
   const decision = await consentDecision({ auth: supabase.auth }, formData)
   // Formulaire altéré : l'état « lien invalide » de la page, aucun appel au SDK.
   if (decision.kind === "invalid") redirect(CONSENT_PATH)
-  if (decision.kind === "retry") redirect(`${consentPath(decision.authorizationId)}&erreur=${decision.erreur}`)
+  if (decision.kind === "retry") redirect(`${consentPath(decision.authorizationId)}&error=${decision.erreur}`)
   // L'adresse de retour que rend Supabase (avec `code=` ou `error=access_denied`), vérifiée http(s)
   // par le paquet, jamais une valeur du formulaire.
   redirect(decision.url)

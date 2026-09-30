@@ -1,6 +1,6 @@
 // « Liens publics » de l'écran « Organisation » (E05-S10, AC-d7 ; ADR-013 § 2) : les liens de partage actifs de
 // l'organisation, pour son administrateur — le contenu, son auteur, sa date — et
-// « Désactiver », confirmé en place (`ActionPlateforme`, `DELETE /api/plateforme/shares/<id>`). La liste arrive
+// « Désactiver », confirmé en place (`ActionPlateforme`, `DELETE /api/platform/shares/<id>`). La liste arrive
 // après l'écran, sous son `<Suspense>` : l'hôte la lit (`listShares`) sans l'attendre. Un contenu d'un espace
 // privé garde son espace et perd son titre (D44, décidé par le service). Server Component. Sans lui, un
 // administrateur ne voit pas ce que son organisation publie hors d'elle.

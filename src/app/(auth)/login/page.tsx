@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 type LoginPageProps = {
   /**
-   * `error=auth_callback_error` : `/auth/confirmer` ou `/auth/callback` a refusé le lien de l'email ;
+   * `error=auth_callback_error` : `/auth/confirm` ou `/auth/callback` a refusé le lien de l'email ;
    * `error=oauth` : le serveur d'auth a rendu une erreur au retour de Google ou Microsoft (E09-S03) ;
    * `redirect` : la page demandée avant la connexion, où revenir ensuite (E02-S02).
    */

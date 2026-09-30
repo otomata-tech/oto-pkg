@@ -4,7 +4,7 @@
 // sur une autre et devient son enfant, ses sous-contenus avec elle ; déposée entre deux lignes (le quart haut
 // ou bas d'une ligne), elle prend cette place parmi ses frères, pour tout le monde. Au clavier, le « ⋯ »
 // propose « Déplacer » (le choix du « Déplacer » de l'en-tête, `FormulaireDeDeplacement`), « Monter » et
-// « Descendre ». Changer de parent passe par l'envoi de l'en-tête (`POST /api/plateforme/nodes/move`), après
+// « Descendre ». Changer de parent passe par l'envoi de l'en-tête (`POST /api/platform/nodes/move`), après
 // l'aperçu du service (`GET nodes/impact`) : quand le déplacement change qui voit le contenu, un
 // `ConfirmDialog` le dit avant l'envoi, sinon il part sans question ; ranger passe par `POST nodes/position`
 // (après le déplacement, quand le dépôt change aussi de parent : deux appels, HN-E05S10e-11). Droits décidés

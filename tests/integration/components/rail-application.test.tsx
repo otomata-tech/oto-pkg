@@ -44,14 +44,14 @@ const ADRESSES: AdressesDuRail = {
   pages: "/n/",
   accueil: "/",
   journal: "/journal",
-  equipes: "/equipes",
+  equipes: "/teams",
   brancher: "/connect",
   usage: "/admin/usage",
-  retours: "/admin/retours",
-  organisation: "/admin/organisation",
-  connecteurs: "/admin/connecteurs",
-  corbeille: "/corbeille",
-  profil: "/profil",
+  retours: "/admin/feedback",
+  organisation: "/admin/organization",
+  connecteurs: "/admin/connectors",
+  corbeille: "/trash",
+  profil: "/profile",
 }
 
 /** Le lien de l'hôte : une ancre marquée, pour reconnaître ce qu'il rend. */
@@ -191,7 +191,7 @@ describe("RailApplication zones (AC-a3)", () => {
     // Chaque liste de l'arbre porte le nom de sa section, comme le navigateur d'arbre remplacé.
     expect(within(rail).getByRole("list", { name: "Ventes" })).toContainElement(within(rail).getByRole("link", { name: "Qualifier un prospect" }))
     // Le pied d'oto-frontend portait « Couleur », « Procédures », « Agents » : aucun n'est une ligne du rail ; la Corbeille est au menu du compte.
-    expect(within(rail).getByRole("link", { name: "Connecteurs" })).toHaveAttribute("href", "/admin/connecteurs")
+    expect(within(rail).getByRole("link", { name: "Connecteurs" })).toHaveAttribute("href", "/admin/connectors")
     expect(within(rail).queryByRole("link", { name: /^(Agents|Procédures|Corbeille)$/ })).toBeNull()
     expect(within(rail).queryByRole("button", { name: /^(Agents|Couleur du thème)$/ })).toBeNull()
   })
@@ -201,7 +201,7 @@ describe("RailApplication zones (AC-a3)", () => {
     expect(within(membre).queryByRole("link", { name: "Connecteurs" })).toBeNull()
     cleanup()
 
-    const admin = monter({}, "/admin/connecteurs")
+    const admin = monter({}, "/admin/connectors")
     expect(within(admin).getByRole("link", { name: "Connecteurs" })).toHaveAttribute("aria-current", "page")
   })
 
@@ -248,7 +248,7 @@ describe("RailApplication menus (AC-a4)", () => {
     [true, ["Organisation", "Équipes & accès", "Journal", "Usage", "Retours"]],
     [false, ["Équipes & accès", "Journal"]],
   ])("should offer the company menu by administration right (%s), settings before follow-up, each entry navigating", (administre, attendues) => {
-    const rail = monter({ administre, adresses: { ...ADRESSES, marque: "/admin/marque", drapeaux: "/admin/drapeaux", acces: "/admin/acces" } })
+    const rail = monter({ administre, adresses: { ...ADRESSES, marque: "/admin/brand", drapeaux: "/admin/flags", acces: "/admin/access" } })
     fireEvent.click(within(rail).getByRole("button", { name: /^Entreprise : Démo/ }))
 
     expect(itemsDuMenu()).toEqual(attendues)
@@ -257,7 +257,7 @@ describe("RailApplication menus (AC-a4)", () => {
     else expect(texte).not.toMatch(/Réglages de l’entreprise|Suivi de l’entreprise/)
     expect(texte).not.toContain("Membres & équipes")
     fireEvent.click(menu().getByRole("menuitem", { name: "Équipes & accès" }))
-    expect(hote.naviguer).toHaveBeenCalledWith("/equipes")
+    expect(hote.naviguer).toHaveBeenCalledWith("/teams")
   })
 
   // E05-S11 (AC-6, AC-e22) : « Profil » ouvre la page Profil, la Corbeille s'ouvre d'ici ; ni « Apparence » ni « Couleur ».
@@ -271,11 +271,11 @@ describe("RailApplication menus (AC-a4)", () => {
 
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Profil" }))
-    expect(hote.naviguer).toHaveBeenLastCalledWith("/profil")
+    expect(hote.naviguer).toHaveBeenLastCalledWith("/profile")
 
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Corbeille" }))
-    expect(hote.naviguer).toHaveBeenLastCalledWith("/corbeille")
+    expect(hote.naviguer).toHaveBeenLastCalledWith("/trash")
 
     fireEvent.click(within(rail).getByRole("button", { name: "Compte : Claire Morel. Ouvrir le menu" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Déconnexion" }))
@@ -312,7 +312,7 @@ describe("RailApplication menus (AC-a4)", () => {
     expect(screen.queryByRole("dialog")).toBeNull()
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/sans_titre_2"))
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes", methode: "POST", corps: { path: "ventes/sans_titre", ...NEUF, summary: RESUMES.table, kind: "table", ...COLONNE_CLE } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes", methode: "POST", corps: { path: "ventes/sans_titre", ...NEUF, summary: RESUMES.table, kind: "table", ...COLONNE_CLE } }])
   })
 
   it("should offer a page, a table and a procedure from the « + » of Privé as elsewhere, and create at the first free address: a visible one skipped, a taken one tried again (AC-34)", async () => {
@@ -363,7 +363,7 @@ describe("RailApplication menus (AC-a4)", () => {
     fireEvent.click(menu().getByRole("menuitem", { name: "Une procédure" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/qualifier/sans_titre"))
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes", methode: "POST", corps: { path: "ventes/qualifier/sans_titre", ...NEUF, summary: RESUMES.procedure, kind: "procedure" } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes", methode: "POST", corps: { path: "ventes/qualifier/sans_titre", ...NEUF, summary: RESUMES.procedure, kind: "procedure" } }])
   })
 
   // E10-S01 (AC-a5) : « Télécharger en .md » s'ajoute, et c'est le seul geste du « ⋯ » d'un Contexte.
@@ -388,13 +388,13 @@ describe("RailApplication, files (E10-S01, AC-a3, AC-a5, AC-b1, AC-b6)", () => {
     fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Grille tarifaire" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Télécharger en .csv" }))
     await waitFor(() => expect(clic).toHaveBeenCalledTimes(1))
-    expect(appels).toEqual([{ url: "/api/plateforme/tables/export?path=conseil%2Fgrille", methode: "GET", corps: undefined }])
+    expect(appels).toEqual([{ url: "/api/platform/tables/export?path=conseil%2Fgrille", methode: "GET", corps: undefined }])
     expect(creer).toHaveBeenCalledWith(expect.objectContaining({ type: "text/csv;charset=utf-8" }))
 
     fireEvent.click(within(rail).getByRole("button", { name: "Autres actions sur Contexte · Tout le monde" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Télécharger en .md" }))
     expect(await screen.findByRole("alert")).toHaveTextContent("Ce contenu n'est plus visible.")
-    expect(appels[1].url).toMatch(/^\/api\/plateforme\/nodes\/export\?path=/)
+    expect(appels[1].url).toMatch(/^\/api\/platform\/nodes\/export\?path=/)
   })
 
   it("should open the import dialog from « Importer un fichier… » of a « + », and from a file dropped on a line", async () => {
@@ -429,7 +429,7 @@ describe("RailApplication keyboard (AC-x3)", () => {
     fireEvent.keyDown(ouvert, { key: "ArrowDown" })
     expect(ouvert).toHaveAttribute("aria-activedescendant", within(ouvert).getByRole("menuitem", { name: "Profil" }).id)
     fireEvent.keyDown(ouvert, { key: "Enter" })
-    expect(hote.naviguer).toHaveBeenCalledWith("/profil")
+    expect(hote.naviguer).toHaveBeenCalledWith("/profile")
     // Le menu part avec le focus : il revient au déclencheur, jamais sur la page.
     expect(compte).toHaveFocus()
   })
@@ -442,7 +442,7 @@ describe("RailApplication keyboard (AC-x3)", () => {
 
     // H04 : jamais le texte anglais du service ; aucune page ouverte, rien de relu.
     expect(await within(rail).findByRole("alert")).toHaveTextContent("Vous n'avez pas le droit de faire cela.")
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes", methode: "POST", corps: { path: "conseil/sans_titre", ...NEUF, summary: RESUMES.page, kind: "page" } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes", methode: "POST", corps: { path: "conseil/sans_titre", ...NEUF, summary: RESUMES.page, kind: "page" } }])
     expect(plus).toHaveFocus()
     expect(hote.naviguer).not.toHaveBeenCalled()
     expect(hote.rafraichir).not.toHaveBeenCalled()
@@ -532,11 +532,11 @@ describe("RailApplication, moving from the rail (E05-S10, AC-b7)", () => {
     expect(dialogue.getByText("Il quitte Tout le monde pour Privé.")).toBeInTheDocument()
     expect(dialogue.getByText("Perdent l'accès : Ada, Léo et 3 autres.")).toBeInTheDocument()
     expect(dialogue.getByText("Leur accès change : Claire (Peut lire → Accès complet).")).toBeInTheDocument()
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes/impact?path=conseil%2Fgrille&new_path=private%2Fclaire%2Fnotes%2Fgrille", methode: "GET", corps: undefined }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes/impact?path=conseil%2Fgrille&new_path=private%2Fclaire%2Fnotes%2Fgrille", methode: "GET", corps: undefined }])
     fireEvent.click(dialogue.getByRole("button", { name: "Déplacer" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/private/claire/notes/grille"))
-    expect(appels[1]).toEqual({ url: "/api/plateforme/nodes/move", methode: "POST", corps: { path: "conseil/grille", new_path: "private/claire/notes/grille" } })
+    expect(appels[1]).toEqual({ url: "/api/platform/nodes/move", methode: "POST", corps: { path: "conseil/grille", new_path: "private/claire/notes/grille" } })
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
   })
 
@@ -549,7 +549,7 @@ describe("RailApplication, moving from the rail (E05-S10, AC-b7)", () => {
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/contexte/grille"))
     expect(screen.queryByRole("dialog")).toBeNull()
-    expect(appels.map((appel) => appel.url)).toEqual(["/api/plateforme/nodes/impact?path=conseil%2Fgrille&new_path=contexte%2Fgrille", "/api/plateforme/nodes/move"])
+    expect(appels.map((appel) => appel.url)).toEqual(["/api/platform/nodes/impact?path=conseil%2Fgrille&new_path=contexte%2Fgrille", "/api/platform/nodes/move"])
     expect(appels[1].corps).toEqual({ path: "conseil/grille", new_path: "contexte/grille" })
 
     // La relecture de l'hôte, à la nouvelle adresse : la ligne déplacée est sous le Contexte, déplié, sélectionnée.
@@ -588,7 +588,7 @@ describe("RailApplication, moving from the rail (E05-S10, AC-b7)", () => {
     // L'aperçu refusé : la destination n'est plus visible, rien ne part, le rail se relit.
     glisserSur(lien(rail, "Grille tarifaire"), lien(rail, "Notes"))
     await waitFor(() => expect(within(rail).getByRole("alert")).toHaveTextContent("Ce contenu ou sa destination n'est plus visible."))
-    expect(appels.map((appel) => appel.url.split("?")[0])).toEqual(["/api/plateforme/nodes/impact", "/api/plateforme/nodes/impact", "/api/plateforme/nodes/move", "/api/plateforme/nodes/impact"])
+    expect(appels.map((appel) => appel.url.split("?")[0])).toEqual(["/api/platform/nodes/impact", "/api/platform/nodes/impact", "/api/platform/nodes/move", "/api/platform/nodes/impact"])
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
   })
 
@@ -609,7 +609,7 @@ describe("RailApplication, moving from the rail (E05-S10, AC-b7)", () => {
     expect(confirmation.getByText("Son sous-contenu le suit.")).toBeInTheDocument()
     fireEvent.click(confirmation.getByRole("button", { name: "Déplacer" }))
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/conseil"))
-    expect(appels[1]).toEqual({ url: "/api/plateforme/nodes/move", methode: "POST", corps: { path: "conseil", new_path: "ventes/conseil" } })
+    expect(appels[1]).toEqual({ url: "/api/platform/nodes/move", methode: "POST", corps: { path: "conseil", new_path: "ventes/conseil" } })
   })
 
   it("should say only the owner changes when nobody gains nor loses access", async () => {
@@ -665,7 +665,7 @@ describe("RailApplication, ordering siblings (E05-S10, b2, AC-b9)", () => {
     survoler("drop", lien("Offres"), 2)
 
     await waitFor(() => expect(hote.rafraichir).toHaveBeenCalledTimes(1))
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes/position", methode: "POST", corps: { path: "tarifs", after: null } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes/position", methode: "POST", corps: { path: "tarifs", after: null } }])
     expect(screen.queryByRole("dialog")).toBeNull()
     expect(hote.naviguer).not.toHaveBeenCalled()
     expect(screen.getByText("« Tarifs » a changé de place.")).toHaveAttribute("role", "status")
@@ -699,9 +699,9 @@ describe("RailApplication, ordering siblings (E05-S10, b2, AC-b9)", () => {
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/devis_2"))
     expect(appels.map((appel) => [appel.url.split("?")[0], appel.corps])).toEqual([
-      ["/api/plateforme/nodes/impact", undefined],
-      ["/api/plateforme/nodes/move", { path: "conseil/devis", new_path: "devis" }],
-      ["/api/plateforme/nodes/position", { path: "devis_2", after: "conseil" }],
+      ["/api/platform/nodes/impact", undefined],
+      ["/api/platform/nodes/move", { path: "conseil/devis", new_path: "devis" }],
+      ["/api/platform/nodes/position", { path: "devis_2", after: "conseil" }],
     ])
   })
 
@@ -761,7 +761,7 @@ describe("RailApplication, duplicating and deleting (E05-S10, b2, AC-b10, AC-b11
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/conseil_copie"))
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes/duplicate", methode: "POST", corps: { path: "conseil" } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes/duplicate", methode: "POST", corps: { path: "conseil" } }])
     const avecLaCopie = [noeud("guide", "page", "Guide de Démo", [...ARBRE[0].children, noeud("conseil_copie", "page", "Conseil (copie)")])]
     rerender(railA("/n/conseil_copie", { arbre: { data: { tree: avecLaCopie, truncated: false } } }))
     expect(lien("Conseil (copie)")).toHaveAttribute("aria-current", "page")
@@ -793,7 +793,7 @@ describe("RailApplication, duplicating and deleting (E05-S10, b2, AC-b10, AC-b11
 
     // La page ouverte (sa grille) partie avec lui : le parent s'ouvre, la racine menant au Contexte.
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/guide"))
-    expect(appels).toEqual([{ url: "/api/plateforme/trash", methode: "POST", corps: { path: "conseil" } }])
+    expect(appels).toEqual([{ url: "/api/platform/trash", methode: "POST", corps: { path: "conseil" } }])
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
     expect(screen.getByText("« Conseil » est à la corbeille.")).toHaveAttribute("role", "status")
     await waitFor(() => expect(lien("Contexte · Tout le monde")).toHaveFocus())
@@ -802,7 +802,7 @@ describe("RailApplication, duplicating and deleting (E05-S10, b2, AC-b10, AC-b11
   // Le chemin vers la corbeille, depuis le menu du compte (E05-S11, AC-e22) : `RailApplication menus`.
   it("should say a refused deletion in the rail and open nothing", async () => {
     simulerLAPI({ error: { code: "conflict", message: "A content was put under conseil meanwhile." } })
-    render(railA("/corbeille"))
+    render(railA("/trash"))
     fireEvent.click(screen.getByRole("button", { name: "Autres actions sur Conseil" }))
     fireEvent.click(menu().getByRole("menuitem", { name: "Supprimer" }))
     fireEvent.click(within(screen.getByRole("dialog", { name: "Supprimer « Conseil » ?" })).getByRole("button", { name: "Supprimer" }))
@@ -866,7 +866,7 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
     fireEvent.click(menu().getByRole("menuitem", { name: "Une procédure" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith(`/n/${chemin}`))
-    expect(appels).toEqual([{ url: "/api/plateforme/nodes", methode: "POST", corps: { path: chemin, ...NEUF, summary: RESUMES.procedure, kind: "procedure" } }])
+    expect(appels).toEqual([{ url: "/api/platform/nodes", methode: "POST", corps: { path: chemin, ...NEUF, summary: RESUMES.procedure, kind: "procedure" } }])
     // L'hôte ouvre la page créée, pas encore relue : sa ligne est sous celle du Contexte, dépliée.
     rerender(railA(`/n/${chemin}`))
     const pli = within(rail()).getByRole("button", { name: `Replier ${ligne}` })
@@ -886,10 +886,10 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
 
     const dialogue = within(await screen.findByRole("dialog", { name: "Déplacer « Notes » ?" }))
     expect(dialogue.getByText("Il quitte Privé pour Ventes.")).toBeInTheDocument()
-    expect(appels[0].url).toBe("/api/plateforme/nodes/impact?path=private%2Fclaire%2Fnotes&new_path=ventes%2Fcontexte%2Fnotes")
+    expect(appels[0].url).toBe("/api/platform/nodes/impact?path=private%2Fclaire%2Fnotes&new_path=ventes%2Fcontexte%2Fnotes")
     fireEvent.click(dialogue.getByRole("button", { name: "Déplacer" }))
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/contexte/notes"))
-    expect(appels[1]).toEqual({ url: "/api/plateforme/nodes/move", methode: "POST", corps: { path: "private/claire/notes", new_path: "ventes/contexte/notes" } })
+    expect(appels[1]).toEqual({ url: "/api/platform/nodes/move", methode: "POST", corps: { path: "private/claire/notes", new_path: "ventes/contexte/notes" } })
     cleanup()
 
     simulerLAPI()
@@ -920,7 +920,7 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
 
     choisirAuClavier(within(rail()).getByRole("button", { name: "Autres actions sur Relancer les devis" }), 1)
     await waitFor(() => expect(appels).toHaveLength(1))
-    expect(appels[0]).toEqual({ url: "/api/plateforme/nodes/position", methode: "POST", corps: { path: "contexte/relance", after: null } })
+    expect(appels[0]).toEqual({ url: "/api/platform/nodes/position", methode: "POST", corps: { path: "contexte/relance", after: null } })
 
     choisirAuClavier(within(rail()).getByRole("button", { name: "Autres actions sur Conseil" }), 0)
     const choix = within(screen.getByRole("dialog", { name: "Déplacer « Conseil »" }))
@@ -928,7 +928,7 @@ describe("RailApplication, contents under a Contexte (E05-S12, AC-25 to AC-27)",
     expect(choix.getByText("Nouveau chemin : contexte/conseil")).toBeInTheDocument()
     fireEvent.click(choix.getByRole("button", { name: "Déplacer ici" }))
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/contexte/conseil"))
-    expect(appels[2]).toEqual({ url: "/api/plateforme/nodes/move", methode: "POST", corps: { path: "conseil", new_path: "contexte/conseil" } })
+    expect(appels[2]).toEqual({ url: "/api/platform/nodes/move", methode: "POST", corps: { path: "conseil", new_path: "contexte/conseil" } })
   })
 
   it("should give the focus back to the Contexte line once its first child is in the bin (AC-27)", async () => {
@@ -961,7 +961,7 @@ describe("RailApplication search (AC-a7)", () => {
     expect(within(rouverte.getByRole("group", { name: "Tableaux" })).getByRole("option", { name: "Grille tarifaire" })).toBeInTheDocument()
 
     const dansLeContenu = await rouverte.findByRole("group", { name: "Dans le contenu" })
-    expect(appels).toEqual([{ url: "/api/plateforme/search?q=grille", methode: "GET", corps: undefined }])
+    expect(appels).toEqual([{ url: "/api/platform/search?q=grille", methode: "GET", corps: undefined }])
     // Le titre reste lisible : l'extrait, sans marques, est coupé court en fin de ligne.
     expect(within(dansLeContenu).getByText("Appliquer la grille tarifaire à chaque prospect…")).toBeInTheDocument()
     fireEvent.click(within(dansLeContenu).getByRole("option", { name: /Qualifier un prospect/ }))
@@ -998,6 +998,6 @@ describe("SectionsDuRail in the sidebar of an ERP (AC-a8)", () => {
     fireEvent.click(menu().getByRole("menuitem", { name: "Une page" }))
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/erp/plateforme/n/conseil/sans_titre"))
-    expect(appels[0]).toMatchObject({ url: "/api/plateforme/nodes", methode: "POST", corps: { path: "conseil/sans_titre", kind: "page" } })
+    expect(appels[0]).toMatchObject({ url: "/api/platform/nodes", methode: "POST", corps: { path: "conseil/sans_titre", kind: "page" } })
   })
 })

@@ -30,10 +30,10 @@ const hrefDuNoeud = (chemin: string) => `/n/${chemin}`
 type Donnees = Pick<EcranDuJournalProps, "resultat" | "conversation" | "equipes" | "personnes">
 
 async function lire(db: PlatformDb, identity: Identity, filtres: JournalFilters): Promise<Donnees> {
-  const liste = { periodDays: filtres.periode, teamId: filtres.equipe, userId: filtres.personne, errorsOnly: filtres.erreurs === "1", cursor: filtres.curseur }
+  const liste = { periodDays: filtres.period, teamId: filtres.team, userId: filtres.person, errorsOnly: filtres.errors === "1", cursor: filtres.cursor }
   const [resultat, conversation, equipes, personnes] = await Promise.all([
     resultatDe(listConversations(db, identity, liste)),
-    filtres.conversation ? resultatDe(getConversation(db, identity, filtres.conversation, { cursor: filtres.appels })) : undefined,
+    filtres.conversation ? resultatDe(getConversation(db, identity, filtres.conversation, { cursor: filtres.calls })) : undefined,
     resultatDe(listTeams(db, identity)),
     resultatDe(listMembers(db, identity)),
   ])
@@ -54,7 +54,7 @@ export default async function JournalPage({
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
   const identite = await getPlatformIdentitySafely("journal")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   // Aucune valeur de l'adresse ne va brute à un service : une valeur illisible retombe sur son défaut (AC4).
   const filtres = journalFiltersSchema.parse(await searchParams)

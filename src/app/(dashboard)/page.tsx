@@ -21,8 +21,8 @@ import { getPlatformIdentitySafely, getRequestOrigin, type PlatformSession } fro
 // de la session, en parallèle, chacun par `resultatDe` : une lecture en échec se dit dans son îlot, et
 // l'écran reste ouvert. La session est celle de l'hôte, Supabase ou OIDC (E01-S11 b, AC-b6).
 //
-// E11-S10 (lot e, AC-e3) : l'accueil n'a plus d'onglets ; la vue « Contexte » est à `/context`, et `?onglet=`
-// n'est plus lu.
+// E11-S10 (lot e, AC-e3) : l'accueil n'a plus d'onglets ; la vue « Contexte » est à `/context`, et le
+// paramètre d'onglet n'est plus lu.
 //
 // E05-S12 (lot B) : les activités de la semaine (`listActivities`, le journal par gestes) au lieu des
 // conversations, qui restent à `/journal`, et les procédures utiles de l'îlot de droite (`usefulProcedures`).
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 const ECHEC = { error: "Une erreur est survenue. Réessayez." } as const
 
 /** La semaine du journal : la période par défaut de `/journal`, celle que « Tout le journal » ouvre. */
-const PERIODE = journalFiltersSchema.parse({}).periode
+const PERIODE = journalFiltersSchema.parse({}).period
 
 /** Les adresses de l'hôte que l'écran ouvre, et son lien. */
 const NAVIGATION: Omit<EcranDAccueilProps, "donnees"> = {
@@ -73,12 +73,12 @@ function AccueilLu({ lecture }: { lecture: Promise<DonneesDeLAccueil> }) {
 export default async function AccueilPage() {
   const identite = await getPlatformIdentitySafely("accueil")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
   // Une panne de la résolution de l'identité : l'écran la dit une fois, avec « Réessayer ».
   if (!identite) return <EcranDAccueil donnees={ECHEC} {...NAVIGATION} />
   // L'identité vient de l'hôte de la requête : sans hôte, elle n'aurait pas été résolue (comme `/connect`).
   const origine = await getRequestOrigin()
-  if (!origine) redirect("/aucune-organisation")
+  if (!origine) redirect("/no-organization")
   return (
     <Suspense fallback={<EcranDAccueilChargement />}>
       <AccueilLu lecture={lire(identite.data, origine)} />

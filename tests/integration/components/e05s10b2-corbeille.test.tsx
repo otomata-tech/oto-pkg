@@ -19,7 +19,7 @@ function monter(resultat: ComponentProps<typeof EcranDeLaCorbeille>["resultat"])
   render(
     <CoquilleOto>
       <ContexteDeRafraichissement.Provider value={hote.rafraichir}>
-        <ContexteDeLHote.Provider value={{ Lien: "a", chemin: "/corbeille", naviguer: hote.naviguer }}>
+        <ContexteDeLHote.Provider value={{ Lien: "a", chemin: "/trash", naviguer: hote.naviguer }}>
           <EcranDeLaCorbeille resultat={resultat} prefixeDesPages="/n/" />
         </ContexteDeLHote.Provider>
       </ContexteDeRafraichissement.Provider>
@@ -81,7 +81,7 @@ describe("EcranDeLaCorbeille (AC-b11)", () => {
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/n/ventes/grille_2"))
     expect(hote.rafraichir).toHaveBeenCalledTimes(1)
-    expect(appels).toEqual([{ url: "/api/plateforme/trash/restore", corps: { path: "ventes/grille" } }])
+    expect(appels).toEqual([{ url: "/api/platform/trash/restore", corps: { path: "ventes/grille" } }])
   })
 
   it("should say a refusal under the button, give it the focus back, open nothing, and re-read the page when the content left the bin", async () => {

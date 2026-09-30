@@ -23,7 +23,7 @@ const LONG = "est un élément assez long pour se replier sur plusieurs lignes, 
 async function creerLaPage(page: Page, chemin: string): Promise<void> {
   const issue = await page.evaluate(
     async (corps) => {
-      const reponse = await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+      const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
       return reponse.ok ? "écrite" : await reponse.text()
     },
     { path: chemin, title: "Listes et liens", summary: "Page jetable du contrôle d'E11-S06.", publish: true, ops: [{ op: "add_section", section: "Réunion", text: "Premier paragraphe." }] },
@@ -142,7 +142,7 @@ test.describe("listes et liens dans l'éditeur (E11-S06)", () => {
 
       // La version publiée : le nouveau libellé, jamais la source du lien.
       await attendre(async () => {
-        const html = await lireLeHtml(page, `/n/${chemin}?version=publiee`)
+        const html = await lireLeHtml(page, `/n/${chemin}?version=published`)
         expect(html).toContain("Tâches revues")
         expect(html).not.toContain("[[")
       }).toPass({ timeout: 90_000 })

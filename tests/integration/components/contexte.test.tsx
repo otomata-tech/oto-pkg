@@ -14,7 +14,7 @@ import { bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 // dernière ligne, chaque ligne un lien vers la vue « Contexte » de l'accueil. E11-S10 (lot g) : l'encart sans titre
 // visible ni « Règles Oto », ses lignes vers `/context` ; la publication sans phrase de recharge. E11-S05 (AC-e2) :
 // « À quoi sert cette page » est un repli fermé à l'arrivée, en tête de la colonne de droite. `fetch` simulé pour
-// `POST /api/plateforme/nodes`, relecture espionnée.
+// `POST /api/platform/nodes`, relecture espionnée.
 
 const rafraichir = vi.fn()
 const EQUIPES = [{ slug: "ventes", name: "Ventes" }]
@@ -235,7 +235,7 @@ describe("voici ce que votre agent va lire (AC12 ; E05-S11, AC-9 à AC-11)", () 
       ["calendar", null],
     ])
     expect(within(apercu().getByRole("list", { name: "Ordre de lecture" })).getAllByRole("link").map((lien) => lien.getAttribute("href"))).toEqual(
-      ["contexte-tout-le-monde", "contexte-prive", "contexte-ventes", "nouveautes", "procedures", "contenus", "partie-8"].map((ancre) => `/context#${ancre}`),
+      ["everyone-context", "private-context", "context-ventes", "news", "procedures", "recent-content", "part-8"].map((ancre) => `/context#${ancre}`),
     )
     for (const lien of apercu().getAllByRole("link")) expect(lien).not.toHaveAttribute("tabindex", "-1")
     // AC-10 : le texte servi replié est parti (il se lit dans la vue « Contexte »).

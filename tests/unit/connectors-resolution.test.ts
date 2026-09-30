@@ -286,7 +286,7 @@ describe("chooseAccount: nothing usable (AC16, N5, N6)", () => {
     const error = refusalOf(chooseAccount({ fn: CREATE, accounts: [], team: VENTES }))
     expect(error.code).toBe("not_enabled")
     expect(error.message).toBe(
-      "No mail account is connected for you (team Ventes, then the organisation). Ask an administrator of Acme Test (Ada Martin) to connect one on the dashboard: https://acme.example.test/admin/connecteurs.",
+      "No mail account is connected for you (team Ventes, then the organisation). Ask an administrator of Acme Test (Ada Martin) to connect one on the dashboard: https://acme.example.test/admin/connectors.",
     )
     const alone = refusalOf(chooseAccount({ fn: CREATE, accounts: [], team: null }))
     expect(alone.message).toContain("(the organisation). Ask an administrator of Acme Test (Ada Martin)")

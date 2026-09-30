@@ -6,7 +6,7 @@ import { ContexteDeLHote, ContexteDeRafraichissement, EcranOrganisation } from "
 
 // « Liens publics » de l'écran « Organisation » (E05-S10, AC-d7 ; ADR-013 § 2) : les liens actifs de
 // l'organisation, lus par l'hôte (`listShares`, simulé ici par sa promesse), et « Désactiver » par
-// `DELETE /api/plateforme/shares/<id>` (`fetch` simulé), confirmé en place, puis la page relue.
+// `DELETE /api/platform/shares/<id>` (`fetch` simulé), confirmé en place, puis la page relue.
 
 const DEMO: OrgView = {
   name: "Démo",
@@ -33,9 +33,9 @@ function Lien({ children, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & 
 async function monter(lecture: Promise<{ data: OrgShareView[] } | { error: string }>) {
   await act(async () => {
     render(
-      <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/organisation", naviguer: vi.fn() }}>
+      <ContexteDeLHote.Provider value={{ Lien, chemin: "/admin/organization", naviguer: vi.fn() }}>
         <ContexteDeRafraichissement.Provider value={rafraichir}>
-          <EcranOrganisation resultat={{ data: DEMO }} Lien={Lien} ici="/admin/organisation" hrefGuide="/n/contexte" liensPublics={{ lecture, prefixeDesPages: "/n/" }} />
+          <EcranOrganisation resultat={{ data: DEMO }} Lien={Lien} ici="/admin/organization" hrefGuide="/n/contexte" liensPublics={{ lecture, prefixeDesPages: "/n/" }} />
         </ContexteDeRafraichissement.Provider>
       </ContexteDeLHote.Provider>,
     )
@@ -75,7 +75,7 @@ describe("EcranOrganisation, public links (AC-d7)", () => {
     expect(fetchMock).not.toHaveBeenCalled()
     fireEvent.click(liens.getByRole("button", { name: "Désactiver le lien" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(fetchMock.mock.calls[0][0]).toBe(`/api/plateforme/shares/${TARIFS.id}`)
+    expect(fetchMock.mock.calls[0][0]).toBe(`/api/platform/shares/${TARIFS.id}`)
     expect(fetchMock.mock.calls[0][1]?.method).toBe("DELETE")
   })
 
@@ -86,6 +86,6 @@ describe("EcranOrganisation, public links (AC-d7)", () => {
 
     const echec = await monter(Promise.resolve({ error: "Une erreur est survenue. Réessayez." }))
     expect(echec.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(echec.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organisation")
+    expect(echec.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/organization")
   })
 })

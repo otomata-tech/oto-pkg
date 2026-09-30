@@ -268,7 +268,7 @@ export function accountRefusal(refusal: AccountRefusal, fn: FunctionTraits, word
       const names = words.administrators ? ` (${words.administrators})` : ""
       return new PlatformError(
         "not_enabled",
-        `No ${fn.connector} account is connected for you (${steps}). Ask an administrator of ${words.orgName}${names} to connect one on the dashboard: ${words.origin}/admin/connecteurs.`,
+        `No ${fn.connector} account is connected for you (${steps}). Ask an administrator of ${words.orgName}${names} to connect one on the dashboard: ${words.origin}/admin/connectors.`,
       )
     }
   }

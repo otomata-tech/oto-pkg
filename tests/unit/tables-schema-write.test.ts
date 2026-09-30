@@ -173,7 +173,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
   })
 
   describe("settings of the screen (E11-S01, lot g: AC-g4, AC-g8)", () => {
-    // La porte de la route `POST /api/plateforme/nodes` : `writeNode` avec la provenance d'une personne.
+    // La porte de la route `POST /api/platform/nodes` : `writeNode` avec la provenance d'une personne.
     const screenWrite = async (person: "lea" | "marc", header: Record<string, unknown>, identity = acmeIdentity(ref, person)) => {
       const { db, calls } = spyDb(await ref.db(person))
       const outcome = await writeNode(db, identity, { path: PROSPECTS.path, base_revision: 3, header, publish: true }, { kind: "human" }).then(

@@ -190,7 +190,7 @@ export const tableDeleteRowsArgsSchema = z.strictObject({
 export type TableDeleteRowsArgs = z.infer<typeof tableDeleteRowsArgsSchema>
 
 // ------------------------------------------------------------------------ Import d'un CSV (E10-S01)
-// `table.import` (AC-c1) et le corps de `POST /api/plateforme/tables/import` (AC-b3 à AC-b5) : deux portes
+// `table.import` (AC-c1) et le corps de `POST /api/platform/tables/import` (AC-b3 à AC-b5) : deux portes
 // d'un même service (`importRows`, `mcp-patterns.md § 1`). La lecture et le contrôle d'un CSV sont des
 // fonctions pures de `csv.ts`, que l'écran joue avant d'envoyer et que le service rejoue.
 

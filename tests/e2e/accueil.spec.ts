@@ -117,7 +117,7 @@ test.describe("l'accueil", () => {
         await expect(contenu.getByRole("heading", { level: 1, name: "Contexte" })).toBeVisible({ timeout: 60_000 })
         const vue = contenu
         // La partie Tout le monde : la même avant et après le regroupement des faits (E05-S12, D109).
-        await expect(vue.getByRole("region", { name: "Contexte : Tout le monde" })).toHaveAttribute("id", "contexte-tout-le-monde", { timeout: 60_000 })
+        await expect(vue.getByRole("region", { name: "Contexte : Tout le monde" })).toHaveAttribute("id", "everyone-context", { timeout: 60_000 })
         await expect(vue.getByText(/caractères sur|reflète les versions/)).toHaveCount(0)
         for (const largeur of [375, 1280]) {
           await page.setViewportSize({ width: largeur, height: 900 })

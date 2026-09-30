@@ -123,7 +123,7 @@ describe("ActionPlateforme confirmation (AC20)", () => {
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe(`/api/plateforme/${SUPPRIMER.requete.ressource}`)
+    expect(url).toBe(`/api/platform/${SUPPRIMER.requete.ressource}`)
     expect(init?.method).toBe("DELETE")
     expect(reload).not.toHaveBeenCalled()
   })

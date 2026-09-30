@@ -206,7 +206,7 @@ test.describe("tableau, vue et revue", () => {
 
       // Le tri par montant_estime (AC4) : le bouton de l'en-tête, l'adresse, `aria-sort` et l'ordre des lignes, qui n'est pas celui des clés.
       await grille.getByRole("button", { name: "Trier sur montant_estime" }).click()
-      await attendre(page).toHaveURL(/[?&]tri=montant_estime(&|$)/)
+      await attendre(page).toHaveURL(/[?&]sort=montant_estime(&|$)/)
       const triee = page.getByRole("table", { name: `${lue.titre} — ${attendu.toutes}`, exact: true })
       // L'en-tête se nomme par ses deux boutons (« Trier sur montant_estime Filtrer sur montant_estime ») : la table du design system.
       await attendre(triee.getByRole("columnheader", { name: /^Trier sur montant_estime / })).toHaveAttribute("aria-sort", "ascending")
@@ -224,8 +224,8 @@ test.describe("tableau, vue et revue", () => {
       await auRepos(page.getByRole("dialog"))
       await capturer(page, testInfo, `panneau-du-filtre-${mode}`)
       await panneau.getByRole("button", { name: "Filtrer" }).click()
-      await attendre(page).toHaveURL(new RegExp(`[?&]f=ville%3Acontient%3A${VILLE}(&|$)`))
-      await expect(page).toHaveURL(/[?&]tri=montant_estime(&|$)/)
+      await attendre(page).toHaveURL(new RegExp(`[?&]f=ville%3Acontains%3A${VILLE}(&|$)`))
+      await expect(page).toHaveURL(/[?&]sort=montant_estime(&|$)/)
       lue = await lireLaDemo()
       attendu = attendus(lue)
       const filtre = attendus(lue, contientLaVille)

@@ -11,7 +11,7 @@ import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
 
 const IMAGE = "f1000000-0000-4000-8000-000000000001"
 const FILE = "f2000000-0000-4000-8000-000000000002"
-const ORIGIN = "https://acme.oto.test/api/plateforme/files"
+const ORIGIN = "https://acme.oto.test/api/platform/files"
 
 const report: BlockInput = { type: "file", text: null, data: { file_id: FILE, name: "Rapport (v2) ](final).pdf", size: 1_234_567, mime: "application/pdf" } }
 const plan: BlockInput = { type: "image", text: null, data: { file_id: IMAGE, alt: "Plan du site" } }
@@ -28,30 +28,30 @@ describe("markdown of attached files (AC-d1)", () => {
     expect(renderBlocks([plan, report], { fileRoute: ORIGIN })).toBe(
       `![Plan du site](${ORIGIN}/${IMAGE})\n\n[Rapport (v2) ](final).pdf (1,234,567 bytes, pdf)](${ORIGIN}/${FILE})`,
     )
-    expect(renderBlock(report)).toBe(`[Rapport (v2) ](final).pdf (1,234,567 bytes, pdf)](/api/plateforme/files/${FILE})`)
+    expect(renderBlock(report)).toBe(`[Rapport (v2) ](final).pdf (1,234,567 bytes, pdf)](/api/platform/files/${FILE})`)
     expect([fileSizeText(1), fileSizeText(2)]).toEqual(["1 byte", "2 bytes"])
   })
 
   it.each([
     ["the origin of read", ORIGIN],
-    ["another origin", "http://localhost:3000/api/plateforme/files"],
-    ["no origin", "/api/plateforme/files"],
+    ["another origin", "http://localhost:3000/api/platform/files"],
+    ["no origin", "/api/platform/files"],
   ])("should read both forms back from %s, identical", (_name, route) => {
     expect(blocksOf(renderBlocks([plan, report], { fileRoute: route }))).toEqual([plan, report])
   })
 
   it("should take the uuid in lower case, give a hand-written label provisional metadata, and keep an ordinary link as a paragraph", () => {
     expect(blocksOf(`![](${ORIGIN}/${IMAGE.toUpperCase()})`)).toEqual([{ type: "image", text: null, data: { file_id: IMAGE, alt: "" } }])
-    expect(blocksOf(`[le rapport](/api/plateforme/files/${FILE})`)).toEqual([
+    expect(blocksOf(`[le rapport](/api/platform/files/${FILE})`)).toEqual([
       { type: "file", text: null, data: { file_id: FILE, name: "le rapport", size: 1, mime: "application/octet-stream" } },
     ])
-    for (const text of [`[x](https://acme.oto.test/api/plateforme/public/jeton/files/${FILE})`, "[x](https://example.com/rapport.pdf)", `[x](/api/plateforme/files/${FILE}/html)`]) {
+    for (const text of [`[x](https://acme.oto.test/api/platform/public/jeton/files/${FILE})`, "[x](https://example.com/rapport.pdf)", `[x](/api/platform/files/${FILE}/html)`]) {
       expect(blocksOf(text)).toEqual([{ type: "paragraph", text, data: {} }])
     }
   })
 
   it("should read a hostile line of brackets in linear time", () => {
-    const line = `[${"](".repeat(Math.floor((PAGE_MAX - 60) / 2))}](/api/plateforme/files/${FILE})`
+    const line = `[${"](".repeat(Math.floor((PAGE_MAX - 60) / 2))}](/api/platform/files/${FILE})`
     const start = performance.now()
     const blocks = blocksOf(line)
     expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)

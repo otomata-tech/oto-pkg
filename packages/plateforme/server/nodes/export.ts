@@ -1,4 +1,4 @@
-// `GET /api/plateforme/nodes/export?path=` (E10-S01, AC-a5) : le `.md` d'une page, d'une procédure ou d'un
+// `GET /api/platform/nodes/export?path=` (E10-S01, AC-a5) : le `.md` d'une page, d'une procédure ou d'un
 // Contexte publiés, pour « Télécharger en .md » du rail. La lecture est exigée avant toute requête sur les blocs
 // (`findNode`, niveau d'`access.ts`) ; le fichier est composé par `pageMarkdown` (`schemas/blocks-render.ts`, que
 // l'écran lit aussi), sans références de blocs. Sans lui, une page ne sort de la plateforme que copiée à la main.

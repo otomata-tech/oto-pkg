@@ -71,7 +71,7 @@ type EcranDeNoeudProps = {
   /** Le `handle` de la personne (son profil) : son espace `private/<handle>` n'est pas un maillon du fil. */
   handle: string | null
   nomOrganisation: string
-  /** `?version=publiee` : un rédacteur lit la version publiée, sans éditeur (AC9). */
+  /** `?version=published` : un rédacteur lit la version publiée, sans éditeur (AC9). */
   versionPubliee: boolean
   Lien: LienDeLHote
   hrefDuChemin: (chemin: string) => string
@@ -241,7 +241,7 @@ function Introuvable({ Lien, hrefDuChemin }: Pick<EcranDeNoeudProps, "Lien" | "h
 
 export function EcranDeNoeud(props: EcranDeNoeudProps) {
   const { chemin, noeud, versionPubliee, Lien, hrefDuChemin } = props
-  const ici = `${hrefDuChemin(chemin)}${versionPubliee ? "?version=publiee" : ""}`
+  const ici = `${hrefDuChemin(chemin)}${versionPubliee ? "?version=published" : ""}`
   if (noeud.error !== undefined) return <EchecDuNoeud message={noeud.error} ici={ici} Lien={Lien} />
   if (noeud.data === null) return <Introuvable Lien={Lien} hrefDuChemin={hrefDuChemin} />
   const { fichierVu } = props

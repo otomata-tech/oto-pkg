@@ -76,7 +76,7 @@ afterEach(() => {
 describe("FaviconDuTheme", () => {
   it("should paint the square in the primary of the page's .oto root, not of a theme swatch inside it, and the mark in its ink", () => {
     // Une pastille de thème dans la racine, `.oto` imbriquée comme celles du formulaire de marque
-    // (`/admin/marque`) : lue à la place de la racine, elle peindrait l'onglet en Forêt.
+    // (l'écran de la marque) : lue à la place de la racine, elle peindrait l'onglet en Forêt.
     const pastille = document.createElement("span")
     pastille.className = "oto"
     pastille.dataset.otoTheme = "foret"

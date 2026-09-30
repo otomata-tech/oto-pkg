@@ -90,7 +90,7 @@ d'invitation, texte MCP). Plus une garde machine qui refuse un retour du frança
 | Nœud | `version=publiee` | `version=published` |
 | Organisation | `enregistre=1` | `saved=1` |
 | Consentement | `erreur=decision` | `error=decision` |
-| Ancres | `nouveautes`, `contenus`, `contexte-tout-le-monde`, `contexte-prive`, `contexte-<slug>`, `partie-<n>` | `news`, `recent-content`, `context-everyone`, `context-private`, `context-<slug>`, `part-<n>` (`procedures` inchangée) |
+| Ancres | `nouveautes`, `contenus`, `contexte-tout-le-monde`, `contexte-prive`, `contexte-<slug>`, `partie-<n>` | `news`, `recent-content`, `everyone-context`, `private-context`, `context-<slug>`, `part-<n>` (`procedures` inchangée) |
 
 ## Critères d'acceptation
 
@@ -418,9 +418,26 @@ Gestes réservés au responsable d'Oto :
 ## Post-implémentation
 
 ### Écarts avec l'architecture
+Aucun écart avec `docs/architecture.md` : la règle y entre comme invariant (§ 8, ADR-020). Écarts avec la story :
+- **Garde étendue** (HN-E11S07-14) : elle refuse aussi les routes retirées (`/admin/acces`, `/admin/marque`,
+  `/admin/drapeaux`) et les autres formes d'un paramètre : `URLSearchParams` (`set`, `append`, objet passé),
+  champ `name=` et prop `nom=` ; elle ne contrôle pas les opérations écrites dans la valeur de `f=`.
+- **Étiquettes de log renommées** : l'étiquette passée à `getPlatformIdentitySafely` suit la route
+  (`admin/organization`…).
+- **Texte MCP de la corbeille** : la phrase de `node.trash` (récapitulatif et résultat) renvoie à
+  `<origine>/trash`, comme le refus `not_enabled` à `<origine>/admin/connectors` (AC-a4).
+- **Ancres fixes** `everyone-context` et `private-context`, au lieu de `context-everyone` et
+  `context-private` de la correspondance : un slug d'équipe (`context-<slug>`) ne peut pas les produire
+  (HN-E11S07-13).
 
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
 |----------------------|------|-------|
+| PLATFORM_API_PREFIX | `packages/plateforme/schemas/api.ts` | Préfixe de l'API des écrans (`/api/platform/`), réexporté par `./schemas`, lu par la porte, le client et les routes de fichiers (HN-E11S07-10) |
+| CHAMP_DE_L_OPERATION, OperationSaisie | `packages/plateforme/ui/tableau/adresse.ts` | Opération → champ du formulaire « Filtrer », `min`/`max` pour `gte`/`lte` |
 
 ### Notes
+- Documents : ADR-020 ; ADR-012, ADR-016, ADR-017, ADR-018, `docs/architecture.md`, `hypotheses.md`
+  (section E11-S07, N7 d'E08-S09 remplacée), `fiche-decisions.md` (D11, D146), `seo-patterns.md § Règles SEO`
+  et sa fiche, `CHANGELOG.md` du paquet (`## Unreleased`).
+- Actions JB : `.method/sprint/status.md § Actions réservées à JB`, ligne « Après la fusion d'E11-S07 ».

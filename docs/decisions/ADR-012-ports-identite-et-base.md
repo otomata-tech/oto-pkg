@@ -95,7 +95,7 @@ absente de Scaleway (`moddatetime`).
    (`org:export`) et les réglages d'un projet (`auth:settings`, `data-api:close`). Règles et
    commandes de contrôle : `.method/conventions/supabase-patterns.md § Couplage à Supabase`. Aucune
    API REST complète : sans consommateur nommé, le MCP reste la porte HTTP du paquet vers les
-   assistants, et `/api/plateforme/*` celle des écrans.
+   assistants, et `/api/platform/*` celle des écrans.
 
 ## Conséquences
 

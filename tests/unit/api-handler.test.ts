@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
+import { PLATFORM_API_PREFIX } from "@otomata_tech/oto_platform/schemas"
 import { PlatformError, type Identity } from "@otomata_tech/oto_platform/server"
 import type { VerifyToken } from "../../packages/plateforme/mcp/auth"
 import { resolveIdentity } from "../../packages/plateforme/server/identity"
@@ -50,7 +51,7 @@ const TEAM_ID = "0e8e5a3c-7f10-4a5b-8d3b-2b1c4d5e6f70"
 type Task = () => Promise<void>
 
 function request(method: string, path: string, init: { body?: string; headers?: Record<string, string> } = {}) {
-  return new Request(`https://${HOST}/api/plateforme/${path}`, {
+  return new Request(`https://${HOST}/api/platform/${path}`, {
     method,
     body: init.body,
     headers: { "x-forwarded-proto": "https", origin: ORIGIN, "user-agent": "api-test", ...init.headers },
@@ -91,7 +92,7 @@ describe("handlePlateforme gate", () => {
   })
 
   it("should refuse a mutation without an Origin header", async () => {
-    const req = new Request(`https://${HOST}/api/plateforme/invitations/${INVITATION_ID}`, { method: "DELETE" })
+    const req = new Request(`https://${HOST}/api/platform/invitations/${INVITATION_ID}`, { method: "DELETE" })
     const { response } = await call(req)
     expect(response.status).toBe(403)
   })
@@ -102,6 +103,14 @@ describe("handlePlateforme gate", () => {
     expect(unknown.body.error.code).toBe("not_found")
     const tooDeep = await call(request("GET", "invitations/a/b"))
     expect(tooDeep.response.status).toBe(404)
+  })
+
+  it("should answer 404 not_found under the former French prefix, reading nothing (E11-S07, AC-a3)", async () => {
+    const ancien = PLATFORM_API_PREFIX.replace("platform", "plateforme")
+    const { response, body } = await call(new Request(`https://${HOST}${ancien}invitations`, { headers: { origin: ORIGIN } }))
+    expect(response.status).toBe(404)
+    expect(body.error.code).toBe("not_found")
+    expect(listInvitations).not.toHaveBeenCalled()
   })
 
   it("should answer 400 invalid_arguments for a body that is not JSON", async () => {
@@ -162,7 +171,7 @@ describe("handlePlateforme routes", () => {
     expect(response.status).toBe(201)
     expect(body).toEqual({ data: created })
     expect(inviteMember).toHaveBeenCalledWith(expect.anything(), IDENTITY, { email: "a@x.test" }, {
-      redirectTo: `${ORIGIN}/auth/confirmer?next=/`,
+      redirectTo: `${ORIGIN}/auth/confirm?next=/`,
     })
   })
 

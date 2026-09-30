@@ -68,7 +68,7 @@ describe.skipIf(!sqlConfigured)(portable("local sessions (E11-S14)"), () => {
       personId = person.id
       await local.addMember(org.id, person.id, { role: "admin" })
       const { accessToken } = await local.sessionFor(person)
-      const invitations = () => new Request(`https://${host}/api/plateforme/invitations`, { headers: { "x-forwarded-proto": "https" } })
+      const invitations = () => new Request(`https://${host}/api/platform/invitations`, { headers: { "x-forwarded-proto": "https" } })
 
       const served = await handlePlateforme(invitations(), { accessToken, host, verifyToken: local.verifyToken })
 

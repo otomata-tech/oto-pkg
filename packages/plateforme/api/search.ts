@@ -1,4 +1,4 @@
-// Ressource `search` de l'API du paquet (E05-S09, AC-a7) : `GET /api/plateforme/search?q=` sert à la
+// Ressource `search` de l'API du paquet (E05-S09, AC-a7) : `GET /api/platform/search?q=` sert à la
 // palette du rail (⌘K) les nœuds que la personne lit, trouvés dans leur titre, leur résumé ou leur
 // contenu publié, par le service de l'outil `find` (même recherche, architecture § 5 : « MCP,
 // écrans »). Adaptateur mince : la recherche et le filtre de niveau sont dans `server/find.ts` ; sans

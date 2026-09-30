@@ -12,7 +12,7 @@ const PUBLIC_ROUTES = [
   "/reset-password",
   "/auth/callback",
   // Lien de l'email d'invitation ou de connexion : la personne n'a pas encore de session (E02-S01).
-  "/auth/confirmer",
+  "/auth/confirm",
   // Connexion, retour et déconnexion chez l'émetteur OIDC de l'hôte (E01-S11 b).
   "/auth/oidc",
   "/design-system",

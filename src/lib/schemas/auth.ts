@@ -58,7 +58,7 @@ export const magicLinkSchema = z.object({
   redirect: redirectField,
 })
 
-// Champs cachés de la page `/auth/confirmer` : le jeton du lien de l'email (`{{ .TokenHash }}`)
+// Champs cachés de la page `/auth/confirm` : le jeton du lien de l'email (`{{ .TokenHash }}`)
 // n'est vérifié qu'au clic sur « Continuer » (fiche D11).
 export const confirmerLienSchema = z.object({
   token_hash: z.string().min(1).max(512),

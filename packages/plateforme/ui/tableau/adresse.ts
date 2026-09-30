@@ -1,5 +1,5 @@
 // Les réglages de la grille dans l'adresse de l'hôte (E07-S03, AC4 à AC7 ; H95, H96, HN-E07S03-4) :
-// fonctions pures. `reglagesDepuisLAdresse` lit `q`, `tri`, `f` et `n` contre l'en-tête du tableau
+// fonctions pures. `reglagesDepuisLAdresse` lit `q`, `sort`, `f` et `n` contre l'en-tête du tableau
 // (un réglage illisible est écarté, et l'écran le dit), traduit les clauses dans la grammaire de H95,
 // et reconnaît les champs d'un formulaire « Filtrer », que la page réécrit en `f` ; `adresseDesReglages`
 // écrit des réglages dans l'adresse. Sans lui, la page et la grille liraient chacune l'adresse, et un
@@ -11,8 +11,11 @@
 import { GRID_PAGE_ROWS, GRID_ROWS_MAX, GRID_SEARCH_MAX, MAX_FILTER_CLAUSES, tableScreenParamsSchema, type TableColumn, type TableHeader } from "../../schemas"
 import { isValidDate } from "../../schemas/tables"
 
-/** Les opérations d'une clause de l'adresse (HN-E07S03-4). */
-export type Operation = "contient" | "egal" | "min" | "max" | "vide" | "rempli"
+/** Les opérations d'une clause de l'adresse, les opérateurs de H95 (HN-E07S03-4 ; noms anglais, E11-S07). */
+export type Operation = "contains" | "eq" | "gte" | "lte" | "empty" | "not_empty"
+
+/** Une opération à valeur saisie : toutes sauf la présence (`empty`, `not_empty`). */
+export type OperationSaisie = Exclude<Operation, "empty" | "not_empty">
 
 /** Une clause de filtre telle que l'adresse la porte : `f=<colonne>:<opération>:<valeur>`. */
 export type Clause = { colonne: string; operation: Operation; valeur: string }
@@ -37,9 +40,9 @@ export type ReglagesLus = Reglages & {
 /** Les paramètres de l'adresse, comme la page de l'hôte les reçoit. */
 export type Parametres = Readonly<Record<string, string | readonly string[] | undefined>>
 
-const TEXTE: readonly Operation[] = ["contient", "vide", "rempli"]
-const CHOIX: readonly Operation[] = ["egal", "vide", "rempli"]
-const BORNES: readonly Operation[] = ["min", "max", "vide", "rempli"]
+const TEXTE: readonly Operation[] = ["contains", "empty", "not_empty"]
+const CHOIX: readonly Operation[] = ["eq", "empty", "not_empty"]
+const BORNES: readonly Operation[] = ["gte", "lte", "empty", "not_empty"]
 
 /** Les opérations de chaque type (AC6). */
 const PAR_TYPE: Record<TableColumn["type"], readonly Operation[]> = {
@@ -53,8 +56,14 @@ const PAR_TYPE: Record<TableColumn["type"], readonly Operation[]> = {
   datetime: BORNES,
 }
 
-/** L'opérateur de H95 de chaque opération (AC6). */
-const OPERATEURS: Record<Operation, string> = { contient: "contains", egal: "eq", min: "gte", max: "lte", vide: "empty", rempli: "not_empty" }
+/**
+ * Le champ du formulaire « Filtrer » de chaque opération saisie (E11-S07) : les bornes gardent `min` et `max`,
+ * les autres le nom de l'opération. Sans lui, le formulaire et sa lecture écriraient chacun ce nom.
+ */
+export const CHAMP_DE_L_OPERATION: Record<OperationSaisie, string> = { contains: "contains", eq: "eq", gte: "min", lte: "max" }
+
+/** Les opérations qui prennent une valeur saisie, dans l'ordre des champs du formulaire. */
+const SAISIES: readonly OperationSaisie[] = ["contains", "eq", "gte", "lte"]
 
 /** Les opérations d'une colonne (AC6) : celles que l'adresse accepte, et les champs de son repli « Filtrer ». */
 export function operationsDe(colonne: TableColumn): readonly Operation[] {
@@ -109,13 +118,13 @@ function borne(colonne: TableColumn, valeur: string): number | string | null {
 /** La valeur de H95 d'une clause, contrôlée contre le type de la colonne (AC6) ; `null` : clause illisible. */
 function valeurDeH95(colonne: TableColumn, clause: Clause): string | number | boolean | null {
   switch (clause.operation) {
-    case "vide":
-    case "rempli":
+    case "empty":
+    case "not_empty":
       return true
-    case "contient":
+    case "contains":
       return clause.valeur.trim() === "" ? null : clause.valeur.trim()
-    case "egal":
-      if (colonne.type === "bool") return clause.valeur === "oui" ? true : clause.valeur === "non" ? false : null
+    case "eq":
+      if (colonne.type === "bool") return clause.valeur === "true" ? true : clause.valeur === "false" ? false : null
       return (colonne.options ?? []).includes(clause.valeur) ? clause.valeur : null
     default:
       return borne(colonne, clause.valeur)
@@ -132,7 +141,7 @@ function clauseLue(entree: string, entete: TableHeader): Clause | null {
   const declaree = entete.columns.find((candidate) => candidate.name === colonne)
   const permise = declaree ? operationsDe(declaree).find((candidate) => candidate === operation) : undefined
   if (!declaree || !permise) return null
-  const clause = { colonne, operation: permise, valeur: permise === "vide" || permise === "rempli" ? "" : valeur }
+  const clause = { colonne, operation: permise, valeur: permise === "empty" || permise === "not_empty" ? "" : valeur }
   return valeurDeH95(declaree, clause) === null ? null : clause
 }
 
@@ -152,26 +161,23 @@ function clausesLues(entrees: readonly string[], entete: TableHeader): { clauses
 
 function triLu(valeur: string | undefined, entete: TableHeader): { tri: Tri | null; ignores: boolean } {
   if (valeur === undefined || valeur === "") return { tri: null, ignores: false }
-  const format = tableScreenParamsSchema.shape.tri.safeParse(valeur)
+  const format = tableScreenParamsSchema.shape.sort.safeParse(valeur)
   const colonne = valeur.startsWith("-") ? valeur.slice(1) : valeur
   if (!format.success || !entete.columns.some((une) => une.name === colonne)) return { tri: null, ignores: true }
   return { tri: { colonne, sens: valeur.startsWith("-") ? "desc" : "asc" }, ignores: false }
 }
 
 /**
- * Les champs d'un formulaire « Filtrer » (`colonne`, puis `contient`, `egal`, `min`, `max` et `presence`
- * : `vide` ou `rempli`) en clauses de cette colonne ; un champ vide ne pose rien.
+ * Les champs d'un formulaire « Filtrer » (`column`, puis `contains`, `eq`, `min`, `max` et `presence`
+ * : `empty` ou `not_empty`) en clauses de cette colonne ; un champ vide ne pose rien.
  */
 function clausesDuFormulaire(parametres: Parametres, colonne: TableColumn): { clauses: Clause[]; ignores: boolean } {
   const presence = premier(parametres.presence) ?? ""
-  const champs: [Operation, string][] = [
-    ["contient", premier(parametres.contient) ?? ""],
-    ["egal", premier(parametres.egal) ?? ""],
-    ["min", premier(parametres.min) ?? ""],
-    ["max", premier(parametres.max) ?? ""],
-  ]
-  const saisies: Clause[] = champs.flatMap(([operation, valeur]) => (valeur.trim() === "" ? [] : [{ colonne: colonne.name, operation, valeur: valeur.trim() }]))
-  const presences: Clause[] = presence === "vide" || presence === "rempli" ? [{ colonne: colonne.name, operation: presence, valeur: "" }] : []
+  const saisies: Clause[] = SAISIES.flatMap((operation) => {
+    const valeur = premier(parametres[CHAMP_DE_L_OPERATION[operation]]) ?? ""
+    return valeur.trim() === "" ? [] : [{ colonne: colonne.name, operation, valeur: valeur.trim() }]
+  })
+  const presences: Clause[] = presence === "empty" || presence === "not_empty" ? [{ colonne: colonne.name, operation: presence, valeur: "" }] : []
   const permises = operationsDe(colonne)
   const clauses = [...saisies, ...presences].filter((clause) => permises.includes(clause.operation) && valeurDeH95(colonne, clause) !== null)
   return { clauses, ignores: clauses.length < saisies.length + presences.length || (presence !== "" && presences.length === 0) }
@@ -184,13 +190,13 @@ function filtreDesClauses(clauses: readonly Clause[], entete: TableHeader): Filt
   for (const clause of clauses) {
     const colonne = entete.columns.find((une) => une.name === clause.colonne)
     const valeur = colonne ? valeurDeH95(colonne, clause) : null
-    if (colonne && valeur !== null) filtre[clause.colonne] = { ...filtre[clause.colonne], [OPERATEURS[clause.operation]]: valeur }
+    if (colonne && valeur !== null) filtre[clause.colonne] = { ...filtre[clause.colonne], [clause.operation]: valeur }
   }
   return filtre
 }
 
 /**
- * Les réglages de la grille lus dans l'adresse (AC4 à AC7) : `q` (100 caractères), `tri`, les clauses
+ * Les réglages de la grille lus dans l'adresse (AC4 à AC7) : `q` (100 caractères), `sort`, les clauses
  * de `f` et `n` (20 à 200) ; une colonne inconnue, une opération qu'un type ne prend pas, une valeur
  * mal typée ou une trente et unième clause sont écartées, et `ignores` le dit. Les champs d'un
  * formulaire « Filtrer » remplacent les clauses de leur colonne ; `aReecrire` demande la redirection.
@@ -198,12 +204,12 @@ function filtreDesClauses(clauses: readonly Clause[], entete: TableHeader): Filt
 export function reglagesDepuisLAdresse(parametres: Parametres, entete: TableHeader): ReglagesLus {
   const brut = premier(parametres.q)
   const q = brut === undefined ? { success: true as const, data: undefined } : tableScreenParamsSchema.shape.q.safeParse(brut)
-  const tri = triLu(premier(parametres.tri), entete)
+  const tri = triLu(premier(parametres.sort), entete)
   const lues = clausesLues(tous(parametres.f), entete)
   const n = tableScreenParamsSchema.shape.n.parse(premier(parametres.n))
   let clauses = lues.clauses
   let ignores = !q.success || tri.ignores || lues.ignores
-  const nomDuFormulaire = premier(parametres.colonne)
+  const nomDuFormulaire = premier(parametres.column)
   if (nomDuFormulaire !== undefined) {
     const colonne = entete.columns.find((une) => une.name === nomDuFormulaire)
     const formulaire = colonne ? clausesDuFormulaire(parametres, colonne) : { clauses: [], ignores: true }
@@ -215,11 +221,11 @@ export function reglagesDepuisLAdresse(parametres: Parametres, entete: TableHead
   return { q: texte === "" ? null : texte, tri: tri.tri, clauses, n, filtre: filtreDesClauses(clauses, entete), ignores, aReecrire: nomDuFormulaire !== undefined }
 }
 
-/** Les réglages écrits dans l'adresse, sans `?` : `q`, `tri`, `f` répété, `n` hors défaut ; `""` sans réglage. */
+/** Les réglages écrits dans l'adresse, sans `?` : `q`, `sort`, `f` répété, `n` hors défaut ; `""` sans réglage. */
 export function adresseDesReglages(reglages: Reglages): string {
   const recherche = new URLSearchParams()
   if (reglages.q) recherche.set("q", reglages.q)
-  if (reglages.tri) recherche.set("tri", `${reglages.tri.sens === "desc" ? "-" : ""}${reglages.tri.colonne}`)
+  if (reglages.tri) recherche.set("sort", `${reglages.tri.sens === "desc" ? "-" : ""}${reglages.tri.colonne}`)
   for (const clause of reglages.clauses) recherche.append("f", `${clause.colonne}:${clause.operation}:${clause.valeur}`)
   if (reglages.n !== GRID_PAGE_ROWS) recherche.set("n", String(reglages.n))
   return recherche.toString()

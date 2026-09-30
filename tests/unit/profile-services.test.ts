@@ -1,7 +1,7 @@
 // @vitest-environment node
 // La fiche que la personne écrit (E05-S04, AC13 ; H31, P39, HN-E05S04-12) sur une vraie base (E01-S10, lot
 // t1-e1) : `updateProfile` et `update_my_profile` (E01-S06 AC33) sur la ligne `members` de Léa dans O
-// (`seedReferenceOrg`), relue par la connexion d'administration ; puis `PATCH /api/plateforme/profile` par
+// (`seedReferenceOrg`), relue par la connexion d'administration ; puis `PATCH /api/platform/profile` par
 // la porte entière (`handlePlateforme`), identité résolue par l'adresse de O, ligne de journal relue. Les
 // bornes de la fonction sont prouvées sur le projet par `tests/integration/profil.test.ts` ; le schéma du
 // service ayant les mêmes, le refus `22023` de la base est rendu par l'espion (`spyDb`, option `fail`).
@@ -48,7 +48,7 @@ describe.skipIf(!sqlConfigured)(portable(SUITE), { timeout: NETWORK_TIMEOUT }, (
       .profile
 
   function patch(body: unknown) {
-    return new Request(`https://${ref.org.host}/api/plateforme/profile`, {
+    return new Request(`https://${ref.org.host}/api/platform/profile`, {
       method: "PATCH",
       body: JSON.stringify(body),
       headers: { "x-forwarded-proto": "https", origin: `https://${ref.org.host}`, "content-type": "application/json" },
@@ -132,7 +132,7 @@ describe.skipIf(!sqlConfigured)(portable(SUITE), { timeout: NETWORK_TIMEOUT }, (
     })
   })
 
-  describe("PATCH /api/plateforme/profile (AC13)", () => {
+  describe("PATCH /api/platform/profile (AC13)", () => {
     it("should answer 401 without a session and 400 to a field the person does not write, writing nothing", async () => {
       const { db, sent } = spyDb(lea)
       base.db = db

@@ -1,6 +1,6 @@
 // @vitest-environment node
 // État de la cellule (E08-S04) sans base : présence des variables (AC10), version du paquet, et
-// `GET /api/plateforme/cell` servi sans identité par l'adresse (AC12), `cellStatus` posé par le test.
+// `GET /api/platform/cell` servi sans identité par l'adresse (AC12), `cellStatus` posé par le test.
 // `cellStatus` lui-même (AC8, AC9, AC11) tourne sur une base réelle depuis la partie e2 d'E01-S10
 // (`tests/integration/cell-status.test.ts`) ; `applied_migrations` dans `tests/integration/role-plateforme.test.ts`.
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -78,11 +78,11 @@ describe("packageVersion", () => {
   })
 })
 
-describe("GET /api/plateforme/cell (AC12)", () => {
+describe("GET /api/platform/cell (AC12)", () => {
   const NOWHERE = "nowhere.example.invalid"
 
   function request(method = "GET", path = "cell") {
-    return new Request(`https://${NOWHERE}/api/plateforme/${path}`, {
+    return new Request(`https://${NOWHERE}/api/platform/${path}`, {
       method,
       headers: { "x-forwarded-proto": "https", origin: `https://${NOWHERE}` },
     })

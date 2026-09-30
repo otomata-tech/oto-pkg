@@ -37,7 +37,7 @@ export type EcranOrganisationProps = {
    * « La couleur », écrits par `PATCH brand` (E05-S11, AC-22) ; sans elle, l'initiale du nom et aucun de ces îlots.
    */
   marque?: MarqueDOrganisation
-  /** La page revient d'un enregistrement de la marque (`?enregistre=1` de l'hôte). */
+  /** La page revient d'un enregistrement de la marque (`?saved=1` de l'hôte). */
   enregistre?: boolean
   /** Le fil de l'en-tête : les adresses que l'hôte donne au rail et le droit de la personne ; sans lui, pas de fil. */
   fil?: FilDeLEcran

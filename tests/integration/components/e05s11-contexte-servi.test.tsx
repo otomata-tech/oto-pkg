@@ -2,7 +2,7 @@
 // `context` servirait, empilées dans l'ordre, chacune nommée et à son ancre (sans chiffres depuis E05-S13) ; un Contexte que la personne peut écrire (niveau décidé par le service, lu par la page) s'y écrit en
 // place avec l'éditeur d'une page, les autres se lisent ; les échecs se disent. E11-S10 (lot f) : ni tête servie, ni
 // lien vers Profil, ni « Règles Oto » ; une partie sans corps le dit ; « Nouveautés » toujours là ; l'ancre suivie.
-// `fetch` simulé pour `POST /api/plateforme/nodes`, relecture espionnée.
+// `fetch` simulé pour `POST /api/platform/nodes`, relecture espionnée.
 import type { ReactNode } from "react"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -93,10 +93,10 @@ describe("la vue « Contexte » (AC-13)", () => {
     const parties = screen.getAllByRole("region")
     // Sans « Règles Oto » (E11-S10, AC-f4) : les autres parties gardent leur ancre.
     expect(parties.map((une) => [une.getAttribute("aria-labelledby") ? within(une).getByRole("heading", { level: 2 }).textContent : une.getAttribute("aria-label"), une.id])).toEqual([
-      ["Contexte : Tout le monde", "contexte-tout-le-monde"],
-      ["Contexte : Privé", "contexte-prive"],
-      ["Contexte : équipe Ventes", "contexte-ventes"],
-      ["Nouveautés", "nouveautes"],
+      ["Contexte : Tout le monde", "everyone-context"],
+      ["Contexte : Privé", "private-context"],
+      ["Contexte : équipe Ventes", "context-ventes"],
+      ["Nouveautés", "news"],
       ["Fin du texte", ""],
     ])
     // E05-S13 (AC-13) : ni taille, ni état, ni note des versions, ni total.
@@ -197,15 +197,15 @@ describe("la vue « Contexte » allégée (E11-S10, lot f)", () => {
       ]),
     })
     expect(screen.getAllByRole("region").map((une) => [within(une).getByRole("heading", { level: 2 }).textContent, une.id])).toEqual([
-      ["Contexte : Tout le monde", "contexte-tout-le-monde"],
-      ["Nouveautés", "nouveautes"],
+      ["Contexte : Tout le monde", "everyone-context"],
+      ["Nouveautés", "news"],
       ["Procédures utiles", "procedures"],
     ])
     expect(partie("Nouveautés").getByText("Aucune nouveauté n'est servie à l'assistant en ce moment.")).toBeInTheDocument()
     cleanup()
 
     monter({ apercu: apercuDe([{ name: "news", texte: "Nouveau depuis hier." }]) })
-    expect(document.querySelectorAll("#nouveautes")).toHaveLength(1)
+    expect(document.querySelectorAll("#news")).toHaveLength(1)
     expect(screen.queryByText("Aucune nouveauté n'est servie à l'assistant en ce moment.")).toBeNull()
   })
 
@@ -216,13 +216,13 @@ describe("la vue « Contexte » allégée (E11-S10, lot f)", () => {
       amenes.push(this.id)
     })
     try {
-      window.history.replaceState(null, "", "#contexte-ventes")
+      window.history.replaceState(null, "", "#context-ventes")
       monter()
-      window.history.replaceState(null, "", "#nouveautes")
+      window.history.replaceState(null, "", "#news")
       act(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
-      window.history.replaceState(null, "", "#regles")
+      window.history.replaceState(null, "", "#rules")
       act(() => window.dispatchEvent(new HashChangeEvent("hashchange")))
-      expect(amenes).toEqual(["contexte-ventes", "nouveautes", "haut-de-la-vue"])
+      expect(amenes).toEqual(["context-ventes", "news", "haut-de-la-vue"])
       cleanup()
       window.dispatchEvent(new HashChangeEvent("hashchange"))
       expect(amenes).toHaveLength(3)

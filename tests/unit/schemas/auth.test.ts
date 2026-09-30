@@ -139,7 +139,7 @@ describe("redirect field of the sign-in schemas (E02-S02)", () => {
   })
 
   it("should carry the redirect of the magic link and of the provider buttons", () => {
-    expect(magicLinkSchema.safeParse({ email: "claire@acme.test", redirect: "/plateforme" }).data?.redirect).toBe("/plateforme")
-    expect(oauthSignInSchema.safeParse({ fournisseur: "google", redirect: "/plateforme" }).data?.redirect).toBe("/plateforme")
+    expect(magicLinkSchema.safeParse({ email: "claire@acme.test", redirect: "/platform" }).data?.redirect).toBe("/platform")
+    expect(oauthSignInSchema.safeParse({ fournisseur: "google", redirect: "/platform" }).data?.redirect).toBe("/platform")
   })
 })

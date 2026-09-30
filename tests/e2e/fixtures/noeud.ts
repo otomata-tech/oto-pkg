@@ -52,14 +52,14 @@ export async function capturer(page: Page, testInfo: TestInfo, nom: string): Pro
 type NoeudJetable = { chemin: string; titre: string; resume: string; genre?: "procedure" }
 
 /**
- * Crée un nœud jetable par `POST /api/plateforme/nodes` (E03-S03), depuis la page connectée : même origine,
+ * Crée un nœud jetable par `POST /api/platform/nodes` (E03-S03), depuis la page connectée : même origine,
  * même session, un premier paragraphe, publié. Un nœud qui existe déjà (ou dont c'est un ancien chemin) rend
  * `stale_revision`, faute de révision lue : il est gardé tel quel.
  */
 export async function assurerLeNoeud(page: Page, { chemin, titre, resume, genre }: NoeudJetable): Promise<void> {
   const issue = await page.evaluate(
     async (corps) => {
-      const reponse = await fetch("/api/plateforme/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+      const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
       const lu: { error?: { code?: string } } = await reponse.json()
       return reponse.ok ? "créée" : (lu.error?.code ?? String(reponse.status))
     },

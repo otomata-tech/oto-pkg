@@ -11,8 +11,8 @@ import type { MarqueDOrganisation } from "@otomata_tech/oto_platform/ui"
 import ForgotPasswordPage, { metadata as metadataMotDePasseOublie } from "@/app/(auth)/forgot-password/page"
 import LoginPage, { metadata as metadataConnexion } from "@/app/(auth)/login/page"
 import ResetPasswordPage, { metadata as metadataNouveauMotDePasse } from "@/app/(auth)/reset-password/page"
-import AucuneOrganisationPage, { metadata as metadataAucuneOrganisation } from "@/app/aucune-organisation/page"
-import ConfirmerPage, { metadata as metadataConfirmer } from "@/app/auth/confirmer/page"
+import AucuneOrganisationPage, { metadata as metadataAucuneOrganisation } from "@/app/no-organization/page"
+import ConfirmerPage, { metadata as metadataConfirmer } from "@/app/auth/confirm/page"
 import { metadata as metadataRacine } from "@/app/layout"
 import { forgotPasswordAction, loginAction, magicLinkAction, resetPasswordAction } from "@/lib/actions/auth"
 import { marqueDeLAdresse } from "@/lib/plateforme/marque-de-l-adresse"
@@ -106,7 +106,7 @@ const ECRANS: Ecran[] = [
     legende: "Se connecter",
   },
   {
-    chemin: "/auth/confirmer",
+    chemin: "/auth/confirm",
     page: () => ConfirmerPage({ searchParams: Promise.resolve({ token_hash: "h", type: "email", next: "/" }) }),
     titre: "Connexion",
     onglet: metadataConfirmer.title,
@@ -248,7 +248,7 @@ describe("/forgot-password and /reset-password (AC-d3 ; E05-S07, AC6, AC8)", () 
   })
 })
 
-describe("/auth/confirmer (E05-S07, AC9)", () => {
+describe("/auth/confirm (E05-S07, AC9)", () => {
   it("should still render the button without parameters (N27)", async () => {
     await rendre(await ConfirmerPage({ searchParams: Promise.resolve({}) }))
 
@@ -256,7 +256,7 @@ describe("/auth/confirmer (E05-S07, AC9)", () => {
   })
 })
 
-describe("/aucune-organisation on the template (E05-S07, AC10)", () => {
+describe("/no-organization on the template (E05-S07, AC10)", () => {
   const SESSION: PlatformSession = {
     user: { id: "user-1", email: "claire@acme.test" },
     accessToken: "session-token",

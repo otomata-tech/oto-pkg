@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Les deux lectures du rail (E05-S09, partie a) par la porte entière, `handlePlateforme` :
-// `GET /api/plateforme/nodes?path=` (la tête d'un nœud que « Renommer » lit, AC-a4) et
-// `GET /api/plateforme/search?q=` (la recherche de la palette, AC-a7, par le service de `find`), sur la base
+// `GET /api/platform/nodes?path=` (la tête d'un nœud que « Renommer » lit, AC-a4) et
+// `GET /api/platform/search?q=` (la recherche de la palette, AC-a7, par le service de `find`), sur la base
 // réelle (E01-S10, lots b1 et e1a : la lecture des nœuds et l'identité passent par la face SQL, que la base
 // simulée ne sert pas). Seuls le client et la vérification du jeton sont remplacés ; identité, droits et
 // services sont les vrais. En suite portable (`sqlConfigured`) : le projet, ou le Postgres nu du job `bare-postgres`.
@@ -36,7 +36,7 @@ afterEach(() => {
 type Caller = { host: string; id: string; email: string }
 
 async function lire(ressource: string, caller: Caller) {
-  const request = new Request(`https://${caller.host}/api/plateforme/${ressource}`, { method: "GET", headers: { "x-forwarded-proto": "https" } })
+  const request = new Request(`https://${caller.host}/api/platform/${ressource}`, { method: "GET", headers: { "x-forwarded-proto": "https" } })
   const verifyToken = async () => ({ token: gate.token, clientId: "", scopes: [], extra: { sub: caller.id, email: caller.email } })
   const response = await handlePlateforme(request, { accessToken: gate.token, host: caller.host, verifyToken })
   return { status: response.status, body: await response.json() }
@@ -68,7 +68,7 @@ async function lireSous(ressource: string, person: Person) {
   }
 }
 
-describe.skipIf(!sqlConfigured)(portable("GET /api/plateforme/nodes?path= (AC-a4)"), { timeout: NETWORK_TIMEOUT }, () => {
+describe.skipIf(!sqlConfigured)(portable("GET /api/platform/nodes?path= (AC-a4)"), { timeout: NETWORK_TIMEOUT }, () => {
   it("should serve the head of a node, its draft only to a writer, and answer an invisible, unknown or malformed path as the node page does", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {})
 
@@ -85,7 +85,7 @@ describe.skipIf(!sqlConfigured)(portable("GET /api/plateforme/nodes?path= (AC-a4
   })
 })
 
-describe.skipIf(!sqlConfigured)(portable("GET /api/plateforme/search?q= (AC-a7)"), { timeout: NETWORK_TIMEOUT }, () => {
+describe.skipIf(!sqlConfigured)(portable("GET /api/platform/search?q= (AC-a7)"), { timeout: NETWORK_TIMEOUT }, () => {
   it("should serve the nodes find reads, one snippet each and no function, and refuse a blank query", async () => {
     // Claire (membre) lit « Annonces » ; l'extrait est le fragment que `search_content` (E01-S13) tire du bloc,
     // terme en gras, sans le mot court de tête (ShortWord=2) et prolongé jusqu'à la fin du bloc.

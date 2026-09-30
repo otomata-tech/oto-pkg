@@ -36,12 +36,12 @@ export const GRID_SEARCH_MAX = 100
 
 /**
  * Les paramètres de la grille dans l'adresse (HN-E07S03-4), forme brute : `q` (100 caractères),
- * `tri` (`-` pour décroissant), `f` répété `<colonne>:<opération>:<valeur>` (30 au plus, H95), `n` de 20
+ * `sort` (`-` pour décroissant), `f` répété `<colonne>:<opération>:<valeur>` (30 au plus, opérateurs de H95), `n` de 20
  * à 200. La validation contre les colonnes est celle de `reglagesDepuisLAdresse` (`ui/tableau/adresse.ts`).
  */
 export const tableScreenParamsSchema = z.object({
   q: z.string().trim().max(GRID_SEARCH_MAX).optional(),
-  tri: z.string().max(80).optional(),
+  sort: z.string().max(80).optional(),
   f: z.array(z.string().max(300)).max(MAX_FILTER_CLAUSES).optional(),
   n: z.coerce.number().int().min(GRID_PAGE_ROWS).max(GRID_ROWS_MAX).catch(GRID_PAGE_ROWS),
 })

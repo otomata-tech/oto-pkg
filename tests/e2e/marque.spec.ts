@@ -7,7 +7,7 @@ import { seConnecterSurLEspace } from "./fixtures/noeud"
 
 // Contrôle visuel connecté de la marque (E09-S01, AC13), sur l'écran porté d'oto-frontend (E05-S09 partie d2 :
 // `settings.appearance.lazy.tsx`) : le compte E2E, administrateur de l'organisation de la campagne (`espace.ts`),
-// règle la marque dans « Organisation » (`/admin/organisation`, E05-S11 AC-22 ; `/admin/marque` y mène), en clair
+// règle la marque dans « Organisation » (`/admin/organization`, E05-S11 AC-22), en clair
 // puis en sombre, en cliquant la carte d'un thème ; le nom montré est celui de l'organisation, sans « Nom affiché »
 // (E05-S13, AC-3) ; captures de l'écran, de l'écran dans les huit thèmes (posés sur la racine `.oto`, sans écrire
 // la marque), et de `/login` (sans session) dans `test-results/`. La marque d'origine (`orgs.brand`), lue au début
@@ -35,7 +35,7 @@ type Marque = { theme: string; logo: string }
 async function ouvrirLEcran(browser: Browser, colorScheme: "light" | "dark"): Promise<Page> {
   const page = await browser.newPage({ colorScheme, viewport: { width: 1920, height: 1080 } })
   await seConnecterSurLEspace(page, { email, password })
-  await page.goto(`${ESPACE.adresse}/admin/organisation`)
+  await page.goto(`${ESPACE.adresse}/admin/organization`)
   await expect(page.getByRole("region", { name: "La couleur" })).toBeVisible()
   return page
 }
@@ -49,7 +49,7 @@ async function enregistrer(page: Page, marque: Marque): Promise<void> {
   await expect(page.getByLabel("Nom affiché")).toHaveCount(0)
   // Le bouton de la marque, au bout de « La couleur » : celui de « L'entreprise » enregistre le nom.
   await page.getByRole("region", { name: "La couleur" }).getByRole("button", { name: "Enregistrer" }).click()
-  await page.waitForURL(/\/admin\/organisation\?enregistre=1$/)
+  await page.waitForURL(/\/admin\/organization\?saved=1$/)
 }
 
 test.describe("marque de l'organisation", () => {

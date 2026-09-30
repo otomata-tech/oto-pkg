@@ -11,7 +11,7 @@ import { ADRESSES } from "../adresses"
 // HN-E05S13-7) : réservé au membre de l'équipe plateforme qui administre l'organisation de l'adresse
 // (`handlesFeedback`), décidé ici avant tout appel ; à tout autre, `notFound()` (l'administrateur du client ne
 // sait plus que l'écran existe) ; le service le redécide. L'écran change l'état d'un retour par
-// `PATCH /api/plateforme/feedback/<ticket>`, puis la page se relit.
+// `PATCH /api/platform/feedback/<ticket>`, puis la page se relit.
 export const metadata: Metadata = {
   title: "Retours des assistants",
   robots: { index: false },
@@ -21,18 +21,18 @@ const ECHEC = { error: "Une erreur est survenue. Réessayez." } as const
 
 /** L'adresse des retours pour ces paramètres ; un paramètre absent n'y est pas écrit. */
 function hrefDeFiltre(parametres: FeedbackListQuery): string {
-  const recherche = new URLSearchParams({ etat: parametres.etat, periode: String(parametres.periode) })
+  const recherche = new URLSearchParams({ state: parametres.state, period: String(parametres.period) })
   if (parametres.type) recherche.set("type", parametres.type)
-  if (parametres.curseur) recherche.set("curseur", parametres.curseur)
-  return `/admin/retours?${recherche}`
+  if (parametres.cursor) recherche.set("cursor", parametres.cursor)
+  return `/admin/feedback?${recherche}`
 }
 
 /** La conversation du ticket dans l'écran Journal (E05-S05). */
-const hrefDeConversation = (code: string, periode: UsagePeriod) => `/journal?conversation=${encodeURIComponent(code)}&periode=${periode}`
+const hrefDeConversation = (code: string, periode: UsagePeriod) => `/journal?conversation=${encodeURIComponent(code)}&period=${periode}`
 
 function lire(db: PlatformDb, identity: Identity, filtres: FeedbackListQuery): Promise<EcranRetoursProps["resultat"]> {
-  const state = filtres.etat === "all" ? undefined : filtres.etat
-  return resultatDe(listFeedback(db, identity, { state, type: filtres.type, days: filtres.periode, cursor: filtres.curseur }))
+  const state = filtres.state === "all" ? undefined : filtres.state
+  return resultatDe(listFeedback(db, identity, { state, type: filtres.type, days: filtres.period, cursor: filtres.cursor }))
 }
 
 export default async function RetoursPage({
@@ -42,9 +42,9 @@ export default async function RetoursPage({
 }) {
   // La session et l'appartenance se revérifient ici, hors de tout `try` : le layout n'est pas une
   // frontière (`nextjs-patterns.md § Un layout n'est JAMAIS une frontière d'autorisation`).
-  const identite = await getPlatformIdentitySafely("admin/retours")
+  const identite = await getPlatformIdentitySafely("admin/feedback")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   // Aucune valeur de l'adresse ne va brute à un service : une valeur inconnue retombe sur son défaut (AC9).
   const filtres = feedbackListQuerySchema.parse(await searchParams)
@@ -58,7 +58,7 @@ export default async function RetoursPage({
       hrefDeFiltre={hrefDeFiltre}
       hrefDeConversation={hrefDeConversation}
       // Les adresses du rail du staff, que le layout lui donne aussi : Retours y est, seul de « Suivi de l'entreprise ».
-      fil={{ adresses: { ...ADRESSES, retours: "/admin/retours" }, administre: identite !== null }}
+      fil={{ adresses: { ...ADRESSES, retours: "/admin/feedback" }, administre: identite !== null }}
     />
   )
 }

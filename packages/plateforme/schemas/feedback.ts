@@ -64,18 +64,18 @@ export type FeedbackStateChange = z.output<typeof feedbackStateChangeSchema>
 const FEEDBACK_FILTERS = ["to_handle", ...FEEDBACK_STATES, "all"] as const
 
 /**
- * Les paramètres de `/admin/retours` (AC9), noms français comme ceux de `/journal` (N7) : une valeur
+ * Les paramètres de `/admin/feedback` (AC9), en anglais comme ceux de `/journal` (E11-S07) : une valeur
  * absente ou illisible retombe sur son défaut, jamais passée brute à une requête.
  */
 export const feedbackListQuerySchema = z.object({
-  etat: z.enum(FEEDBACK_FILTERS).catch("to_handle"),
+  state: z.enum(FEEDBACK_FILTERS).catch("to_handle"),
   type: feedbackTypeSchema.optional().catch(undefined),
-  periode: journalPeriodSchema.catch(30),
-  curseur: z.string().min(1).max(200).optional().catch(undefined),
+  period: journalPeriodSchema.catch(30),
+  cursor: z.string().min(1).max(200).optional().catch(undefined),
 })
 
 export type FeedbackListQuery = z.output<typeof feedbackListQuerySchema>
-export type FeedbackFilter = FeedbackListQuery["etat"]
+export type FeedbackFilter = FeedbackListQuery["state"]
 
 /** Un ticket tel que l'écran et le MCP admin le lisent (E08-S09, champs anglais H05). */
 export type FeedbackTicketView = {

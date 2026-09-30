@@ -2,6 +2,7 @@ import { randomUUID } from "crypto"
 import { describe, expect, it } from "vitest"
 import {
   createTeamSchema,
+  equipesListesSchema,
   equipesSearchSchema,
   teamMemberSchema,
   teamRoleSchema,
@@ -71,18 +72,26 @@ describe("teamRoleSchema (E05-S13, AC-24)", () => {
   })
 })
 
-describe("equipesSearchSchema (AC1 ; E05-S13, AC-5)", () => {
+describe("equipesSearchSchema (AC1 ; E05-S13, AC-5 ; E11-S07, AC-b2)", () => {
   it("should read the two tabs", () => {
-    for (const onglet of ["membres", "equipes"]) {
-      expect(equipesSearchSchema.parse({ onglet }).onglet).toBe(onglet)
+    for (const tab of ["members", "teams"]) {
+      expect(equipesSearchSchema.parse({ tab }).tab).toBe(tab)
     }
   })
 
-  it("should fall back to membres for an unknown, removed, missing or repeated tab", () => {
-    expect(equipesSearchSchema.parse({ onglet: "reglages" }).onglet).toBe("membres")
-    expect(equipesSearchSchema.parse({ onglet: "regles" }).onglet).toBe("membres")
-    expect(equipesSearchSchema.parse({ onglet: "acces" }).onglet).toBe("membres")
-    expect(equipesSearchSchema.parse({}).onglet).toBe("membres")
-    expect(equipesSearchSchema.parse({ onglet: ["equipes", "membres"] }).onglet).toBe("membres")
+  it("should fall back to members for an unknown, removed, missing, repeated or former French tab", () => {
+    expect(equipesSearchSchema.parse({ tab: "reglages" }).tab).toBe("members")
+    expect(equipesSearchSchema.parse({ tab: "rules" }).tab).toBe("members")
+    expect(equipesSearchSchema.parse({ tab: "equipes" }).tab).toBe("members")
+    expect(equipesSearchSchema.parse({}).tab).toBe("members")
+    expect(equipesSearchSchema.parse({ tab: ["teams", "members"] }).tab).toBe("members")
+    expect(equipesSearchSchema.parse({ onglet: "teams" }).tab).toBe("members")
+  })
+})
+
+describe("equipesListesSchema (E05-S09 d1 ; E11-S07, AC-b2)", () => {
+  it("should read filter, sort and order under their English names, and ignore the former French ones", () => {
+    expect(equipesListesSchema.parse({ q: "a", filter: "invitations", sort: "people", order: "desc" })).toEqual({ q: "a", filter: "invitations", sort: "people", order: "desc" })
+    expect(equipesListesSchema.parse({ filtre: "invitations", tri: "personnes", sens: "desc" })).toEqual({ q: "", filter: undefined, sort: undefined, order: "asc" })
   })
 })

@@ -1,7 +1,7 @@
 // `table.import` et `importRows` (E10-S01, AC-b3 à AC-b5, AC-b7, AC-c1 ; fiches D100, D117, D120) : des lignes
 // lues d'un CSV, écrites dans un tableau existant, ou dans un tableau que l'import crée et publie. Un service, deux
 // portes (`mcp-patterns.md § 1`) : `table.import` derrière `call`, adaptateur fin en fin de fichier, et `POST
-// /api/plateforme/tables/import` (l'écran, un lot de 500 lignes par requête, et la conversion d'un tableau
+// /api/platform/tables/import` (l'écran, un lot de 500 lignes par requête, et la conversion d'un tableau
 // simple) ; E10-S05 l'appellera aussi. Les droits se décident avant toute requête sur les lignes : l'écriture du
 // parent pour une création, comme `writeNode` (écrire publie, fiche D135 ; l'en-tête est publié, D120),
 // l'écriture du tableau sinon ; puis tout le lot est contrôlé (`checkImport`, que l'écran a déjà joué), puis

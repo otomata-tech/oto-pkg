@@ -44,7 +44,7 @@ beforeEach(() => {
   fetchMock.mockReset()
   assign.mockReset()
   vi.stubGlobal("fetch", fetchMock)
-  vi.stubGlobal("location", { ...window.location, pathname: "/admin/marque", assign })
+  vi.stubGlobal("location", { ...window.location, pathname: "/admin/brand", assign })
 })
 
 afterEach(() => {
@@ -94,7 +94,7 @@ describe("EcranMarque for an administrator (AC6)", () => {
 
 describe("EcranMarque saving (AC7, AC8)", () => {
   // E05-S13 (AC-3) : l'envoi retire l'ancien nom affiché, que `readBrand` ne lit plus.
-  it("should send the whole brand to PATCH /api/plateforme/brand, the display name removed, then reload with ?enregistre=1", async () => {
+  it("should send the whole brand to PATCH /api/platform/brand, the display name removed, then reload with ?saved=1", async () => {
     const marque = { theme: "foret", logo_url: "https://example.com/logo.png", display_name: null }
     fetchMock.mockResolvedValue(reponse(200, { data: marque }))
     rendre({ ...DEMO, marque: { ...DEMO.marque, nomAffiche: "Démo Industrie" } })
@@ -103,9 +103,9 @@ describe("EcranMarque saving (AC7, AC8)", () => {
     fireEvent.change(champLogo(), { target: { value: "https://example.com/logo.png" } })
     enregistrer()
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith("/admin/marque?enregistre=1"))
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/admin/brand?saved=1"))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe("/api/plateforme/brand")
+    expect(url).toBe("/api/platform/brand")
     expect(init?.method).toBe("PATCH")
     expect(corpsEnvoye()).toEqual(marque)
   })
@@ -172,8 +172,8 @@ describe("EcranMarque refusals and failures (AC9, AC10)", () => {
     expect(screen.queryByRole("radio")).toBeNull()
     expect(screen.queryByRole("link", { name: "Réessayer" })).toBeNull()
 
-    vue.rerender(<EcranMarque resultat={echec} enregistre={false} Lien={({ children, ...props }) => <a {...props}>{children}</a>} ici="/admin/marque" />)
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/marque")
+    vue.rerender(<EcranMarque resultat={echec} enregistre={false} Lien={({ children, ...props }) => <a {...props}>{children}</a>} ici="/admin/brand" />)
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/brand")
   })
 })
 

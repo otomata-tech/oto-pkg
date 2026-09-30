@@ -19,7 +19,7 @@ export default async function DepotPage({ params }: { params: Promise<{ token: s
   const { token } = await params
   const identite = await getPlatformIdentitySafely("upload")
   if (identite?.error?.code === "unauthenticated") redirect("/login")
-  if (identite?.error) redirect("/aucune-organisation")
+  if (identite?.error) redirect("/no-organization")
 
   const resultat = identite ? await resultatDe(uploadForm(identite.data.session.db, identite.data.identity, token), REFUS_DU_DEPOT) : ECHEC
   return <EcranDeDepot resultat={resultat} jeton={token} />

@@ -11,15 +11,15 @@ import * as z from "zod/v4"
 const PEOPLE_SEARCH_MAX = 100
 
 /**
- * `q` : le nom ou l'adresse cherchés ; `filtre=invitations` : les invitations en attente seules ; `tri` : la
- * colonne triée du tableau des équipes (le nom par défaut) ; `sens` : croissant par défaut. Une valeur
- * illisible (trop longue, répétée, inconnue) retombe sur son défaut.
+ * `q` : le nom ou l'adresse cherchés ; `filter=invitations` : les invitations en attente seules ; `sort` : la
+ * colonne triée du tableau des équipes (le nom par défaut) ; `order` : croissant par défaut (noms anglais,
+ * E11-S07). Une valeur illisible (trop longue, répétée, inconnue) retombe sur son défaut.
  */
 export const equipesListesSchema = z.object({
   q: z.string().trim().max(PEOPLE_SEARCH_MAX).catch(""),
-  filtre: z.enum(["invitations"]).optional().catch(undefined),
-  tri: z.enum(["equipe", "personnes"]).optional().catch(undefined),
-  sens: z.enum(["asc", "desc"]).catch("asc"),
+  filter: z.enum(["invitations"]).optional().catch(undefined),
+  sort: z.enum(["team", "people"]).optional().catch(undefined),
+  order: z.enum(["asc", "desc"]).catch("asc"),
 })
 
 export type ReglagesDesListes = z.output<typeof equipesListesSchema>

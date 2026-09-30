@@ -23,24 +23,24 @@ export const JOURNAL_REQUEST_CHARS = 80
 export const journalPeriodSchema = z.coerce.number().pipe(z.union([z.literal(7), z.literal(30), z.literal(90)]))
 
 /**
- * Les paramètres de l'adresse, un schéma par paramètre : `curseur` pour la liste, `appels` pour les
- * appels d'une conversation ouverte (les deux se lisent ensemble, liste et panneau restent affichés).
+ * Les paramètres de l'adresse, en anglais (E11-S07), un schéma par paramètre : `cursor` pour la liste, `calls`
+ * pour les appels d'une conversation ouverte (les deux se lisent ensemble, liste et panneau restent affichés).
  */
 const PARAMS = {
-  periode: journalPeriodSchema,
-  equipe: z.uuid(),
-  personne: z.uuid(),
-  erreurs: z.literal("1"),
-  curseur: z.string().max(200),
+  period: journalPeriodSchema,
+  team: z.uuid(),
+  person: z.uuid(),
+  errors: z.literal("1"),
+  cursor: z.string().max(200),
   conversation: ctxCodeSchema,
-  appels: z.string().max(200),
+  calls: z.string().max(200),
 }
 
 export type JournalParam = keyof typeof PARAMS
 
 type ParamValue<K extends JournalParam> = z.output<(typeof PARAMS)[K]>
 
-/** Un paramètre lu : absent ou vide (« Toutes les équipes » envoie `equipe=`), il n'est pas posé. */
+/** Un paramètre lu : absent ou vide (« Toutes les équipes » envoie `team=`), il n'est pas posé. */
 function readParam<K extends JournalParam>(raw: Record<string, unknown>, key: K, ignored: JournalParam[]): ParamValue<K> | undefined {
   const value = raw[key]
   if (value === undefined || value === "") return undefined
@@ -59,13 +59,13 @@ function readParam<K extends JournalParam>(raw: Record<string, unknown>, key: K,
 export const journalFiltersSchema = z.record(z.string(), z.unknown()).transform((raw) => {
   const ignored: JournalParam[] = []
   return {
-    periode: readParam(raw, "periode", ignored) ?? 7,
-    equipe: readParam(raw, "equipe", ignored),
-    personne: readParam(raw, "personne", ignored),
-    erreurs: readParam(raw, "erreurs", ignored),
-    curseur: readParam(raw, "curseur", ignored),
+    period: readParam(raw, "period", ignored) ?? 7,
+    team: readParam(raw, "team", ignored),
+    person: readParam(raw, "person", ignored),
+    errors: readParam(raw, "errors", ignored),
+    cursor: readParam(raw, "cursor", ignored),
     conversation: readParam(raw, "conversation", ignored),
-    appels: readParam(raw, "appels", ignored),
+    calls: readParam(raw, "calls", ignored),
     ignored,
   }
 })

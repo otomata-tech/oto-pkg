@@ -152,7 +152,7 @@ describe("ReglesDuNoeud managing (AC17)", () => {
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Règle enregistrée."))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe("/api/plateforme/rules")
+    expect(url).toBe("/api/platform/rules")
     expect(init?.method).toBe("POST")
     expect(JSON.parse(String(init?.body))).toEqual({ path: "ventes/devis", subject: { kind: "team", id: VENTES }, level: "write" })
     expect(rafraichir).toHaveBeenCalledTimes(1)
@@ -225,7 +225,7 @@ describe("ReglesDuNoeud managing (AC17)", () => {
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe(`/api/plateforme/rules/${REGLE}`)
+    expect(url).toBe(`/api/platform/rules/${REGLE}`)
     expect(init?.method).toBe("DELETE")
     // La ligne part avec la relecture : le focus va au titre du panneau, qui reste (accessibility-patterns § Focus Management).
     await waitFor(() => expect(screen.getByRole("heading", { name: "Accès à Devis" })).toHaveFocus())

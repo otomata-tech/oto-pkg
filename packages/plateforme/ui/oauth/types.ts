@@ -25,5 +25,5 @@ export type DemandeDeConsentement = {
   organisation: OrganisationDeLaDemande
 }
 
-/** Échec de la décision précédente, que l'hôte lit dans son adresse (`?erreur=`) : `decisionErrorSchema`. */
+/** Échec de la décision précédente, que l'hôte lit dans son adresse (`?error=`) : `decisionErrorSchema`. */
 export type ErreurDeDecision = DecisionError

@@ -10,6 +10,14 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-30] — E11-S07 : adresses en anglais
+
+**Quoi :** E11-S07 : adresses en anglais (routes, préfixe `/api/platform`, paramètres, valeurs, ancres) sans alias ; garde `check:framework` des segments de route et des anciens noms (ADR-020). Préfixe de l'API des écrans lu d'une seule constante, `PLATFORM_API_PREFIX` ; `seo-patterns.md § Règles SEO` : la redirection permanente ne vaut que pour une page publique indexée, une page authentifiée ou `noindex` renommée répond 404.
+
+**Pourquoi :** consigne du responsable d'Oto, jamais de français dans une URL (fiche D132) ; sans client, aucun alias (fiche D131).
+
+**Fichiers :** `docs/decisions/ADR-020-adresses-en-anglais.md` (nouveau) ; ADR-012, ADR-016, ADR-017, ADR-018, `docs/architecture.md`, `hypotheses.md` (section E11-S07, N7 d'E08-S09 remplacée), `fiche-decisions.md` (D11, D146) ; conventions `seo`, `security`, `forms`, `accessibility`, `portage-ecrans`, registry ; `CLAUDE.md § Invariants techniques` ; `docs/mcp-golden-queries.md` ; `packages/plateforme/CHANGELOG.md` ; code : voir la story.
+
 ## [2026-09-30] — E10-S02 : fichiers et images, « Voir » isolé, `read {file}`, dépôt par lien ; E11-S14 (lot c) : isolation semée sans Supabase Auth
 
 **Quoi :**

@@ -12,7 +12,7 @@ sans étape de build, sous licence MIT.
 | `ui/` | `@otomata_tech/oto_platform/ui` | Écrans et composants, portés d'oto-frontend ; jamais `server/`, `migrations/`, client DB |
 | `schemas/` | `@otomata_tech/oto_platform/schemas` | Schémas Zod (`zod/v4`) partagés par toutes les faces, `ui/` compris ; Zod pur, aucune autre face ni client DB (frontière ESLint) |
 | `mcp/` | `@otomata_tech/oto_platform/mcp` | Six outils, ctx, routage, prompts ; instructions et descriptions statiques |
-| `api/` | `@otomata_tech/oto_platform/api` | Route handlers `/api/plateforme/*` : adaptateurs des services |
+| `api/` | `@otomata_tech/oto_platform/api` | Route handlers `/api/platform/*` : adaptateurs des services |
 | `server/` | `@otomata_tech/oto_platform/server` | Services : la seule porte d'écriture (Zod → droits → écriture → journal) |
 | `migrations/` | `@otomata_tech/oto_platform/migrations/*` | SQL du schéma `platform`, additif, copié par l'application hôte |
 | `cli/` | commande `oto-platform` | Copie et contrôle des migrations dans l'application hôte ; préparation d'une base (`db prepare`) |
@@ -92,7 +92,11 @@ Pour une application Next 15 (App Router) sur Supabase.
    [`otomata-tech/oto-pkg`](https://github.com/otomata-tech/oto-pkg), qui en est la
    référence. Les écrans s'y montent à l'un des trois niveaux de « Monter les écrans ».
 
-   Routes de `/api/plateforme/*` des gestes du rail et du partage public, servies par la même route
+   Toute adresse est en anglais (routes, paramètres, ancres), quelle que soit la langue de l'écran ; le
+   préfixe de l'API des écrans est `PLATFORM_API_PREFIX` (`/api/platform/`, `@otomata_tech/oto_platform/schemas`),
+   que la porte, le client des écrans et les liens de fichiers lisent : la route de l'hôte se monte sous lui.
+
+   Routes de `/api/platform/*` des gestes du rail et du partage public, servies par la même route
    de l'hôte :
    - `GET nodes/links?path=` : liens sortants et entrants d'un nœud (« Contenus liés »).
    - `GET nodes/impact?path=&new_path=` : qui gagne, perd ou change d'accès si le nœud se déplace.
@@ -139,7 +143,7 @@ Pour une application Next 15 (App Router) sur Supabase.
    - CORS du bucket : `PUT` et `GET` depuis l'origine de chaque adresse de l'application, en-tête
      `content-type` admis.
    - CSP de l'application, si elle en pose une : `img-src` et `connect-src` admettent l'origine du bucket.
-   - Routes de `/api/plateforme/*` : `GET files` (l'état du stockage) ; `POST files`
+   - Routes de `/api/platform/*` : `GET files` (l'état du stockage) ; `POST files`
      `{ node, name, mime, size }` (la demande d'envoi : droit d'écrire le nœud, type par l'extension du nom,
      50 Mo, 4 Mo pour `html`, `md`, `txt` et `csv`, 10 Go par organisation) ; `POST files/<id>/complete`
      `{}` (la confirmation, après l'envoi) ; `GET files/<id>[?disposition=inline]` (redirection 302 ;
@@ -153,16 +157,16 @@ Pour une application Next 15 (App Router) sur Supabase.
      `routeDesFichiers={publicFilesRoute(<jeton>)}`) à l'écran. Un fichier HTML s'y exécute dans une iframe
      `sandbox` sans `allow-same-origin`, chargée depuis la route isolée, qui pose elle-même sa CSP, `nosniff`,
      `Referrer-Policy: no-referrer` et `frame-ancestors 'self'`. L'hôte **exclut ces deux routes**
-     (`/api/plateforme/files/<id>/html` et `/api/plateforme/public/<jeton>/files/<id>/html`) de son
+     (`/api/platform/files/<id>/html` et `/api/platform/public/<jeton>/files/<id>/html`) de son
      `X-Frame-Options` et de sa `Referrer-Policy` globaux, et de toute CSP globale (`next.config.ts` de l'hôte de
-     référence : une source `/((?!api/plateforme/(?:public/[^/]+/)?files/[^/]+/html/?$).*)`). Sa propre CSP, s'il en
+     référence : une source `/((?!api/platform/(?:public/[^/]+/)?files/[^/]+/html/?$).*)`). Sa propre CSP, s'il en
      pose une sur ses pages, admet `frame-src 'self'`.
    - Dépôt par lien à usage unique (ADR-018) : `upload.link`, derrière `call`, rend à un assistant une adresse
-     `POST /api/plateforme/uploads/<jeton>`, servie **sans session** (le ticket en tient lieu : 15 minutes, un envoi,
+     `POST /api/platform/uploads/<jeton>`, servie **sans session** (le ticket en tient lieu : 15 minutes, un envoi,
      1 Mo, le droit relu à l'envoi), en texte brut ; une requête qui porte un en-tête `Origin` y est refusée, et
      l'hôte n'y pose aucun CORS. Pour un assistant sans shell, un formulaire : l'hôte sert la page
      `/upload/<token>`, sous session, qui passe `uploadForm(db, identity, token)` à `EcranDeDepot` (phrases :
-     `REFUS_DU_DEPOT`) ; l'écran envoie le fichier à `POST /api/plateforme/uploads/<jeton>/form` (à session, même
+     `REFUS_DU_DEPOT`) ; l'écran envoie le fichier à `POST /api/platform/uploads/<jeton>/form` (à session, même
      origine). Le formulaire a son propre jeton, distinct de celui de `curl` : chacun n'ouvre que sa route, et le
      ticket sert une fois, par l'un ou par l'autre. `upload.link` peut aussi télécharger une adresse `https` publique (`source_url`) : la seule requête
      du paquet vers une adresse choisie par un appelant, adresses privées et de métadonnées refusées.
@@ -235,7 +239,7 @@ Une seule coque est visible, quel que soit le niveau choisi :
    <CoquilleOto theme={preferredTheme(identity)} pleinePage>
      {/* le fournisseur ci-dessus */}
      <Desk>
-       <RailApplication entreprise={…} arbre={…} equipes={…} handle={…} compte={…} administre={isOrgAdmin(identity)} adresses={{ pages: "/n/", profil: "/profil", … }} />
+       <RailApplication entreprise={…} arbre={…} equipes={…} handle={…} compte={…} administre={isOrgAdmin(identity)} adresses={{ pages: "/n/", profil: "/profile", … }} />
        <Content>{children}</Content>
      </Desk>
    </CoquilleOto>
@@ -247,7 +251,7 @@ Une seule coque est visible, quel que soit le niveau choisi :
    « ⋯ » et « + »), `PiedDuRail` (Connecteurs, le compte et son menu), sous une `CoquilleOto` et le même
    fournisseur ; les primitives qui les composent sont exportées aussi (`Desk`, `Content`, `Rail`,
    `RailSection`, `RailTree`, `RailItem`, `DropdownMenu`), à employer dans un composant client : elles
-   reçoivent des fonctions. Leurs gestes passent par l'API du paquet (`/api/plateforme/*`, même
+   reçoivent des fonctions. Leurs gestes passent par l'API du paquet (`/api/platform/*`, même
    origine).
 
 3. **Un écran seul** dans une page de l'ERP (la grille d'un tableau dans une fiche client) : l'écran
@@ -294,7 +298,7 @@ les fonctions natives, sans outil de plus. Un besoin nouveau devient une fonctio
 - **Où** : `src/lib/fonctions-metier.ts` de l'application, qui appelle une fois
   `registerFunctions([...])` de `@otomata_tech/oto_platform/server`. Chaque appel remplace toute la
   liste. Ce fichier est importé pour son effet, en tête de chaque route qui monte une porte du
-  paquet : `src/app/api/mcp/route.ts`, `src/app/api/plateforme/[...route]/route.ts` et
+  paquet : `src/app/api/mcp/route.ts`, `src/app/api/platform/[...route]/route.ts` et
   `src/app/api/mcp-admin/route.ts` (`import "@/lib/fonctions-metier"`). Chaque route est un bundle
   à part : une route qui l'oublie sert un catalogue sans ces fonctions. Une page de l'application
   qui appelle elle-même un service qui lit le catalogue (`checkProcedure` ou `checkProcedureBlocks`

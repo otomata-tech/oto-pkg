@@ -3,7 +3,7 @@
 > Document technique unique : le paquet et ses faces, le modèle de données, les services et leurs
 > portes, l'identité, l'installation d'un hôte, les invariants. Le fonctionnel (vision, parcours,
 > exigences et leur état) est dans [`docs/prd.md`](prd.md). Les décisions sont dans
-> `docs/decisions/` : ADR-001 à ADR-018 ; `hypotheses.md` et `fiche-decisions.md` résolvent les
+> `docs/decisions/` : ADR-001 à ADR-020 ; `hypotheses.md` et `fiche-decisions.md` résolvent les
 > identifiants de choix encore cités par le code (H…, P…, D…, hypothèses de story). Ce document dit
 > où chaque chose vit ; les ADR disent pourquoi.
 
@@ -32,11 +32,11 @@ graph TB
 | Claude, ChatGPT, Claude Code | Les six outils | `https://<adresse>/api/mcp`, jeton OAuth de l'utilisateur |
 | Équipe plateforme | Huit outils admin | `https://<adresse>/api/mcp-admin`, jeton OAuth, rôle plateforme |
 | Page de l'hôte (Server Component) | Services du paquet | Import de `@otomata_tech/oto_platform/server`, appelant de la session |
-| Écran du paquet (mutation) | API du paquet | `/api/plateforme/<ressource>`, même origine |
+| Écran du paquet (mutation) | API du paquet | `/api/platform/<ressource>`, même origine |
 | Lecteur anonyme | Page publique d'un lien de partage | `/p/<jeton>`, sans session (ADR-013) |
 | Services du paquet | Schéma `platform` | SQL au nom de l'appelant vérifié, sous RLS d'isolation (ADR-012 § 1) |
 | Services du paquet, navigateur | Stockage d'objets compatible S3 (fichiers joints) | Troisième port (ADR-016) : URL présignées, clés d'accès S3 de l'hôte ; sans elles, fichiers désactivés |
-| Claude Code (`curl`) | Dépôt d'un fichier | `POST /api/plateforme/uploads/<jeton>`, sans session : ticket à usage unique d'`upload.link` (ADR-018) |
+| Claude Code (`curl`) | Dépôt d'un fichier | `POST /api/platform/uploads/<jeton>`, sans session : ticket à usage unique d'`upload.link` (ADR-018) |
 | Services du paquet | API des tiers (CRM, mail, ERP) | V2 : connecteurs TypeScript du paquet, secret du compte lu dans le coffre (ADR-019) |
 
 **Trois cas de client, un seul code.**
@@ -88,17 +88,17 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   ├── app/(dashboard)/                        # Layout authentifié : organisation par l'adresse, `CoquilleOto` au thème de l'organisation, le rail
 │   │   ├── page.tsx                            # Accueil
 │   │   ├── n/[...chemin]/page.tsx              # Tout nœud de l'arbre : page, procédure, Contexte, tableau
-│   │   ├── equipes/, journal/, connect/        # Équipes et droits ; journal ; brancher un assistant
+│   │   ├── teams/, journal/, connect/          # Équipes et droits ; journal ; brancher un assistant
 │   │   ├── upload/[token]/page.tsx             # Formulaire de dépôt d'un assistant sans shell (`form_url`, ADR-018 § 8)
-│   │   └── admin/…                             # Tableau de bord : organisation, accès, connecteurs, drapeaux, marque, usage, retours
-│   ├── app/(auth)/, app/auth/callback, app/auth/confirmer   # Mode Supabase : connexion, lien magique, réinitialisation, invitation acceptée au retour
+│   │   └── admin/…                             # Tableau de bord : `organization/` (marque comprise), `connectors/`, `usage/`, `feedback/`
+│   ├── app/(auth)/, app/auth/callback, app/auth/confirm     # Mode Supabase : connexion, lien magique, réinitialisation, invitation acceptée au retour
 │   ├── app/auth/oidc/{login,callback,logout}   # Mode OIDC : connexion chez l'émetteur, session en cookie chiffré
 │   ├── app/oauth/consent/page.tsx              # Mode Supabase : consentement OAuth des assistants
-│   ├── app/aucune-organisation/page.tsx        # Personne connectée sans appartenance à l'organisation de l'adresse
+│   ├── app/no-organization/page.tsx            # Personne connectée sans appartenance à l'organisation de l'adresse
 │   ├── app/p/…                                 # Page publique d'un lien de partage (ADR-013)
 │   ├── app/api/mcp/route.ts                    # MCP des organisations
 │   ├── app/api/mcp-admin/route.ts              # MCP admin, rôle plateforme
-│   ├── app/api/plateforme/[...route]/route.ts  # API du paquet
+│   ├── app/api/platform/[...route]/route.ts    # API du paquet
 │   ├── app/.well-known/oauth-protected-resource/[[...chemin]]/route.ts  # RFC 9728 : racine et formes suffixées
 │   ├── lib/fonctions-metier.ts                 # Fonctions de l'ERP inscrites au catalogue, importé en tête des routes MCP et API
 │   ├── lib/plateforme/                         # Session de l'hôte dans les deux modes, client et session OIDC, marque de l'adresse
@@ -108,7 +108,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   ├── ui/                                     # Écrans copiés d'oto-frontend et leur design system ; JAMAIS server/, migrations/ ni client de base
 │   ├── schemas/                                # Zod partagé par toutes les faces, ui/ compris ; rendu des blocs, syntaxe des liens
 │   ├── mcp/                                    # Six outils, MCP admin, résultats, vérification des jetons, métadonnées de ressource
-│   ├── api/                                    # Handler de /api/plateforme/* : adaptateurs des services
+│   ├── api/                                    # Handler de /api/platform/* : adaptateurs des services
 │   ├── server/                                 # Services : la seule porte d'écriture dans platform
 │   ├── migrations/                             # Ligne de base du schéma platform et migrations additives suivantes
 │   ├── cli/                                    # `oto-platform` : `db prepare`, `migrations sync`, `migrations check`
@@ -321,7 +321,7 @@ rejoue sur chaque lot, et les règles d'une valeur de tableau (`tables.ts` : `is
 - `mcp/` : handlers bas niveau, outils calculés par organisation, un seul formateur de résultat,
   garde `ctx` ; `makeVerifyToken()` injecté par la route ; métadonnées de ressource protégée.
 - `api/` : un handler unique, `handlePlateforme(request, { accessToken, host, defer?, verifyToken? })`, qui
-  vérifie le jeton, résout l'organisation de l'adresse puis dispatche `/api/plateforme/<ressource>`
+  vérifie le jeton, résout l'organisation de l'adresse puis dispatche `/api/platform/<ressource>`
   vers le service. Réponses `{ data }` ou `{ error: { code, message } }` avec le statut HTTP. Une
   ressource sans organisation (`cell`, équipe plateforme) se reconnaît avant l'identité par
   l'adresse. Routes du tableau de bord sous `admin/*`. `GET nodes/export` et `GET tables/export`
@@ -363,7 +363,7 @@ L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platf
 
 ### Web
 - On entre par invitation. En mode Supabase, la personne reçoit le lien magique ; le lien se
-  vérifie au clic sur « Continuer » (`/auth/confirmer`), jamais à l'ouverture ; au retour,
+  vérifie au clic sur « Continuer » (`/auth/confirm`), jamais à l'ouverture ; au retour,
   `accept_invitations()` crée `members`. En mode OIDC, la plateforme envoie l'email au SMTP de
   l'hôte, et la personne entre à sa première connexion chez l'émetteur.
 - Google et Microsoft (mode Supabase) : boutons des seuls fournisseurs activés, comptes filtrés par
@@ -470,6 +470,9 @@ choix ne changent pas sans ADR.
 - Fichiers derrière un troisième port, un stockage d'objets compatible S3 configuré par l'hôte ;
   les octets jamais en base (ADR-016). Un fichier HTML ne se voit que dans un iframe isolé, origine
   opaque, sans accès à l'hôte (ADR-017). La seule porte sans session qui écrit est le ticket d'envoi (ADR-018).
+- Toute adresse est en anglais (segments, paramètres, valeurs, ancres), quelle que soit la langue de
+  l'écran ; l'API des écrans se monte sous `/api/platform/*` (`PLATFORM_API_PREFIX`) ; un renommage
+  sans client se fait sans alias, l'ancienne adresse en 404 ; garde : `pnpm check:framework` (ADR-020).
 
 **Code** : les quatre invariants de `CLAUDE.md § Invariants techniques` (Server Components par
 défaut, Server Actions pour les mutations de l'hôte, un schéma Zod par donnée, RLS sur toute table

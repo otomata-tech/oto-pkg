@@ -43,7 +43,7 @@ function demandeIllisible(kind: "invalid" | "expired", erreur: ErreurDeDecision 
 export default async function ConsentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ authorization_id?: Parametre; erreur?: Parametre }>
+  searchParams: Promise<{ authorization_id?: Parametre; error?: Parametre }>
 }) {
   if (oidcEnabled()) notFound()
   const parametres = await searchParams
@@ -54,8 +54,8 @@ export default async function ConsentPage({
   const lecture = await consentRequest({ auth: supabase.auth, db: session.db }, parametres.authorization_id)
   // Consentement déjà donné : Supabase rend l'adresse de retour de l'assistant.
   if (lecture.kind === "redirect") redirect(lecture.url)
-  // `erreur` vient de l'adresse : seule une valeur de `decisionErrorSchema` s'affiche.
-  const erreur = decisionErrorSchema.safeParse(parametres.erreur).data
+  // `error` vient de l'adresse : seule une valeur de `decisionErrorSchema` s'affiche.
+  const erreur = decisionErrorSchema.safeParse(parametres.error).data
   const resultat = lecture.kind === "ask" ? { data: lecture.demande } : { error: demandeIllisible(lecture.kind, erreur) }
   const organisation = lecture.kind === "ask" ? lecture.demande.organisation : null
   const theme = organisation?.etat === "connue" ? organisation.marque.theme : undefined

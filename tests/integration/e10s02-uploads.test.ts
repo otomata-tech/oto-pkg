@@ -111,7 +111,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
   /** Le jeton d'un lien, lu dans l'adresse rendue. */
   function tokenOf(text: string): string {
-    const token = /\/api\/plateforme\/uploads\/([A-Za-z0-9_-]{43})/.exec(text)?.[1]
+    const token = /\/api\/platform\/uploads\/([A-Za-z0-9_-]{43})/.exec(text)?.[1]
     if (!token) throw new Error(`no upload link in: ${text.slice(0, 300)}`)
     return token
   }
@@ -126,7 +126,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
   /** L'envoi de `curl` : la porte sans session, sans jeton de session ; `query` : ce qu'ajouterait un tiers à l'adresse. */
   async function send(token: string, body: string | Uint8Array, options: { host?: string; query?: string } = {}) {
     const host = options.host ?? o.host
-    const request = new Request(`https://${host}/api/plateforme/uploads/${token}${options.query ?? ""}`, {
+    const request = new Request(`https://${host}/api/platform/uploads/${token}${options.query ?? ""}`, {
       method: "POST",
       body,
       headers: { "user-agent": "curl/8.7.1", "content-type": "application/x-www-form-urlencoded" },
@@ -190,7 +190,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       const linked = await lea.link({ path, kind: "file", mode: "create", name: "rapport d'avril.html", title: "Rapport d'avril", summary: "Le rapport d'avril." })
       const token = tokenOf(linked.text)
       const formToken = formTokenOf(linked.text)
-      const url = `https://${o.host}/api/plateforme/uploads/${token}`
+      const url = `https://${o.host}/api/platform/uploads/${token}`
       const form = `https://${o.host}/upload/${formToken}`
       const fields = (linked.result.structuredContent as { result: Record<string, unknown> }).result
       const [row] = await fx.admin<{ row: Record<string, unknown> }[]>`select to_json(t) as row from platform.upload_tickets t where token_hash = ${uploadTokenHash(token)}`
@@ -296,7 +296,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       })
       expect(JSON.stringify([...lea.journal, line])).not.toContain(token)
       // AC-f11, HTML servi : le `.html` envoyé se lit par la route isolée d'AC-c3, aux en-têtes d'ADR-017 § 1, dans un iframe.
-      const viewed = await handlePlateforme(new Request(`https://${o.host}/api/plateforme/files/${file.id}/html`, { headers: { "sec-fetch-dest": "iframe" } }), {
+      const viewed = await handlePlateforme(new Request(`https://${o.host}/api/platform/files/${file.id}/html`, { headers: { "sec-fetch-dest": "iframe" } }), {
         accessToken: (await fx.sessionFor(o.people.lea)).accessToken,
         host: o.host,
         verifyToken: fx.verifyToken,

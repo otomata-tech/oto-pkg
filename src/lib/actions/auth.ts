@@ -69,7 +69,7 @@ export async function magicLinkAction(formData: FormData): Promise<ActionResult<
   // `shouldCreateUser` : une adresse invitée sans compte en reçoit un ; le hook refuse les autres (D1).
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data.email,
-    options: { shouldCreateUser: true, emailRedirectTo: `${origin}/auth/confirmer?next=${next}` },
+    options: { shouldCreateUser: true, emailRedirectTo: `${origin}/auth/confirm?next=${next}` },
   })
   if (error) console.error("magicLinkAction: signInWithOtp a échoué", error.status)
 
@@ -113,7 +113,7 @@ export async function connexionFournisseurAction(
 }
 
 /**
- * Vérifie le jeton du lien de l'email au clic sur « Continuer » de `/auth/confirmer`, jamais à
+ * Vérifie le jeton du lien de l'email au clic sur « Continuer » de `/auth/confirm`, jamais à
  * l'ouverture du lien (fiche D11 : une passerelle de messagerie l'ouvrirait avant la personne).
  */
 export async function confirmerLienAction(formData: FormData): Promise<never> {

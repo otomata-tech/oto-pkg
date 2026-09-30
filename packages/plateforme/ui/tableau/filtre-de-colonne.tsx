@@ -24,7 +24,19 @@ import { Button, IconButton } from "../ds/react/primitives"
 import { Radio, RadioGroup } from "../ds/react/radio"
 import { Select } from "../ds/react/select"
 import { useHote } from "../hote/navigation"
-import { adresseDuTableau, champsGardes, operationsDe, parametresDuFormulaire, reglagesDepuisLAdresse, sansFiltres, type Clause, type Operation, type Reglages } from "./adresse"
+import {
+  adresseDuTableau,
+  CHAMP_DE_L_OPERATION,
+  champsGardes,
+  operationsDe,
+  parametresDuFormulaire,
+  reglagesDepuisLAdresse,
+  sansFiltres,
+  type Clause,
+  type Operation,
+  type OperationSaisie,
+  type Reglages,
+} from "./adresse"
 import { GRILLE, OPERATIONS_LUES, TEXTES_DE_CELLULE } from "./libelles"
 
 export type FiltreDeColonneProps = {
@@ -39,31 +51,31 @@ export type FiltreDeColonneProps = {
 const valeurPosee = (posees: readonly Clause[], operation: Operation) => posees.find((clause) => clause.operation === operation)?.valeur ?? ""
 
 /** Le champ d'une opération, étiqueté, au type de la colonne ; sa valeur est celle de la clause posée. */
-function ChampDOperation({ operation, colonne, posees }: { operation: Operation; colonne: TableColumn; posees: readonly Clause[] }) {
+function ChampDOperation({ operation, colonne, posees }: { operation: OperationSaisie; colonne: TableColumn; posees: readonly Clause[] }) {
   const defaut = valeurPosee(posees, operation)
-  if (operation === "egal") {
-    const options = colonne.type === "bool" ? [{ value: "oui", label: TEXTES_DE_CELLULE.oui }, { value: "non", label: TEXTES_DE_CELLULE.non }] : (colonne.options ?? []).map((option) => ({ value: option, label: option }))
+  if (operation === "eq") {
+    const options = colonne.type === "bool" ? [{ value: "true", label: TEXTES_DE_CELLULE.oui }, { value: "false", label: TEXTES_DE_CELLULE.non }] : (colonne.options ?? []).map((option) => ({ value: option, label: option }))
     return (
-      <Field label={OPERATIONS_LUES.egal}>
-        <Select name="egal" size="sm" defaultValue={defaut} options={[{ value: "", label: GRILLE.peuImporte }, ...options]} />
+      <Field label={OPERATIONS_LUES.eq}>
+        <Select name={CHAMP_DE_L_OPERATION.eq} size="sm" defaultValue={defaut} options={[{ value: "", label: GRILLE.peuImporte }, ...options]} />
       </Field>
     )
   }
-  const type = operation === "contient" ? "text" : colonne.type === "number" ? "number" : colonne.type === "date" ? "date" : "datetime-local"
+  const type = operation === "contains" ? "text" : colonne.type === "number" ? "number" : colonne.type === "date" ? "date" : "datetime-local"
   return (
     <Field label={OPERATIONS_LUES[operation]}>
-      <Input name={operation} type={type} size="sm" step={type === "number" ? "any" : undefined} defaultValue={defaut} maxLength={type === "text" ? GRID_SEARCH_MAX : undefined} />
+      <Input name={CHAMP_DE_L_OPERATION[operation]} type={type} size="sm" step={type === "number" ? "any" : undefined} defaultValue={defaut} maxLength={type === "text" ? GRID_SEARCH_MAX : undefined} />
     </Field>
   )
 }
 
 /** « Vide » ou « Rempli », pour toute colonne (AC6) : trois choix, « Peu importe » d'abord. */
 function Presence({ posees }: { posees: readonly Clause[] }) {
-  const posee = posees.find((clause) => clause.operation === "vide" || clause.operation === "rempli")?.operation ?? ""
+  const posee = posees.find((clause) => clause.operation === "empty" || clause.operation === "not_empty")?.operation ?? ""
   const choix: [string, string][] = [
     ["", GRILLE.peuImporte],
-    ["vide", OPERATIONS_LUES.vide],
-    ["rempli", OPERATIONS_LUES.rempli],
+    ["empty", OPERATIONS_LUES.empty],
+    ["not_empty", OPERATIONS_LUES.not_empty],
   ]
   return (
     <RadioGroup legend={GRILLE.presence} orientation="horizontal">
@@ -76,7 +88,7 @@ function Presence({ posees }: { posees: readonly Clause[] }) {
 
 /** Les champs du panneau : les opérations saisies du type (AC6), puis la présence, que toute colonne prend. */
 function ChampsDuFiltre({ colonne, posees }: { colonne: TableColumn; posees: readonly Clause[] }) {
-  const saisies = operationsDe(colonne).filter((operation) => operation !== "vide" && operation !== "rempli")
+  const saisies = operationsDe(colonne).filter((operation): operation is OperationSaisie => operation !== "empty" && operation !== "not_empty")
   return (
     <>
       {saisies.map((operation) => (
@@ -95,7 +107,7 @@ function ChampsCaches({ reglages, colonne }: { reglages: Reglages; colonne: stri
         // Un champ caché n'a pas d'identité : son rang dans la liste des réglages gardés.
         <input key={`${nom}-${rang}`} type="hidden" name={nom} value={valeur} />
       ))}
-      <input type="hidden" name="colonne" value={colonne} />
+      <input type="hidden" name="column" value={colonne} />
     </>
   )
 }

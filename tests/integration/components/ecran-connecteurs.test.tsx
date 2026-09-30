@@ -47,7 +47,7 @@ function rendre(donnees: Partial<DonneesDesConnecteurs> | { error: string } = {}
   const resultat = "error" in donnees ? donnees : { data: { ...DONNEES, ...donnees } }
   return render(
     <ContexteDeRafraichissement.Provider value={rafraichir}>
-      <EcranConnecteurs resultat={resultat} Lien={Lien} ici="/admin/connecteurs" />
+      <EcranConnecteurs resultat={resultat} Lien={Lien} ici="/admin/connectors" />
     </ContexteDeRafraichissement.Provider>,
   )
 }
@@ -87,7 +87,7 @@ describe("EcranConnecteurs, connectors (AC4, AC5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Activer mail" }))
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: "/api/plateforme/admin/connectors/mail/activation", methode: "POST", corps: {} })
+    expect(envoi()).toEqual({ url: "/api/platform/admin/connectors/mail/activation", methode: "POST", corps: {} })
     expect(screen.getByRole("heading", { level: 2, name: "Connecteurs" })).toHaveFocus()
   })
 
@@ -109,7 +109,7 @@ describe("EcranConnecteurs, connectors (AC4, AC5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Désactiver mail" }))
     fireEvent.click(within(screen.getByRole("group", { name: question })).getByRole("button", { name: "Désactiver" }))
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toMatchObject({ url: "/api/plateforme/admin/connectors/mail/activation", methode: "DELETE" })
+    expect(envoi()).toMatchObject({ url: "/api/platform/admin/connectors/mail/activation", methode: "DELETE" })
     expect(screen.getByRole("heading", { level: 2, name: "Connecteurs" })).toHaveFocus()
   })
 
@@ -146,7 +146,7 @@ describe("EcranConnecteurs, simulated accounts (AC6, AC7)", () => {
     fireEvent.click(within(comptes.getByRole("group", { name: question })).getByRole("button", { name: "Désactiver" }))
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    expect(envoi()).toEqual({ url: `/api/plateforme/admin/accounts/${COMPTE}/disable`, methode: "POST", corps: {} })
+    expect(envoi()).toEqual({ url: `/api/platform/admin/accounts/${COMPTE}/disable`, methode: "POST", corps: {} })
     // Le geste part avec la relecture (un compte désactivé n'en a plus) : le focus l'attend au titre de la liste.
     expect(screen.getByRole("heading", { level: 2, name: "Comptes simulés" })).toHaveFocus()
   })
@@ -163,7 +163,7 @@ describe("EcranConnecteurs, simulated accounts (AC6, AC7)", () => {
 
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     expect(envoi()).toEqual({
-      url: "/api/plateforme/admin/accounts",
+      url: "/api/platform/admin/accounts",
       methode: "POST",
       corps: { connector: "mail", owner_kind: "team", team_id: VENTES, label: "Mail Support", mode: "simule" },
     })
@@ -196,6 +196,6 @@ describe("EcranConnecteurs, states (AC12)", () => {
   it("should say a failed read in an alert, with a way to retry", () => {
     rendre({ error: "Une erreur est survenue. Réessayez." })
     expect(screen.getByRole("alert")).toHaveTextContent("Une erreur est survenue. Réessayez.")
-    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/connecteurs")
+    expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/connectors")
   })
 })

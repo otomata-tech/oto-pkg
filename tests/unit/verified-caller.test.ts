@@ -61,7 +61,7 @@ describe("verified caller at the three gates (E01-S10 part a)", () => {
     vi.mocked(requireStaff).mockRejectedValue(new PlatformError("forbidden", "Platform team only."))
     const verifyToken = makeVerifyToken({ jwks, issuer: ISSUER })
     const bearer = await token()
-    const request = new Request(`https://${HOST}/api/plateforme/invitations`, { headers: { "x-forwarded-proto": "https" } })
+    const request = new Request(`https://${HOST}/api/platform/invitations`, { headers: { "x-forwarded-proto": "https" } })
     const claims = (await verifyToken(request, bearer))?.extra
 
     const mcp = await resolveMcpRequest({ accessToken: bearer, claims, host: HOST, origin: `https://${HOST}`, userAgent: null })

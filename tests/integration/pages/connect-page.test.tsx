@@ -61,10 +61,10 @@ describe("/connect page session (AC9)", () => {
     expect(lastConnections).not.toHaveBeenCalled()
   })
 
-  it.each(["unknown_org", "not_member"] as const)("should send %s to /aucune-organisation, reading nothing", async (code) => {
+  it.each(["unknown_org", "not_member"] as const)("should send %s to /no-organization, reading nothing", async (code) => {
     vi.mocked(getPlatformIdentity).mockResolvedValue({ error: { code } })
 
-    await expect(ConnectPage()).rejects.toThrow("NEXT_REDIRECT:/aucune-organisation")
+    await expect(ConnectPage()).rejects.toThrow("NEXT_REDIRECT:/no-organization")
     expect(usefulProcedures).not.toHaveBeenCalled()
     expect(lastConnections).not.toHaveBeenCalled()
   })

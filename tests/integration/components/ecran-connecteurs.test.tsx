@@ -199,3 +199,12 @@ describe("EcranConnecteurs, states (AC12)", () => {
     expect(screen.getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/admin/connectors")
   })
 })
+
+describe("capacités atteintes (E12-S02, AC-10)", () => {
+  it("should grey the activation of an inactive connector at connectors_max, with the raise link", () => {
+    rendre({ connectors: [MAIL_INACTIF], limites: { members: null, teams: null, connectors: { max: 0, used: 0 }, raiseUrl: "https://acme.test/billing?from=pkg" } })
+    expect(screen.getByRole("button", { name: "Activer" })).toBeDisabled()
+    expect(screen.getByText(/Limite atteinte : 0 connecteur actif sur 0\./)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Relever la limite" })).toHaveAttribute("href", "https://acme.test/billing?from=pkg&capacity=connectors_max")
+  })
+})

@@ -14,6 +14,7 @@ import { memberDirectory, type DirectoryEntry } from "../directory"
 import { boundedList, inTransaction, invalidInput, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import { isJsonObject } from "../json"
+import { orgLimits, requireUnderLimit } from "../limits"
 import type { Tx } from "../sql"
 
 /** Une ligne d'activation ; `updated_at` lu par `to_json`, en texte ISO comme PostgREST le rendait (AC-x2). */
@@ -129,10 +130,13 @@ async function checkedConnector(db: PlatformDb, identity: Identity, input: unkno
 export async function activateConnector(db: PlatformDb, identity: Identity, input: unknown): Promise<OrgConnector> {
   const { connector, functions } = await checkedConnector(db, identity, input)
   const orgId = identity.org.id
-  // La ligne lue, puis écrite si elle n'est pas active, dans la même transaction.
+  const limits = await orgLimits(identity.org)
+  // La ligne lue, puis écrite si elle n'est pas active, dans la même transaction ; un connecteur déjà actif ne compte
+  // pas contre `connectors_max` (E12-S02, AC-5).
   const row = await inTransaction(db, "activateConnector: connector_activations", async (sql) => {
     const current = await activationRow(sql, orgId, connector)
     if (current?.state === "active") return current
+    await requireUnderLimit(sql, { db, identity, limits }, "connectors_max")
     const [written] = await sql<ActivationRow[]>`
       insert into platform.connector_activations (org_id, connector, state, activated_by)
       values (${orgId}, ${connector}, 'active', ${identity.user.id})

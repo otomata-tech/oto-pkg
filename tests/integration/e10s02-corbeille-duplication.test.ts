@@ -229,7 +229,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         )
         const [{ copies }] = await fx.admin<{ copies: number }[]>`
           select count(*)::int as copies from platform.nodes where org_id = ${o.org.id} and title = ${`${segment} (copie)`}`
-        expect({ refused, copies }).toEqual({ refused: { code: "too_large", details: { reason: "quota" } }, copies: 0 })
+        expect({ refused, copies }).toEqual({ refused: { code: "too_large", details: { reason: "quota", max: ORG_QUOTA_BYTES } }, copies: 0 })
       } finally {
         await fx.admin`delete from platform.files where node_id = ${filler}`
       }

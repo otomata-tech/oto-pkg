@@ -20,6 +20,7 @@ import type { PlatformDb } from "./db"
 import { inTeam, leadNames, memberDirectory, teamRoster, type DirectoryEntry } from "./directory"
 import { changedMeanwhile, fromDatabaseError, inTransaction, invalidInput, isUniqueViolation, PlatformError } from "./errors"
 import { teamRole, type Identity } from "./identity"
+import { limitedTx } from "./limits"
 import { slugOf } from "./nodes/segments"
 import { parseId, requireAdmin, type Mutation } from "./members"
 import type { Tx } from "./sql"
@@ -115,7 +116,7 @@ export async function listTeams(db: PlatformDb, identity: Identity): Promise<Tea
 
 /**
  * Crée une équipe (AC11). Son dossier et son Contexte naissent par `teams_tree_sync` ; un chemin déjà pris par une page
- * d'organisation fait échouer toute la création (`23505`, `path_taken`). Le créateur en devient le responsable, dans la
+ * d'organisation fait échouer toute la création (`23505`, `path_taken`) ; au plafond de `teams_max`, refus (E12-S02). Le créateur en devient le responsable, dans la
  * même transaction (E11-S10, AC-c1), sauf entré par un accès plateforme : `team_members_insert_admin` refuserait sa ligne.
  */
 export async function createTeam(
@@ -129,8 +130,8 @@ export async function createTeam(
   const { name } = parsed.data
   const slug = unreservedSlug(name)
 
-  const data = await db
-    .tx(async (sql) => {
+  // Au plafond de `teams_max`, refus en tête de la transaction (E12-S02).
+  const data = await limitedTx(db, identity, "teams_max", async (sql) => {
       await checkName(sql, identity, name)
       const [team] = await sql<{ id: string; slug: string; name: string }[]>`
         insert into platform.teams (org_id, slug, name) values (${identity.org.id}, ${slug}, ${name})

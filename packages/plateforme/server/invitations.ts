@@ -27,6 +27,7 @@ import type { PlatformDb } from "./db"
 import { fromDatabaseError, inTransaction, isPlatformError, PlatformError } from "./errors"
 import { memberRole, type Identity, type MemberRole } from "./identity"
 import { oidcMode } from "./issuer"
+import { limitedTx } from "./limits"
 import { invitationMail, mailSender, type MailContent } from "./mail"
 import { PlatformConfigError } from "./sql"
 
@@ -246,9 +247,9 @@ export async function inviteMember(
 
   // L'envoi avant l'insertion : une variable manquante ne laisse aucune invitation sans email.
   const email = oidcMode() ? platformEmail(identity, invite.email, options.redirectTo) : magicLinkEmail(options.redirectTo)
-  const data = await db
-    .tx(
-      (sql) => sql<CreatedRow[]>`
+  // Au plafond de `members_max` (invitations en attente comprises), refus avant l'insertion, donc avant l'email (E12-S02).
+  const data = await limitedTx(db, identity, "members_max", (sql) =>
+      sql<CreatedRow[]>`
         insert into platform.invitations (org_id, email, role, team_id, invited_by)
         values (${identity.org.id}, ${invite.email}, ${invite.role}, ${invite.teamId ?? null}, ${identity.user.id})
         returning id, email, role, team_id, to_json(expires_at) as expires_at`,

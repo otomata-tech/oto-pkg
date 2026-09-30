@@ -216,8 +216,8 @@ export async function getOrg(db: PlatformDb, identity: Identity): Promise<OrgShe
   }
 }
 
-/** Le refus d'un `23505` de `create_org`, par sa contrainte (N24) ; `null` pour toute autre erreur. */
-async function createConflict(
+/** Le refus d'un `23505` de `create_org` ou `signup_org`, par sa contrainte (N24) ; `null` pour toute autre erreur. */
+export async function createConflict(
   db: PlatformDb,
   error: { code?: string; message?: string },
   draft: OrgDraft,

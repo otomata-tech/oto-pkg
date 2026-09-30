@@ -17,3 +17,4 @@
 | E09 | Cellule partagée, marque et sous-domaines | ✅ Livré | — |
 | E10 | Contenus riches : import, fichiers, images, HTML | 🟢 Ready, après la V1 (`E10-contenus-riches.md`, ADR-016 à ADR-018) | — |
 | E11 | Retours de la démo : tableaux, contexte, routage, écrans, éditeur, adresses en anglais | 🟢 Ready, avec E10 en 1.1.0 (`E11-retours-de-la-demo.md`, fiches D131, D132, D145) | — |
+| E12 | Offres de l'hôte : inscription libre et capacités par organisation | ✅ Livré pour la 1.2.0, non publié (`E12-offres-de-l-hote.md`, ADR-022, ADR-023) | — |

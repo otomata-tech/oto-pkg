@@ -13,6 +13,7 @@ import type { PlatformDb } from "../db"
 import { inTransaction, invalidInput, PlatformError } from "../errors"
 import { copyFileObjects, requireQuota } from "../files/service"
 import type { Identity } from "../identity"
+import { orgStorageQuota } from "../limits"
 import type { Mutation } from "../members"
 import { findNode, notAvailable, parentPath, ROOT_PATH, unknownNode, type NodeRow } from "./lookup"
 import { structureOf } from "./move"
@@ -81,6 +82,8 @@ export async function duplicateNode(db: PlatformDb, identity: Identity, input: u
   const descendants = await copiedDescendants(db, identity, node)
   const title = copyTitle(node.title)
   const path = await freePath(db, identity, { parent: parentAt, segment: titleSegment(title) })
+  // Lu chez l'hôte avant la transaction (E12-S02) : la copie ne sait qu'après l'insertion si elle porte des fichiers.
+  const quota = await orgStorageQuota(identity.org)
   const { count, files } = await inTransaction(db, "duplicate: copy", async (sql) => {
     const position = await positionAfter(sql, identity.org.id, { parentId, afterId: node.id, movingId: null })
     const copies = await sql<{ copy_path: string; copied_files: Record<string, string> }[]>`
@@ -88,7 +91,7 @@ export async function duplicateNode(db: PlatformDb, identity: Identity, input: u
                                                        p_segment => ${lastSegment(path)}, p_title => ${title}, p_position => ${position})`
     const pairs = copies.flatMap((copy) => Object.entries(copy.copied_files))
     // E10-S02 (AC-e3) : les fichiers copiés comptent au quota de l'organisation, relu sous son verrou après l'insertion.
-    if (pairs.length > 0) await requireQuota(sql, identity, { adding: 0, what: `A copy of ${node.path}` })
+    if (pairs.length > 0) await requireQuota(sql, identity, { adding: 0, what: `A copy of ${node.path}`, quota })
     return { count: copies.length, files: pairs }
   }).catch((error: unknown) => {
     // Le chemin pris entre la lecture et la copie (la fonction revérifie sous le verrou de l'arbre).

@@ -11,7 +11,7 @@
 // `overQuota`, `stepLeft` : V2), marques d'outils, liens vers une page de connecteur, pile de clés, toolbox
 // (architecture § 10).
 import { Plug } from "@phosphor-icons/react/dist/ssr/Plug"
-import type { AccountMode, AccountView, DeactivationImpact, OrgConnector } from "../../../schemas"
+import { limitReached, type AccountMode, type AccountView, type DeactivationImpact, type OrgConnector, type OrgLimitsView } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
 import { ActionPlateforme } from "../../components/action-plateforme"
 import { EmptyState } from "../../ds/react/empty-state"
@@ -19,6 +19,7 @@ import { Icon } from "../../ds/react/icon"
 import { Row, RowList } from "../../ds/react/row-list"
 import { TwoColumns } from "../../ds/react/two-columns"
 import { dateLisible } from "../../format/dates"
+import { LimiteAtteinte } from "../../limites/limite-atteinte"
 import { EnTeteDAdministration } from "../en-tete"
 import { ErreurDeLecture } from "../../components/erreur-de-lecture"
 import { Chargement, Ilot } from "../ilot"
@@ -33,6 +34,8 @@ export type DonneesDesConnecteurs = {
   impacts: Partial<Record<string, DeactivationImpact>>
   accounts: AccountView[]
   options: { teams: { id: string; name: string }[] }
+  /** Les capacités de l'organisation (`orgLimitsView`, E12-S02) ; absentes : aucune activation grisée. */
+  limites?: OrgLimitsView
 }
 
 export type EcranConnecteursProps = {
@@ -61,7 +64,18 @@ function etat(connecteur: OrgConnector): string {
   return `Actif depuis le ${dateLisible(connecteur.activatedAt) ?? "?"}${qui ? ` (${qui})` : ""}`
 }
 
-function LigneDeConnecteur({ connecteur, impact }: { connecteur: OrgConnector; impact: DeactivationImpact | undefined }) {
+/** L'activation d'un connecteur inactif : grisée au plafond de `connectors_max` (E12-S02), avec le lien de l'hôte (écran réservé aux administrateurs). */
+function Activation({ nom, ressource, limites }: { nom: string; ressource: string; limites: OrgLimitsView | undefined }) {
+  if (limites?.connectors && limitReached(limites.connectors)) {
+    return <LimiteAtteinte libelle="Activer" nom="connectors_max" etat={limites.connectors} lien={limites.raiseUrl} />
+  }
+  // Réversible : sans question (N5).
+  return <ActionPlateforme libelle="Activer" nomAccessible={`Activer ${nom}`} requete={{ methode: "POST", ressource, corps: {} }} ancre={ANCRE_DES_CONNECTEURS} />
+}
+
+type LigneDeConnecteurProps = { connecteur: OrgConnector; impact: DeactivationImpact | undefined; limites: OrgLimitsView | undefined }
+
+function LigneDeConnecteur({ connecteur, impact, limites }: LigneDeConnecteurProps) {
   const nom = connecteur.connector
   const fonctions = connecteur.functions.map((fonction) => fonction.name)
   const ressource = `admin/connectors/${encodeURIComponent(nom)}/activation`
@@ -82,21 +96,22 @@ function LigneDeConnecteur({ connecteur, impact }: { connecteur: OrgConnector; i
           ancre={ANCRE_DES_CONNECTEURS}
         />
       ) : (
-        // Réversible : sans question (N5).
-        <ActionPlateforme libelle="Activer" nomAccessible={`Activer ${nom}`} requete={{ methode: "POST", ressource, corps: {} }} ancre={ANCRE_DES_CONNECTEURS} />
+        <Activation nom={nom} ressource={ressource} limites={limites} />
       )}
     </Row>
   )
 }
 
-function Connecteurs({ connecteurs, impacts }: { connecteurs: OrgConnector[]; impacts: DonneesDesConnecteurs["impacts"] }) {
+type ConnecteursProps = { connecteurs: OrgConnector[]; impacts: DonneesDesConnecteurs["impacts"]; limites: OrgLimitsView | undefined }
+
+function Connecteurs({ connecteurs, impacts, limites }: ConnecteursProps) {
   return (
     <Ilot id={ANCRE_DES_CONNECTEURS} titre="Connecteurs" compte={pluriel(connecteurs.length, "connecteur activable", "connecteurs activables")}>
       <div className="flex flex-col gap-3">
         <p className="oto-caption">Les fonctions de tableau (table.*) et celles de l&apos;application sont toujours actives : elles ne s&apos;activent pas.</p>
         <RowList rules empty={<EmptyState compact title="Aucun connecteur à activer dans cette version de la plateforme." />}>
           {connecteurs.map((connecteur) => (
-            <LigneDeConnecteur key={connecteur.connector} connecteur={connecteur} impact={impacts[connecteur.connector]} />
+            <LigneDeConnecteur key={connecteur.connector} connecteur={connecteur} impact={impacts[connecteur.connector]} limites={limites} />
           ))}
         </RowList>
       </div>
@@ -155,7 +170,7 @@ function Donnees({ donnees }: { donnees: DonneesDesConnecteurs }) {
   const connecteurs = donnees.connectors.map((connecteur) => connecteur.connector)
   return (
     <TwoColumns aside={<Comptes comptes={donnees.accounts} connecteurs={connecteurs} equipes={donnees.options.teams} />}>
-      <Connecteurs connecteurs={donnees.connectors} impacts={donnees.impacts} />
+      <Connecteurs connecteurs={donnees.connectors} impacts={donnees.impacts} limites={donnees.limites} />
     </TwoColumns>
   )
 }

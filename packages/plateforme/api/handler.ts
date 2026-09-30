@@ -3,6 +3,7 @@
 // Réponses `{ data }` ou `{ error: { code, message, details? } }`, au statut de `HTTP_STATUS`
 // (H04). Une ligne de journal par mutation, écrite après la réponse (H07).
 import type { VerifyToken } from "../mcp/auth"
+import type { SignupOptions } from "../server/admin/signup"
 import { PLATFORM_API_PREFIX } from "../schemas/api"
 import type { Json } from "../server/database"
 import type { PlatformDb } from "../server/db"
@@ -24,6 +25,7 @@ import { rulesRoutes } from "./rules"
 import { searchRoutes } from "./search"
 import { addressOrigin, asPlatformError, authenticationRequired, errorResponse, requireSameOrigin, sessionIdentity, verifiedSession } from "./session"
 import { sharesRoutes } from "./shares"
+import { isSignupRoute, signupResponse } from "./signup"
 import { trashRoutes } from "./trash"
 import { isUploadFormRoute, isUploadRoute, uploadFormResponse, uploadResponse } from "./uploads"
 import { tablesRoutes } from "./tables"
@@ -122,6 +124,8 @@ type PlatformRequestOptions = {
    * Auth du projet par défaut ou l'émetteur OIDC de `PLATFORM_OIDC_ISSUER`, comme `/api/mcp`.
    */
   verifyToken?: VerifyToken
+  /** L'inscription libre (E12-S01, ADR-023) : son point de création et son contrôle d'abus ; absente, `POST signup` n'existe pas. */
+  signup?: SignupOptions
 }
 
 const PREFIX = PLATFORM_API_PREFIX
@@ -278,6 +282,8 @@ export async function handlePlateforme(request: Request, options: PlatformReques
       const result = await cellRoutes.GET.handle({ db })
       return Response.json({ data: result.data }, { status: result.status })
     }
+    // L'inscription (E12-S01) : sans organisation par l'adresse, sur l'option de l'hôte seule ; sans elle, route inconnue.
+    if (options.signup && isSignupRoute(segments, method)) return await signupResponse(request, session, { signup: options.signup, defer: options.defer }, started)
     const match = matchRoute(segments, method)
     if (!match) return errorResponse(new PlatformError("not_found", "Unknown route."))
 

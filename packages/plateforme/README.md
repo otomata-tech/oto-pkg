@@ -355,6 +355,49 @@ les fonctions natives, sans outil de plus. Un besoin nouveau devient une fonctio
   `call` ne la cite pas, `find` la trouve. Un contrat servi ne se durcit pas en place : une fonction
   dont les arguments changent s'inscrit sous un autre nom.
 
+## Capacités par organisation
+
+Un hôte qui vend le paquet par offres borne certaines écritures de chaque organisation (ADR-022) ; le
+paquet ne connaît ni offre, ni prix, ni prestataire. Sans rien enregistrer, rien ne change.
+
+- **Où** : `registerOrgLimits({ read, raiseUrl? })` de `@otomata_tech/oto_platform/server`, une fois,
+  dans un fichier importé pour son effet en tête des trois routes qui montent une porte (comme les
+  fonctions métier) et des pages qui montrent un geste limité (Équipes, Connecteurs) ; une route qui
+  l'oublie sert sans limite.
+- **Valeurs** : `read({ id, slug })`, synchrone ou non, rend un `OrgLimits` (`orgLimitsSchema` de
+  `/schemas`, toutes les clés facultatives, absente = sans limite) ou `null` : `members_max` (membres
+  et invitations en attente, contrôlé à l'invitation), `teams_max` (0 ferme la création d'équipes),
+  `connectors_max` (connecteurs actifs), `storage_bytes` (10 Go sans valeur), `account_owner_kinds` et
+  `accounts_per_owner_max` (lus, contrôlés par aucun service dans cette version). Elle est appelée à
+  chaque écriture bridée et par `orgLimitsView` ; une clé inconnue, une valeur hors schéma ou une
+  exception refusent l'écriture (`internal`), jamais « sans limite ».
+- **Refus** : `forbidden`, `details: { reason: "limit", limit, max }` ; le stockage, `too_large`,
+  `details: { reason: "quota", max }`. Même refus par l'API, le MCP et le MCP admin. Baisser une limite
+  ne supprime rien : seule la création suivante est refusée.
+- **Écrans** : la page passe `orgLimitsView(db, identity)` à `EcranEquipes` (`limites`) et à
+  `EcranConnecteurs` (`donnees.limites`) ; le geste au plafond est grisé, et un administrateur voit
+  « Relever la limite », vers `<raiseUrl>?capacity=<nom>` (`raiseUrl` : `https://…` ou un chemin de
+  l'hôte, résolu sur l'adresse de l'organisation). `AdressesDuRail.abonnement` ajoute l'écran
+  « Abonnement » de l'hôte aux réglages de l'entreprise.
+
+## Inscription libre
+
+Une personne connectée, membre d'aucune organisation, crée la sienne et en devient l'administratrice
+(ADR-023). Désactivée par défaut : un ERP garde l'entrée sur invitation seule.
+
+- **Activer** : `handlePlateforme(request, { …, signup: { orgCreation, admit? } })`. `orgCreation` est le
+  point de création de l'hôte (`OrgCreationHook`, les adresses de la nouvelle organisation) ; `admit({
+  email, request })` son contrôle d'abus (captcha, débit par IP, domaines jetables) : un texte refuse
+  l'inscription avec ce texte, `null` l'admet.
+- **Écran** : la page de l'hôte monte `FormulaireDInscription` dans `EcranDAuthentification` ; il
+  appelle `POST /api/platform/signup` en deux temps (l'adresse d'abord, puis la création) et mène à
+  l'adresse de la nouvelle organisation, où la personne se reconnecte (la session est liée à l'adresse).
+- **Comptes** : en mode OIDC, l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
+  crée l'identité de la personne. En mode Supabase, `hook_before_user_created` refuse tout compte sans
+  invitation : l'hôte qui ouvre l'inscription retire ce hook de ses réglages d'Auth.
+- **Refus** : `email_required`, `already_member` (une organisation par compte), `signup_refused` (le
+  texte d'`admit`, dans `details.text`), `conflict` pour un slug, un préfixe ou une adresse pris.
+
 ## Migrations
 
 Le SQL du paquet ne touche que le schéma `platform` et ne fait qu'ajouter. L'application copie les

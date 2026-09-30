@@ -23,6 +23,7 @@ import { createAnonPlatformDb, createPlatformDb, type PlatformDb } from "./db"
 import { inTransaction, isPlatformError, PlatformError } from "./errors"
 import { admittedType, requireQuota, requireStore } from "./files/service"
 import { identityInOrg, resolveOrg, type Identity, type IdentityOrg } from "./identity"
+import { orgStorageQuota } from "./limits"
 import { clip, journalError, MAX_TARGET_CHARS, wellFormed, writeJournal, type JournalEntry } from "./journal"
 import { checkDestination, writeUpload, type UploadResult, type UploadTicket } from "./uploads-write"
 
@@ -75,7 +76,8 @@ export async function createUploadTicket(context: FunctionContext, input: Upload
   if (args.kind === "file") {
     const name = args.name ?? ""
     admittedType(name)
-    await inTransaction(db, "uploads: quota", (sql) => requireQuota(sql, identity, { adding: UPLOAD_BYTES_MAX, what: name }))
+    const quota = await orgStorageQuota(identity.org)
+    await inTransaction(db, "uploads: quota", (sql) => requireQuota(sql, identity, { adding: UPLOAD_BYTES_MAX, what: name, quota }))
   }
   const token = newUploadToken()
   const formToken = newUploadToken()

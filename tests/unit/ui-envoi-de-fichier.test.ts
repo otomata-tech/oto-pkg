@@ -25,6 +25,10 @@ describe("messageDEnvoi (AC-b4)", () => {
   ])("should translate %s (%s) for %o", (code, raison, fichier, attendu) => {
     expect(messageDEnvoi({ code, raison, statut: 400 }, fichier)).toBe(attendu)
   })
+
+  it("should say the quota the host posed, carried in bytes by the refusal (E12-S02, AC-6)", () => {
+    expect(messageDEnvoi({ code: "too_large", raison: "quota", statut: 413, details: { reason: "quota", max: 1_073_741_824 } }, rapport)).toBe(FICHIERS.quota("1 Go"))
+  })
 })
 
 describe("LIMITES (AC-b4)", () => {

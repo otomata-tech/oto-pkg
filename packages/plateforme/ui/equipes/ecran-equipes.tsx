@@ -12,7 +12,7 @@
 // rail en tient lieu) ; les onglets « Règles d'accès » et « Accès plateforme » (E05-S13, AC-5, fiche D127 b,
 // c : les droits se règlent dans « Partager » de chaque contenu, les accès plateforme depuis la console Oto).
 import { Users } from "@phosphor-icons/react/dist/ssr/Users"
-import type { EquipesTab, MemberView, ReglagesDesListes, TeamView } from "../../schemas"
+import { limitReached, type EquipesTab, type MemberView, type OrgLimitsView, type ReglagesDesListes, type TeamView } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { Icon } from "../ds/react/icon"
@@ -21,6 +21,7 @@ import { Badge } from "../ds/react/primitives"
 import { ScreenHeader } from "../ds/react/screen-header"
 import { Skeleton } from "../ds/react/skeleton"
 import { BoutonDInvitation } from "../invitations/bouton-d-invitation"
+import { LimiteAtteinte } from "../limites/limite-atteinte"
 import { CreationDEquipe } from "./creation-d-equipe"
 import { OngletEquipes } from "./equipes"
 import { ECRAN, ONGLETS, pluriel } from "./libelles"
@@ -38,6 +39,8 @@ export type EcranEquipesProps = {
   invitations: Resultat<InvitationEnAttente[]>
   optionsDInvitation: Resultat<OptionsDInvitation | null>
   equipes: Resultat<TeamView[]>
+  /** Les capacités de l'organisation (`orgLimitsView`, E12-S02) ; absentes : aucun geste grisé. */
+  limites?: OrgLimitsView
   Lien: LienDeLHote
   /** L'adresse d'un onglet ; `reglages` : ceux de ses tableaux (un réglage absent y prend son défaut). */
   hrefDOnglet: (onglet: EquipesTab, reglages?: Partial<ReglagesDesListes>) => string
@@ -59,13 +62,21 @@ function meta(props: EcranEquipesProps): string | undefined {
   return invitations.data && invitations.data.length > 0 ? `${gens} · ${pluriel(invitations.data.length, "invitation", "invitations")}` : gens
 }
 
-/** L'action de l'en-tête suit l'onglet : on invite depuis les personnes, on crée une équipe depuis les équipes. */
-function action({ onglet, moi, nomOrganisation, optionsDInvitation }: EcranEquipesProps) {
+/**
+ * L'action de l'en-tête suit l'onglet : on invite depuis les personnes, on crée une équipe depuis les équipes ; une
+ * capacité atteinte grise le geste et le dit (E12-S02), avec le lien de l'hôte pour un administrateur.
+ */
+function action({ onglet, moi, nomOrganisation, optionsDInvitation, limites }: EcranEquipesProps) {
+  const lien = moi.estAdmin ? (limites?.raiseUrl ?? null) : null
   if (onglet === "members" && optionsDInvitation.data) {
+    if (limites?.members && limitReached(limites.members)) return <LimiteAtteinte libelle="Inviter quelqu'un" nom="members_max" etat={limites.members} lien={lien} />
     const options = optionsDInvitation.data
     return <BoutonDInvitation equipes={options.teams.map((equipe) => ({ id: equipe.id, nom: equipe.name }))} rolesPermis={options.roles} equipeObligatoire={options.teamRequired} />
   }
-  if (onglet === "teams" && moi.estAdmin) return <CreationDEquipe nomOrganisation={nomOrganisation} />
+  if (onglet === "teams" && moi.estAdmin) {
+    if (limites?.teams && limitReached(limites.teams)) return <LimiteAtteinte libelle="Créer une équipe" nom="teams_max" etat={limites.teams} lien={lien} />
+    return <CreationDEquipe nomOrganisation={nomOrganisation} />
+  }
   return undefined
 }
 

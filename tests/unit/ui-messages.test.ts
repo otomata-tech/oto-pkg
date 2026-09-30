@@ -65,3 +65,18 @@ describe("messageDErreur, phrases of a gesture", () => {
     )
   })
 })
+
+describe("messageDErreur, organisation limits (E12-S02)", () => {
+  it.each([
+    [{ limit: "members_max", max: 5 }, "L'organisation est limitée à 5 membres, invitations en attente comprises."],
+    [{ limit: "teams_max", max: 1 }, "L'organisation est limitée à 1 équipe."],
+    [{ limit: "teams_max", max: 0 }, "La création d'équipes n'est pas ouverte pour cette organisation."],
+    [{ limit: "connectors_max", max: 2 }, "L'organisation est limitée à 2 connecteurs actifs."],
+  ])("should say the limit %o in French", (details, message) => {
+    expect(messageDErreur(refus("forbidden", "limit", details))).toBe(message)
+  })
+
+  it("should fall back to the forbidden sentence when the refusal carries no known limit", () => {
+    expect(messageDErreur(refus("forbidden", "limit", { limit: "other", max: 1 }))).toBe("Vous n'avez pas le droit de faire cela.")
+  })
+})

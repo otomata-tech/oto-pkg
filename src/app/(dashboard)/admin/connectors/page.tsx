@@ -7,6 +7,7 @@ import {
   listConnectorsForOrg,
   listOrgAccounts,
   listTeams,
+  orgLimitsView,
   type Identity,
   type PlatformDb,
 } from "@otomata_tech/oto_platform/server"
@@ -34,10 +35,16 @@ const ICI = "/admin/connectors"
 
 async function lire(db: PlatformDb, identity: Identity): Promise<DonneesDesConnecteurs> {
   // Trois lectures indépendantes, en parallèle (`performance-patterns.md § Data Fetching Performance`).
-  const [connectors, accounts, teams] = await Promise.all([listConnectorsForOrg(db, identity), listOrgAccounts(db, identity), listTeams(db, identity)])
+  // Les capacités (E12-S02) : leur panne ne grise rien, le service refuse quand même.
+  const [connectors, accounts, teams, limites] = await Promise.all([
+    listConnectorsForOrg(db, identity),
+    listOrgAccounts(db, identity),
+    listTeams(db, identity),
+    orgLimitsView(db, identity).catch(() => undefined),
+  ])
   const actifs = connectors.filter((connecteur) => connecteur.state === "active")
   const impacts = await Promise.all(actifs.map(async ({ connector }) => [connector, await deactivationImpact(db, identity, connector)] as const))
-  return { connectors, impacts: Object.fromEntries(impacts), accounts, options: { teams: teams.map(({ id, name }) => ({ id, name })) } }
+  return { connectors, impacts: Object.fromEntries(impacts), accounts, options: { teams: teams.map(({ id, name }) => ({ id, name })) }, limites }
 }
 
 export default async function ConnecteursPage() {

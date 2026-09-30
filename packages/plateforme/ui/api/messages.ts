@@ -1,11 +1,14 @@
 // Les messages d'erreur des écrans, en français : l'API sert des codes et des messages anglais,
 // `ui/` traduit (H04). Une seule table, lue par tous les écrans ; jamais le texte du serveur.
+import { phraseDeLimite } from "../limites/limite-atteinte"
 import type { ErreurPlateforme } from "./client"
 
 const PAR_RAISON = new Map<string, string>([
   ["forbidden/not_allowed", "Inviter est réservé aux administrateurs et aux responsables d'équipe."],
   ["forbidden/admin_role_reserved", "Seul un administrateur peut inviter un administrateur."],
   ["forbidden/team_required", "Choisissez une équipe que vous dirigez."],
+  ["forbidden/already_member", "Vous faites déjà partie d'une organisation. Pour en créer une autre, demandez à l'équipe plateforme."],
+  ["forbidden/email_required", "L'inscription demande une adresse email vérifiée."],
   ["conflict/already_member", "Cette personne fait déjà partie de l'organisation."],
   ["conflict/already_invited", "Une invitation attend déjà cette adresse. Révoquez-la pour en envoyer une autre."],
   ["conflict/email_rate_limited", "Un email vient de partir vers cette adresse. Réessayez dans une minute."],
@@ -66,7 +69,10 @@ export function messageDErreur(erreur: ErreurPlateforme, propres?: MessagesDuGes
   if (erreur.code === "reseau") return phrasePropre(erreur, propres) ?? "La connexion au serveur a échoué. Réessayez."
   // Sans session, l'API répond 401 avec le code `forbidden` (N9) : le statut porte la différence.
   if (erreur.statut === 401) return "Votre session a expiré. Reconnectez-vous."
+  // Une capacité de l'organisation atteinte (E12-S02) : sa limite et son plafond, lus dans le refus.
+  const limite = erreur.code === "forbidden" && erreur.raison === "limit" ? phraseDeLimite(erreur.details?.limit, erreur.details?.max) : null
   const texte =
+    limite ??
     phrasePropre(erreur, propres) ??
     PAR_RAISON.get(`${erreur.code}/${erreur.raison ?? ""}`) ??
     PAR_CODE.get(erreur.code) ??

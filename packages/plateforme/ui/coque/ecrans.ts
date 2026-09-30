@@ -11,6 +11,7 @@ import { Buildings } from "@phosphor-icons/react/dist/csr/Buildings"
 import { ChartBar } from "@phosphor-icons/react/dist/csr/ChartBar"
 import { ChatCircleText } from "@phosphor-icons/react/dist/csr/ChatCircleText"
 import { ClockCounterClockwise } from "@phosphor-icons/react/dist/csr/ClockCounterClockwise"
+import { CreditCard } from "@phosphor-icons/react/dist/csr/CreditCard"
 import { Plug } from "@phosphor-icons/react/dist/csr/Plug"
 import { Info } from "@phosphor-icons/react/dist/csr/Info"
 import { Robot } from "@phosphor-icons/react/dist/csr/Robot"
@@ -37,6 +38,8 @@ const ECRANS: readonly Ecran[] = [
   { cle: "organisation", libelle: ENTREPRISE.organisation, glyphe: Buildings, rangement: "reglages", admin: true },
   { cle: "equipes", libelle: ENTREPRISE.equipes, glyphe: Users, rangement: "reglages", admin: false },
   { cle: "journal", libelle: ENTREPRISE.journal, glyphe: ClockCounterClockwise, rangement: "reglages", admin: false },
+  // E12-S02 : l'abonnement de l'hôte qui vend le paquet, s'il en donne l'adresse.
+  { cle: "abonnement", libelle: ENTREPRISE.abonnement, glyphe: CreditCard, rangement: "reglages", admin: true },
   { cle: "connecteurs", libelle: RAIL.connecteurs, glyphe: Plug, rangement: "pied", admin: true },
   { cle: "contexte", libelle: COMPTE.contexte, glyphe: Info, rangement: "compte", admin: false },
   { cle: "profil", libelle: COMPTE.profil, glyphe: UserCircle, rangement: "compte", admin: false },

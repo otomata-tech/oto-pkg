@@ -58,6 +58,9 @@ const REFUS = {
 export function messageDEnvoi(erreur: ErreurPlateforme, fichier: Pick<File, "name" | "size">): string {
   if (erreur.code === "invalid_arguments" && fileTypeOf(fichier.name) !== null) return FICHIERS.nomRefuse
   if (erreur.code === "too_large" && erreur.raison === undefined && fichier.size < 1) return FICHIERS.vide
+  // Le quota de l'organisation, posé par l'hôte (E12-S02), que le refus porte en octets ; 10 Go sinon.
+  const quota = erreur.details?.max
+  if (erreur.raison === "quota" && typeof quota === "number") return FICHIERS.quota(tailleLisible(quota))
   return messageDErreur(erreur, REFUS)
 }
 

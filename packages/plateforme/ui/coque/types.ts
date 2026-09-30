@@ -30,6 +30,8 @@ export type AdressesDuRail = {
   profil?: string
   /** La vue « Contexte », ce que lit l'assistant (E11-S10, AC-e1) : en tête du menu du compte, et dans la palette. */
   contexte?: string
+  /** L'écran d'abonnement de l'hôte (E12-S02) : aux réglages de l'entreprise, pour qui administre, et dans la palette ; absente, rien. */
+  abonnement?: string
 }
 
 export type EquipeDuRail = { slug: string; name: string }

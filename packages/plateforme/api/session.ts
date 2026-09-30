@@ -6,6 +6,7 @@
 // contrôle d'origine et la forme de l'erreur (`coding-standards.md § DRY`).
 import { makeVerifyToken, verifiedCaller, type VerifyToken } from "../mcp/auth"
 import { createPlatformDb, type PlatformDb } from "../server/db"
+import type { Caller } from "../server/sql"
 import { HTTP_STATUS, isPlatformError, PlatformError } from "../server/errors"
 import { requestOrigin, resolveIdentity, type Identity } from "../server/identity"
 
@@ -17,8 +18,11 @@ export type SessionOptions = {
   verifyToken?: VerifyToken
 }
 
-/** Le client de base de l'appelant vérifié, et l'email qu'en lit l'identité. */
-export type VerifiedSession = { db: PlatformDb; email: string }
+/**
+ * Le client de base de l'appelant vérifié, et l'email qu'en lit l'identité ; `caller`, l'appelant lui-même, dont
+ * l'inscription ouvre un second client une fois son identité créée (E12-S01).
+ */
+export type VerifiedSession = { db: PlatformDb; email: string; caller: Caller }
 
 /** Le refus d'une requête sans jeton ou au jeton refusé : `forbidden`, que chaque porte sert en 401. */
 export function authenticationRequired(): PlatformError {
@@ -34,7 +38,7 @@ export async function verifiedSession(request: Request, options: SessionOptions)
   const verifyToken = options.verifyToken ?? makeVerifyToken()
   const caller = verifiedCaller((await verifyToken(request, options.accessToken))?.extra)
   if (!caller) return null
-  return { db: createPlatformDb({ caller }), email: caller.email ?? "" }
+  return { db: createPlatformDb({ caller }), email: caller.email ?? "", caller }
 }
 
 /** L'identité de la session par l'adresse ; l'identifiant interne est celui de la session, que la base traduit (E01-S11). */

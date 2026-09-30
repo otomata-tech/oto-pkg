@@ -13,7 +13,6 @@ import {
   fileRequestSchema,
   fileTypeOf,
   IMAGE_TYPES,
-  ORG_QUOTA_BYTES,
   TEXT_FILE_MAX_BYTES,
   TEXT_TYPES,
   type FileAvailability,
@@ -27,6 +26,7 @@ import { readBounded } from "../bounded-read"
 import type { PlatformDb } from "../db"
 import { boundedList, changedMeanwhile, inTransaction, invalidInput, PlatformError } from "../errors"
 import type { Identity } from "../identity"
+import { orgStorageQuota } from "../limits"
 import type { Mutation } from "../members"
 import { findNode, unknownNode } from "../nodes/lookup"
 import { ownerOf, teamOf } from "../nodes/view"
@@ -138,20 +138,20 @@ export async function purgePendingFiles(db: PlatformDb, identity: Identity): Pro
 
 /**
  * Le quota de l'organisation (AC-a3, 5 ; ADR-016 § 4), dans la transaction qui écrit des lignes `files` : le verrou de
- * l'organisation, puis la somme des lignes `pending` et `ready` plus `adding` octets ; au-delà de 10 Go, `too_large`
- * (raison `quota`), qui annule la transaction. Pris avant l'insertion (la demande d'envoi) ou après elle (la duplication
- * d'une page, AC-e3, `adding` nul) : la dernière transaction à prendre le verrou compte les lignes des autres, validées.
+ * l'organisation, puis la somme des lignes `pending` et `ready` plus `adding` octets ; au-delà de `quota` (`orgStorageQuota`,
+ * lu chez l'hôte avant la transaction, 10 Go par défaut, E12-S02), `too_large` (raison `quota`, `max` en octets), qui
+ * annule la transaction. Pris avant l'insertion (la demande d'envoi) ou après elle (la duplication d'une page, AC-e3,
+ * `adding` nul) : la dernière transaction à prendre le verrou compte les lignes des autres, validées.
  */
-export async function requireQuota(sql: Tx, identity: Identity, request: { adding: number; what: string }): Promise<void> {
+export async function requireQuota(sql: Tx, identity: Identity, request: { adding: number; what: string; quota: number }): Promise<void> {
   await sql`select pg_catalog.pg_advisory_xact_lock(${QUOTA_LOCK}, pg_catalog.hashtext(${identity.org.id}::text))`
   const [{ used }] = await sql<{ used: string }[]>`
     select coalesce(sum(size), 0)::text as used from platform.files where org_id = ${identity.org.id} and status in ('pending', 'ready')`
-  if (Number(used) + request.adding > ORG_QUOTA_BYTES) {
-    throw new PlatformError("too_large", `${request.what} would take the files of ${identity.org.name} beyond ${gigabytes(ORG_QUOTA_BYTES)}: delete the pages that hold files no longer needed.`, {
-      reason: "quota",
-    })
+  if (Number(used) + request.adding > request.quota) {
+    throw new PlatformError("too_large", `${request.what} would take the files of ${identity.org.name} beyond ${gigabytes(request.quota)}: delete the pages that hold files no longer needed.`, { reason: "quota", max: request.quota })
   }
 }
+
 
 /** Copies d'objets lancées ensemble au plus : une page qui cite des centaines de fichiers n'ouvre pas autant de requêtes. */
 const COPIES_AT_ONCE = 8
@@ -232,8 +232,9 @@ export async function requestFileUpload(db: PlatformDb, identity: Identity, inpu
  * la demande de l'écran, et l'envoi par le serveur du dépôt par lien (lot f, `storeFile`). Rend son identifiant.
  */
 async function insertPending(db: PlatformDb, identity: Identity, file: { nodeId: string; name: string; mime: string; size: number }): Promise<string> {
+  const quota = await orgStorageQuota(identity.org)
   return inTransaction(db, "files: request", async (sql) => {
-    await requireQuota(sql, identity, { adding: file.size, what: file.name })
+    await requireQuota(sql, identity, { adding: file.size, what: file.name, quota })
     const [row] = await sql<{ id: string }[]>`
       insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
       values (${identity.org.id}, ${file.nodeId}, ${file.name}, ${file.mime}, ${file.size}, 'pending', ${identity.user.id})

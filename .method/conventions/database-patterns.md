@@ -193,7 +193,9 @@ numéros de ticket (réservée), 7301 arbre d'une organisation (insertion et
 déplacement d'un nœud, clé `org_id`), 7401 brouillon d'un nœud (chaque écriture
 d'un bloc `draft` sous un jeton la prend en partage sans attendre, `publish_node` en exclusif avant
 tout autre verrou, clé `node_id`), 7501 quota des fichiers joints d'une organisation (demande
-d'envoi, dépôt par lien et duplication, avant de sommer `files.size`, clé `org_id`). Un verrou pris dans un déclencheur de ligne
+d'envoi, dépôt par lien et duplication, avant de sommer `files.size`, clé `org_id`), 7601 limites comptées d'une
+organisation (invitation, équipe, connecteur, avant de compter, clé `org_id`, `server/limits.ts`), 7801 inscription d'une
+personne (`signup_org`, clé émetteur et sujet, sinon identifiant). Un verrou pris dans un déclencheur de ligne
 vient après le verrou de la ligne écrite : deux écritures qui se croisent peuvent s'interbloquer,
 Postgres en annule une (`40P01`), l'invariant tient. **Vérifiable :** tout `raise exception` de
 doublon qui suit un `exists` sur la même table, et tout contrôle d'une ligne contre d'autres lignes

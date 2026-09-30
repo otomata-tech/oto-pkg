@@ -94,8 +94,9 @@ export {
   orgSlugSchema,
   orgUpdateSchema,
   platformAccessSchema,
+  signupSchema,
 } from "./admin"
-export type { OrgSettings } from "./admin"
+export type { OrgSettings, SignupInput } from "./admin"
 export { moveNodeSchema } from "./nodes"
 export type { MoveNodeInput } from "./nodes"
 // Tableaux (E07-S01) : en-tête, grammaire de filtre et arguments des trois fonctions de lecture, que
@@ -237,6 +238,9 @@ export type { FileAvailability, FileReady, FileStorageState, FileType, FileUploa
 // E10-S02 (lot c) : « Voir ». Les routes des fichiers d'un lien public, le paramètre `view` et le fichier vu.
 export { FILES_ROUTE, filePath, fileViewParamSchema, publicFilesRoute } from "./files"
 export type { FileMarkdown, FileView, ViewedBlock } from "./files"
+// E12-S02 (ADR-022) : les capacités d'une organisation, fournies par l'hôte, et leur état pour les écrans.
+export { limitReached, orgLimitsSchema } from "./limits"
+export type { LimitState, OrgLimits, OrgLimitsView } from "./limits"
 // E10-S02 (lot f, ADR-018) : le dépôt par lien à usage unique. Entrée d'`upload.link`, jeton, bornes, adresses.
 export { MODES_OF, UPLOAD_BYTES_MAX, UPLOAD_FORM_ROUTE, UPLOAD_KINDS, UPLOAD_MODES, UPLOAD_RULE, UPLOAD_TOKEN_PATTERN, UPLOAD_TTL_MINUTES, UPLOADS_ROUTE, uploadLinkSchema } from "./uploads"
 export type { UploadDone, UploadFormView, UploadKind, UploadLinkArgs, UploadMode } from "./uploads"

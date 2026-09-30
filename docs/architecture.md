@@ -3,7 +3,7 @@
 > Document technique unique : le paquet et ses faces, le modèle de données, les services et leurs
 > portes, l'identité, l'installation d'un hôte, les invariants. Le fonctionnel (vision, parcours,
 > exigences et leur état) est dans [`docs/prd.md`](prd.md). Les décisions sont dans
-> `docs/decisions/` : ADR-001 à ADR-020 ; `hypotheses.md` et `fiche-decisions.md` résolvent les
+> `docs/decisions/` : ADR-001 à ADR-023 ; `hypotheses.md` et `fiche-decisions.md` résolvent les
 > identifiants de choix encore cités par le code (H…, P…, D…, hypothèses de story). Ce document dit
 > où chaque chose vit ; les ADR disent pourquoi.
 
@@ -219,7 +219,8 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `accept_invitations()` | Au retour de connexion : crée `members` et `team_members` depuis les invitations de l'email vérifié, et recopie email, nom et date de connexion dans chaque ligne `members` de la personne |
 | `hook_before_user_created(event)` | Mode Supabase : n'accepte une création de compte que sur invitation en attente |
 | `unique_handle(org, email)` | `handle` de l'espace personnel : partie locale de l'email, ASCII, unique dans l'organisation (outillage) |
-| `create_org(name, slug, prefix, hosts)` | Organisation avec sa racine, son dossier `private`, son nœud `contexte` et ses adresses (équipe plateforme) |
+| `create_org(name, slug, prefix, hosts)` | Organisation avec sa racine, son dossier `private`, son nœud `contexte` et ses adresses (équipe plateforme), par `org_skeleton` (interne, exécutable par aucun rôle), l'accès `creation` du créateur en plus |
+| `signup_org(name, slug, prefix, hosts)` | Inscription (ADR-023) : l'identité de l'appelant s'il n'en a pas (mode OIDC), l'arbre de départ par `org_skeleton`, les adresses et le premier membre `admin`, sans équipe ni accès plateforme ; refus `42501` sans email, ou pour une personne déjà membre d'une organisation ; verrou 7801 sur la personne. Seconde barrière : l'activation est décidée par le service |
 | `is_context_path(org, path)` | Seule définition d'un chemin de Contexte : `contexte`, `<équipe>/contexte`, `private/<handle>/contexte` |
 | `node_owner(node)` | Propriétaire effectif d'un nœud : le plus proche ancêtre, lui compris, qui en porte un |
 | `level_rank(level)`, `node_level_of(user, …)`, `node_level_for(…)` | Rang d'un niveau ; `node_level_of` porte le seul corps SQL du niveau de lecture d'un nœud pour une personne (règles de personne, d'équipe et d'organisation, propriétaire, espaces personnels ; ADR-012 § 3, ADR-014), appelable par les fonctions du paquet seulement ; `node_level_for` l'applique à l'appelant pour la recherche, égal au calcul du service (test de parité) |
@@ -306,7 +307,8 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `tables/` | `table.schema`, `rows`, `aggregate`, `write`, `claim`, `release`, `delete_rows` (suppression définitive par clé, `delete-rows.ts`) sur les blocs `row` ; preuve exigée pour toute valeur nouvelle si le tableau l'exige (`proof`) ; `create_only` ; recherche `q` par mots (chaque mot, ou avec `match: any` au moins un, les lignes qui en portent le plus d'abord) ; revue humaine, ou par l'assistant si le tableau l'autorise ; lectures de l'écran (grille, résumé, file, vues) ; évolution de l'en-tête par `write` ; import d'un CSV (`import.ts` : `table.import` et `POST tables/import` appellent `importRows`, provenance `import`) et export CSV (`export.ts`) | MCP (`call`), API, écrans |
 | `feedback.ts` | Tickets | MCP, MCP admin, écrans |
 | `journal-read.ts`, `journal-rows.ts`, `journal-model.ts`, `usage.ts`, `activities.ts` | Lecture du journal par conversation, dans la portée décidée par le service (ses lignes, celles des équipes qu'on mène, toutes pour l'admin) ; arguments masqués et coupés ; un appel sur l'espace personnel d'autrui ne livre à un autre lecteur que son outil, son heure, son issue, son code et sa cible coupée à `private/<handle>` (`perso/<handle>` sur une ligne d'avant ce nom, le journal n'étant pas réécrit) ; usage agrégé ; activités de l'accueil (le journal classé en gestes sur un contenu, dans la même portée, titre et lien seulement pour un contenu que la personne lit) | écrans, MCP, MCP admin |
-| `admin/` | Opérations des huit outils admin, partagées avec le tableau de bord ; journal admin ; point d'extension de la création d'une organisation, que l'hôte branche | MCP admin, API |
+| `admin/` | Opérations des huit outils admin, partagées avec le tableau de bord ; journal admin ; point d'extension de la création d'une organisation, que l'hôte branche ; inscription libre (`signup.ts`, ADR-023), sur l'option `signup` de `handlePlateforme` | MCP admin, API |
+| `limits.ts` | Capacités par organisation (ADR-022) : la source de l'hôte (`registerOrgLimits`), lue hors transaction ; le refus au plafond (`requireUnderLimit`, `limitedTx`, verrou 7601) de `inviteMember`, `createTeam`, `activateConnector` ; le quota de fichiers (`orgStorageQuota`, 10 Go par défaut) ; l'état servi aux écrans (`orgLimitsView`) | API, MCP, MCP admin, écrans |
 | `flags.ts`, `cell.ts`, `brand.ts` | Drapeaux par organisation ; état de la cellule (version, migrations, variables exigées selon le mode) ; marque | MCP admin, écrans |
 | `share-image.ts` | Données de l'image de partage d'une adresse, sans session (E11-S21) : l'organisation de l'adresse (`org_by_host`, logo lu par `fetchSource`, en `data:`), et, pour un lien public, le titre et le résumé que `readPublicNode` sert ; jamais un nœud sans lien ; ne lève jamais (repli générique). Dessinée par `ImageDePartage` (`ui/`), rendue par `ImageResponse` chez l'hôte | Routes d'image de l'hôte |
 
@@ -373,7 +375,7 @@ la première requête (`identity_for_caller()`), et une personne invitée entre 
 L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platform_staff`.
 
 ### Web
-- On entre par invitation. En mode Supabase, la personne reçoit le lien magique ; le lien se
+- On entre par invitation, ou, si l'hôte active l'inscription (ADR-023), en créant sa propre organisation depuis une adresse sans organisation (`POST signup`, `FormulaireDInscription`). En mode Supabase, la personne reçoit le lien magique ; le lien se
   vérifie au clic sur « Continuer » (`/auth/confirm`), jamais à l'ouverture ; au retour,
   `accept_invitations()` crée `members`. En mode OIDC, la plateforme envoie l'email au SMTP de
   l'hôte, et la personne entre à sa première connexion chez l'émetteur.
@@ -492,6 +494,9 @@ choix ne changent pas sans ADR.
 - Toute adresse est en anglais (segments, paramètres, valeurs, ancres), quelle que soit la langue de
   l'écran ; l'API des écrans se monte sous `/api/platform/*` (`PLATFORM_API_PREFIX`) ; un renommage
   sans client se fait sans alias, l'ancienne adresse en 404 ; garde : `pnpm check:framework` (ADR-020).
+- Capacités par organisation déclarées par le paquet, valeurs fournies par l'hôte, refus décidés par le
+  service avant l'écriture ; sans source, aucune limite (ADR-022). Inscription libre activée par l'hôte seul
+  (ADR-023).
 
 **Code** : les quatre invariants de `CLAUDE.md § Invariants techniques` (Server Components par
 défaut, Server Actions pour les mutations de l'hôte, un schéma Zod par donnée, RLS sur toute table

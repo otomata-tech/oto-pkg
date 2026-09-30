@@ -388,3 +388,31 @@ describe("EcranEquipes accessibility (AC-x3)", () => {
     }
   })
 })
+
+describe("capacités atteintes (E12-S02, AC-10)", () => {
+  it("should grey the header gesture at the limit, with the raise link for an administrator only", () => {
+    const limites = { members: { max: 3, used: 3 }, teams: { max: 2, used: 2 }, connectors: null, raiseUrl: "/billing" }
+    const { unmount } = rendre({ limites })
+    expect(screen.getByRole("button", { name: "Inviter quelqu'un" })).toBeDisabled()
+    expect(screen.getByText(/Limite atteinte : 3 membres sur 3, invitations en attente comprises\./)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Relever la limite" })).toHaveAttribute("href", "/billing?capacity=members_max")
+    unmount()
+
+    rendre({ limites, onglet: "teams" })
+    expect(screen.getByRole("button", { name: "Créer une équipe" })).toBeDisabled()
+    expect(screen.getByRole("link", { name: "Relever la limite" })).toHaveAttribute("href", "/billing?capacity=teams_max")
+  })
+
+  it("should leave the gesture open under the limit, and give no link to a lead", () => {
+    const { unmount } = rendre({ limites: { members: { max: 3, used: 2 }, teams: null, connectors: null, raiseUrl: "/billing" } })
+    expect(screen.getByRole("button", { name: "Inviter quelqu'un" })).toBeEnabled()
+    unmount()
+    rendre({
+      moi: { userId: ADA, estAdmin: false, equipesDirigees: [VENTES] },
+      optionsDInvitation: { data: { roles: ["member"], teams: [{ id: VENTES, name: "Ventes" }], teamRequired: true } },
+      limites: { members: { max: 3, used: 3 }, teams: null, connectors: null, raiseUrl: "/billing" },
+    })
+    expect(screen.getByRole("button", { name: "Inviter quelqu'un" })).toBeDisabled()
+    expect(screen.queryByRole("link", { name: "Relever la limite" })).toBeNull()
+  })
+})

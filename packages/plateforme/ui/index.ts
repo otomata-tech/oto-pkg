@@ -5,6 +5,8 @@ export { NavigateurDArbre, NavigateurDArbreChargement } from "./arbre/navigateur
 export type { NoeudDArbre } from "./arbre/types"
 export { EcranDAuthentification } from "./authentification/ecran-d-authentification"
 export { IlotDAuthentification } from "./authentification/ilot-d-authentification"
+// E12-S01 (ADR-023) : l'inscription d'une organisation, montée par l'hôte qui l'active dans `EcranDAuthentification`.
+export { FormulaireDInscription } from "./inscription/formulaire-d-inscription"
 export { AucuneOrganisation, AucuneOrganisationChargement } from "./identite/aucune-organisation"
 export type { ResultatAucuneOrganisation } from "./identite/aucune-organisation"
 export { InviterQuelquUn } from "./invitations/inviter-quelqu-un"
@@ -88,6 +90,21 @@ export { EcranDuContexte, EcranDuContexteChargement } from "./contexte/ecran-du-
 // de l'hôte (connexion, mot de passe oublié, réinitialisation), rendus dans l'îlot du gabarit.
 export { Alert, Button } from "./ds/react/primitives"
 export { Field, Input } from "./ds/react/forms"
+// E12-S02 : les primitives que composent les écrans d'administration d'un hôte (l'abonnement du SaaS), sur le même design
+// system, et leur en-tête, rangé au fil des réglages.
+export { Badge } from "./ds/react/primitives"
+export { Island, IslandBody, IslandFoot, IslandHead } from "./ds/react/island"
+export { SegmentedControl } from "./ds/react/segmented-control"
+export { Dialog } from "./ds/react/dialog"
+export { ConfirmDialog } from "./ds/react/confirm-dialog"
+export { Table } from "./ds/react/table"
+export type { Column } from "./ds/react/table"
+export { Skeleton, SkeletonText } from "./ds/react/skeleton"
+export { EmptyState } from "./ds/react/empty-state"
+export { Checkbox } from "./ds/react/checkbox"
+export { EnTeteDAdministration } from "./admin/en-tete"
+export type { EcranDAdministration } from "./admin/fil-de-l-administration"
+export type { FilDeLEcran } from "./admin/types"
 // E05-S09 (partie d2) : les écrans d'administration sur le design system ; « Accès plateforme » a son écran.
 export { EcranAccesPlateforme } from "./admin/acces/ecran-acces-plateforme"
 // E05-S10 (partie b2) : l'écran « Corbeille », ouvert par le pied du rail (AC-b11).

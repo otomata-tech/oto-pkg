@@ -114,6 +114,19 @@ export type OrgView = {
   contact: { name: string; email: string } | null
 }
 
+/**
+ * L'inscription d'une organisation (E12-S01, ADR-023) : nom, slug et préfixe, contrôlés comme par `orgCreateSchema`, sans
+ * adresse (celles de l'hôte, `OrgCreationHook`) ; deux temps.
+ */
+export const signupSchema = z.strictObject({
+  name: orgNameSchema,
+  org: orgSlugSchema,
+  prefix: toolPrefixSchema,
+  confirm: z.boolean().optional(),
+})
+
+export type SignupInput = z.infer<typeof signupSchema>
+
 /** `create` d'`admin_org` : slug, nom, préfixe, première adresse facultative, deux temps (N8). */
 export const orgCreateSchema = z.strictObject({
   org: orgSlugSchema,

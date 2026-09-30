@@ -18,7 +18,7 @@ import { useHote } from "../hote/navigation"
 import type { FilDeLEcran } from "./types"
 
 /** Les écrans d'administration de la plateforme, par leur clé dans les adresses du rail. */
-export type EcranDAdministration = "usage" | "retours" | "organisation" | "marque" | "drapeaux" | "acces" | "connecteurs"
+export type EcranDAdministration = "usage" | "retours" | "organisation" | "marque" | "drapeaux" | "acces" | "connecteurs" | "abonnement"
 
 const GROUPES: Partial<Record<Rangement, { titre: string; glyphe: Glyphe }>> = {
   reglages: { titre: ENTREPRISE.reglages, glyphe: Gear },

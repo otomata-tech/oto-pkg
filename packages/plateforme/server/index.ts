@@ -23,6 +23,9 @@ export type { Database } from "./database"
 export { fromDatabaseError, HTTP_STATUS, isPlatformError, PLATFORM_ERROR_CODES, PlatformError } from "./errors"
 export type { PlatformErrorCode } from "./errors"
 export { FLAGS, isEnabled, listFlags, setFlag } from "./flags"
+// E12-S02 (ADR-022) : les capacités d'une organisation, dont l'hôte enregistre la source ; l'état pour les écrans.
+export { orgLimitsView, registerOrgLimits } from "./limits"
+export type { OrgLimitsSource } from "./limits"
 export {
   identityInOrg,
   normalizeHost,
@@ -75,6 +78,9 @@ export type { StaffCaller } from "./admin/context"
 export { createOrg, getOrg, listOrgOverviews, listOrgs, updateOrg } from "./admin/orgs"
 export type { AdminOrg, OrgChange, OrgDraft, OrgOverview, OrgSheet } from "./admin/orgs"
 export type { OrgCreationHook } from "./admin/org-creation"
+// E12-S01 (ADR-023) : l'inscription libre, que l'hôte active par l'option `signup` de `handlePlateforme`.
+export { signUp } from "./admin/signup"
+export type { SignupOptions, SignupResult } from "./admin/signup"
 export { addHost, removeHost } from "./admin/hosts"
 export { grantAccess, revokeAccess } from "./admin/grants"
 export { moveNode } from "./nodes/move"

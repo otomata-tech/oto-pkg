@@ -4,7 +4,8 @@ import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { fileViewParamSchema, publicFilesRoute } from "@otomata_tech/oto_platform/schemas"
 import { isPlatformError, publicFileView, readPublicNode, requestHost } from "@otomata_tech/oto_platform/server"
-import { CoquilleOto, MESSAGES_DE_LA_VISIONNEUSE, metadonneesDePartage, PAGE_PUBLIQUE, PagePublique, resultatDe, type PagePubliqueProps } from "@otomata_tech/oto_platform/ui"
+import { CoquilleOto, MESSAGES_DE_LA_VISIONNEUSE, PAGE_PUBLIQUE, PagePublique, resultatDe, type PagePubliqueProps } from "@otomata_tech/oto_platform/ui"
+import { metadonneesDePartage } from "@otomata_tech/oto_platform/share"
 import { marqueDeLAdresse } from "@/lib/plateforme/marque-de-l-adresse"
 
 // La page publique d'un lien de partage (E05-S10, AC-d2 à AC-d6 ; ADR-013 § 4, § 5) : `/p/<jeton>` pour le

@@ -425,7 +425,9 @@ Pas à pas, variables et vérifications : `packages/plateforme/README.md` et oto
   chacune important d'abord `lib/fonctions-metier.ts` ; `CoquilleOto` dans le layout. Aperçu d'un lien (E11-S21) :
   le layout racine pose `metadonneesDePartage` (origine de la requête en `metadataBase`, organisation de l'adresse),
   la page publique la sienne (contenu du lien) ; deux routes d'image, `opengraph-image.tsx` à la racine (laissée
-  passer par le middleware) et `p/[jeton]/share-image/[[...chemin]]`.
+  passer par le middleware) et `p/[jeton]/share-image/[[...chemin]]`. Image et métadonnées s'importent de
+  `@otomata_tech/oto_platform/share`, sans module client ; un fichier du segment racine qui importe `/ui` met le code
+  client de la face dans le JavaScript de toutes les pages (`performance-patterns.md § Bundle Size`).
 - **Base** : une fois par base, par un administrateur, `oto-platform db prepare` (rôles,
   schéma `auth` réduit, extensions, `platform_app`) ; puis `oto-platform migrations sync` et
   `migrations check`, et l'application des migrations par l'outil de l'hôte (`supabase db push

@@ -2,12 +2,14 @@
 // l'application de référence hors du dépôt, puis `next build`. Le `build` du workspace lit le paquet
 // par un lien vers ses sources ; un hôte le lit dans `node_modules`, où son bundler applique
 // `"sideEffects": false` et peut charger en premier n'importe quel module d'une face : seul ce passage
-// voit ce que voit l'hôte (cycle d'imports lu au chargement, fichier absent de `files`).
+// voit ce que voit l'hôte (cycle d'imports lu au chargement, fichier absent de `files`). Il mesure aussi le JS
+// chargé par toutes les pages, sous budget (`shared-first-load-js.mjs`).
 // Usage : `node scripts/ci/packed-host-build.mjs` depuis la racine ; code de sortie de l'étape en échec.
 import { execFileSync, spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { assertSharedJsBudget, SHARED_JS_BUDGET_KB } from "./shared-first-load-js.mjs"
 
 const ROOT = path.resolve(import.meta.dirname, "../..")
 const PACKAGE = "@otomata_tech/oto_platform"
@@ -70,7 +72,10 @@ try {
   // Le verrou du dépôt garde les versions de ses dépendances ; seule l'entrée du paquet change.
   run("pnpm install --no-frozen-lockfile", host)
   run("pnpm exec next build", host)
-  console.log(`\npacked-host-build: ${tarball} se construit chez un hôte.`)
+  // Le JS de toutes les pages, mesuré chez l'hôte : un import du paquet par un fichier du segment racine y met du code
+  // client que le build du workspace ne signale pas (`performance-patterns.md § Bundle Size`).
+  const sharedKb = assertSharedJsBudget(path.join(host, ".next"))
+  console.log(`\npacked-host-build: ${tarball} se construit chez un hôte ; JS partagé ${sharedKb.toFixed(1)} kB (budget ${SHARED_JS_BUDGET_KB} kB).`)
 } catch (error) {
   console.error(`\npacked-host-build: ${error.message}`)
   process.exitCode = 1

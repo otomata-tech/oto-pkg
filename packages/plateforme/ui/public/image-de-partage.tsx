@@ -5,6 +5,9 @@
 // par la table ci-dessous (confrontée au fichier par son test) et mélangées par les formules du contrat `.oto`
 // (`--ink`, `--mute`, `--title`). Aucune mention d'Oto quand l'organisation est connue, comme la page publique.
 // Aussi : les métadonnées de partage que les pages de l'hôte posent (`metadonneesDePartage`).
+// Point d'entrée `@otomata_tech/oto_platform/share` : un fichier de convention de métadonnées (`opengraph-image`) est
+// chargé par le segment racine, et un import du barrel `ui/` y tirerait tous ses modules `"use client"` dans le JS de
+// toutes les pages ; ce module n'importe donc que des types et `schemas/`, jamais un module de `ui/`.
 import type { Metadata } from "next"
 import type { ShareImageData, Theme } from "../../schemas"
 import { webUrl } from "../../schemas/oauth"

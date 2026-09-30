@@ -1,6 +1,6 @@
 {
   "name": "@otomata_tech/oto_platform",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -30,6 +30,7 @@
   "exports": {
     "./ui": "./ui/index.ts",
     "./ui/styles.css": "./ui/styles.css",
+    "./share": "./ui/public/image-de-partage.tsx",
     "./schemas": "./schemas/index.ts",
     "./mcp": "./mcp/index.ts",
     "./api": "./api/index.ts",

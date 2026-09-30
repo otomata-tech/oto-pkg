@@ -1,11 +1,13 @@
 import { headers } from "next/headers"
 import { ImageResponse } from "next/og"
 import { requestHost, shareImageData } from "@otomata_tech/oto_platform/server"
-import { ImageDePartage, TAILLE_DE_PARTAGE } from "@otomata_tech/oto_platform/ui"
+import { ImageDePartage, TAILLE_DE_PARTAGE } from "@otomata_tech/oto_platform/share"
 
 // L'image de partage de toute adresse (E11-S21) : l'organisation de l'adresse seule, jamais une page (HN-E11S21-2) ;
 // une messagerie la montre sous un lien collé. Un lien public pose la sienne (`p/[jeton]/share-image`). Publique :
-// le middleware la laisse passer, un robot d'aperçu n'a pas de session.
+// le middleware la laisse passer, un robot d'aperçu n'a pas de session. Importée de `/share`, jamais de `/ui` : chargé
+// par le segment racine, ce fichier mettrait le code client du barrel dans le JS de toutes les pages
+// (`performance-patterns.md § Bundle Size`).
 
 export const size = TAILLE_DE_PARTAGE
 export const contentType = "image/png"

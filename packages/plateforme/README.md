@@ -10,6 +10,7 @@ sans étape de build, sous licence MIT.
 | Face | Export | Rôle |
 |------|--------|------|
 | `ui/` | `@otomata_tech/oto_platform/ui` | Écrans et composants, portés d'oto-frontend ; jamais `server/`, `migrations/`, client DB |
+| `ui/public/image-de-partage.tsx` | `@otomata_tech/oto_platform/share` | Image et métadonnées de partage (`ImageDePartage`, `TAILLE_DE_PARTAGE`, `metadonneesDePartage`), sans module client : pour les fichiers de métadonnées et les layouts |
 | `schemas/` | `@otomata_tech/oto_platform/schemas` | Schémas Zod (`zod/v4`) partagés par toutes les faces, `ui/` compris ; Zod pur, aucune autre face ni client DB (frontière ESLint) |
 | `mcp/` | `@otomata_tech/oto_platform/mcp` | Six outils, ctx, routage, prompts ; instructions et descriptions statiques |
 | `api/` | `@otomata_tech/oto_platform/api` | Route handlers `/api/platform/*` : adaptateurs des services |
@@ -118,7 +119,10 @@ Pour une application Next 15 (App Router) sur Supabase.
    (l'organisation de l'adresse seule), `app/p/[jeton]/share-image/[[...chemin]]/route.tsx` la même chose avec
    `{ token, path }` (le contenu du lien) ; le middleware laisse passer `/opengraph-image` ; le `generateMetadata` du
    layout racine étend `metadonneesDePartage({ organisation, origine })`, celui de la page publique
-   `metadonneesDePartage({ organisation, page })`. Les fichiers de l'hôte de référence (`src/`) servent de modèle.
+   `metadonneesDePartage({ organisation, page })`. Les trois s'importent de `@otomata_tech/oto_platform/share`, sans
+   code client : importés de `/ui` par `app/opengraph-image.tsx`, fichier du segment racine, ils mettraient le code
+   client de toute la face (éditeur, zod) dans le JavaScript de toutes les pages. Les fichiers de l'hôte de
+   référence (`src/`) servent de modèle.
 
 7. Réglages d'Auth du projet Supabase, une fois les migrations appliquées : depuis un clone du dépôt
    `otomata-tech/oto-pkg`, `pnpm auth:settings --to <ref> --site-url <url> --redirect <motif>`

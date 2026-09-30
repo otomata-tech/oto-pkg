@@ -17,6 +17,12 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.6 — 2026-09-30
+
+### Hosts
+- Install: upgrade to 1.1.6; no migration, no new variable. `app/opengraph-image.tsx` and `app/p/[jeton]/share-image/[[...chemin]]/route.tsx` import `ImageDePartage` and `TAILLE_DE_PARTAGE` from `@otomata_tech/oto_platform/share` instead of `/ui`; the root layout and the public page import `metadonneesDePartage` from it too. Imported from `/ui` by `app/opengraph-image.tsx`, the image put the client code of the whole `/ui` entry (block editor, zod) in the JavaScript loaded by every page: 104 kB shared by all pages in 1.1.4, 314 kB in 1.1.5, 104 kB again with `/share`.
+- UI: new entry `@otomata_tech/oto_platform/share` (`ImageDePartage`, `TAILLE_DE_PARTAGE`, `metadonneesDePartage`), with no client module; `/ui` still exports the three.
+
 ## 1.1.5 — 2026-09-30
 
 ### Hosts

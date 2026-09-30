@@ -142,6 +142,14 @@ composant du catalogue sans nom accessible l'est aussi dans les pages qui l'util
 - **Imports nommés** : `import { Button } from "@/components/ui/button"` (pas `import * as UI`)
 - **Pas de libs géantes pour un usage simple** : `date-fns` > `moment`, natif > lodash
 - **Tree shaking** : vérifier que les libs sont ESM-compatible
+- **Un fichier du segment racine n'importe jamais de `@otomata_tech/oto_platform/ui` ce qu'une entrée sans module
+  client sert** : `app/opengraph-image.tsx` (et toute convention d'image de métadonnées) et le `generateMetadata` du
+  layout racine prennent l'image et les métadonnées de partage dans `@otomata_tech/oto_platform/share`. Next collecte
+  les modules `"use client"` du graphe entier du barrel `ui/index.ts`, pas les seuls noms importés : un import du
+  barrel par un fichier chargé à la racine met le code client de toute la face (éditeur, zod) dans le JavaScript de
+  chaque page. **Vérifiable :** le job CI `packed-host-build` échoue si le JS partagé par toutes les pages dépasse
+  `SHARED_JS_BUDGET_KB` (`scripts/ci/shared-first-load-js.mjs`, 120 kB) ; en local, `node
+  scripts/ci/shared-first-load-js.mjs` après `pnpm build`.
 
 ### Tailles cibles — objectifs mesurés en CI / Lighthouse
 

@@ -10,5 +10,6 @@ Texte complet : `.method/conventions/performance-patterns.md`. La fiche suffit p
 - `pnpm audit:lh` avant une mise en production et après un changement de layout, de hero, de police ou de token de couleur ; un nouvel archétype de page entre dans oto-saas : `lighthouserc.json`. § Audit Lighthouse
 - Aucun constat « bundle trop gros » sans chiffre mesuré. § Tailles cibles — objectifs mesurés en CI / Lighthouse
 - Imports nommés ; aucune bibliothèque géante pour un usage simple (natif ou `date-fns` plutôt que lodash ou `moment`). § Bonnes pratiques
+- Un fichier du segment racine (`opengraph-image`, `generateMetadata` du layout) prend l'image et les métadonnées de partage dans `@otomata_tech/oto_platform/share`, jamais dans `/ui` : le barrel tirerait tout son code client dans chaque page ; budget du JS partagé vérifié par `packed-host-build`. § Bundle Size
 - Les lectures indépendantes partent ensemble (`Promise.all`), jamais en cascade ; une section lente se rend sous son `<Suspense>`. § Parallel fetching · § Streaming avec Suspense
 - Seule l'interactivité est cliente : la page reste serveur, le bouton seul est `"use client"`. § Éviter les re-renders inutiles

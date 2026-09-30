@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og"
 import { requestHost, shareImageData } from "@otomata_tech/oto_platform/server"
-import { ImageDePartage, TAILLE_DE_PARTAGE } from "@otomata_tech/oto_platform/ui"
+import { ImageDePartage, TAILLE_DE_PARTAGE } from "@otomata_tech/oto_platform/share"
 
 // L'image de partage d'un lien public (E11-S21) : `/p/<jeton>/share-image[/<chemin>]`, le titre et le résumé du contenu
 // que le lien sert, aux couleurs de l'organisation ; un lien inconnu, révoqué ou hors de portée : l'image générique,

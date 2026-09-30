@@ -96,6 +96,7 @@ export { EcranDeLaCorbeille, EcranDeLaCorbeilleChargement } from "./corbeille/ec
 export { PAGE_PUBLIQUE, PagePublique, PagePubliqueIntrouvable } from "./public/page-publique"
 export type { PagePubliqueProps } from "./public/page-publique"
 // E11-S21 : l'image de partage d'une adresse, que l'hôte passe à `ImageResponse`, et les métadonnées de partage.
+// Gardés ici (ADR-006) ; l'hôte les importe de `@otomata_tech/oto_platform/share`, sans code client.
 export { ImageDePartage, metadonneesDePartage, TAILLE_DE_PARTAGE } from "./public/image-de-partage"
 // E05-S11 (lot a) : l'écran « Profil », que l'hôte monte à `/profile`.
 export { EcranProfil, EcranProfilChargement } from "./profil/ecran-profil"

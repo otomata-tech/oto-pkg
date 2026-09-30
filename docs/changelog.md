@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-30] — Le JS de toutes les pages revient à 104 kB, 1.1.6
+
+**Quoi :** entrée `@otomata_tech/oto_platform/share` (`ImageDePartage`, `TAILLE_DE_PARTAGE`, `metadonneesDePartage`), qui pointe `ui/public/image-de-partage.tsx`, sans module client ; `/ui` les exporte encore (ADR-006). L'hôte de référence les importe de `/share` (`opengraph-image.tsx`, route `share-image`, layout racine, page publique). Budget du JS partagé par toutes les pages (120 kB), mesuré sur le manifeste du build par `scripts/ci/shared-first-load-js.mjs` et appliqué dans le job `packed-host-build`. Version 1.1.6.
+**Pourquoi :** constaté par oto-saas : « First Load JS shared by all » passé de 104 kB (1.1.4) à 321 kB (1.1.5), éditeur et zod chargés jusque sur `/login`. Cause mesurée par builds : `app/opengraph-image.tsx` importait le barrel `/ui` ; Next collecte tous les modules client du barrel dans les morceaux du segment racine (314 kB ici, 104 kB sans ce fichier ou avec `/share`) ; le layout racine seul n'en était pas la cause.
+**Problèmes :** la colonne « First Load JS » de `next build` ne compte pas les layouts : le layout racine charge déjà 318 kB par `FaviconDuTheme` importé du barrel (1.1.4 compris), non corrigé (M104). `/_not-found` dynamique depuis la 1.1.5, accepté (HN-E11S21-11). Garde écrite : `performance-patterns.md § Bundle Size`.
+**Fichiers :** `packages/plateforme/{package.json,ui/public/image-de-partage.tsx,ui/index.ts,CHANGELOG.md,README.md}` ; `src/app/{layout.tsx,opengraph-image.tsx,p/[jeton]/[[...chemin]]/page.tsx,p/[jeton]/share-image/[[...chemin]]/route.tsx}` ; `scripts/ci/{shared-first-load-js.mjs,packed-host-build.mjs}` ; `tests/unit/shared-first-load-js.test.ts`, `tests/integration/components/image-de-partage.test.tsx` ; `docs/architecture.md`, `docs/decisions/hypotheses.md`, `.method/conventions/{performance-patterns.md,fiches/performance-patterns.md,component-registry.md}`, `.method/sprint/status.md`.
+
 ## [2026-09-30] — Les tableaux ne décentrent plus la lecture, 1.1.5
 
 **Quoi :** le corps de lecture (lecteur, page publique, visionneuse d'un `.md`) centre ses blocs dans une colonne à la mesure du texte (`--colonne-du-lecteur`, `content.css`) ; un tableau simple ou un tableau markdown gardé en texte s'élargit des deux côtés jusqu'au bord du corps, puis défile dans son cadre, une région nommée et focusable. L'éditeur garde sa pleine largeur (`data-reading="blocs"`).

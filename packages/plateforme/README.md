@@ -9,7 +9,7 @@ sans étape de build, sous licence MIT.
 
 | Face | Export | Rôle |
 |------|--------|------|
-| `ui/` | `@otomata_tech/oto_platform/ui` | Écrans et composants, portés d'oto-frontend ; jamais `server/`, `migrations/`, client DB |
+| `ui/` | `@otomata_tech/oto_platform/ui` | Écrans et composants, portés d'oto-frontend ; jamais `server/`, `migrations/`, client DB ; un fichier de réexports seuls, que l'hôte déclare dans `optimizePackageImports` (installation, étape 3) |
 | `ui/public/image-de-partage.tsx` | `@otomata_tech/oto_platform/share` | Image et métadonnées de partage (`ImageDePartage`, `TAILLE_DE_PARTAGE`, `metadonneesDePartage`), sans module client : pour les fichiers de métadonnées et les layouts |
 | `schemas/` | `@otomata_tech/oto_platform/schemas` | Schémas Zod (`zod/v4`) partagés par toutes les faces, `ui/` compris ; Zod pur, aucune autre face ni client DB (frontière ESLint) |
 | `mcp/` | `@otomata_tech/oto_platform/mcp` | Six outils, ctx, routage, prompts ; instructions et descriptions statiques |
@@ -61,10 +61,15 @@ Pour une application Next 15 (App Router) sur Supabase.
      - "@otomata_tech/oto_platform"
    ```
 
-3. `next.config.ts` : le paquet est publié en sources TypeScript, Next le transpile.
+3. `next.config.ts` : le paquet est publié en sources TypeScript, Next le transpile ; et Next réécrit
+   chaque import de `@otomata_tech/oto_platform/ui` vers le module de l'export nommé. Sans cette
+   réécriture, un layout ou une page qui importe de `/ui` charge le code client de tous les écrans
+   (éditeur, zod) : 337 kB de JavaScript sur `/login`, 151 kB avec elle. Le sous-chemin exact : le nom
+   du paquet seul ne couvre pas `/ui`.
 
    ```ts
    transpilePackages: ["@otomata_tech/oto_platform"],
+   experimental: { optimizePackageImports: ["@otomata_tech/oto_platform/ui"] },
    ```
 
 4. `src/app/globals.css`, après `@import "tailwindcss";` : Tailwind lit les classes des écrans

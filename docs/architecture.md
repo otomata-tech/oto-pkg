@@ -421,7 +421,10 @@ L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platf
 Pas à pas, variables et vérifications : `packages/plateforme/README.md` et oto-saas : `docs/deploiement.md`.
 
 - **Installer** : `@otomata_tech/oto_platform` en version exacte et ses dépendances pairs ;
-  `transpilePackages` ; `@source` et `ui/styles.css` dans le CSS de l'hôte ; les routes de § 3,
+  `transpilePackages` ; `optimizePackageImports` sur `@otomata_tech/oto_platform/ui` (le sous-chemin exact), pour que
+  Next réécrive chaque import du barrel vers le module de l'export nommé : sans lui, une page ou un layout qui importe
+  de `/ui` charge le code client de tous les écrans (éditeur, zod), `/login` à 337 kB au lieu de 151 kB ; le barrel
+  reste un fichier de réexports seuls, condition de cette réécriture ; `@source` et `ui/styles.css` dans le CSS de l'hôte ; les routes de § 3,
   chacune important d'abord `lib/fonctions-metier.ts` ; `CoquilleOto` dans le layout. Aperçu d'un lien (E11-S21) :
   le layout racine pose `metadonneesDePartage` (origine de la requête en `metadataBase`, organisation de l'adresse),
   la page publique la sienne (contenu du lien) ; deux routes d'image, `opengraph-image.tsx` à la racine (laissée

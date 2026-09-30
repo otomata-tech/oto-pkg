@@ -17,7 +17,11 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
-## 1.1.6 — 2026-09-30
+## 1.1.7 — 2026-09-30
+
+### Hosts
+- Install: upgrade to 1.1.7; no migration, no new variable, no import to change. In `next.config.ts`, add `experimental: { optimizePackageImports: ["@otomata_tech/oto_platform/ui"] }` (the subpath exactly: the package name alone does not cover `/ui`). Next then rewrites each import of the `/ui` entry to the module of the named export; without it, a layout or page that imports from `/ui` loads the client code of every screen (block editor, zod): 337 kB of JavaScript on `/login` (page and layouts), 151 kB with it; 322 kB on the dashboard shell, 219 kB with it. The « First Load JS » column of `next build` does not count layouts and hides it.
+- UI: the `/ui` entry stays a file of re-exports only, which that rewrite requires (checked by a test).
 
 ### Hosts
 - Install: upgrade to 1.1.6; no migration, no new variable. `app/opengraph-image.tsx` and `app/p/[jeton]/share-image/[[...chemin]]/route.tsx` import `ImageDePartage` and `TAILLE_DE_PARTAGE` from `@otomata_tech/oto_platform/share` instead of `/ui`; the root layout and the public page import `metadonneesDePartage` from it too. Imported from `/ui` by `app/opengraph-image.tsx`, the image put the client code of the whole `/ui` entry (block editor, zod) in the JavaScript loaded by every page: 104 kB shared by all pages in 1.1.4, 314 kB in 1.1.5, 104 kB again with `/share`.

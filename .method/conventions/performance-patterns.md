@@ -150,6 +150,15 @@ composant du catalogue sans nom accessible l'est aussi dans les pages qui l'util
   chaque page. **Vérifiable :** le job CI `packed-host-build` échoue si le JS partagé par toutes les pages dépasse
   `SHARED_JS_BUDGET_KB` (`scripts/ci/shared-first-load-js.mjs`, 120 kB) ; en local, `node
   scripts/ci/shared-first-load-js.mjs` après `pnpm build`.
+- **Un écran s'importe de `@otomata_tech/oto_platform/ui` par son nom, et l'hôte déclare
+  `optimizePackageImports: ["@otomata_tech/oto_platform/ui"]`** (sous-chemin exact, dans `experimental` de
+  `next.config.ts`) : Next réécrit alors chaque import vers le module de l'export, et une route ne charge que le code
+  client des écrans qu'elle monte (`/login` sans l'éditeur, `/n/<chemin>` avec). Sans cette ligne, ou avec le nom du
+  paquet seul, qui ne couvre pas `/ui`, toute page ou tout layout qui importe du barrel charge le code client de toute
+  la face. La réécriture exige un barrel de réexports seuls : `ui/index.ts` ne déclare rien lui-même (test « pure
+  re-export file » de `tests/unit/package-faces.test.ts`). Le JS d'une route se mesure page et layouts ensemble : la
+  colonne « First Load JS » de `next build` ignore les layouts. **Vérifiable :** `packed-host-build` échoue si `/login`
+  ou la coque (`/admin`) dépasse son budget (`ROUTE_BUDGETS_KB`, même script).
 
 ### Tailles cibles — objectifs mesurés en CI / Lighthouse
 

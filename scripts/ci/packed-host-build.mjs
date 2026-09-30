@@ -3,13 +3,13 @@
 // par un lien vers ses sources ; un hôte le lit dans `node_modules`, où son bundler applique
 // `"sideEffects": false` et peut charger en premier n'importe quel module d'une face : seul ce passage
 // voit ce que voit l'hôte (cycle d'imports lu au chargement, fichier absent de `files`). Il mesure aussi le JS
-// chargé par toutes les pages, sous budget (`shared-first-load-js.mjs`).
+// chargé par toutes les pages et celui de `/login` et `/admin`, sous budget (`shared-first-load-js.mjs`).
 // Usage : `node scripts/ci/packed-host-build.mjs` depuis la racine ; code de sortie de l'étape en échec.
 import { execFileSync, spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { assertSharedJsBudget, SHARED_JS_BUDGET_KB } from "./shared-first-load-js.mjs"
+import { assertRouteBudgets, assertSharedJsBudget, ROUTE_BUDGETS_KB, SHARED_JS_BUDGET_KB } from "./shared-first-load-js.mjs"
 
 const ROOT = path.resolve(import.meta.dirname, "../..")
 const PACKAGE = "@otomata_tech/oto_platform"
@@ -75,7 +75,12 @@ try {
   // Le JS de toutes les pages, mesuré chez l'hôte : un import du paquet par un fichier du segment racine y met du code
   // client que le build du workspace ne signale pas (`performance-patterns.md § Bundle Size`).
   const sharedKb = assertSharedJsBudget(path.join(host, ".next"))
-  console.log(`\npacked-host-build: ${tarball} se construit chez un hôte ; JS partagé ${sharedKb.toFixed(1)} kB (budget ${SHARED_JS_BUDGET_KB} kB).`)
+  // Et le JS d'une route entière (page et layouts) : un import serveur du barrel `/ui` sans `optimizePackageImports`
+  // met le code client de toute la face dans la route, que la colonne « First Load JS » ne montre pas.
+  const routes = Object.entries(assertRouteBudgets(path.join(host, ".next")))
+    .map(([page, kb]) => `${page} ${kb.toFixed(1)} kB (budget ${ROUTE_BUDGETS_KB[page]} kB)`)
+    .join(", ")
+  console.log(`\npacked-host-build: ${tarball} se construit chez un hôte ; JS partagé ${sharedKb.toFixed(1)} kB (budget ${SHARED_JS_BUDGET_KB} kB) ; ${routes}.`)
 } catch (error) {
   console.error(`\npacked-host-build: ${error.message}`)
   process.exitCode = 1

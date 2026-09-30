@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-30] — Chaque route ne charge que ses écrans, 1.1.7
+
+**Quoi :** l'hôte de référence déclare `experimental.optimizePackageImports: ["@otomata_tech/oto_platform/ui"]` dans `next.config.ts` : Next réécrit chaque import du barrel `/ui` vers le module de l'export. Aucun export ni import changé. Budgets du JS d'une route (page et layouts) ajoutés à la garde CI : `/login` 170 kB, `/admin` 240 kB (`ROUTE_BUDGETS_KB`, `routeFirstLoadJs`, `assertRouteBudgets`). Test : `ui/index.ts` ne fait que réexporter. Paquet en 1.1.7.
+**Pourquoi :** M104. Tout layout ou page qui importait du barrel côté serveur chargeait le code client de toute la face : Next collecte les modules `"use client"` du graphe entier du barrel avant l'élagage, et `"sideEffects": false` n'y change rien. JS mesuré, page et layouts, avant → après : `/login` 337 → 151 kB, `/` 323 → 234, `/n/[...chemin]` 323 → 303, `/p/[jeton]` 318 → 211, `/admin` 322 → 219, 404 318 → 116. Garde vérifiée en échec sur l'état 1.1.6 (`/login` 336.7 kB > 170).
+**Problèmes :** l'essai de la 1.1.6 portait sur le nom du paquet, qui ne couvre pas le sous-chemin `/ui`. Garde écrite : `performance-patterns.md § Bundle Size` (et sa fiche) ; HN-E11S21-12.
+**Fichiers :** `next.config.ts` ; `packages/plateforme/{package.json,CHANGELOG.md,README.md}` ; `scripts/ci/{shared-first-load-js.mjs,packed-host-build.mjs}` ; `tests/unit/{shared-first-load-js,package-faces}.test.ts` ; `README.md`, `docs/architecture.md`, `docs/decisions/hypotheses.md`, `.method/conventions/performance-patterns.md`, sa fiche, `.method/sprint/status.md`.
+
 ## [2026-09-30] — Le JS de toutes les pages revient à 104 kB, 1.1.6
 
 **Quoi :** entrée `@otomata_tech/oto_platform/share` (`ImageDePartage`, `TAILLE_DE_PARTAGE`, `metadonneesDePartage`), qui pointe `ui/public/image-de-partage.tsx`, sans module client ; `/ui` les exporte encore (ADR-006). L'hôte de référence les importe de `/share` (`opengraph-image.tsx`, route `share-image`, layout racine, page publique). Budget du JS partagé par toutes les pages (120 kB), mesuré sur le manifeste du build par `scripts/ci/shared-first-load-js.mjs` et appliqué dans le job `packed-host-build`. Version 1.1.6.

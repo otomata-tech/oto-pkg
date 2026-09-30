@@ -31,7 +31,8 @@ utilisateurs [`docs/pilote/guide-installation.md`](docs/pilote/guide-installatio
 2. pnpm 12 : exclure le paquet de `minimumReleaseAge` dans `pnpm-workspace.yaml`
    (README du paquet, « Installer dans une application », point 2).
 3. `next.config.ts` : `transpilePackages: ["@otomata_tech/oto_platform"]` (le paquet est publié en
-   sources TypeScript).
+   sources TypeScript) et `experimental: { optimizePackageImports: ["@otomata_tech/oto_platform/ui"] }`
+   (sans lui, chaque page qui importe de `/ui` charge le code client de tous les écrans).
 4. `src/app/globals.css`, après `@import "tailwindcss";` :
    `@source "../../node_modules/@otomata_tech/oto_platform/ui";` puis
    `@import "@otomata_tech/oto_platform/ui/styles.css";`.

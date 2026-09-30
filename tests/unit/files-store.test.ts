@@ -69,6 +69,55 @@ describe("S3 adapter", () => {
     expect(absent).toEqual([null, null])
   })
 
+  /**
+   * Supabase Storage derrière son CDN : un objet relu `text/plain` sort compressé au `HEAD`, sans `content-length`,
+   * sauf sur `accept-encoding: identity` (que `ignoresIdentity` fait ignorer) ; `range: bytes=0-0` dit la taille dans
+   * `content-range`, et rend 416 sur un objet vide. `ranged` : ce que rend un `GET` qui lit toute la taille autrement.
+   */
+  function behindCdn(size: number, options: { ignoresIdentity?: boolean; ranged?: Response } = {}) {
+    return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      if (request.method === "GET") {
+        if (options.ranged) return options.ranged
+        if (size === 0) return new Response(null, { status: 416, headers: { "content-range": "bytes */0" } })
+        return new Response("x", { status: 206, headers: { "content-range": `bytes 0-0/${size}`, "content-type": "text/plain" } })
+      }
+      const identity = request.headers.get("accept-encoding") === "identity" && !options.ignoresIdentity
+      const headers: Record<string, string> = identity ? { "content-length": String(size) } : { "content-encoding": "gzip", "transfer-encoding": "chunked" }
+      return new Response(null, { status: 200, headers: { ...headers, "content-type": "text/plain" } })
+    })
+  }
+
+  it("should read the size of an object the CDN compresses, by an uncompressed HEAD, else by content-range of bytes=0-0, 0 for an empty one", async () => {
+    const store = s3FileStore({ ...AWS_EXAMPLE, endpoint: "https://s3.fr-par.scw.cloud", bucket: "plateforme-essai", region: "fr-par" })
+    const identity = behindCdn(156)
+    vi.stubGlobal("fetch", identity)
+    const byHead = await store.head(objectKey(ORG, FILE))
+    const [sent] = identity.mock.calls.map(([input, init]) => new Request(input, init))
+    vi.stubGlobal("fetch", behindCdn(156, { ignoresIdentity: true }))
+    const byRange = await store.head(objectKey(ORG, FILE))
+    vi.stubGlobal("fetch", behindCdn(0, { ignoresIdentity: true }))
+    const empty = await store.head(objectKey(ORG, FILE))
+    expect({
+      byHead,
+      requests: identity.mock.calls.length,
+      acceptEncoding: sent.headers.get("accept-encoding"),
+      // Un CDN réécrit `accept-encoding` vers l'origine : signé, il casserait la signature.
+      signed: sent.headers.get("authorization")?.includes("accept-encoding"),
+      byRange,
+      empty,
+    }).toEqual({ byHead: { size: 156, mime: "text/plain" }, requests: 1, acceptEncoding: "identity", signed: false, byRange: { size: 156, mime: "text/plain" }, empty: { size: 0, mime: "text/plain" } })
+  })
+
+  it("should give no size, never NaN, and log the headers read, when neither the HEAD nor bytes=0-0 says it", async () => {
+    const store = s3FileStore({ ...AWS_EXAMPLE, endpoint: "https://s3.fr-par.scw.cloud", bucket: "plateforme-essai", region: "fr-par" })
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.stubGlobal("fetch", behindCdn(156, { ignoresIdentity: true, ranged: new Response("x", { status: 200, headers: { "content-encoding": "gzip" } }) }))
+    const head = await store.head(objectKey(ORG, FILE))
+    expect({ head, logged: errors.mock.calls.map(([message]) => message) }).toEqual({ head: { size: null, mime: "text/plain" }, logged: ["[platform] files: storage gave no size"] })
+    errors.mockRestore()
+  })
+
   it("should sign a presigned GET like the published AWS example (SigV4)", async () => {
     const client = s3Client({ endpoint: "https://s3.amazonaws.com", bucket: "examplebucket", region: "us-east-1", ...AWS_EXAMPLE })
     const url = new URL(await presign(client, "https://examplebucket.s3.amazonaws.com/test.txt", { method: "GET", seconds: 86_400, datetime: "20130524T000000Z" }))

@@ -10,6 +10,20 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-09-30] — Un diagramme se lit dans l'éditeur comme à la lecture, 1.1.4
+
+**Quoi :** hors du focus, un bloc diagramme non vide de l'éditeur se rend par `RenduDUnBloc` (dessin, puis « Voir le code » replié ; « Diagramme invalide » et le texte s'il ne se lit pas) dans `DiagrammeAuRepos` (`champ-au-repos.tsx`), un groupe nommé comme le champ, atteint au clavier, `data-champ` et `data-au-repos` ; son focus (clic sur le dessin, Tab, flèches, geste de l'éditeur) monte le champ du code, curseur à la fin, sans dessin pendant la frappe ; « Voir le code » garde son repli sans ouvrir le champ ; le survol ne monte plus le champ d'un diagramme. `DiagrammeEcrit` retiré, `children` obligatoire pour `DiagrammeMermaid`. Un diagramme vide reste un champ au repos.
+**Pourquoi :** demande de JB : dans l'éditeur, le code s'affichait au-dessus du dessin ; hors du focus, le bloc doit se lire comme sur la page publique.
+**Fichiers :** `packages/plateforme/ui/noeud/{diagramme-mermaid.tsx,editeur/champ-au-repos.tsx,editeur/champ-de-bloc.tsx,editeur/rangee-de-bloc.tsx}` ; `tests/integration/components/diagramme-mermaid.test.tsx` ; `.method/conventions/component-registry.md`.
+
+## [2026-09-30] — Un fichier HTML s'envoie sur Supabase Storage, 1.1.4
+
+**Quoi :** l'adaptateur S3 lit la taille d'un objet par un `HEAD` en `accept-encoding: identity` (posé hors de la signature), et, sans `content-length` non compressé, par `content-range` d'un `GET bytes=0-0` (416 : objet vide) ; sinon une taille `null`, jamais `NaN`, et les en-têtes lus au log serveur. La confirmation dit les deux tailles d'un écart et le journalise avant de supprimer ligne et objet ; une taille non dite rend `internal` et garde ligne et objet. Garde écrite : `supabase-patterns.md § Couplage à Supabase (ADR-012)` (une lecture de taille envoie `identity` et ne lit jamais un `content-length` absent ou compressé), HN-E10S02-124.
+
+**Pourquoi :** en production (1.1.3, Supabase Storage), tout `.html` envoyé à l'écran finissait en 409 « does not match its request (size) », preuve supprimée. Diagnostic sur le bucket : Supabase relit le HTML en `text/plain`, et son CDN compresse cette réponse quand `fetch` annonce gzip (par défaut) : `HEAD` sans `content-length`, lu `NaN`. Même objet en `identity` : taille exacte ; octets stockés identiques. Un stockage en `application/octet-stream` n'y change rien (relu `text/plain` quand même) : écarté. `upload.link` échouait de même (« kept NaN bytes »).
+
+**Fichiers :** `packages/plateforme/server/files/{s3,store,service}.ts` ; `tests/unit/files-store.test.ts`, `tests/integration/files.test.ts` ; `packages/plateforme/{package.json,CHANGELOG.md}` ; `docs/decisions/hypotheses.md` ; `.method/conventions/supabase-patterns.md` et sa fiche ; `.method/sprint/status.md`.
+
 ## [2026-09-30] — L'éditeur ne se fige plus sur une page longue, 1.1.3
 
 **Quoi :** seul le bloc touché monte son `<textarea>` (focus, geste de l'éditeur, panneau « Lien ») ou celui sous la souris ; les autres se lisent dans `ChampAuRepos` (un `span` aux classes et à la géométrie du champ, `role="textbox"`, même nom, atteint à la tabulation), qui s'ouvre au focus, curseur au caractère touché ou à la fin ; un champ qui a le focus reste monté jusqu'à sa sortie (D21 révisée). ↑ au début d'un texte va à la fin du bloc d'avant, ↓ à sa fin au début du bloc d'après. Une frappe ne rend que sa rangée (`RangeeDeBloc` mémoïsée, gestes stables `useGestesStables`, chemin lu par `useCheminDeLaFile` hors de l'état de la file) ; les entrées des menus « + » et poignée se construisent au geste qui les ouvre ; la lecture en ligne d'un texte (`segmentsEnLigne`) est gardée en cache au navigateur (1 000 textes, pas au serveur). La hauteur d'un champ n'est plus mesurée bloc par bloc : `field-sizing: content`, sinon une passe groupée à l'image suivante, seul le champ tapé se mesurant tout de suite (garde : `portage-ecrans.md § 7`). Pour les tests : un bloc s'ouvre par `ouvrirLeChamp` et se lit par `texteDuBloc` (`tests/helpers/champ-du-bloc.ts`) ; en e2e, `click()` ou `focus()` avant `fill()` ou `toHaveValue`.

@@ -221,7 +221,14 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
       const mismatching = (await request()).data.id
       memory.objects.set(objectKey(o.org.id, mismatching), { bytes: bytesOf("12345"), mime: "application/pdf" })
+      // Le log part avant la suppression : il garde la preuve que la ligne et l'objet emportent.
+      const objectWhenLogged: boolean[] = []
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {
+        objectWhenLogged.push(memory.objects.has(objectKey(o.org.id, mismatching)))
+      })
       const mismatch = await outcome(completeFileUpload(lea.db, lea.identity, mismatching))
+      const logged = loggedText(errors)
+      errors.mockRestore()
       const [gone] = await fx.admin<{ n: number }[]>`select count(*)::int as n from platform.files where id = ${mismatching}`
 
       const done = await request()
@@ -233,11 +240,44 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         otherPerson: otherPerson.code,
         notUploaded: notUploaded.code,
         stillPending: stillPending.status,
-        mismatch: mismatch.code,
+        mismatch: { code: mismatch.code, message: mismatch.message },
+        logged,
+        objectWhenLogged,
         rowGone: gone.n,
         objectGone: memory.objects.has(objectKey(o.org.id, mismatching)),
         again: again.code,
-      }).toEqual({ otherPerson: "not_found", notUploaded: "conflict", stillPending: "pending", mismatch: "conflict", rowGone: 0, objectGone: false, again: "not_found" })
+      }).toEqual({
+        otherPerson: "not_found",
+        notUploaded: "conflict",
+        stillPending: "pending",
+        mismatch: { code: "conflict", message: "r.pdf does not match its request: 4 bytes announced, 5 bytes stored. Upload it again." },
+        logged: `[platform] files: size mismatch { id: '${mismatching}', announced: 4, stored: 5 }`,
+        objectWhenLogged: [true],
+        rowGone: 0,
+        objectGone: false,
+        again: "not_found",
+      })
+    })
+
+    it("should keep the pending row and its object when the storage gives no size, and confirm them on a later try (HN-E10S02-124)", async () => {
+      await page("ventes/f_sans_taille")
+      const lea = as("lea")
+      const { data } = await requestFileUpload(lea.db, lea.identity, { node: "ventes/f_sans_taille", name: "page.html", mime: "text/html", size: 4 })
+      await memory.fetch(data.upload.url, { method: "PUT", headers: data.upload.headers, body: bytesOf("<p/>") })
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {})
+      vi.spyOn(memory, "head").mockResolvedValueOnce({ size: null, mime: "text/plain" })
+      const unknown = await outcome(completeFileUpload(lea.db, lea.identity, data.id))
+      const [kept] = await fx.admin<{ status: string }[]>`select status from platform.files where id = ${data.id}`
+      const objectKept = memory.objects.has(objectKey(o.org.id, data.id))
+      const later = await completeFileUpload(lea.db, lea.identity, data.id)
+      expect({ code: unknown.code, message: unknown.message, logged: loggedText(errors), status: kept.status, objectKept, later: later.data.size }).toEqual({
+        code: "internal",
+        message: "page.html was uploaded, but the file storage gave no size: confirm it again later.",
+        logged: `[platform] files: size unknown { id: '${data.id}', announced: 4 }`,
+        status: "pending",
+        objectKept: true,
+        later: 4,
+      })
     })
 
     it("should confirm an HTML file that the storage reads back as text/plain, like Supabase Storage, on its size alone", async () => {

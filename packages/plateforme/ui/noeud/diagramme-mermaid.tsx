@@ -1,7 +1,7 @@
 "use client"
 
 // Un bloc `mermaid` dessiné (1.1.3) : à la lecture (page, page publique, visionneuse, par `RenduDUnBloc`) et dans
-// l'éditeur, sous le champ du diagramme (`rangee-de-bloc.tsx`). Le serveur rend le texte (légende et code) : sans
+// l'éditeur, hors du focus, par le même rendu (1.1.4, `champ-au-repos.tsx`, `DiagrammeAuRepos`). Le serveur rend le texte (légende et code) : sans
 // JavaScript, ou tant que le dessin n'est pas prêt, on le lit ; un texte que mermaid ne lit pas le garde et dit « Diagramme invalide », sans
 // casser la page. Dessiné, le texte reste sous le dessin, derrière « Voir le code ».
 //
@@ -49,12 +49,9 @@ async function dessiner(cible: string, texte: string, sombre: boolean): Promise<
   return svg
 }
 
-type Props = { id?: string; texte: string; children?: ReactNode }
+type Props = { id?: string; texte: string; children: ReactNode }
 
-/**
- * `children` : le texte rendu par le serveur (légende et code), montré tel quel tant que rien n'est dessiné, puis sous
- * « Voir le code ». Sans lui (l'éditeur, dont le champ montre déjà le texte), ni repli ni « Voir le code ».
- */
+/** `children` : le texte rendu par le serveur (légende et code), montré tel quel tant que rien n'est dessiné, puis sous « Voir le code ». */
 export function DiagrammeMermaid({ id, texte, children }: Props) {
   const racine = useRef<HTMLDivElement>(null)
   // `useId` porte des caractères qu'un sélecteur CSS refuse ; mermaid s'en sert pour cibler son `<style>`.
@@ -96,12 +93,10 @@ export function DiagrammeMermaid({ id, texte, children }: Props) {
         <>
           {/* Assaini par mermaid (`securityLevel: "strict"`, DOMPurify), voir l'en-tête. */}
           <div role="img" aria-label={DIAGRAMME.nom(nomDuDiagramme(texte))} className="oto-diagramme-dessin" dangerouslySetInnerHTML={{ __html: etat.svg }} />
-          {children !== undefined && (
-            <details className="oto-diagramme-code">
-              <summary className="rounded-sm text-xs text-mute focus-visible:ring-2 focus-visible:ring-ink">{DIAGRAMME.voirLeCode}</summary>
-              {children}
-            </details>
-          )}
+          <details className="oto-diagramme-code">
+            <summary className="rounded-sm text-xs text-mute focus-visible:ring-2 focus-visible:ring-ink">{DIAGRAMME.voirLeCode}</summary>
+            {children}
+          </details>
         </>
       ) : (
         <>

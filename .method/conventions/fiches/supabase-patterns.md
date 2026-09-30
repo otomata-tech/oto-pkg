@@ -20,6 +20,7 @@ Texte complet : `.method/conventions/supabase-patterns.md`. La fiche suffit pour
 - Aucun nouvel appel à `supabase.auth.*` ni nouvelle lecture du schéma `auth` hors des points admis (`auth.uid()` et `auth.jwt()` restent permis). § Couplage à Supabase (ADR-012)
 - La vérification du jeton s'injecte sur chaque porte (`VerifyToken`, `makeVerifyToken`) ; une porte n'appelle ni `jwtVerify` ni `getUser`. § Couplage à Supabase (ADR-012)
 - Le port de stockage ne lit d'un `HEAD` que l'existence et la taille, jamais le type (Supabase Storage relit `text/html` en `text/plain`) ; le bucket en mémoire joue ce fournisseur. § Couplage à Supabase (ADR-012)
+- Une lecture de taille au stockage envoie `accept-encoding: identity` hors de la signature, et ne lit jamais un `content-length` absent ou compressé (le CDN compresse `text/plain`) : repli sur `content-range` d'un `GET bytes=0-0`, sinon taille `null`, jamais `NaN`. § Couplage à Supabase (ADR-012)
 - Une hypothèse sur PostgREST (code `PGRST…`, `PT409`, `READ_PAGE_ROWS`, droit par colonne) ne s'écrit que dans `server/errors.ts`. § Couplage à Supabase (ADR-012)
 - La face SQL ne pose aucun `set` de session : rôle, claims et délais par `set_config(…, true)` ou `set local`, dans `server/sql.ts` seul. § Couplage à Supabase (ADR-012)
 - Un `db.tx` ne tient que ses requêtes : il n'ouvre pas la transaction d'une autre session, et son `fn` n'appelle ni `fetch`, ni `db.auth`, ni un client Auth, ni le service connecteurs. § Couplage à Supabase (ADR-012)

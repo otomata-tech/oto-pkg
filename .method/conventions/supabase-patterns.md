@@ -146,6 +146,13 @@ franchit une de ces règles passe par un ADR.
   jamais son type : Supabase Storage relit un objet `text/html` en `text/plain`, et le type relu
   varie d'un fournisseur S3 à l'autre. Le bucket en mémoire des tests joue ce fournisseur le plus
   strict. **Vérifiable :** `rg -n "head\??\.mime" packages/plateforme/server` ne trouve rien.
+- **Une requête au stockage qui lit une taille envoie `accept-encoding: identity`, hors de la
+  signature, et ne lit jamais un `content-length` absent ou compressé** : `fetch` annonce gzip, et le
+  CDN devant Supabase compresse un objet relu `text/plain`, sans `content-length` ; `Number(null)`
+  vaut 0 et `Number(undefined)` `NaN`. À défaut, `content-range` d'un `GET bytes=0-0`, sinon une
+  taille `null` que le service refuse sans rien supprimer. **Vérifiable :**
+  `rg -n "Number\(.*content-length" packages/plateforme/server` ne trouve rien, et
+  `tests/unit/files-store.test.ts` (« an object the CDN compresses ») passe.
 - **La face SQL ne pose aucun état de session, et n'en hérite d'aucun** : le pooler de
   Supabase en mode transaction rend une connexion serveur à d'autres clients de `platform_app` sans
   la remettre à zéro, et un rôle ou des claims posés pour la connexion passent aux transactions

@@ -261,6 +261,7 @@ async function sendObject(store: FileStore, key: string, object: { bytes: Uint8A
   const head = await store.head(key)
   // La taille seule, comme la confirmation (`completeFileUpload`) : le type relu n'est pas celui envoyé partout.
   if (!head) return "the file storage did not keep it"
+  if (head.size === null) return "the file storage gave no size"
   return head.size === size ? null : `the file storage kept ${head.size} bytes instead of ${size}`
 }
 
@@ -302,8 +303,10 @@ async function pendingFile(db: PlatformDb, identity: Identity, id: string): Prom
 
 /**
  * La confirmation d'un envoi (AC-a4) : la ligne `pending` de l'appelant, l'écriture sur son nœud, l'objet lu
- * (`HEAD`). Taille égale à celle de la ligne : `ready`. Objet absent : `conflict`. Taille différente : la ligne
- * puis l'objet supprimés, `conflict`. Ligne inconnue, déjà `ready` ou d'une autre personne : `not_found`.
+ * (`HEAD`). Taille égale à celle de la ligne : `ready`. Objet absent : `conflict`. Taille différente : journalisée
+ * avec les deux tailles, puis la ligne et l'objet supprimés, `conflict` qui les dit. Taille non dite par le stockage :
+ * `internal`, la ligne `pending` et l'objet gardés pour une nouvelle confirmation (HN-E10S02-124). Ligne inconnue, déjà
+ * `ready` ou d'une autre personne : `not_found`.
  *
  * Le type relu n'est pas comparé (ADR-016 § 4, HN-E10S02-114) : Supabase Storage relit un objet `text/html` en
  * `text/plain`, et la comparaison refusait tout fichier HTML. Il ne garde rien : l'URL d'envoi signe déjà le
@@ -318,11 +321,16 @@ export async function completeFileUpload(db: PlatformDb, identity: Identity, fil
   await requireNodeLevel(db, identity, { id: file.node_id, path: file.path }, "write")
   const head = await onStorage("head", () => store.head(objectKey(identity.org.id, file.id)))
   if (!head) throw new PlatformError("conflict", `${file.name} has not been uploaded: send it to its upload address, then confirm.`)
+  if (head.size === null) {
+    console.error("[platform] files: size unknown", { id: file.id, announced: file.size })
+    throw new PlatformError("internal", `${file.name} was uploaded, but the file storage gave no size: confirm it again later.`)
+  }
   if (head.size !== file.size) {
+    console.error("[platform] files: size mismatch", { id: file.id, announced: file.size, stored: head.size })
     await inTransaction(db, "files: mismatch", (sql) => sql`
       delete from platform.files where org_id = ${identity.org.id} and id = ${file.id} and status = 'pending'`)
     await removeObjects(identity.org.id, [file.id])
-    throw new PlatformError("conflict", `${file.name} does not match its request (size): upload it again.`)
+    throw new PlatformError("conflict", `${file.name} does not match its request: ${file.size} bytes announced, ${head.size} bytes stored. Upload it again.`)
   }
   await markReady(db, identity, file, { label: "files: complete", advice: "upload it again" })
   const data: FileReady = { id: file.id, name: file.name, size: file.size, mime: file.mime }

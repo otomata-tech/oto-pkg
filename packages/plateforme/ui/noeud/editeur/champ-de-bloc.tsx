@@ -47,7 +47,7 @@
 //
 // E11-S17 (lot a) : ⌘A une seconde fois, le texte déjà tout sélectionné ou le bloc vide, prend tous les blocs de la page
 // (AC-a2, `selection-de-blocs.ts`).
-import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type RefObject, type SyntheticEvent } from "react"
+import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { Resultat } from "../../api/resultat"
 import { useRechercheDeContenus } from "../../api/use-recherche-de-contenus"
@@ -55,7 +55,7 @@ import { aDesLiens, aDuBalisage, type CiblesDesLiens } from "../en-ligne"
 import { LIEN_DU_BLOC } from "../libelles"
 import { EnLigne } from "../rendu-des-blocs"
 import { tableauColle } from "./blocs-de-page"
-import { ChampAuRepos } from "./champ-au-repos"
+import { ChampAuRepos, DiagrammeAuRepos } from "./champ-au-repos"
 import { ListeDesChoix, useChoixParBarre } from "./choix-de-bloc"
 import { citationAuCurseur, idDOption, lienVers, ListeACiter, useOptionActive, type Citation } from "./citer"
 import { ElementsDeListe } from "./elements-de-liste"
@@ -153,6 +153,11 @@ type ChampDeBlocProps = {
   ouvert: boolean
   /** L'invite du champ vide : le Texte d'une page vide (E11-S05, AC-g1). */
   invite?: string
+  /**
+   * Un diagramme non vide tel qu'à la lecture (1.1.4) : au repos, il remplace le texte brut (`DiagrammeAuRepos`) ; le
+   * survol ne monte pas le champ, qui cacherait le dessin sous la souris.
+   */
+  diagrammeLu?: ReactNode
 }
 
 /**
@@ -255,7 +260,7 @@ function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
   }
 }
 
-export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert, ouvert, invite }: ChampDeBlocProps) {
+export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert, ouvert, invite, diagrammeLu }: ChampDeBlocProps) {
   const gestes = useGestes()
   const champ = useRef<HTMLTextAreaElement>(null)
   const unTexte = genre === "paragraph"
@@ -270,7 +275,7 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
   const [survole, setSurvole] = useState(false)
   // Un champ qui a le focus reste monté jusqu'à sa sortie, même quand un geste en ouvre un autre : démonté avec le focus,
   // il ne recevrait pas de `blur`, et son texte ne partirait pas (ni son bloc vidé ne se retirerait).
-  const monte = ouvert || survole || auFocus
+  const monte = ouvert || auFocus || (survole && diagrammeLu === undefined)
   const enListe = genre === "list" || genre === "checklist"
   const lien = useLienAuCurseur(texte, champ, liens !== null && !lectureSeule, enListe)
   const idDuLien = useId()
@@ -318,6 +323,13 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
     if (evenement.defaultPrevented) gestes.activerLeChamp(cle)
   }
 
+  if (diagrammeLu !== undefined && !monte) {
+    return (
+      <DiagrammeAuRepos nom={nom} decritPar={decritPar} ouvrir={() => gestes.ouvrirLeChamp(cle, texte.length)}>
+        {diagrammeLu}
+      </DiagrammeAuRepos>
+    )
+  }
   return (
     <>
       {/* Le champ, ou le bloc lu, et son rendu au repos dans la même case (`oto-block-pile`) : seul le champ change quand le bloc est touché, le rendu et la copie d'une liste restent. Un `span` : la pile vit aussi dans le `h2` d'un titre. Le menu contextuel d'un lien rendu y est lu par délégation (AC-b9). */}

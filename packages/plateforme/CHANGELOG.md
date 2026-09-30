@@ -17,6 +17,17 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.4 — 2026-09-30
+
+### Assistants
+- An HTML file sent by `upload.link` to Supabase Storage is stored, instead of failing with « the file storage kept NaN bytes ».
+
+### Hosts
+- Install: upgrade to 1.1.4; nothing else to do (no migration, no new variable).
+- API: an HTML file uploads on Supabase Storage: `POST /api/platform/files/<id>/complete` no longer answers `conflict` « does not match its request (size) ». Its CDN compresses the size check of a file read back as `text/plain`; the storage adapter now reads the size uncompressed (`accept-encoding: identity`, else `content-range` of `bytes=0-0`).
+- API: a size mismatch on `complete` says both sizes (« <n> bytes announced, <m> bytes stored ») and is logged (`[platform] files: size mismatch`) before the row and the object are deleted; a storage that gives no size answers `internal` and keeps the pending row and the object, so a later confirmation can pass.
+- UI: in the editor, a diagram block out of focus reads as on the reading screen: the drawing, then its code folded under « Voir le code »; a click on the drawing, Tab or the keyboard opens the code field, and leaving it draws it again (formerly the code showed above the drawing).
+
 ## 1.1.3 — 2026-09-30
 
 ### Assistants

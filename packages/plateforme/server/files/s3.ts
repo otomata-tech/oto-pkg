@@ -63,12 +63,45 @@ function failed(operation: string, status: number): Error {
   return new Error(`storage ${operation} answered HTTP ${status}`)
 }
 
+/** Une taille écrite en chiffres seuls, sinon `null` : jamais `Number(null)` (0) ni `NaN`. */
+function digits(value: string | null | undefined): number | null {
+  return value && /^\d{1,15}$/.test(value) ? Number(value) : null
+}
+
+/** La taille d'une réponse non compressée ; `null` si un `content-encoding` la change ou si `content-length` manque. */
+function plainLength(headers: Headers): number | null {
+  const encoding = headers.get("content-encoding")
+  return encoding === null || encoding.toLowerCase() === "identity" ? digits(headers.get("content-length")) : null
+}
+
+/** Les en-têtes qui disent comment une taille a été rendue, pour le log serveur : aucun ne porte de secret. */
+function sizeHeaders(answer: Response): Record<string, string | number | null> {
+  const read = (name: string) => answer.headers.get(name)
+  return { status: answer.status, "content-length": read("content-length"), "content-encoding": read("content-encoding"), "transfer-encoding": read("transfer-encoding"), "content-range": read("content-range"), "content-type": read("content-type") }
+}
+
 export function s3FileStore(config: S3Config): FileStore {
   const client = s3Client(config)
   const base = `${trimmedEndpoint(config.endpoint)}/${encodeURIComponent(config.bucket)}`
   const objectUrl = (key: string) => `${base}/${key}`
   const call = (key: string, init: { method: string; headers?: Record<string, string> }) =>
     client.fetch(objectUrl(key), { ...init, signal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) })
+  // Une lecture de taille : `accept-encoding: identity` posé après la signature, hors d'elle, car un CDN le réécrit vers
+  // l'origine ; sans lui, `fetch` annonce gzip et le CDN de Supabase compresse un objet relu `text/plain`, sans
+  // `content-length` (HN-E10S02-124). `range` n'est jamais signé par `aws4fetch`.
+  const sized = async (key: string, method: "HEAD" | "GET", headers: Record<string, string> = {}) => {
+    const signed = await client.sign(objectUrl(key), { method, headers })
+    signed.headers.set("accept-encoding", "identity")
+    return fetch(signed, { signal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) })
+  }
+  // La taille par `content-range` d'un `GET bytes=0-0` (`bytes 0-0/<taille>`) ; 416 : l'objet est vide ; `null` sinon.
+  const rangedSize = async (key: string): Promise<{ size: number | null; answer: Response }> => {
+    const answer = await sized(key, "GET", { range: "bytes=0-0" })
+    await answer.body?.cancel()
+    const total = /^bytes (?:0-0|\*)\/(\d{1,15})$/.exec(answer.headers.get("content-range") ?? "")?.[1]
+    if (answer.status === 206 || answer.status === 416) return { size: digits(total) ?? (answer.status === 416 ? 0 : null), answer }
+    return { size: answer.status === 200 ? plainLength(answer.headers) : null, answer }
+  }
 
   return {
     async uploadUrl(key: string, object: ObjectHead) {
@@ -83,11 +116,16 @@ export function s3FileStore(config: S3Config): FileStore {
     },
 
     async head(key: string) {
-      const answer = await call(key, { method: "HEAD" })
+      const answer = await sized(key, "HEAD")
       // Un objet absent : 404, ou 403 quand les clés ne listent pas le bucket (comme la lecture, HN-E10S02-32).
       if (answer.status === 404 || answer.status === 403) return null
       if (!answer.ok) throw failed("HEAD", answer.status)
-      return { size: Number(answer.headers.get("content-length") ?? Number.NaN), mime: answer.headers.get("content-type") ?? "" }
+      const mime = answer.headers.get("content-type") ?? ""
+      const size = plainLength(answer.headers)
+      if (size !== null) return { size, mime }
+      const ranged = await rangedSize(key)
+      if (ranged.size === null) console.error("[platform] files: storage gave no size", { key, head: sizeHeaders(answer), range: sizeHeaders(ranged.answer) })
+      return { size: ranged.size, mime }
     },
 
     async copy(from: string, to: string) {

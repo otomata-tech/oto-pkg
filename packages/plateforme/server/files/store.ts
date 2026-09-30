@@ -20,8 +20,11 @@ export type FileStore = {
   uploadUrl(key: string, object: ObjectHead): Promise<{ url: string; headers: Record<string, string> }>
   /** URL présignée de lecture (`GET`), valable `READ_URL_SECONDS`, type et disposition signés. */
   readUrl(key: string, response: ObjectResponse): Promise<string>
-  /** Taille et type de l'objet ; `null` quand il est absent. */
-  head(key: string): Promise<ObjectHead | null>
+  /**
+   * Taille et type de l'objet ; `null` quand il est absent ; `size` nul quand le stockage ne l'a pas dite (ni
+   * `content-length` non compressé, ni `content-range`), jamais `NaN`.
+   */
+  head(key: string): Promise<{ size: number | null; mime: string } | null>
   /** Copie côté bucket (duplication d'une page, fiche D118). */
   copy(from: string, to: string): Promise<void>
   /** Supprime l'objet ; un objet déjà absent n'est pas une erreur. */

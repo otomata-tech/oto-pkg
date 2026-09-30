@@ -34,8 +34,9 @@
 //
 // E11-S17 (lot a) : un bloc sélectionné est surligné ; Maj+clic, Ctrl+clic ou ⌘+clic sur la poignée prend des blocs (AC-a4).
 //
-// 1.1.3 : un diagramme s'écrit comme le code, son dessin dessous hors du focus (`DiagrammeEcrit`). La rangée est
-// mémoïsée : une frappe ne rend que la sienne ; les entrées de ses menus se construisent au premier geste qui peut les ouvrir.
+// 1.1.3 : un diagramme s'écrit comme le code ; hors du focus, non vide, il se lit comme à la lecture, dessin puis
+// « Voir le code » replié (1.1.4, `DiagrammeAuRepos`). La rangée est mémoïsée : une frappe ne rend que la sienne ;
+// les entrées de ses menus se construisent au premier geste qui peut les ouvrir.
 import { memo, useId, useState, type DragEvent, type ReactNode } from "react"
 import { ArrowDown } from "@phosphor-icons/react/dist/csr/ArrowDown"
 import { ArrowUp } from "@phosphor-icons/react/dist/csr/ArrowUp"
@@ -51,7 +52,6 @@ import { BlockRow } from "../../ds/react/block-row"
 import { AnimatedIcon } from "../../ds/react/icon"
 import { DropdownMenu, type MenuItem } from "../../ds/react/overlays"
 import { Button, IconButton } from "../../ds/react/primitives"
-import { DiagrammeMermaid } from "../diagramme-mermaid"
 import { texteLu } from "../en-ligne"
 import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC, SELECTION } from "../libelles"
 import { FICHIERS } from "../libelles-des-fichiers"
@@ -158,35 +158,17 @@ type BlocEcritProps = {
   invite?: string
 }
 
-/**
- * Un diagramme écrit (1.1.3) : son texte dans son champ ; hors du focus, et non vide, son dessin dessous
- * (`diagramme-mermaid.tsx`), qui dit « Diagramme invalide » si mermaid ne le lit pas. Pendant la frappe, rien ne se
- * redessine.
- */
-function DiagrammeEcrit({ texte, children }: { texte: string; children: ReactNode }) {
-  const [ecrit, setEcrit] = useState(false)
-  return (
-    <div onFocus={() => setEcrit(true)} onBlur={() => setEcrit(false)}>
-      {children}
-      {!ecrit && texte.trim() !== "" && (
-        <div className="mt-2">
-          <DiagrammeMermaid texte={texte} />
-        </div>
-      )}
-    </div>
-  )
-}
-
 /** Les champs d'un tableau ou d'un repli (E10-S06), ou le champ de texte de toute autre forme écrite. */
 function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, ouvert, suivreLaCellule, decritPar, invite }: Omit<BlocEcritProps, "erreur"> & { decritPar?: string }) {
   const { cle, bloc } = rangee
   const mots = premiersMots(bloc)
   if (forme === "tableau") return <TableauEdite cle={cle} bloc={bloc} decritPar={decritPar} lectureSeule={verrouille} suivre={suivreLaCellule} />
   if (forme === "repli") return <RepliEdite cle={cle} bloc={bloc} mots={mots} decritPar={decritPar} lectureSeule={verrouille} liens={liens} />
-  const champ = (
+  const texte = texteDe(bloc)
+  return (
     <ChampDeBloc
       cle={cle}
-      texte={texteDe(bloc)}
+      texte={texte}
       nom={`Modifier ${FORMES[forme].champ} — ${mots}`}
       decritPar={decritPar}
       // Un diagramme s'écrit sur le fond sombre et dans la chasse du code (`editeur.css`, `data-kind="code"`).
@@ -199,9 +181,15 @@ function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, ouvert, su
       menuOuvert={menuOuvert}
       ouvert={ouvert}
       invite={invite}
+      // Hors du focus, un diagramme non vide se lit comme à la lecture ; pendant la frappe, rien ne se redessine. Sans
+      // sa référence : l'ancre est déjà sur l'élément du bloc (`BlocEcrit`).
+      diagrammeLu={
+        forme === "diagramme" && texte.trim() !== "" ? (
+          <RenduDUnBloc bloc={{ type: bloc.type, text: texte, data: bloc.data }} Lien="a" hrefDuChemin={(chemin) => `${liens.prefixe}${chemin}`} />
+        ) : undefined
+      }
     />
   )
-  return forme === "diagramme" ? <DiagrammeEcrit texte={texteDe(bloc)}>{champ}</DiagrammeEcrit> : champ
 }
 
 /** Le champ d'un bloc écrit, dans son élément : un titre reste un titre, nommé par son texte (AC7). */

@@ -6,7 +6,9 @@
 // atteint au clavier et se dit modifiable (`role="textbox"`, nom du champ) ; son focus (tabulation, toucher, geste de
 // l'éditeur) monte le `<textarea>` à sa place, curseur au caractère touché, sinon à la fin. Sans lui, chaque bloc
 // d'une page montait son `<textarea>`, et une page de trois cents blocs se figeait plusieurs secondes à l'ouverture.
-import { useRef } from "react"
+//
+// 1.1.4 : un diagramme non vide se lit au repos comme à l'écran de lecture (`DiagrammeAuRepos`).
+import { useRef, type ReactNode } from "react"
 
 /**
  * Le rang, dans le texte brut du champ au repos, du caractère sous le pointeur (le rendu posé dessus laisse passer le
@@ -78,5 +80,39 @@ export function ChampAuRepos({ texte, nom, genre, decritPar, lectureSeule, rendu
         <br />
       ) : null}
     </span>
+  )
+}
+
+type DiagrammeAuReposProps = {
+  nom: string
+  decritPar?: string
+  /** Le focus arrive sur le bloc lui-même : le champ du code se monte, curseur à la fin. */
+  ouvrir: () => void
+  /** Le diagramme tel qu'à la lecture (`RenduDUnBloc`) : le dessin, puis « Voir le code » replié. */
+  children: ReactNode
+}
+
+/**
+ * Un diagramme non vide au repos (1.1.4) : lu comme à la lecture, pas en texte. Un groupe nommé comme le champ, et non
+ * une zone de texte ni un bouton : il contient le `<details>` de « Voir le code », qu'aucun de ces deux rôles ne peut
+ * contenir. Son propre focus (tabulation, clic sur le dessin, geste de l'éditeur) monte le champ du code ; celui de
+ * « Voir le code », qui garde son repli, ne le monte pas.
+ */
+export function DiagrammeAuRepos({ nom, decritPar, ouvrir, children }: DiagrammeAuReposProps) {
+  return (
+    <div
+      role="group"
+      aria-label={nom}
+      aria-describedby={decritPar}
+      tabIndex={0}
+      data-champ=""
+      data-au-repos=""
+      className="cursor-pointer focus-visible:outline-hidden!"
+      onFocus={(evenement) => {
+        if (evenement.target === evenement.currentTarget) ouvrir()
+      }}
+    >
+      {children}
+    </div>
   )
 }

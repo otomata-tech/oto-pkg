@@ -34,7 +34,7 @@ export function missingCtxMessage(prefix: string): string {
 
 /**
  * Le refus d'un code périmé (H27) ; `paths` : les Contextes changés depuis son émission, dans l'ordre des parties,
- * bornés (E11-S03, AC-a5). Sans chemin : un code émis avant la 1.0.1, dont la ligne ne les garde pas.
+ * bornés (E11-S03, AC-a5). Sans chemin : un code émis avant la 1.1.0, dont la ligne ne les garde pas.
  */
 export function staleCtxMessage(prefix: string, paths: readonly string[] = []): string {
   const changed = paths.length > 0 ? ` (${boundedList(paths)})` : ""
@@ -177,7 +177,7 @@ export async function requireCtx(
     }
     if (options.staleAllowed) return { code, host: row.host }
     if (current.status === "rejected") throw fromDatabaseError(current.reason, "requireCtx: nodes")
-    // Émis avant la 1.0.1 : la ligne ne dit pas quels Contextes elle a servis (AC-a5, HN-E11S03-4).
+    // Émis avant la 1.1.0 : la ligne ne dit pas quels Contextes elle a servis (AC-a5, HN-E11S03-4).
     if (row.contexts === null) throw new PlatformError("ctx_stale", staleCtxMessage(prefix))
     const changed = await changedContexts(sql, row.contexts, paths, current.value)
     if (changed.length > 0) throw new PlatformError("ctx_stale", staleCtxMessage(prefix, changed))

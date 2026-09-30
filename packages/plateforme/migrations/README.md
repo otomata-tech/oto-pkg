@@ -256,7 +256,8 @@ Les six fichiers d'origine de `20260930100000_v1_1_0.sql` (`20260929140000`, `20
 version : seule une base de développement, ou le projet de test de ce dépôt, a pu en appliquer. Le
 fichier de version ne se rejoue pas sur une telle base (ses `create` échoueraient) et `supabase db push`
 refuse un historique qui nomme des versions absentes du dossier. Par qui exploite la base, jamais par la
-CI, avant la poussée qui apporte le fichier de version, `DB_URL` posée comme au § précédent :
+CI, avant la poussée qui apporte le fichier de version, à la racine d'un dépôt dont `supabase/migrations/`
+porte `20260930100000_v1_1_0.sql` et plus aucun des six fichiers, `DB_URL` posée comme au § précédent :
 
 - **Base locale de test** : `pnpm db:local --reset` la recrée, rien d'autre.
 - **Les six appliquées** (`supabase migration list` les montre côté base) : seul l'historique change.
@@ -268,9 +269,9 @@ CI, avant la poussée qui apporte le fichier de version, `DB_URL` posée comme a
   npx supabase db push --db-url "$DB_URL" --dry-run   # « Remote database is up to date »
   ```
 
-- **Une partie seulement** : appliquer d'abord, à la main et dans l'ordre, les parties manquantes du
-  fichier de version (chaque bannière nomme son fichier d'origine), puis le cas précédent ; ou recréer la
-  base.
+- **Une partie seulement** : appliquer d'abord, à la main et dans l'ordre, les parties du fichier de
+  version qui suivent la dernière appliquée (chaque bannière nomme son fichier d'origine), puis le cas
+  précédent ; une base qui en a sauté une se recrée.
 
 Les copies des six dans `supabase/migrations/` de l'hôte se suppriment : `migrations sync` ajoute, il
 ne retire rien.

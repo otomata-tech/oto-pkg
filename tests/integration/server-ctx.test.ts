@@ -132,7 +132,7 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
       }
     })
 
-    // E11-S03 (AC-a5, HN-E11S03-4) : un code émis avant la 1.0.1 ne dit pas ce qu'il a servi ; `rules_version` n'est plus lu.
+    // E11-S03 (AC-a5, HN-E11S03-4) : un code émis avant la 1.1.0 ne dit pas ce qu'il a servi ; `rules_version` n'est plus lu.
     it("should refuse a code without kept Contextes as stale, without paths, and ignore the rules version", async () => {
       await ref.write({ ctx: [{ code: "CCCC-0001", org_id: ORG.id, user_id: PEOPLE.lea.id, rules_version: 1, contexts: null }] })
       await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), ref.id("CCCC-0001"))).rejects.toMatchObject({

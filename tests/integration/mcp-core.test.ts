@@ -231,8 +231,8 @@ describe.skipIf(!sqlConfigured)(
       })
 
       // E11-S03 : le code périme par les Contextes qu'il a servis (`tests/integration/server-ctx.test.ts`), plus par
-      // `rules_version` ; un code sans Contextes gardés (émis avant la 1.0.1) est périmé, `feedback` le prend quand même.
-      it("should refuse a ctx issued before 1.0.1 but let feedback through, then accept a fresh one", async () => {
+      // `rules_version` ; un code sans Contextes gardés (émis avant la 1.1.0) est périmé, `feedback` le prend quand même.
+      it("should refuse a ctx issued before 1.1.0 but let feedback through, then accept a fresh one", async () => {
         const session = await connectMcp(orgA, people.claire)
         const { code } = await session.openContext("Relance les devis en attente")
         expect((await session.call("find", { ...VALID_ARGS.find, ctx: code })).isError).toBe(false)

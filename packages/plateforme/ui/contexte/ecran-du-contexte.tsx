@@ -2,15 +2,17 @@
 // (`portage-ecrans.md § 0`) ; l'en-tête, puis la vue (`ContexteServi`), montée telle quelle. Server Component ; les
 // quatre états (`portage-ecrans.md § 4`) : la vue, l'échec de la lecture de l'identité (« Réessayer »), le
 // chargement ; la vue dit elle-même une partie vide. Sans lui, la route n'aurait ni en-tête du paquet ni chargement.
+// E11-S15 (AC-a8) : sous le titre, « À quoi sert cette page » explique le contexte, ouvert.
 import { Info } from "@phosphor-icons/react/dist/ssr/Info"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
-import { Icon } from "../ds/react/icon"
+import { AnimatedIcon, Icon } from "../ds/react/icon"
+import { LinkedContent } from "../ds/react/linked-content"
 import { ScreenHeader } from "../ds/react/screen-header"
 import { Skeleton } from "../ds/react/skeleton"
 import { ContexteServi, type DonneesDuContexteServi } from "./contexte-servi"
-import { CONTEXTE_SERVI } from "./libelles"
+import { ANNEXES, CONTEXTE_SERVI, EXPLICATION_DU_CONTEXTE } from "./libelles"
 
 export type EcranDuContexteProps = {
   /** Ce que la page a lu ; `{ error }` quand l'identité n'a pas pu l'être. */
@@ -22,10 +24,35 @@ export type EcranDuContexteProps = {
   ici: string
 }
 
+/**
+ * « À quoi sert cette page » (E11-S15, AC-a8) : ce qu'est le contexte, comment il vit et son ordre, dans l'encart d'aide
+ * d'un Contexte (`AnnexesDuContexte`), ouvert : sans lui, la vue montre des parties sans dire ce qu'elles sont.
+ */
+function Explication() {
+  const { ceQuEst, fonctionnement, ordre, etapes, plafond } = EXPLICATION_DU_CONTEXTE
+  return (
+    // Un `<details>` a le rôle `group` sans nom propre : il prend celui de son titre.
+    <LinkedContent open aria-label={ANNEXES.titre} title={ANNEXES.titre} icon={<AnimatedIcon as={Info} size="xs" />}>
+      <div className="flex flex-col gap-2 text-sm text-ink">
+        <p>{ceQuEst}</p>
+        <p>{fonctionnement}</p>
+        <p>{ordre}</p>
+        <ol className="list-decimal space-y-1 ps-6">
+          {etapes.map((etape) => (
+            <li key={etape}>{etape}</li>
+          ))}
+        </ol>
+        <p>{plafond}</p>
+      </div>
+    </LinkedContent>
+  )
+}
+
 export function EcranDuContexte({ resultat, Lien, prefixeDesPages, ici }: EcranDuContexteProps) {
   return (
     <>
       <ScreenHeader title={CONTEXTE_SERVI.titre} icon={<Icon as={Info} size="sm" />} />
+      <Explication />
       {resultat.error !== undefined ? (
         <ErreurDeLecture message={resultat.error} href={ici} Lien={Lien} />
       ) : (

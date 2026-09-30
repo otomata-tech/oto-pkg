@@ -25,12 +25,16 @@
 // E11-S05 (AC-g1, AC-g2) : plus d'état vide ni de « Commencer à écrire » ; une page sans bloc a un Texte vide, créé
 // sur le poste, dont le champ porte l'invite, et qui prend le focus à l'ouverture quand le titre est écrit.
 // E10-S02 (lot b) : il tient les envois de fichiers et leurs dialogues (`envoi-de-fichier.ts`, `choix-au-depot.tsx`).
+//
+// E11-S17 (lot a) : ses rangées vivent dans la zone des blocs, où se tient la sélection de blocs entiers
+// (`selection-de-blocs.ts`) : surlignés, annoncés dans une région vivante montée vide, la zone nommée par leur nombre
+// quand elle a le focus ; le menu d'un bloc sélectionné parmi d'autres supprime et déplace le groupe.
 import { useState, type ReactNode } from "react"
 import type { BlockView, NodeKind } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
 import { Reader } from "../../ds/react/reader"
 import type { CiblesDesLiens } from "../en-ligne"
-import { EDITEUR } from "../libelles"
+import { EDITEUR, SELECTION } from "../libelles"
 import { Publication } from "../publication"
 import { ContexteDesGestes } from "./gestes"
 import { useGlisser } from "./glisser"
@@ -40,7 +44,9 @@ import { estLaPageVide } from "./page-vide"
 import type { LiensDesBlocs } from "./champ-de-bloc"
 import { DialogueDesFichiers } from "./choix-au-depot"
 import type { Depot } from "./envoi-de-fichier"
+import type { Rectangle } from "./pointeur-de-la-selection"
 import { RangeeDeBloc } from "./rangee-de-bloc"
+import { useSelectionDeBlocs } from "./selection-de-blocs"
 import type { Conflit } from "./use-envois"
 import { useEditeur } from "./use-editeur"
 
@@ -76,10 +82,12 @@ type RangeesProps = {
   fichiers: boolean
   /** Les envois en cours, par rangée locale (E10-S02, AC-b1). */
   depots: Readonly<Record<string, Depot>>
+  /** Les blocs sélectionnés (E11-S17, lot a). */
+  selection: ReadonlySet<string>
 }
 
 /** Les rangées, une par bloc, rendues par leur clé de rendu, jamais par leur rang ; le Texte d'une page vide porte l'invite. */
-function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues, fichiers, depots }: RangeesProps) {
+function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues, fichiers, depots, selection }: RangeesProps) {
   const invite = estLaPageVide(modele) ? EDITEUR.invite : undefined
   return modele.map((rangee, rang) => (
     <RangeeDeBloc
@@ -88,6 +96,7 @@ function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, reference
       premiere={rang === 0}
       derniere={rang === modele.length - 1}
       tenue={tenue === rangee.cle}
+      selectionnee={selection.has(rangee.cle)}
       menuOuvert={menuOuvert === rangee.cle}
       // Un conflit ouvert : les autres champs sont en lecture seule jusqu'à son règlement (HN-E05S08-3).
       verrouillee={conflit !== null && conflit.cle !== rangee.cle}
@@ -102,34 +111,71 @@ function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, reference
   ))
 }
 
+/** Le rectangle tiré depuis la marge (AC-a5), posé dans la zone des blocs ; décoratif, la région vivante dit la sélection. */
+function RectangleDeSelection({ rectangle }: { rectangle: Rectangle | null }) {
+  if (!rectangle) return null
+  const { gauche, haut, largeur, hauteur } = rectangle
+  return <div aria-hidden="true" className="oto-rectangle-de-selection" style={{ left: gauche, top: haut, width: largeur, height: hauteur }} />
+}
+
 export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
   const { blocs, revisionServie, referencesRendues, genre = "page" } = props
   const editeur = useEditeur({ blocs, revisionServie, focusALOuverture: props.focusALOuverture })
   const { envois } = editeur
-  const glisser = useGlisser({ racine: editeur.racine, glisser: editeur.actions.glisserDUnRang, deposer: editeur.actions.deposer })
   const [menuOuvert, setMenuOuvert] = useState<string | null>(null)
+  const fermerLeMenu = () => setMenuOuvert(null)
+  const selection = useSelectionDeBlocs({ modele: editeur.modele, actions: editeur.actions, fermerLeMenu })
+  const glisser = useGlisser({ racine: editeur.racine, glisser: selection.glisser, deposer: selection.deposer, groupe: selection.groupe, revenir: selection.revenir })
   const liens: LiensDesBlocs = { prefixe: props.prefixeDesPages, cibles: props.cibles, lecture: props.liens }
-  // Tout le texte d'un bloc sélectionné ouvre le menu de sa poignée ; une autre sélection le referme (AC-28).
-  const selectionner = (cle: string, totale: boolean) => setMenuOuvert((ouvert) => (totale ? cle : ouvert === cle ? null : ouvert))
+  // Tout le texte d'un bloc sélectionné ouvre le menu de sa poignée ; une autre sélection le referme (AC-28). Des blocs
+  // sélectionnés n'en ouvrent aucun : un glissé qui passe sur tout un texte prend des blocs (E11-S17, AC-a1).
+  const selectionner = (cle: string, totale: boolean) => {
+    if (selection.cles.length === 0) setMenuOuvert((ouvert) => (totale ? cle : ouvert === cle ? null : ouvert))
+  }
+  const gestes = {
+    ...editeur.actions,
+    poignee: glisser.poignee,
+    selectionner,
+    fermerLeMenu,
+    toutSelectionnerLesBlocs: selection.toutSelectionner,
+    cliquerLaPoignee: selection.cliquerLaPoignee,
+    supprimer: selection.supprimer,
+    deplacer: selection.deplacer,
+  }
   return (
-    <ContexteDesGestes.Provider value={{ ...editeur.actions, poignee: glisser.poignee, selectionner, fermerLeMenu: () => setMenuOuvert(null) }}>
+    <ContexteDesGestes.Provider value={gestes}>
       <Reader ref={editeur.racine}>
         <IndicationDEnregistrement />
         <div className="mb-3.5 flex flex-col gap-2">
           <Publication genre={genre} blocs={editeur.blocs} />
           <AlerteDEdition alerte={envois.alerte} />
         </div>
-        <Rangees
-          modele={editeur.modele}
-          tenue={glisser.enCours}
-          menuOuvert={menuOuvert}
-          erreurs={editeur.erreurs}
-          conflit={envois.conflit}
-          liens={liens}
-          referencesRendues={referencesRendues}
-          fichiers={editeur.fichiers.stockage.actif}
-          depots={editeur.fichiers.depots}
-        />
+        {/* La zone des blocs : elle tient la sélection, et prend le focus quand toute la page est sélectionnée (AC-a2). */}
+        <div
+          ref={selection.zone}
+          role="group"
+          tabIndex={-1}
+          aria-label={selection.annonce || SELECTION.zone}
+          className="relative rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+          {...selection.proprietes}
+        >
+          <Rangees
+            modele={editeur.modele}
+            tenue={glisser.enCours}
+            menuOuvert={menuOuvert}
+            erreurs={editeur.erreurs}
+            conflit={envois.conflit}
+            liens={liens}
+            referencesRendues={referencesRendues}
+            fichiers={editeur.fichiers.stockage.actif}
+            depots={editeur.fichiers.depots}
+            selection={selection.ensemble}
+          />
+          <RectangleDeSelection rectangle={selection.rectangle} />
+          <p role="status" className="oto-sr-only">
+            {selection.annonce}
+          </p>
+        </div>
         <LigneDAnnonce annonce={envois.annonce} />
         <DialogueDesFichiers dialogue={editeur.fichiers.dialogue} chemin={envois.chemin} />
       </Reader>

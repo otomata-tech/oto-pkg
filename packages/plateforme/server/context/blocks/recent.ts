@@ -86,9 +86,10 @@ async function personalReads(db: PlatformDb, identity: Identity): Promise<Person
 /**
  * Les documents récents de la personne, les plus récents d'abord, 20 au plus (AC5) : ses sources et les
  * nœuds qu'elles visent (`personalReads`), puis leurs niveaux en un lot, après la transaction ; gardés :
- * niveau ≥ 1, page ou tableau, hors racine ; date = la plus récente de leurs sources.
+ * niveau ≥ 1, page ou tableau, hors racine ; date = la plus récente de leurs sources. Lue aussi par la liste de
+ * « @ » de l'éditeur (`GET /api/platform/search/recent`, E11-S15, AC-b4).
  */
-async function recentDocuments(db: PlatformDb, identity: Identity): Promise<(DocumentNode & { at: string })[]> {
+export async function recentDocuments(db: PlatformDb, identity: Identity): Promise<(DocumentNode & { at: string })[]> {
   const found = await personalReads(db, identity)
   const nodes = new Map<string, DocumentNode>([...found.atPath, ...found.atId, ...found.nodes].map(({ id, path, kind, title }) => [id, { id, path, kind, title }]))
   // La date d'une source (ISO, à la milliseconde comme `Date.parse` la compare), la plus récente par nœud.

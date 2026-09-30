@@ -31,6 +31,8 @@
 // E10-S02 (lot b) : le « + » propose « Image » et « Fichier » quand le stockage est activé (AC-b1, AC-b2, AC-b7) ; un
 // fichier lâché sur la rangée est un dépôt, jamais un déplacement (AC-b4) ; le bloc local d'un envoi n'a ni « + » ni
 // poignée ; une image se décrit dans son bloc et choisit sa largeur au menu (AC-b3) ; un CSV joint s'y convertit (AC-b6).
+//
+// E11-S17 (lot a) : un bloc sélectionné est surligné ; Maj+clic, Ctrl+clic ou ⌘+clic sur la poignée prend des blocs (AC-a4).
 import { useId, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react"
 import { ArrowDown } from "@phosphor-icons/react/dist/csr/ArrowDown"
 import { ArrowUp } from "@phosphor-icons/react/dist/csr/ArrowUp"
@@ -48,7 +50,7 @@ import { DropdownMenu, type MenuItem } from "../../ds/react/overlays"
 import { Button, IconButton } from "../../ds/react/primitives"
 import { texteLu } from "../en-ligne"
 import { largeurDe } from "../fichier-du-bloc"
-import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC } from "../libelles"
+import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC, SELECTION } from "../libelles"
 import { FICHIERS } from "../libelles-des-fichiers"
 import { baliseDuTitre, RenduDUnBloc } from "../rendu-des-blocs"
 import type { Position } from "./blocs-de-page"
@@ -69,6 +71,8 @@ type RangeeDeBlocProps = {
   derniere: boolean
   /** La rangée se glisse (E05-S10, AC-a3) : sa gouttière reste révélée. */
   tenue: boolean
+  /** Le bloc est dans la sélection de blocs (E11-S17, lot a) : surligné, sa gouttière révélée (`editeur.css`). */
+  selectionnee: boolean
   /** Tout le texte du bloc est sélectionné : le menu de la poignée est ouvert, le focus reste au champ (E05-S11, AC-28). */
   menuOuvert: boolean
   /** Un autre bloc est en conflit : ce champ est en lecture seule jusqu'à son règlement (HN-E05S08-3). */
@@ -279,6 +283,7 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
   const depot = useDepotSurLaRangee(rangee.cle, verrouillee)
   // La cellule courante d'un tableau simple, où son menu ajoute et retire (E10-S06, AC-b2).
   const [cellule, setCellule] = useState<Position>({ ligne: 0, colonne: 0 })
+  const etatDeLaSelection = useId()
   const { cle, bloc } = rangee
   // Le bloc local d'un envoi : ni « + » ni poignée, seulement « Annuler » (E10-S02, AC-b4).
   if (enDepot(bloc)) {
@@ -304,15 +309,26 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
       variant="ghost"
       size="sm"
       data-geste="poignee"
+      // Un bloc sélectionné le dit aux lecteurs d'écran, par la description de sa poignée (E11-S17, AC-a9).
+      aria-describedby={props.selectionnee ? etatDeLaSelection : undefined}
       onPointerDown={(evenement) => gestes.poignee.appui(cle, evenement)}
       onPointerMove={gestes.poignee.mouvement}
       onPointerUp={gestes.poignee.lacher}
       onPointerCancel={gestes.poignee.annuler}
-      onClickCapture={gestes.poignee.clicCapture}
+      // Le clic qui finit un glissé est avalé ; un autre, avec Maj, Ctrl ou ⌘, prend des blocs sans ouvrir le menu (E11-S17, AC-a4).
+      onClickCapture={(evenement) => {
+        gestes.poignee.clicCapture(evenement)
+        if (!evenement.isPropagationStopped()) gestes.cliquerLaPoignee(cle, evenement)
+      }}
       // Composé avec l'ouverture du menu au clavier (`Anchor` chaîne les gestionnaires) : seul `Tab` est pris ici.
       onKeyDown={(evenement) => sortirDuBlocAuClavier(evenement, forme)}
     >
       <AnimatedIcon as={DotsSixVertical} size="xs" />
+      {props.selectionnee && (
+        <span id={etatDeLaSelection} hidden>
+          {SELECTION.selectionne}
+        </span>
+      )}
     </IconButton>
   )
   // Le « + » ouvre le choix du bloc à insérer (E10-S06, AC-a1) ; Échap le ferme et lui rend le focus. Approché, il lit
@@ -329,6 +345,7 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
       {...depot}
       // La rangée qu'on glisse garde sa gouttière révélée : une présence, puis la teinte du design system (`blocks.css`).
       state={tenue ? "moving" : undefined}
+      data-selectionnee={props.selectionnee ? "" : undefined}
       // Un bouton cliqué ne prend pas le focus sous Safari et Firefox macOS : l'appui dit que la rangée reste (M30).
       onPointerDown={() => gestes.appuyerDansLaRangee(cle)}
       onBlur={(evenement) => gestes.quitterLaRangee(cle, evenement)}
@@ -338,7 +355,16 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
         conflit ? (
           poignee
         ) : (
-          <DropdownMenu side="bottom" align="start" trigger={poignee} items={itemsDuMenu(menu, gestes)} ouvertSansFocus={menuOuvert} surFermeture={gestes.fermerLeMenu} />
+          // Sa hauteur suit ses entrées, bornée à la fenêtre (E11-S15, AC-b5, `editeur.css`) : sans barre de défilement.
+          <DropdownMenu
+            side="bottom"
+            align="start"
+            className="oto-menu-de-poignee"
+            trigger={poignee}
+            items={itemsDuMenu(menu, gestes)}
+            ouvertSansFocus={menuOuvert}
+            surFermeture={gestes.fermerLeMenu}
+          />
         )
       }
     >

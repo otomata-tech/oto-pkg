@@ -114,6 +114,9 @@
 .oto-separator[data-orientation="vertical"]   { inline-size: 1px; block-size: 100%; align-self: stretch; margin-inline: var(--space-2); }
 .oto-separator[data-strong] { background: var(--island-bd); }
 
+/* Des étapes numérotées séparées d'un filet (le guide de branchement, E11-S15, AC-a5) : porté par l'élément, un `<hr>` n'entrant pas entre deux `<li>` ; le numéro suit la première ligne, sous le filet. `--island-bd` et non `--hair` : dans l'îlot, le filet intérieur ne se voyait pas entre deux étapes longues. */
+.oto-etapes > li + li { border-block-start: 1px solid var(--island-bd); padding-block-start: var(--space-4); }
+
 /* un séparateur avec un mot : le filet passe de part et d'autre */
 .oto-separator-labelled {
   display: flex;

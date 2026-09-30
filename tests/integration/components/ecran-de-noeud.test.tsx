@@ -197,9 +197,9 @@ describe("EcranDeNoeud, encarts et blocs (AC4 ; E11-S05, lot e)", () => {
     expect(screen.queryByText(/Mentionn/)).toBeNull()
 
     const sousPages = within(within(encart("Sous-pages")).getByRole("list", { name: "Sous-pages" }))
-    // Le résumé d'une procédure seule (AC-f2) : une page dessous ne dit que sa nature.
+    // Chaque nœud dessous ne dit que sa nature, sans résumé, procédure comprise (E11-S15, AC-a2).
     expect(sousPages.getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([
-      ["ExempleProcédure · Un cas réel.", "/n/ventes/modele_relance/exemple"],
+      ["ExempleProcédure", "/n/ventes/modele_relance/exemple"],
       ["NotePage", "/n/ventes/modele_relance/note"],
     ])
     const cite = within(within(encart("Cite")).getByRole("list", { name: "Cite" }))

@@ -110,15 +110,17 @@ function checkBounds(before: readonly WorkBlock[], after: readonly WorkBlock[], 
  * « Nothing was written. » : rien n'est écrit. `revision`, celle du nœud, que porte un refus de révision
  * de bloc (`details.revision`, AC37). `tolerant` (E10-S01, AC-a2) : les textes se lisent en mode tolérant, et
  * `keptAsText` compte ce qu'ils ont gardé en texte (0 sans lui). `wholeFile` (E10-S02, AC-f7) : un `.md` déposé par lien,
- * sans borne de section ; celles de la page et du nombre de blocs restent.
+ * sans borne de section ; celles de la page et du nombre de blocs restent. `opsMax` : les opérations d'un appel, que
+ * `write.ts` décide selon la porte (fiche D153) ; `OPS_MAX` sans lui.
  */
 export function applyOps(
   blocks: readonly DocBlock[],
   ops: readonly WriteOpBody[],
-  options: { path: string; revision?: number; tolerant?: boolean; wholeFile?: boolean },
+  options: { path: string; revision?: number; tolerant?: boolean; wholeFile?: boolean; opsMax?: number },
 ): { blocks: WorkBlock[]; touched: Touched[]; keptAsText: number } {
-  if (ops.length > OPS_MAX) {
-    throw new PlatformError("invalid_arguments", `${formatCount(ops.length)} operations; ${OPS_MAX} at most per call: split them over several calls.`)
+  const opsMax = options.opsMax ?? OPS_MAX
+  if (ops.length > opsMax) {
+    throw new PlatformError("invalid_arguments", `${formatCount(ops.length)} operations; ${formatCount(opsMax)} at most per call: split them over several calls.`)
   }
   const state: OpState = {
     blocks: blocks.map((block, uid) => ({ ...block, uid })),

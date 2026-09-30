@@ -752,22 +752,27 @@
   max-inline-size: var(--content-max-doc);
 }
 
-/* La colonne de cartes est une grille : ses îlots ne partagent jamais un bord. */
+/* La colonne de cartes est une grille : ses îlots ne partagent jamais un bord. Sa piste est `minmax(0, 1fr)` : la piste implicite `auto` prenait la largeur min-content de ses îlots (un nom d'encart en `nowrap`, un bloc de code), débordait la colonne et faisait défiler la page en largeur (E11-S15, AC-a2, AC-a3). */
 .oto-two-columns-main,
 .oto-two-columns-aside {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gap);
   min-inline-size: 0;
 }
 
-/* Changé (E05-S12, lot C) : sous 1 410 px de contenu, les deux gouttières qui centrent le document laissaient aux annexes moins que leur largeur (90 px à 1 280 px, rail ouvert) ; le document prend alors ce qui reste à gauche, les annexes leur largeur (`--annexes-w`), et l'en-tête s'arrête au bord du document. 1 410 = 830 + 2 × (10 + 280) : au-dessus, la piste des annexes vaut déjà `--annexes-w`. */
+/* Changé (E05-S12, lot C) : sous 1 410 px de contenu, les deux gouttières qui centrent le document laissaient aux annexes moins que leur largeur (90 px à 1 280 px, rail ouvert) ; le document et les annexes (`--annexes-w`) forment alors une paire, et l'en-tête s'arrête au bord du document. 1 410 = 830 + 2 × (10 + 280) : au-dessus, la piste des annexes vaut déjà `--annexes-w`.
+   Changé (E11-S15, AC-a3) : la paire est centrée, le document borné à sa mesure (`--content-max-doc`), l'en-tête posé à son bord gauche ; le zoom du navigateur fait passer le contenu sous ce palier (1 920 px à 125 %), et le document, collé à gauche et élargi, s'y décalait. */
 @container (max-width: 1409px) {
-  .oto-two-columns[data-main="document"] { grid-template-columns: minmax(0, 1fr) var(--annexes-w); }
+  .oto-two-columns[data-main="document"] {
+    grid-template-columns: minmax(0, var(--content-max-doc)) var(--annexes-w);
+    justify-content: center;
+  }
   .oto-two-columns[data-main="document"] > .oto-two-columns-main { grid-column: 1; }
   .oto-two-columns[data-main="document"] > .oto-two-columns-aside { grid-column: 2; }
   .oto-content:has(> .oto-two-columns[data-main="document"]) > .oto-screen-header {
-    max-inline-size: calc(100% - var(--annexes-w) - var(--space-2-5));
-    margin-inline: 0 auto;
+    max-inline-size: min(var(--content-max-doc), calc(100% - var(--annexes-w) - var(--space-2-5)));
+    margin-inline: max(0px, calc((100% - var(--content-max-doc) - var(--annexes-w) - var(--space-2-5)) / 2)) auto;
   }
 }
 /* Sous 770 px de contenu (rail ouvert à 1 024 px, inspecteur dans le flux), il resterait moins de 480 px au document : une colonne, les annexes sous la carte. Écrit avant le palier de la fenêtre, qui l'emporte sous 1 024 px. */

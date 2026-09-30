@@ -25,8 +25,9 @@ type GuideDeBranchementProps = {
 }
 
 const DEMANDES_MONTREES = 3
-// Des marqueurs de liste, donc pas de flex : un `li` devenu élément flex peut perdre son numéro.
-const LISTE_D_ETAPES = "list-decimal space-y-4 ps-6"
+// Des marqueurs de liste, donc pas de flex : un `li` devenu élément flex peut perdre son numéro. Un filet entre deux
+// étapes (`oto-etapes`, E11-S15, AC-a5).
+const LISTE_D_ETAPES = "oto-etapes list-decimal space-y-4 ps-6"
 const ONGLETS = ASSISTANTS.map((assistant) => ({ value: assistant, label: assistant }))
 
 /** L'onglet ouvert d'abord : l'assistant de la connexion la plus récente, claude.ai sans connexion connue (HN-E11S09-2). */

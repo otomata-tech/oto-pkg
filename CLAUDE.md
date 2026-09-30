@@ -190,9 +190,10 @@ s'en exclut, `revue` ne relit pas la prose) ; cinq règles s'appliquent quand m�
    en ANSI, chaque lettre accentuée devient deux caractères ; une réécriture passe par l'outil
    d'édition. **Vérifiable :** `rg -n 'Ã[©¨ª«®´§ ]' tests packages src scripts docs` ne trouve rien.
    Un échappement de code (barre oblique inverse suivie de `u` et d'un code, ou doublée) ne s'écrit
-   ni par l'outil Edit ni par un heredoc passé à un interpréteur : l'un et l'autre peuvent le livrer
+   ni par l'outil Edit ni par un heredoc, passé à un interpréteur ou écrit dans un fichier : l'un et l'autre peuvent le livrer
    déjà interprété, en caractère invisible ou combinant. Il s'écrit par un script qui compose la barre
-   (`chr(92)`, `String.fromCharCode(92)`), puis se relit. **Vérifiable :**
+   (`chr(92)`, `String.fromCharCode(92)`), puis se relit. Aucun fichier du dépôt ne se modifie par `sed -i`
+   sous Git Bash, qui réécrit ses fins de ligne (CRLF en LF) : une modification passe par l'outil d'édition. **Vérifiable :**
    `rg -n "[\x{2028}\x{2029}\x{200B}-\x{200F}\x{0300}-\x{036F}]" packages src tests scripts` ne trouve rien.
 5. **Aucun nom réel dans un texte nouveau**, de document, de code ou de test : un client ou une
    personne réels s'écrivent par leur libellé neutre (« le premier client », « l'ERP Python »,

@@ -10,6 +10,9 @@ export const SEARCH_QUERY_MAX = 200
 /** `GET /api/platform/search?q=` : les mots cherchés, espaces retirés. */
 export const searchQuerySchema = z.object({ q: z.string().trim().min(1).max(SEARCH_QUERY_MAX) })
 
+/** `GET /api/platform/search/recent?exclude=` (E11-S15, AC-b4) : la page qu'on édite, que la liste de « @ » ne propose pas. */
+export const recentQuerySchema = z.object({ exclude: nodePathSchema.optional() })
+
 /** Un nœud trouvé, tel que l'écran le montre : son chemin, son genre, son titre, un extrait. */
 export type SearchMatch = { path: string; kind: string; title: string; snippet: string | null }
 

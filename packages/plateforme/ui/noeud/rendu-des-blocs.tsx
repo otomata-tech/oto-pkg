@@ -25,6 +25,8 @@
 // E10-S02 (lot b) : une image jointe se lit à la route de ses octets, toute image à sa largeur, agrandie au clic
 // (AC-b1, AC-b3) ; un fichier joint, en carte (AC-b2, `fichier-du-bloc.tsx`). Lot c : les routes des fichiers d'un lien
 // public (`routeDesFichiers`, AC-c5), celles d'une personne connectée par défaut.
+//
+// E11-S15 (AC-b1) : l'en-tête d'un tableau simple sur le fond teinté du primary (`data-simple`, `editeur.css`).
 import { Suspense, use, type ReactNode } from "react"
 import { LIST_DEPTH_MAX, simpleTableOf } from "../../schemas/blocks"
 import { filePath } from "../../schemas/files"
@@ -37,7 +39,7 @@ import { EmbedCard } from "../ds/react/embed-card"
 import { LinkedContent } from "../ds/react/linked-content"
 import { ReaderHeading, ReaderList, ReaderParagraph } from "../ds/react/reader"
 import { texteDUnAppel } from "../procedure/libelles"
-import { cibleDe, estUnTableau, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
+import { adresseSansIdentifiants, cibleDe, estUnTableau, libelleDUneAdresse, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
 import { CarteDeFichier, ImageAgrandissable, largeurDe } from "./fichier-du-bloc"
 import { GlypheDeNature } from "./glyphes"
 import { ECRAN } from "./libelles"
@@ -81,11 +83,15 @@ const APRES = "mb-3.5"
 
 /**
  * Une adresse web (AC-a8) : un lien vers un autre site, ouvert dans un nouvel onglet, sans l'adresse de la page
- * qui le porte (`noreferrer`) ; son libellé raccourci, qui le nomme, l'adresse entière au survol (`title`).
+ * qui le porte (`noreferrer`) ; son libellé raccourci, l'adresse entière au survol (`title`). Une adresse nue coupée
+ * (E11-S15, AC-b10) se nomme par l'adresse entière ; un libellé écrit (`[texte](https://…)`) reste le nom du lien.
+ * L'infobulle et le nom ne montrent jamais l'identifiant ni le mot de passe écrits avant l'hôte (H-b8).
  */
 export function AdresseWeb({ adresse, libelle, className = LIEN, rang }: { adresse: string; libelle: string; className?: string; rang?: number }) {
+  const montree = adresseSansIdentifiants(adresse)
+  const coupee = libelle !== montree && libelle === libelleDUneAdresse(adresse)
   return (
-    <a href={adresse} title={adresse} target="_blank" rel="noopener noreferrer nofollow" className={className} data-lien={rang}>
+    <a href={adresse} title={montree} aria-label={coupee ? montree : undefined} target="_blank" rel="noopener noreferrer nofollow" className={className} data-lien={rang}>
       {libelle}
     </a>
   )
@@ -198,7 +204,7 @@ function TableauSimple({ bloc, ...liens }: RenduProps) {
   // Une cellule n'a pas d'identité : son rang dans une rangée, et la rangée le sien, dans un bloc qui a la sienne.
   return (
     <div id={bloc.ref} className={`oto-table-wrap ${APRES}`}>
-      <table className="oto-table" data-responsive="scroll">
+      <table className="oto-table" data-responsive="scroll" data-simple="">
         <thead>
           <tr>
             {colonnes.map((colonne, rang) => (

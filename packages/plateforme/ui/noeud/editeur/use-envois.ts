@@ -13,8 +13,9 @@ import type { ErreurPlateforme } from "../../api/client"
 import { IMPORT } from "../../coque/libelles"
 import { messageDErreur } from "../../api/messages"
 import { useRafraichir } from "../../hote/rafraichir"
-import { EDITEUR } from "../libelles"
+import { EDITEUR, SELECTION } from "../libelles"
 import { useFileDOperations, type CorpsDEnvoi, type File } from "./file-d-operations"
+import { deplacementsDuGroupe, insertionsDuGroupe, type CorpsDuGroupe, type GesteDeGroupe } from "./groupe"
 import { adopter, rangeesDepuis, texteDe, type BlocEdite, type Focus, type Rangee, type Retiree } from "./modele"
 import { alerteDuRefus, controler, idPrecedent, operationDeplacer, operationInserer, operationRemplacer, operationSupprimer, verdictDuRefus, type AlerteDeRefus } from "./operations"
 import { actionsDeResolution } from "./resolution"
@@ -41,7 +42,8 @@ export type Refus = { geste: Geste; cle: string; erreur: ErreurPlateforme; revis
 /** Un refus qui attend la relecture de la page pour être lu (AC15). */
 type Attente = Refus & { vise: Identite | null; texte: string; blocs: readonly BlockView[] }
 
-export type Annonce = { id: number; message: string; retiree?: Retiree }
+/** `retiree` : « Annuler » d'une suppression ; `groupe` : celui d'un geste sur une sélection de blocs (E11-S17, AC-a6, AC-a8). */
+export type Annonce = { id: number; message: string; retiree?: Retiree; groupe?: GesteDeGroupe }
 
 /** `cle` : la rangée qui reçoit le focus quand « Réessayer » retire l'alerte (celle du geste refusé). */
 export type AlerteDeLEditeur = AlerteDeRefus & { texte: string; cle: string | null }
@@ -69,6 +71,65 @@ export type Moteur = Parametres & {
 }
 
 const trouver = (modele: readonly Rangee[], cle: string) => modele.find((rangee) => rangee.cle === cle)
+
+type MoteurDuGroupe = Pick<Moteur, "file" | "modele" | "fixes" | "ids" | "refuser" | "adopterIdentite" | "setAlerte">
+
+/**
+ * Les écritures d'un geste sur une sélection de blocs (E11-S17, AC-a6, AC-a8) : une seule écriture de plusieurs
+ * opérations, dont le corps se calcule à l'envoi, refusée en entier si l'une l'est (HN-E11S16-7). Un refus se lit sans
+ * bloc visé (`vise: null`) : la page relue dit un conflit de page ou le message, avec « Réessayer ». Un corps refusé
+ * pour lui-même (`invalid_arguments`) échouerait encore renvoyé : il quitte la file, et l'alerte dit de recharger. Sans
+ * elles, un groupe partirait en N écritures, et un refus en laisserait une partie écrite.
+ */
+function envoisDuGroupe({ file, modele, fixes, ids, refuser, adopterIdentite, setAlerte }: MoteurDuGroupe) {
+  const envoyer = (geste: Geste, cles: readonly string[], corps: () => CorpsDuGroupe | null) => {
+    let ordre: readonly string[] = cles
+    file.envoyer({
+      corps: () => {
+        const lu = corps()
+        if (!lu || lu.ops.length === 0) return null
+        ordre = lu.cles
+        return { ops: lu.ops }
+      },
+      issue: (issue) => {
+        if (issue.erreur?.code === "invalid_arguments") {
+          file.remplacerLArret(null)
+          return setAlerte({ message: SELECTION.refusee, copier: false, recharger: true, reessayer: false, texte: "", cle: null })
+        }
+        if (issue.erreur) return refuser({ geste, cle: ordre[0] ?? "", erreur: issue.erreur, revisionEnvoyee: issue.revisionEnvoyee, vise: null })
+        if (geste === "supprimer") for (const cle of ordre) ids.current.delete(cle)
+        else ordre.forEach((cle, rang) => adopterIdentite(cle, issue.data.touched[rang]?.blocks[0]))
+      },
+    })
+  }
+  return {
+    /** N `delete_block`, chacun avec sa révision lue ; un bloc jamais écrit n'a rien à supprimer. */
+    envoyerSuppressions: (retirees: readonly Retiree[]) =>
+      envoyer(
+        "supprimer",
+        retirees.map((retiree) => retiree.rangee.cle),
+        () => {
+          const envoyees = retirees.flatMap(({ rangee: { cle } }) => {
+            const identite = ids.current.get(cle)
+            return identite ? [{ cle, op: operationSupprimer(identite.id, identite.revision) }] : []
+          })
+          return { ops: envoyees.map((une) => une.op), cles: envoyees.map((une) => une.cle) }
+        },
+      ),
+    /** Les blocs rétablis par « Annuler », chacun tel qu'il était enregistré (`fixes`), à sa place. */
+    envoyerInsertions: (cles: readonly string[]) =>
+      envoyer("inserer", cles, () => {
+        const entrees = cles.flatMap((cle) => {
+          const fixe = fixes.current.get(cle)
+          if (!trouver(modele.current, cle) || !fixe || ids.current.has(cle)) return []
+          const controle = controler(fixe)
+          return "entree" in controle ? [{ cle, entree: controle.entree }] : []
+        })
+        return insertionsDuGroupe(modele.current, entrees)
+      }),
+    envoyerDeplacements: (cles: readonly string[]) => envoyer("deplacer", cles, () => deplacementsDuGroupe(modele.current, cles, (cle) => ids.current.get(cle)?.id)),
+  }
+}
 
 /** La rangée d'un refus : celle du geste, ou, pour un bloc supprimé depuis, celle de son ancien voisin. */
 const rangeeDuRefus = (modele: readonly Rangee[], refus: Pick<Refus, "cle" | "retiree">) =>
@@ -205,6 +266,9 @@ export function useEnvois(parametres: Parametres) {
         return identite && trouver(modele.current, cle) ? { ops: [operationDeplacer(identite.id, idPrecedent(modele.current, cle))] } : null
       }),
     annoncer: (message: string, retiree?: Retiree) => setAnnonce({ id: ++numero.current, message, retiree }),
+    ...envoisDuGroupe({ file, modele, fixes, ids, refuser, adopterIdentite, setAlerte }),
+    /** L'annonce d'un geste sur une sélection de blocs, et son « Annuler » quand il a quelque chose à défaire (E11-S17). */
+    annoncerLeGroupe: (message: string, groupe?: GesteDeGroupe) => setAnnonce({ id: ++numero.current, message, groupe }),
     /**
      * Une écriture qui change plusieurs blocs d'un coup (E10-S01, AC-a1, AC-a4, AC-b7), derrière les écritures en
      * attente : à la réponse, le brouillon est relu (le modèle prend ce qu'il lit) et ce que le mode tolérant a gardé

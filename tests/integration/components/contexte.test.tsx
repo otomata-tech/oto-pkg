@@ -112,7 +112,7 @@ describe("écran d'un Contexte (AC10)", () => {
     expect(screen.getAllByRole("complementary").filter((repere) => repere.parentElement?.closest("aside, [role='complementary']"))).toEqual([])
     // E05-S13 (AC-17) : deux phrases, dans un seul style, sans « Reçu par », recharge ni pied.
     expect(phrases()).toEqual([
-      ["P", "", "Ce que les assistants des membres de l'équipe Ventes lisent à chaque conversation."],
+      ["P", "", "Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe Ventes, lit à chaque conversation."],
       ["P", "", "Vous l'écrivez comme n'importe quelle page."],
     ])
     expect(note().queryByText("Reçu par")).toBeNull()
@@ -123,7 +123,7 @@ describe("écran d'un Contexte (AC10)", () => {
 
   // E05-S13 (AC-17 ; D128) : la première phrase dit, par portée, qui le reçoit.
   it.each([
-    ["contexte", "Ce que les assistants de tous les membres de l'organisation lisent à chaque conversation."],
+    ["contexte", "Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'organisation, lit à chaque conversation."],
     // Le `handle` de la personne : son propre Contexte Perso lui est servi.
     ["private/lea/contexte", "Ce que votre assistant lit à chaque conversation ; vous seul le recevez."],
     // Le Contexte Perso d'une autre personne, qu'elle a partagé : servi à elle seule (HN-E05S04-22).
@@ -251,6 +251,6 @@ describe("voici ce que votre agent va lire (AC12 ; E05-S11, AC-9 à AC-11)", () 
     monterLesAnnexes({ apercu: { error: "Une erreur est survenue. Réessayez." } })
     expect(apercu().getByRole("alert")).toHaveTextContent("L'aperçu n'a pas pu être calculé.")
     expect(apercu().getByRole("link", { name: "Réessayer" })).toHaveAttribute("href", "/n/ventes/contexte")
-    expect(note().getByText("Ce que les assistants des membres de l'équipe Ventes lisent à chaque conversation.")).toBeInTheDocument()
+    expect(note().getByText("Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe Ventes, lit à chaque conversation.")).toBeInTheDocument()
   })
 })

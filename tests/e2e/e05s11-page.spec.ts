@@ -104,10 +104,10 @@ test.describe("page d'un nœud après les retours de JB (E05-S11, lot b)", () =>
         await attendre(statut(page, "Enregistré.")).toBeVisible()
         expect(await hautDuPremierBloc(page)).toBe(avant)
 
-        // AC-26, AC-27 : publiée seule puis relue, la page citée se lit par son titre, l'adresse par son domaine.
+        // AC-26, AC-27 : publiée seule puis relue, la page citée se lit par son titre, l'adresse courte entière (E11-S15, AC-b10).
         const rendu = page.locator(".oto-block-rendu").filter({ hasText: horodatage })
         await attendre(rendu.getByRole("link", { name: new RegExp(`^${PROCEDURE}`) })).toHaveAttribute("href", `/n/${CHEMINS.procedure}`)
-        await expect(rendu.getByRole("link", { name: "exemple.fr" })).toHaveAttribute("href", "https://www.exemple.fr/tarifs/2026")
+        await expect(rendu.getByRole("link", { name: "https://www.exemple.fr/tarifs/2026" })).toHaveAttribute("href", "https://www.exemple.fr/tarifs/2026")
         await expect(rendu).not.toContainText("[[")
         await capturer(page, testInfo, `liens-${nom}`)
 

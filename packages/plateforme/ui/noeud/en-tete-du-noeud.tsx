@@ -47,7 +47,10 @@ type EnTeteDuNoeudProps = {
   modifiable: boolean
   /** Le panneau « Partager » (AC-b5) ; absent, l'en-tête n'a pas d'accès. */
   partage?: ReactNode
-  /** « Réglages » d'un tableau (E11-S01, AC-g1), avant « Partager · <espace> », qui reste le dernier (HN-E11S01-16). */
+  /**
+   * « Importer un fichier… » et « Réglages » d'un tableau (E11-S15, AC-a7 ; E11-S01, AC-g1), avant « Partager · <espace> »,
+   * qui reste le dernier (HN-E11S01-16).
+   */
   reglages?: ReactNode
 }
 

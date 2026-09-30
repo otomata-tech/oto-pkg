@@ -10,8 +10,8 @@
 // Porté d'oto-frontend (`src/routes/n.$nodeId.lazy.tsx`, `CorpsTableauDuNoeud`) : les îlots du corps d'un
 // tableau posés l'un sous l'autre, dans le contenu. Retiré : « Qui s'en sert » et l'îlot d'activité du
 // tableau (le journal d'une ligne, V2 : E07-S03 hors périmètre).
-// E10-S01 (AC-b5) : pour qui l'écrit, le corps du tableau reçoit un `.csv` lâché sur lui, ou choisi par « Importer
-// un fichier… » (`DepotSurLeTableau`), vide compris.
+// E10-S01 (AC-b5) : pour qui l'écrit, le corps du tableau reçoit un `.csv` lâché sur lui (`DepotSurLeTableau`), vide
+// compris ; « Importer un fichier… » est dans l'en-tête de l'écran (E11-S15, AC-a7).
 import type { TableGridRows, TableGridSummary, TableHeader, TableReviewQueue } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"

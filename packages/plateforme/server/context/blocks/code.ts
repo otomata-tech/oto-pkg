@@ -1,6 +1,6 @@
 // Bloc 1 de `context` : le code `ctx` et la consigne de le repasser (H27), puis ce que le routage a
-// trouvé pour la phrase (E03-S02) : la procédure servie et les autres candidats, ou les candidats avec
-// une consigne qui dépend de la demande (H37). Repris de la maquette
+// trouvé pour la phrase (E03-S02) : la procédure servie et les autres candidats, ou les candidats entre
+// lesquels l'assistant choisit (E11-S16, H37 amendée). Repris de la maquette
 // (`mcp-test/src/proto/services/context.ts` l. 67-89) : lignes servies, candidats toujours visibles,
 // refus de deviner ; retiré : la consigne unique « Ask the user which procedure they mean » (H37).
 // E05-S12 (retour 2, AC-9, AC-10) : les règles de l'espace, entre la consigne du code et la ligne du routage.
@@ -28,7 +28,7 @@ export const WORKSPACE_RULES = `${SERVED_RULES.title}
 - A renamed or moved content keeps its old path: it still leads there.
 - In a text, [[path]] or [[path|title]] links to another content.
 - A function that sends, deletes or pays first returns a summary and does nothing: show it, get the user's explicit yes, then call again with confirm: true.
-- When a request matches a procedure, its steps come right after this part: follow them in order. Otherwise search, and ask the user rather than guess.
+- When a request matches a procedure, its steps come right after this part: follow them in order. Otherwise the closest procedures are listed there: use the one that fits, or search; ask the user when nothing fits.
 - <p>_read with path journal shows what was done, call by call: trust it over memory.
 - Never invent a path, a figure or a result: read it, or say you could not.`
 
@@ -48,26 +48,19 @@ type CodeBlockInput = {
   kind: RequestKind | null
 }
 
-function candidateList(candidates: readonly Candidate[]): string {
-  return candidates.map((candidate) => `${candidate.path} (${formatScore(candidate.score)})`).join(", ")
+/**
+ * Une candidate par ligne, avec son titre et son résumé (E11-S16, AC-a1) : l'assistant départage ce que le score
+ * lexical ne sait pas départager (« Relancer les devis » et « Relancer les tickets »).
+ */
+function candidateLines(candidates: readonly Candidate[]): string {
+  return candidates.map((candidate) => `- ${candidate.path} — ${candidate.title}: ${candidate.summary} (${formatScore(candidate.score)})`).join("\n")
 }
 
 /**
- * Sans étapes servies, la consigne qui suit les candidats, selon le genre de la demande (E11-S04, AC-b3,
- * HN-E11S04-6) : une action fait choisir ; une question, une demande « comment » ou polie ne suit aucune
- * procédure d'elle-même et propose en choix tous les candidats montrés, jamais le premier seul.
+ * La ligne du routage (AC7, AC8, AC18) : servie, candidats et consigne, rien, ou routage en panne. E11-S16 (décision
+ * de JB) : l'assistant arbitre entre les candidates, sans consigne par genre de phrase ; seule une procédure servie
+ * sur une demande « comment » garde de n'exécuter que sur demande.
  */
-function unmatchedInstruction(prefix: string, kind: RequestKind | null): string {
-  const offer = "offer the user all the candidates above as choices"
-  if (kind === "how") return `It asks how to do something: ${offer}, read the one they pick with ${prefix}_read and explain its steps; run nothing unless the user asks.`
-  if (kind === "request") return `It asks for an action: ${offer}, and run only the one they pick, after their yes.`
-  if (kind === "data") {
-    return `It is a question: answer it without changing data, searching with ${prefix}_find, ${prefix}_read or ${prefix}_call table.rows; then ${offer}, and run one only if they pick it.`
-  }
-  return "Ask the user which one to run; do not guess."
-}
-
-/** La ligne du routage (AC7, AC8, AC18) : servie, candidats et consigne, rien, ou routage en panne. */
 function routingLine({ prefix, phrase, candidates, served, kind }: CodeBlockInput & { phrase: string }): string {
   // Phrase reprise, bornée comme la cible du journal (N4).
   const request = `Request « ${clip(phrase, MAX_TARGET_CHARS)} »`
@@ -75,11 +68,17 @@ function routingLine({ prefix, phrase, candidates, served, kind }: CodeBlockInpu
   if (candidates === null) return `${request}: no procedure could be matched right now. ${search}`
   if (served) {
     const others = candidates.filter((candidate) => candidate.path !== served.path)
-    const tail = others.length > 0 ? ` Other candidates: ${candidateList(others)}.` : ""
-    const how = kind === "how" ? " It asks how: explain these steps, and run them only if the user asks." : ""
-    return `${request} matches ${served.path} (score ${formatScore(served.score)}): its steps follow.${tail}${how}`
+    const matched = `${request} matches ${served.path} (score ${formatScore(served.score)}): its steps follow, if the request is about « ${served.title} ».`
+    const tail =
+      others.length > 0
+        ? `\nOther candidates:\n${candidateLines(others)}\nIf the request is about one of them instead, read that one with ${prefix}_read and follow it rather than these steps.`
+        : ""
+    const how = kind === "how" ? "\nIt asks how: explain these steps, and run them only if the user asks." : ""
+    return `${matched}${tail}${how}`
   }
-  if (candidates.length > 0) return `${request}: no clear match. Candidates: ${candidateList(candidates)}. ${unmatchedInstruction(prefix, kind)}`
+  if (candidates.length > 0) {
+    return `${request}: no clear match. Closest procedures:\n${candidateLines(candidates)}\nRead the one that fits the request with ${prefix}_read, if any; otherwise search with ${prefix}_find or ask the user.`
+  }
   const question = `It is a question: search with ${prefix}_find, ${prefix}_read or ${prefix}_call table.rows and answer it`
   return kind === "data" ? `${request}: no procedure matches. ${question}.` : `${request}: no procedure matches. Say so instead of guessing; ${search}`
 }

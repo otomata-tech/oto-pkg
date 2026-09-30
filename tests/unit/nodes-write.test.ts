@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { inputSchemas, parseInput } from "../../packages/plateforme/mcp/schemas"
 import type { BlockInput } from "../../packages/plateforme/schemas"
+import { BLOCKS_MAX } from "../../packages/plateforme/server/nodes/limits"
 import { writeNode, type WriteOrigin } from "../../packages/plateforme/server/nodes/write"
 import { addBlocks, contentTables, identityOf, nodeId, TEAMS, type ContentNode, type Person, type RuleSpec } from "../helpers/reference-org"
 import { seedReferenceOrg, type ReferenceOrgSql } from "../helpers/reference-org-sql"
@@ -382,6 +383,35 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       })
       const invalid = await write("lea", aimed(1, { type: "heading", text: "Titre", data: { level: 9 } }), screen)
       expect([invalid.error, writes(invalid.calls)]).toMatchObject([{ code: "invalid_arguments", message: expect.stringMatching(/^Invalid arguments: ops\.0\.input/) }, []])
+    })
+  })
+
+  describe("write — operations per call, decided by the door (E11-S17, AC-a6, fiche D153)", () => {
+    /** Une création de `count` paragraphes, chacun inséré en tête par sa propre opération. */
+    const lot = (path: string, count: number) => ({
+      path,
+      title: "Lot",
+      summary: "Lot de blocs.",
+      ops: Array.from({ length: count }, (_, rank) => ({ op: "insert_after", text: `Bloc ${rank + 1}.` })),
+    })
+    const screen = { origin: { kind: "human" } as const }
+
+    it("should take from the screen as many operations as a page holds blocks, in one write, and 50 from an assistant", async () => {
+      await content(base())
+      // L'écran : 51, puis 1 000 opérations passent, chacune en une écriture ; 1 001 sont refusées sans rien écrire.
+      expect((await write("lea", lot("ventes/lot_51", 51), screen)).error).toBeNull()
+      expect(await blockRows("ventes/lot_51", "draft")).toHaveLength(51)
+      expect((await write("lea", lot("ventes/lot_1000", BLOCKS_MAX), screen)).error).toBeNull()
+      expect(await blockRows("ventes/lot_1000", "draft")).toHaveLength(BLOCKS_MAX)
+      const beyond = await write("lea", lot("ventes/lot_1001", BLOCKS_MAX + 1), screen)
+      expect([beyond.error, writes(beyond.calls)]).toMatchObject([
+        { code: "invalid_arguments", message: "1,001 operations; 1,000 at most per call: split them over several calls." },
+        [],
+      ])
+      // Un assistant (`write` du MCP) : 51 opérations refusées, rien d'écrit.
+      const agent = await write("lea", lot("ventes/lot_agent", 51))
+      expect([agent.error, writes(agent.calls)]).toMatchObject([{ code: "invalid_arguments", message: "51 operations; 50 at most per call: split them over several calls." }, []])
+      expect(await nodeRow("ventes/lot_agent")).toBeUndefined()
     })
   })
 })

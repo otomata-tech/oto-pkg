@@ -71,6 +71,9 @@ export function AccessPanel({ scope, scopeIcon, panel, panelLabel = "Accès et p
       {panel ? (
         <Popover
           data-size="lg"
+          // Le déclencheur est au bout de l'en-tête : aligné sur son bord droit, le panneau reste sous lui ; aligné à
+          // gauche, il sortait de la fenêtre et s'y faisait repousser, loin de son bouton (E11-S15, AC-a4).
+          align="end"
           aria-label={panelLabel}
           open={ouvert}
           onOpenChange={poser}

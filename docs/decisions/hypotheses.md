@@ -45,9 +45,9 @@
 | H31 | Les faits de la personne (nom, handle, rôle, équipes, celle par défaut marquée, langue de réponse), lus dans `members.profile`, ouvrent la partie Privé de `context` ; la personne édite son prénom, son nom et sa langue dans son Profil ; ton et préférences s'écrivent dans son Contexte privé. |
 | H32 | Le bloc organisation de `context` donne le nom et les domaines de travail ; le contenu de l'organisation est son Contexte `contexte`, servi avec ses sous-pages, tableaux et pages liées. |
 | H34 | « What's new » liste, depuis le dernier `ctx` de la personne sinon 14 jours, les versions publiées qu'elle lit et les connecteurs activés : 10 lignes et 600 caractères au plus ; sans nouveauté depuis une borne du jour même, le bloc est omis. |
-| H35 | « Procedures you can run » liste 60 procédures lisibles au plus, triées par l'usage sur 90 jours que la personne lit au journal, puis par chemin ; chaque ligne donne chemin, titre et résumé. |
+| H35 | « Procedures you can run » liste 60 procédures lisibles au plus, triées par l'usage sur 90 jours que la personne lit au journal, puis par chemin ; les 15 premières par chemin et résumé, les suivantes par chemin et titre (amendée par E11-S16 : les 40 premières du jeu à l'échelle en 3 932 caractères au lieu de 6 836, toutes visibles). |
 | H36 | « Recent documents » liste 20 pages et tableaux au plus, lus ou écrits par la personne sur 90 jours (journal, blocs qu'elle a écrits, nœuds qu'elle a publiés), sans procédure ni Contexte. |
-| H37 | Sans procédure servie, une phrase qui finit par « ? » ou commence par un interrogatif est une question de données (chercher par `find`, `read` ou `table.rows`, puis répondre) ; sinon, le modèle demande à l'utilisateur quelle procédure lancer. |
+| H37 | Sans procédure servie, une phrase qui finit par « ? » ou commence par un interrogatif est une question de données (`data_question`) ; avec des candidates, une seule consigne, quel que soit le genre de la phrase : le modèle lit celle dont le titre et le résumé correspondent à la demande, sinon cherche ou demande à l'utilisateur ; sans candidate, une question se cherche et se répond (amendée par E11-S16 : l'assistant arbitre, il n'est plus tenu de demander). |
 | H40 | Routage sur le titre et le résumé : score = 0,55 × max(s_summary, s_title) + 0,45 × lexical × min(1, lexèmes/2), + 0,03 par bonus (équipe, usage sur 30 jours) ; candidat dès 0,30 ; étapes servies à 0,65 avec 0,1 d'écart, réglables par organisation. |
 | H43 | Le test de routage sans host joue, sur une organisation jetable, les formulations des résumés (95 % servies au moins), des paraphrases et des négatives (aucune servie à marge sûre) ; paraphrases et demandes d'un mot sont mesurées et rapportées. |
 | H44 | `find` rend trois nœuds au plus par `search_content` (titre, puis résumé, puis blocs publiés, lignes comprises), chacun avec ses emplacements, puis trois fonctions au plus du catalogue, un nom exact en tête. |
@@ -1095,7 +1095,7 @@ Les hypothèses HN-E10S02-1 à 23, prises au cadrage, se lisent dans la story.
 | HN-E11S04-3 | Le routage tente toujours la correction, en plus de la demande telle quelle (pas en dernier recours comme `find`) ; mots de 5 à 40 lettres, seuil 0,3, sans l'exception du dernier mot. |
 | HN-E11S04-4 | La correction par le lexique s'écrit une fois, dans `platform.lexicon_fix` (forme du mot, absence du lexique, mot le plus proche) ; `search_content` l'appelle et garde en ligne son exception du dernier mot, cherché par préfixe. |
 | HN-E11S04-5 | Les poids des mots rares se comptent sur les candidates lisibles de l'appel, jamais sur toute l'organisation : un nœud illisible ne change aucun score. |
-| HN-E11S04-6 | Sans étapes servies, une question (`data`, `how`) ou une demande polie (`request`) ne suit aucune procédure d'elle-même : la consigne dit de répondre ou de chercher sans modifier de données, puis de proposer en choix toutes les candidates montrées (`CANDIDATES_SHOWN`, 3), jamais la première seule ; même ligne sous le seuil et à moins de l'écart. |
+| HN-E11S04-6 | Remplacée par E11-S16 : plus de consigne par genre de phrase sans étapes servies ; les candidates (`CANDIDATES_SHOWN`, 3) viennent par titre et résumé, et le modèle juge si la phrase demande d'agir, d'expliquer ou de répondre. Seule une procédure servie sur une demande « comment » garde « explain these steps, and run them only if the user asks ». |
 | HN-E11S04-7 | Une question « comment » servie reçoit les étapes et « explain these steps, and run them only if the user asks » (ADR-003 § 4). |
 | HN-E11S04-8 | Aucun champ nouveau dans `structuredContent` : `data_question` vaut `false` pour `how` et `request`. |
 | HN-E11S04-9 | `route_candidates` et `search_content` excluent la corbeille (`deleted_at is null`) avant leur coupe ; le service garde `nodeLevels` après la fonction. |
@@ -1303,8 +1303,8 @@ organisation qui compte beaucoup de membres sans email.
 
 | Id | Règle |
 |---|---|
-| HN-E11S06-1 | Le champ garde la source `[[…]]` pendant la frappe : le curseur dans un lien ouvre le panneau, source visible ; un clic sur un lien au repos ouvre le panneau, focus dedans, source cachée ; à la fermeture, le curseur revient au champ. Validée (2026-09-29). |
-| HN-E11S06-2 | Un clic simple sur un lien au repos ouvre le panneau et ne suit plus le lien ; Ctrl, ⌘ ou le bouton du milieu le suivent, et « Ouvrir » aussi. Validée (2026-09-29). |
+| HN-E11S06-1 | Le champ garde la source `[[…]]` pendant la frappe : le curseur dans un lien ouvre le panneau, source visible ; un clic sur un lien au repos ouvre le panneau, focus dedans, source cachée ; à la fermeture, le curseur revient au champ. Validée (2026-09-29). Le clic au repos : remplacé par D151 (le menu contextuel ouvre le panneau). |
+| HN-E11S06-2 | Un clic simple sur un lien au repos ouvre le panneau et ne suit plus le lien ; Ctrl, ⌘ ou le bouton du milieu le suivent, et « Ouvrir » aussi. Validée (2026-09-29). Remplacée par D151 (E11-S15, AC-b9). |
 | HN-E11S06-8 | La copie des éléments d'une liste précède le champ dans le DOM : au clavier, les cases viennent avant le texte. |
 | HN-E11S06-9 | Un lien qui ne se relirait pas tel quel à sa place est refusé par le panneau : « Ce lien ne se relirait pas tel quel à sa place : changez son libellé ou son adresse. ». |
 | HN-E11S06-10 | « Ouvrir » ouvre la destination saisie dans le panneau. |
@@ -1332,6 +1332,47 @@ organisation qui compte beaucoup de membres sans email.
 | HN-E11S07-12 | Les écrans retirés (Marque, Drapeaux, Accès plateforme) restent exportés par le paquet (M65) ; leurs tests les montent sous des adresses fictives en anglais (`/admin/brand`, `/admin/flags`, `/admin/access`), qu'aucune route ne sert. |
 | HN-E11S07-13 | Les ancres fixes des Contextes sont `everyone-context` et `private-context` : elles ne commencent pas par `context-`, qu'aucun slug d'équipe (`context-<slug>`) ne peut donc produire. |
 | HN-E11S07-14 | La garde des anciens noms refuse aussi les routes retirées (`/admin/acces`, `/admin/marque`, `/admin/drapeaux`) ; elle ne contrôle pas les opérations écrites dans la valeur de `f=` (`f=nom:contient:x`), que `reglagesDepuisLAdresse` écarte à la lecture. |
+
+### E11-S15 — Retours sur la 1.1.1 : écrans d'un contenu, éditeur et blocs
+
+| Id | Règle |
+|---|---|
+| HN-E11S15-a1 | « Rangés sous ce contexte » et « Pages citées » passent dans l'encart repliable partout où la vue « Contexte » les rend (`ListesServies` : carte d'une partie, sous l'éditeur ou en lecture, encart « Contexte · Tout le monde » d'Organisation), même glyphe que « Sous-pages » et « Cite », sans total. |
+| HN-E11S15-a2 | Dans un encart d'une page, la nature d'un nœud (« Page », « Procédure »), « déplacé vers … » et « sans cible » restent en méta : un qualificatif ou un état, pas un résumé. |
+| HN-E11S15-a3 | « Centré » sous 1 410 px de contenu : le document (borné à sa mesure) et la colonne d'annexes forment une paire centrée, l'en-tête posé au bord gauche du document ; au-dessus, rien ne change. |
+| HN-E11S15-a4 | La borne de 70 % de la fenêtre vaut pour les deux panneaux larges (`data-size="lg"` : « Partager », « Réglages » d'un tableau) ; « Partager » s'aligne sur le bord droit de son bouton. |
+| HN-E11S15-a5 | Le filet entre les étapes du guide de branchement vaut aussi dans la fenêtre « Brancher » de l'accueil (même guide), en `--island-bd`. |
+| HN-E11S15-a6 | « Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'organisation (de l'équipe X), lit à chaque conversation. » ; le Privé et le Privé d'autrui sont inchangés ; le résumé que la base pose sur un Contexte d'équipe ou de Tout le monde garde l'ancien texte : le changer demande une migration, hors 1.1.2 (M94). |
+| HN-E11S15-a7 | « Importer un fichier… » d'un tableau suit la condition de « Réglages » (niveau écriture, hors `?version=published`), après « Télécharger… », en `secondary` ; le dépôt d'un `.csv` garde la sienne (niveau écriture). |
+| HN-E11S15-a8 | L'explication de la vue « Contexte » est l'encart « À quoi sert cette page », ouvert sous le titre, sans borne chiffrée (elles vivent dans `server/`) ; « Règles Oto » et la procédure servie sont dites « non montrées ici » ; l'outil est nommé « son outil « context » », la procédure servie « quand Oto en reconnaît clairement une » (routage d'Oto, seuil et écart, `decide`). |
+| HN-E11S15-a9 | Un Contexte cité se nomme par `titreDuContexte` (« Contexte · SAV ») dans un lien au repos, quand son libellé est le titre enregistré ou absent, et dans les lignes d'encart ; le genre vient de l'arbre visible que le service sert déjà (aucun champ ajouté au service) ; arbre illisible ou coupé sans le Contexte, ou Contexte déplacé : son titre enregistré. Le nom vaut aussi pour ce que le panneau « Lien » montre d'un lien (page choisie, description, texte laissé par « Retirer le lien »). |
+| HN-E11S15-b1 | Le correcteur du navigateur est coupé (`spellCheck={false}`) sur le champ d'un bloc dont le texte porte un lien et sur « Libellé » et « Chercher une page » du panneau « Lien » ; il reste actif sur un texte sans lien. |
+| HN-E11S15-b2 | L'en-tête teinté d'un tableau simple vaut à la lecture comme dans l'éditeur, sur le jeton `--oto-bg`, opaque (l'en-tête colle en défilant) ; aucun jeton ajouté. |
+| HN-E11S15-b3 | La hauteur libérée du menu de la poignée vaut pour tout bloc (même menu), bornée à la fenêtre. |
+| HN-E11S15-b4 | « etc. » d'AC-b2 se lit : tableau, fichier, image ; le bloc local d'un envoi et les autres blocs restent tels quels. |
+| HN-E11S15-b5 | Le rendu au repos d'un texte marqué vaut pour tout bloc à texte en ligne (Texte, titre, liste, cases, citation) ; un code et un appel restent lus tels quels (M59). |
+| HN-E11S15-b6 | Un clic sur une page citée navigue par un `<a href>` dans l'onglet (Ctrl, ⌘ ou le bouton du milieu : nouvel onglet) ; une adresse web s'ouvre dans un nouvel onglet (`noopener noreferrer nofollow`). |
+| HN-E11S15-b7 | Les contenus récents de « @ » sont ceux du bloc « Recent content » de `context` (`recentDocuments`) : pages et tableaux lus, écrits ou publiés par la personne sur 90 jours, 20 au plus, hors de la page éditée (`GET /api/platform/search/recent?exclude=`) ; affichés tant que rien n'est tapé après « @ » ; le panneau « Lien » reste sans récents ; `search` sans `q` écarté (une requête vide resterait une erreur de saisie). |
+| HN-E11S15-b8 | Une adresse nue s'affiche entière jusqu'à 40 caractères ; au-delà, schéma, hôte et les 12 derniers caractères du chemin, requête et fragment tombés ; l'hôte montré, l'infobulle et le nom accessible viennent de `new URL` (l'hôte que le navigateur ouvre, punycode d'un domaine international), jamais d'un hôte lu à la main qu'une barre oblique inverse déguiserait ; jamais l'identifiant ni le mot de passe ; un libellé écrit reste le nom du lien. |
+
+### E11-S17 — Sélection de blocs dans l'éditeur (lot a)
+
+HN-E11S16-5 à -8 et -12 de la story tiennent pour le lot a ; l'écriture de l'écran porte autant d'opérations qu'une page a de blocs, `write` 50 (D153).
+
+| Id | Règle |
+|---|---|
+| HN-E11S17-a1 | Le rectangle prend les blocs qu'il couvre en hauteur, où qu'il soit en largeur ; il se tire depuis la marge : la zone des blocs, une rangée ou sa gouttière hors de leurs contrôles, jamais le rendu d'un bloc lu. |
+| HN-E11S17-a2 | Un bloc sélectionné porte le fond `--oto-bg` et un contour (`outline`) en `--oto-ink` ; `Highlight` en couleurs forcées ; aucun jeton ajouté ; contraste à mesurer à la campagne. |
+| HN-E11S17-a3 | Après une suppression groupée, le focus va à la poignée du bloc qui précédait le premier retiré, du premier restant sinon ; toute la page retirée, au champ du Texte vide. ⌘Z y annule le geste annoncé ; dans un champ, ⌘Z reste l'annulation de sa frappe. |
+| HN-E11S17-a4 | ⌘Z sur la zone des blocs ou une poignée annule toute annonce qui porte « Annuler », celle d'un bloc seul comprise ; sans annonce, la touche reste au navigateur. |
+| HN-E11S17-a5 | Les touches d'une sélection se lisent sur la zone ou une poignée, jamais dans un champ. Sur la poignée d'un bloc sélectionné, ↑, ↓ et Entrée servent la sélection et n'ouvrent pas son menu ; sur la poignée d'un bloc hors de la sélection, ils restent au bouton (↓ et Entrée ouvrent son menu) ; Espace et le clic l'ouvrent toujours. Échap dans un champ sélectionne son bloc : « Échap puis Entrée » rend le champ au lieu d'ouvrir le menu. ⌘A sur la zone ou une poignée prend toute la page. |
+| HN-E11S17-a6 | Un bloc neuf jamais envoyé, supprimé dans un groupe, part sans écriture et ne revient pas par « Annuler » ; l'annonce le compte. |
+| HN-E11S17-a7 | Maj+clic étend depuis l'ancre (le dernier bloc pris seul, par Échap, ↑↓ ou Ctrl+clic) ; sans sélection, il prend le bloc seul. Un clic simple sur la poignée d'un bloc hors de la sélection la vide et ouvre le menu ; sur un bloc sélectionné, il ouvre le menu et garde la sélection. |
+| HN-E11S17-a8 | Au menu d'un bloc sélectionné parmi d'autres, « Supprimer », « Monter » et « Descendre » agissent sur le groupe ; « Dupliquer » et « Style » restent au bloc. |
+| HN-E11S17-a9 | Une écriture groupée refusée (révision périmée d'un des blocs) se lit sans bloc visé : la page relue dit le conflit de page ou le message, avec « Réessayer » ; refusée pour elle-même (`invalid_arguments`), elle quitte la file et l'alerte dit de recharger la page, sans « Réessayer ». Les blocs restent retirés ou déplacés à l'écran jusque-là ; un conflit déjà ouvert refuse le geste avant tout envoi et le dit. |
+| HN-E11S17-a10 | Un glissé sorti de son bloc garde la sélection du texte sous le navigateur, masquée tant que des blocs sont pris ; revenu au bloc de départ, elle reparaît ; lâché ailleurs, elle se replie et le focus passe à la zone des blocs. Au pointeur sans touche de modification. |
+| HN-E11S17-a11 | La copie annonce « N blocs copiés en markdown. » ; un presse-papiers refusé le dit, et ⌘X ne supprime alors rien. |
+| HN-E11S17-a12 | Le second ⌘A se lit dans le champ d'un Texte, titre, citation, liste ou code ; les cellules d'un tableau simple et les champs d'un repli gardent le ⌘A du navigateur (Échap y sélectionne le bloc). |
 
 ### Tâches de suite
 

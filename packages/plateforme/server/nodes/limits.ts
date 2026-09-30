@@ -9,14 +9,14 @@ export const PAGE_FULL_MAX = 12_000
 /** Texte d'une opération de `write` et caractères rendus d'une page : dans `schemas/nodes.ts`, que l'écran lit aussi (E10-S01). */
 export { OP_TEXT_MAX, PAGE_MAX } from "../../schemas/nodes"
 
-/** Opérations par appel de `write`. */
+/** Opérations par appel de `write` d'un assistant ; une écriture de l'écran en porte jusqu'à `BLOCKS_MAX` (fiche D153). */
 export const OPS_MAX = 50
 
 /** Caractères rendus d'une section, sous-sections comprises. */
 export const SECTION_MAX = 100_000
 
-/** Blocs d'une page, d'une procédure ou d'un Contexte. */
-export const BLOCKS_MAX = 1_000
+/** Blocs d'une page, d'une procédure ou d'un Contexte : dans `schemas/nodes.ts`, que l'écran lit aussi (E11-S17). */
+export { BLOCKS_MAX } from "../../schemas/nodes"
 
 /** Enfants listés par l'en-tête de `read` et par `loadNode` (N5). */
 export const CHILDREN_SHOWN = 50

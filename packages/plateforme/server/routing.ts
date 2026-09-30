@@ -40,7 +40,12 @@ const PREFILTER = 50
 /** Le genre de nœud que le routage sert (N18) : `p_kind` de `route_candidates`. */
 const ROUTED_KIND = "procedure"
 const ROUTING_USAGE_DAYS = 30
-/** Candidats montrés par `context`. */
+/**
+ * Candidats montrés par `context`, par titre et résumé, entre lesquels l'assistant choisit (E11-S16) : sur
+ * 25 paraphrases jouées en direct parmi 60 procédures, la bonne était en tête pour 21 et dans les trois
+ * premiers pour 24 (story E11-S16, § Contexte) ; sur le jeu à l'échelle (`tests/integration/routing.test.ts`),
+ * cinq montrés, aucune au rang 4 ou 5.
+ */
 export const CANDIDATES_SHOWN = 3
 const DAY_MS = 86_400_000
 

@@ -121,7 +121,7 @@ describe("whole blocks under the cap (E11-S03, AC-b1, AC-b2)", () => {
     expect(long.length).toBe(10_000)
     const parts = contextParts(identity(), FACTS, new Map([["contexte", body(long)]]))
     const procedures = proceduresText(
-      Array.from({ length: 60 }, (_, index) => ({ path: `ventes/p${String(index).padStart(2, "0")}`, summary: `Procédure ${index} : ${"étape ".repeat(21)}`.trim() })),
+      Array.from({ length: 60 }, (_, index) => ({ path: `ventes/p${String(index).padStart(2, "0")}`, title: `Procédure ${index} : ${"étape ".repeat(21)}`.trim(), summary: `Procédure ${index} : ${"étape ".repeat(21)}`.trim() })),
       "acme",
     )
     const news = newsBlock(

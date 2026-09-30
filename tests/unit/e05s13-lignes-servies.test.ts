@@ -42,7 +42,7 @@ const FAITS: PartFacts = {
 describe("the procedures block read back (AC-16)", () => {
   it("should read its count, each procedure by its path and summary, the none line and the more line", () => {
     // Un résumé qui porte lui-même « : » reste entier : le chemin s'arrête au premier séparateur.
-    expect(relu(proceduresText([{ path: "ventes/qualifier", summary: "Qualifie un prospect : score et suite." }], "demo"))).toEqual([
+    expect(relu(proceduresText([{ path: "ventes/qualifier", title: "Qualifier un prospect", summary: "Qualifie un prospect : score et suite." }], "demo"))).toEqual([
       { genre: "liste", legende: { genre: "procedures", nombre: 1 }, lignes: [{ genre: "procedure", chemin: "ventes/qualifier", resume: "Qualifie un prospect : score et suite." }] },
     ])
     expect(relu(proceduresText([], "demo"))).toEqual([
@@ -50,7 +50,7 @@ describe("the procedures block read back (AC-16)", () => {
       { genre: "phrase", phrase: "aucune-procedure" },
     ])
     // 61 procédures : 60 listées, la dernière ligne compte l'autre.
-    const nombreuses = Array.from({ length: 61 }, (_, rang) => ({ path: `ventes/p${String(rang).padStart(2, "0")}`, summary: "Une procédure." }))
+    const nombreuses = Array.from({ length: 61 }, (_, rang) => ({ path: `ventes/p${String(rang).padStart(2, "0")}`, title: "Une procédure", summary: "Une procédure." }))
     const morceaux = relu(proceduresText(nombreuses, "demo"))
     expect(morceaux.map((morceau) => (morceau.genre === "liste" ? [morceau.genre, morceau.lignes.length] : morceau))).toEqual([
       ["liste", 60],

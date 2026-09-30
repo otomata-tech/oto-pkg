@@ -270,6 +270,8 @@ export const CITER = {
   recherche: "Recherche…",
   aucun: "Aucun contenu trouvé.",
   panne: "La recherche n'a pas abouti. Continuez à taper pour réessayer.",
+  /** Avant toute frappe après « @ » (E11-S15, AC-b4). */
+  recents: "Vos contenus récents. Tapez au moins deux lettres pour en chercher un autre.",
 } as const
 
 /**
@@ -346,4 +348,25 @@ export const REFUS_DU_PARTAGE_WEB = {
     "Ce contenu ne se partage pas sur le web : la racine, Privé, un espace personnel, un Contexte et le dossier d'une équipe restent dans l'organisation. Partagez une page qu'ils contiennent.",
   forbidden: "Vous ne pouvez pas partager ce contenu sur le web : il faut l'accès complet, et un contenu du Privé d'une autre personne ne se partage que par elle.",
   conflict: "Le lien a changé pendant votre geste : fermez puis rouvrez « Partager ».",
+} as const
+
+/** Un nombre de blocs, accordé : « 1 bloc supprimé », « 3 blocs supprimés ». */
+const blocs = (nombre: number, participe: string) => `${nombre} ${nombre > 1 ? `blocs ${participe}s` : `bloc ${participe}`}`
+
+/** La sélection de blocs de l'éditeur (E11-S17, lot a) : son nom, son annonce, et ce que disent ses gestes groupés. */
+export const SELECTION = {
+  /** Le nom de la zone des blocs, qui prend le focus quand toute la page est sélectionnée (AC-a2). */
+  zone: "Blocs de la page",
+  /** Le nombre de blocs sélectionnés, dans la région vivante et au nom de la zone (AC-a9). */
+  nombre: (nombre: number) => blocs(nombre, "sélectionné"),
+  supprimes: (nombre: number) => `${blocs(nombre, "supprimé")}.`,
+  deplaces: (nombre: number) => `${blocs(nombre, "déplacé")}.`,
+  copies: (nombre: number) => `${blocs(nombre, "copié")} en markdown.`,
+  copieImpossible: "Copie impossible : le navigateur refuse l'accès au presse-papiers.",
+  /** Plus de blocs qu'une page n'en tient : le geste n'est pas fait (fiche D153, `BLOCKS_MAX`). */
+  tropDeBlocs: (maximum: string) => `Un geste prend ${maximum} blocs au plus : sélectionnez-en moins.`,
+  /** Une écriture groupée refusée en entier par le service : la renvoyer telle quelle échouerait encore. */
+  refusee: "Ce geste sur plusieurs blocs a été refusé : rechargez la page pour retrouver les blocs enregistrés.",
+  /** La description de la poignée d'un bloc sélectionné (AC-a9). */
+  selectionne: "Bloc sélectionné",
 } as const

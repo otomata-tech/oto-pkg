@@ -30,6 +30,8 @@
 
 /* un popover qui contient du contenu long découpe et fait défiler */
 .oto-pop-body { max-block-size: min(420px, 60vh); overflow: auto; padding: var(--space-3); }
+/* Un panneau (« Partager », « Réglages ») suit son contenu jusqu'à 70 % de la fenêtre, puis défile en lui-même : borné à 420 px, il défilait sur un grand écran qui avait la place (E11-S15, AC-a4). */
+.oto-pop[data-size="lg"] > .oto-pop-body { max-block-size: 70vh; }
 .oto-pop-head {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2-5) var(--space-3);

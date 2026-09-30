@@ -216,18 +216,51 @@ export function ImportDeFichier({ cible, fichier, fermer, termine }: ImportDeFic
   )
 }
 
+type TableauCible = { chemin: string; titre: string; entete: TableHeader }
+
+/** Le dialogue ouvert sur un tableau, un fichier lâché déjà lu ou non ; après l'import, la page se relit. */
+function ImportDansCeTableau({ chemin, titre, entete, fichier, fermer }: TableauCible & { fichier: File | null; fermer: () => void }) {
+  const rafraichir = useRafraichir()
+  return (
+    <ImportDeFichier
+      cible={{ genre: "tableau", chemin, nom: titre, entete }}
+      fichier={fichier}
+      fermer={fermer}
+      termine={() => {
+        fermer()
+        rafraichir()
+      }}
+    />
+  )
+}
+
+/**
+ * « Importer un fichier… » d'un tableau (E11-S15, AC-a7), dans la rangée des boutons de l'en-tête (« Télécharger… »,
+ * « Réglages ») : le dialogue s'ouvre sur ce tableau, au clavier comme au pointeur.
+ */
+export function ImportDansLeTableau(cible: TableauCible) {
+  const [ouvert, setOuvert] = useState(false)
+  return (
+    <>
+      <Button variant="secondary" size="sm" iconStart={<AnimatedIcon as={UploadSimple} size="xs" />} onClick={() => setOuvert(true)}>
+        {IMPORT.entree}
+      </Button>
+      {ouvert && <ImportDansCeTableau {...cible} fichier={null} fermer={() => setOuvert(false)} />}
+    </>
+  )
+}
+
 /**
  * Un tableau qui reçoit un `.csv` lâché sur lui (AC-b5), pour qui l'écrit : le dialogue s'ouvre sur ce tableau, le
- * fichier lu ; « Importer un fichier… » l'ouvre au clavier. Après l'import, la page se relit.
+ * fichier lu. Le bouton qui l'ouvre au clavier est dans l'en-tête (`ImportDansLeTableau`, E11-S15, AC-a7).
  */
-export function DepotSurLeTableau({ chemin, titre, entete, children }: { chemin: string; titre: string; entete: TableHeader; children: ReactNode }) {
-  const [ouvert, setOuvert] = useState<{ fichier: File | null } | null>(null)
-  const rafraichir = useRafraichir()
+export function DepotSurLeTableau({ children, ...cible }: TableauCible & { children: ReactNode }) {
+  const [lache, setLache] = useState<File | null>(null)
   const lacher = (evenement: DragEvent<HTMLDivElement>) => {
     const fichier = evenement.dataTransfer.files[0]
     if (!fichier) return
     evenement.preventDefault()
-    setOuvert({ fichier })
+    setLache(fichier)
   }
   return (
     <div
@@ -237,23 +270,8 @@ export function DepotSurLeTableau({ chemin, titre, entete, children }: { chemin:
       }}
       onDrop={lacher}
     >
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" iconStart={<AnimatedIcon as={UploadSimple} size="xs" />} onClick={() => setOuvert({ fichier: null })}>
-          {IMPORT.entree}
-        </Button>
-      </div>
       {children}
-      {ouvert && (
-        <ImportDeFichier
-          cible={{ genre: "tableau", chemin, nom: titre, entete }}
-          fichier={ouvert.fichier}
-          fermer={() => setOuvert(null)}
-          termine={() => {
-            setOuvert(null)
-            rafraichir()
-          }}
-        />
-      )}
+      {lache && <ImportDansCeTableau {...cible} fichier={lache} fermer={() => setLache(null)} />}
     </div>
   )
 }

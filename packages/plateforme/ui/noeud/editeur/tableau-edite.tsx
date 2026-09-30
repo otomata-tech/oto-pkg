@@ -9,6 +9,9 @@
 //
 // Écrit dans le style d'oto-frontend, qui n'a pas de tableau éditable : les classes du rendu d'E10-S04
 // (`oto-table-wrap`, `oto-table`), un `Input` du design system par cellule.
+//
+// E11-S15 (AC-b1) : le tableau simple (`data-simple`, `editeur.css`) a son en-tête sur le fond teinté du primary, et la
+// bordure d'une cellule n'y paraît qu'au survol de la cellule ou au focus de son champ.
 import { useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react"
 import { simpleTableOf } from "../../../schemas/blocks"
 import type { MenuItem } from "../../ds/react/overlays"
@@ -195,7 +198,7 @@ export function TableauEdite({ cle, bloc, decritPar, lectureSeule, suivre }: Tab
 
   return (
     <div className="oto-table-wrap">
-      <table ref={grille} className="oto-table">
+      <table ref={grille} className="oto-table" data-simple="">
         <thead>
           <tr>
             <EnTetes {...cellules} />

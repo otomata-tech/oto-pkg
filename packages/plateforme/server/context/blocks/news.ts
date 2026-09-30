@@ -45,9 +45,13 @@ async function versionsSince(db: PlatformDb, identity: Identity, since: string):
        limit ${READ_PAGE_ROWS}`,
   )
   const levels = await nodeLevels(db, identity, [...new Set(rows.map((row) => row.node_id))])
+  // Une ligne par nœud, sa dernière version (E11-S16, AC-b1) : les lignes arrivent les plus récentes d'abord,
+  // la première vue de chaque nœud est la sienne. Sans cela, un document réécrit cinq fois prend cinq des dix lignes.
+  const seen = new Set<string>()
   // Un filtre de liste compare `nodeLevels` à 1 seulement (`security-patterns.md § Droits dans le service`).
   return rows
     .filter((row) => (levels.get(row.node_id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read)
+    .filter((row) => !seen.has(row.node_id) && seen.add(row.node_id))
     .map((row) => versionItem(row, row.created_at.toISOString()))
 }
 

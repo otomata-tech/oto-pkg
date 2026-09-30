@@ -80,8 +80,9 @@ export function LigneDAnnonce({ annonce }: { annonce: Annonce | null }) {
       {annonce && (
         <>
           {annonce.message}
-          {annonce.retiree && (
-            <Button variant="ghost" size="sm" onClick={() => annonce.retiree && gestes.retablir(annonce.retiree)}>
+          {/* Un geste sur une sélection de blocs s'annule d'un seul « Annuler », tous ses blocs ensemble (E11-S17, AC-a6, AC-a8). */}
+          {(annonce.retiree || annonce.groupe) && (
+            <Button variant="ghost" size="sm" onClick={() => (annonce.retiree ? gestes.retablir(annonce.retiree) : annonce.groupe && gestes.annulerLeGroupe(annonce.groupe))}>
               Annuler
             </Button>
           )}

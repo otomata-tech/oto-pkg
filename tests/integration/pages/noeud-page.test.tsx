@@ -287,7 +287,7 @@ describe("/n/[...chemin] page, procedure and Contexte (E05-S04)", () => {
     ["private/lea/contexte", "Ce que votre assistant lit à chaque conversation ; vous seul le recevez."],
     // Le Contexte Perso d'une autre personne, qui l'a partagé : il n'est servi qu'à elle (HN-E05S04-22).
     ["private/marc/contexte", "Ce que l'assistant de la personne de cet espace lit à chaque conversation ; elle seule le reçoit."],
-    ["ventes/contexte", "Ce que les assistants des membres de l'équipe Ventes lisent à chaque conversation."],
+    ["ventes/contexte", "Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe Ventes, lit à chaque conversation."],
   ])("should give the Contexte %s its annexes and what the agent will read, each line leading to the « Contexte » view, without « Ma fiche »", async (chemin, recu) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue({ data: { identity: lea(), session: SESSION } })
     vi.mocked(loadNode).mockResolvedValue(vueDuNoeud({ path: chemin, kind: "context", title: "Contexte", level: 2 }))

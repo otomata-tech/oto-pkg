@@ -28,6 +28,7 @@ import { tableHeaderSchema, type FileView, type NodeRulesView, type NodeView, ty
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
+import { ImportDansLeTableau } from "../coque/import-de-fichier"
 import { EmptyState } from "../ds/react/empty-state"
 import { Icon } from "../ds/react/icon"
 import { Island, IslandBody } from "../ds/react/island"
@@ -42,7 +43,7 @@ import { ChapoDuNoeud, EnTeteDuNoeud } from "./en-tete-du-noeud"
 import { titreDuContexte } from "./fil"
 import { ECRAN, genreDuNoeud, INTROUVABLE, PARTAGE, resumeMontre } from "./libelles"
 import { PartageDuNoeud } from "./partage-du-noeud"
-import { ciblesDesLiens, ContenusLies } from "./sous-pages"
+import { ciblesDesLiens, ContenusLies, nomsDesContextes } from "./sous-pages"
 import { VisionneuseDeFichier } from "./visionneuse-de-fichier"
 
 type Equipe = { slug: string; name: string }
@@ -137,9 +138,15 @@ function PageDuNoeud(props: PageDuNoeudProps) {
   const resume = brouillon?.summary ?? vue.summary
   const arbreLu = arbre.error === undefined ? arbre.data.tree : null
   const partage = props.partage && <PanneauDuPartage partage={props.partage} nomOrganisation={props.nomOrganisation} ici={props.ici} Lien={props.Lien} />
-  // Les réglages d'un tableau, au niveau écriture hors de la version publiée, sous la file d'opérations (E11-S01, AC-g1).
+  // Les réglages d'un tableau, au niveau écriture hors de la version publiée, sous la file d'opérations (E11-S01, AC-g1) ;
+  // « Importer un fichier… » avant eux, dans la même rangée de l'en-tête (E11-S15, AC-a7).
   const enteteDuTableau = vue.kind === "table" && niveauDEcriture !== null ? tableHeaderSchema.safeParse(vue.meta) : null
-  const reglages = enteteDuTableau?.success ? <OptionsDuTableau entete={enteteDuTableau.data} enAttente={(brouillon?.meta ?? null) !== null} /> : undefined
+  const reglages = enteteDuTableau?.success ? (
+    <>
+      <ImportDansLeTableau chemin={vue.path} titre={vue.title} entete={enteteDuTableau.data} />
+      <OptionsDuTableau entete={enteteDuTableau.data} enAttente={(brouillon?.meta ?? null) !== null} />
+    </>
+  ) : undefined
   const entete = (
     <EnTeteDuNoeud
       vue={vue}
@@ -154,7 +161,9 @@ function PageDuNoeud(props: PageDuNoeudProps) {
       reglages={reglages}
     />
   )
-  const cibles = ciblesDesLiens(arbre.error === undefined ? arbre.data : null, cheminsCites(blocsAffiches(vue, versionPubliee)))
+  // Un Contexte cité ou rangé dessous se nomme comme dans l'en-tête et le rail (E11-S15, AC-a9).
+  const contextes = nomsDesContextes(arbreLu, equipesLues, props.handle)
+  const cibles = ciblesDesLiens(arbre.error === undefined ? arbre.data : null, cheminsCites(blocsAffiches(vue, versionPubliee)), contextes)
   // L'îlot du document garde le nom écrit du nœud : seuls l'en-tête et le fil composent celui d'un Contexte.
   const corps: CorpsDuNoeudProps = { ...props, niveauDEcriture, titre: titreEcrit, cibles }
   // Le chapô ne porte que le résumé d'une procédure et une lecture en échec (AC-f1) : sans eux, pas de rangée.
@@ -166,7 +175,7 @@ function PageDuNoeud(props: PageDuNoeudProps) {
     </>
   )
   const encarts = (disposition: "colonne" | "ligne") => (
-    <ContenusLies vue={vue} arbre={arbreLu} liens={props.liens} Lien={props.Lien} hrefDuChemin={props.hrefDuChemin} ici={props.ici} disposition={disposition} />
+    <ContenusLies vue={vue} arbre={arbreLu} contextes={contextes} liens={props.liens} Lien={props.Lien} hrefDuChemin={props.hrefDuChemin} ici={props.ici} disposition={disposition} />
   )
   // Une page, une procédure, un Contexte (AC-e1, AC-e2) : l'en-tête et les colonnes sont frères dans le contenu,
   // l'en-tête suit la colonne du document (`islands.css`) ; le chapô est seul dans sa rangée, pour que la colonne

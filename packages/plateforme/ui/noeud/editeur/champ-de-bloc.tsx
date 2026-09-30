@@ -38,17 +38,26 @@
 //
 // E10-S02 (lot b) : une image collée se joint après le bloc (AC-b1) ; un fichier lâché sur le champ est reçu par sa
 // rangée, qui en fait un dépôt (AC-b4).
+//
+// E11-S15 : un texte marqué sans lien (`**gras**`, `_italique_`, code, barré) se rend aussi au repos (AC-b6) ; un texte
+// qui porte un lien n'est pas relu par le correcteur du navigateur, qui soulignait en rouge sa source (chemin, `_`,
+// mots sans accent) pendant qu'on l'édite (AC-b7) ; un clic sur un lien au repos le suit, le menu contextuel (clic
+// droit, touche Menu, Maj+F10) ouvre le panneau « Lien » (AC-b9).
+//
+// E11-S17 (lot a) : ⌘A une seconde fois, le texte déjà tout sélectionné ou le bloc vide, prend tous les blocs de la page
+// (AC-a2, `selection-de-blocs.ts`).
 import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type SyntheticEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { Resultat } from "../../api/resultat"
 import { useRechercheDeContenus } from "../../api/use-recherche-de-contenus"
-import { aDesLiens, type CiblesDesLiens } from "../en-ligne"
+import { aDesLiens, aDuBalisage, type CiblesDesLiens } from "../en-ligne"
 import { LIEN_DU_BLOC } from "../libelles"
 import { EnLigne } from "../rendu-des-blocs"
 import { tableauColle } from "./blocs-de-page"
 import { ListeDesChoix, useChoixParBarre } from "./choix-de-bloc"
 import { citationAuCurseur, idDOption, lienVers, ListeACiter, useOptionActive, type Citation } from "./citer"
 import { ElementsDeListe } from "./elements-de-liste"
+import { useFileDOperations } from "./file-d-operations"
 import { useGestes } from "./gestes"
 import { PanneauDuLien, useLienAuCurseur } from "./lien-du-bloc"
 
@@ -110,18 +119,29 @@ function toutSelectionne(champ: HTMLTextAreaElement): boolean {
   return champ.value.trim() !== "" && champ.selectionStart === 0 && champ.selectionEnd === champ.value.length
 }
 
+/** ⌘A ou Ctrl+A sur un texte déjà tout sélectionné, ou sur un bloc vide : la page entière, en blocs (E11-S17, AC-a2). */
+function toutEnBlocs(evenement: KeyboardEvent<HTMLTextAreaElement>): boolean {
+  const champ = evenement.currentTarget
+  const touche = (evenement.metaKey || evenement.ctrlKey) && !evenement.shiftKey && !evenement.altKey && evenement.key.toLowerCase() === "a"
+  return touche && (champ.value.trim() === "" || (champ.selectionStart === 0 && champ.selectionEnd === champ.value.length))
+}
+
 /** « @ » (AC-a9) : la citation en cours du champ, sa recherche, l'option active, et le choix qui insère le lien. */
 function useCitation(cle: string, texte: string) {
   const gestes = useGestes()
   const [citation, setCitation] = useState<Citation | null>(null)
   const recherche = useRechercheDeContenus()
-  const trouves = recherche.resultat.etat === "lue" ? recherche.resultat.trouves : []
+  const { chemin } = useFileDOperations()
+  const trouves = "trouves" in recherche.resultat ? recherche.resultat.trouves : []
   const option = useOptionActive(trouves)
   const suivre = (valeur: string, curseur: number) => {
     const lue = citationAuCurseur(valeur, curseur)
     setCitation(lue)
     option.remettre()
-    recherche.chercher(lue?.requete ?? "")
+    // Avant toute frappe après « @ », les contenus récents hors de la page qu'on édite (E11-S15, AC-b4) ; dès la
+    // première, la recherche.
+    if (lue?.requete === "") recherche.recents(chemin)
+    else recherche.chercher(lue?.requete ?? "")
   }
   const fermer = () => {
     setCitation(null)
@@ -215,9 +235,15 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
     element.style.height = `${element.scrollHeight}px`
   }, [texte, genre])
 
-  const auRepos = liens !== null && aDesLiens(texte)
+  const auRepos = liens !== null && aDuBalisage(texte)
+  const sansCorrecteur = liens !== null && aDesLiens(texte)
   const toucher = (evenement: KeyboardEvent<HTMLTextAreaElement>) => {
     collage.noterLaTouche(evenement)
+    // La seconde fois, ⌘A prend tous les blocs : le menu ouvert par la première se ferme, le focus passe à l'éditeur.
+    if (toutEnBlocs(evenement)) {
+      evenement.preventDefault()
+      return gestes.toutSelectionnerLesBlocs()
+    }
     if (menuOuvert && !MODIFICATEURS.has(evenement.key)) {
       gestes.fermerLeMenu()
       // Échap ferme le menu, rien d'autre : le focus reste dans le texte (AC-28).
@@ -237,8 +263,8 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
 
   return (
     <>
-      {/* Le champ et son rendu au repos dans la même case (`oto-block-pile`), toujours : le champ n'est jamais remonté. Un `span` : la pile vit aussi dans le `h2` d'un titre. Un clic sur un lien rendu y est lu par délégation (AC-b2). */}
-      <span className="oto-block-pile" onClickCapture={lien.cliquer}>
+      {/* Le champ et son rendu au repos dans la même case (`oto-block-pile`), toujours : le champ n'est jamais remonté. Un `span` : la pile vit aussi dans le `h2` d'un titre. Le menu contextuel d'un lien rendu y est lu par délégation (AC-b9). */}
+      <span className="oto-block-pile" onContextMenuCapture={lien.menuContextuel}>
         {/* La copie d'une liste précède le champ : ses cases, à gauche du texte, viennent avant lui au clavier. */}
         {enListe && <ElementsDeListe cle={cle} texte={texte} genre={genre} debut={debut} cases={cases} lectureSeule={lectureSeule} rendu={auRepos && !auFocus ? liens : null} />}
         <textarea
@@ -248,6 +274,7 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
           data-kind={genre}
           // Son rendu est posé dessus : hors du focus, le texte brut se tait (`editeur.css`).
           data-rendu={auRepos ? "" : undefined}
+          spellCheck={sansCorrecteur ? false : undefined}
           aria-label={nom}
           placeholder={invite}
           aria-describedby={decrit}

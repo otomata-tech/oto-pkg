@@ -20,6 +20,9 @@
 // E10-S04 (AC-c1) : `~~barré~~` ; une marque dans une marque d'un autre caractère, sur deux niveaux ; les
 // échappements (`\*`, `\_`, `\|`, `` \` ``, `\[`, `\~`, `\<`, `\\`) hors du code en ligne ; `<br>` en saut de
 // ligne ; `<https://…>` en adresse web. Tout autre HTML reste du texte, que React échappe.
+//
+// E11-S15 (AC-b6) : `aDuBalisage` dit à l'éditeur qu'un texte sans lien mais marqué (`**gras**`) se rend aussi au repos.
+// (AC-b10) : une adresse nue ne se réduit plus à son domaine, elle se coupe au milieu (`libelleDUneAdresse`).
 import { chars } from "../../schemas/blocks"
 import { codeSpans, escaped, linksIn, type CodeSpan } from "../../schemas/link-syntax"
 
@@ -33,8 +36,11 @@ export type Segment =
   | { genre: "lien"; chemin: string; reference: string | null; libelle: string }
   | { genre: "web"; adresse: string; libelle: string }
 
-/** Une page citée que la personne lit : son titre, et le chemin où elle se lit (sa nouvelle place, déplacée). */
-export type Cible = { titre: string; chemin: string }
+/**
+ * Une page citée que la personne lit : son titre, et le chemin où elle se lit (sa nouvelle place, déplacée). Un Contexte
+ * (E11-S15, AC-a9) : `titre` est son nom montré (« Contexte · SAV »), `titreEnregistre` son titre en base (« Contexte »).
+ */
+export type Cible = { titre: string; chemin: string; titreEnregistre?: string }
 
 /**
  * Ce que l'écran sait des pages qu'un texte cite (E05-S11, AC-26, AC-27), par chemin écrit : sa cible, ou
@@ -50,11 +56,14 @@ export function cibleDe(cibles: CiblesDesLiens | undefined, chemin: string): Cib
 
 /**
  * Le titre d'une page citée (AC-27) : le libellé écrit (`|titre`, posé par « @ »), sinon le titre de la cible
- * que l'écran connaît, sinon le dernier segment du chemin. Jamais le chemin entier.
+ * que l'écran connaît, sinon le dernier segment du chemin. Jamais le chemin entier. Un Contexte cité sous son titre
+ * enregistré (« Contexte », posé par « @ ») se nomme comme l'écran le nomme ailleurs (E11-S15, AC-a9) ; un libellé écrit
+ * qui en diffère reste celui de la personne.
  */
 export function titreDuLien(lien: { chemin: string; libelle: string }, cibles?: CiblesDesLiens): string {
-  if (lien.libelle) return lien.libelle
-  return cibleDe(cibles, lien.chemin)?.titre ?? dernierSegment(lien.chemin)
+  const cible = cibleDe(cibles, lien.chemin)
+  if (lien.libelle && lien.libelle !== cible?.titreEnregistre) return lien.libelle
+  return cible?.titre ?? dernierSegment(lien.chemin)
 }
 
 /** Le nom d'un chemin quand son titre n'est pas connu : son dernier segment. */
@@ -88,19 +97,81 @@ function sansPonctuationFinale(adresse: string): string {
   return adresse.slice(0, fin)
 }
 
+/** Une adresse nue plus longue se coupe au milieu (E11-S15, AC-b10) ; la fin de son chemin garde ses derniers caractères. */
+const ADRESSE_MONTREE_MAX = 40
+const FIN_DU_CHEMIN = 12
+
+/** Une adresse en trois parts : son origine (schéma et hôte, sans identifiant ni mot de passe), son chemin, sa requête et son fragment. */
+type AdresseLue = { origine: string; chemin: string; suite: string }
+
+/** Une part d'adresse lisible : ses caractères encodés décodés, sauf un caractère de contrôle ou de mise en forme (sens d'écriture), qui reste encodé. */
+function lisible(part: string): string {
+  try {
+    const lue = decodeURI(part)
+    return /[\p{Cc}\p{Cf}]/u.test(lue) ? part : lue
+  } catch {
+    return part
+  }
+}
+
 /**
- * Le libellé d'une adresse web nue (E05-S11, fiche D107) : son domaine, sans `www.`, jamais l'adresse entière
- * (le survol la montre). Une adresse que `URL` ne lit pas : ce qui suit le schéma, jusqu'au chemin.
+ * L'adresse comme le navigateur la suit (`new URL`) : l'hôte qu'il ouvre, jamais un hôte lu à la main, qu'une barre
+ * oblique inverse ou un identifiant déguiseraient (`https://a.example\@b.example/` ouvre `a.example`) ; un nom de
+ * domaine international en punycode, que ses lettres ne confondent pas avec un autre. Un chemin réduit à `/` que
+ * l'adresse n'écrit pas ne s'ajoute pas. `null` si elle ne se lit pas.
+ */
+function lueParLeNavigateur(adresse: string): AdresseLue | null {
+  let url: URL
+  try {
+    url = new URL(adresse)
+  } catch {
+    return null
+  }
+  const cheminEcrit = url.pathname !== "/" || /^https?:\/\/[^/\\?#]*[/\\]/iu.test(adresse)
+  return { origine: `${url.protocol}//${url.host}`, chemin: cheminEcrit ? lisible(url.pathname) : "", suite: lisible(`${url.search}${url.hash}`) }
+}
+
+/**
+ * L'adresse lue à la main, quand `new URL` ne la lit pas (le navigateur ne l'ouvre pas non plus) : l'autorité s'arrête au
+ * premier `/`, `\`, `?` ou `#`, l'identifiant écrit avant `@` retiré. Positions et tranches : linéaire.
+ */
+function lueALaMain(adresse: string): AdresseLue {
+  const schema = /^https?:\/\//iu.exec(adresse)?.[0] ?? ""
+  const reste = adresse.slice(schema.length)
+  const finDeLAutorite = reste.search(/[/\\?#]/u)
+  const autorite = finDeLAutorite < 0 ? reste : reste.slice(0, finDeLAutorite)
+  const apres = finDeLAutorite < 0 ? "" : reste.slice(finDeLAutorite)
+  const finDuChemin = apres.search(/[?#]/u)
+  return {
+    origine: `${schema}${autorite.slice(autorite.lastIndexOf("@") + 1)}`,
+    chemin: finDuChemin < 0 ? apres : apres.slice(0, finDuChemin),
+    suite: finDuChemin < 0 ? "" : apres.slice(finDuChemin),
+  }
+}
+
+/**
+ * Le libellé d'une adresse web nue (E11-S15, AC-b10, au lieu du seul domaine d'E05-S11) : entière jusqu'à 40
+ * caractères ; au-delà, son schéma, son hôte et les 12 derniers caractères de son chemin, le milieu, la requête et
+ * le fragment coupés par une ellipse. L'hôte est celui que le navigateur ouvre (`lueParLeNavigateur`) ; jamais
+ * l'identifiant ni le mot de passe écrits avant lui (`alice:…@`). Linéaire (`security-patterns.md § Validation des inputs`).
  */
 export function libelleDUneAdresse(adresse: string): string {
-  const sansSchema = adresse.replace(/^https?:\/\//iu, "")
-  let hote: string
-  try {
-    hote = new URL(adresse).hostname
-  } catch {
-    hote = sansSchema.split(/[/?#]/u)[0]
-  }
-  return hote.replace(/^www\./iu, "") || sansSchema
+  const { origine, chemin, suite } = lueParLeNavigateur(adresse) ?? lueALaMain(adresse)
+  const montree = `${origine}${chemin}${suite}`
+  if (chars(montree) <= ADRESSE_MONTREE_MAX) return montree
+  const points = Array.from(chemin)
+  // Un chemin court se garde entier : seules la requête ou le fragment tombent, s'il y en a.
+  if (points.length <= FIN_DU_CHEMIN + 1) return suite === "" ? montree : `${origine}${chemin}…`
+  return `${origine}/…${points.slice(-FIN_DU_CHEMIN).join("")}`
+}
+
+/**
+ * L'adresse entière que montrent l'infobulle et le nom d'un lien (E11-S15, H-b8), lue comme son libellé : l'hôte que
+ * le navigateur ouvre, jamais l'identifiant ni le mot de passe écrits avant lui ; le lien (`href`) garde l'adresse écrite.
+ */
+export function adresseSansIdentifiants(adresse: string): string {
+  const { origine, chemin, suite } = lueParLeNavigateur(adresse) ?? lueALaMain(adresse)
+  return `${origine}${chemin}${suite}`
 }
 
 /** Une marque : son segment, le caractère qui l'écrit (`famille`), la longueur de son bord, son expression. */
@@ -315,6 +386,15 @@ function porteUnLien(segments: readonly Segment[]): boolean {
 /** Un texte porte un lien (une page citée, une adresse web) : l'éditeur le rend au repos, liens dans la phrase (E05-S11, AC-26). */
 export function aDesLiens(texte: string): boolean {
   return porteUnLien(segmentsEnLigne(texte))
+}
+
+/**
+ * Le rendu d'un texte diffère de sa source (E11-S15, AC-b6) : un lien, une marque (gras, italique, code, barré), un
+ * échappement ou un saut de ligne écrit. L'éditeur rend alors le texte au repos, comme la lecture.
+ */
+export function aDuBalisage(texte: string): boolean {
+  const segments = segmentsEnLigne(texte)
+  return segments.length > 1 || (segments.length === 1 && (segments[0].genre !== "texte" || segments[0].texte !== texte))
 }
 
 function texteDes(segments: readonly Segment[]): string {

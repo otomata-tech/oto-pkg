@@ -8,8 +8,8 @@ import type { CiblesDesLiens } from "../../../packages/plateforme/ui/noeud/en-li
 import { bloc, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur après les retours de la démo (E11-S06) : une puce, un numéro ou une case par élément d'une liste, portés
-// par la copie de ses éléments (lot a) ; le panneau « Lien » ouvert par le curseur dans un lien ou par un clic sur un
-// lien au repos, qui réécrit le lien seul par une frappe (lot b). Sous la file d'écriture, `fetch` simulé pour
+// par la copie de ses éléments (lot a) ; le panneau « Lien » ouvert par le curseur dans un lien ou par le menu contextuel
+// d'un lien au repos (E11-S15, AC-b9 : un clic le suit), qui réécrit le lien seul par une frappe (lot b). Sous la file d'écriture, `fetch` simulé pour
 // `POST /api/platform/nodes`. La place des repères sur les lignes repliées se mesure dans un navigateur :
 // `tests/e2e/e11s06-editeur.spec.ts`.
 
@@ -95,6 +95,12 @@ function cliquer(lien: HTMLElement, init: MouseEventInit = {}): boolean {
   document.removeEventListener("click", lire)
   return suivi
 }
+
+/**
+ * Le menu contextuel d'un lien : clic droit, ou touche Menu et Maj+F10 sur le lien atteint au clavier, qui lui envoient le
+ * même `contextmenu` ; `true` si celui du navigateur s'ouvrirait.
+ */
+const menuContextuel = (lien: HTMLElement) => fireEvent.contextMenu(lien)
 
 const lienAuRepos = (element: HTMLTextAreaElement, nom: string) => within(couche(element, ".oto-block-rendu")).getByRole("link", { name: nom })
 
@@ -203,15 +209,21 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     const texte = champ(NOM)
     expect(texte).toHaveAttribute("readonly")
     expect(cliquer(lienAuRepos(texte, "Mes tâches"))).toBe(true)
+    expect(menuContextuel(lienAuRepos(texte, "Mes tâches"))).toBe(true)
     act(() => texte.focus())
     placer(texte, 10)
     expect(panneau()).toBeNull()
   })
 
-  it("should open the panel on a plain click of a link at rest, focus in « Libellé », close it without writing when the focus leaves the row, and follow the link with Ctrl or ⌘", async () => {
+  it("should follow a link at rest on a plain click, open the panel from its context menu, by the pointer or the keyboard, focus in « Libellé », close it without writing when the focus leaves the row", async () => {
     monter([bloc(ID.texte, "paragraph", TEXTE)], CIBLES)
     const texte = champ(NOM)
-    expect(cliquer(lienAuRepos(texte, "Mes tâches"))).toBe(false)
+    // Un clic suit le lien (E11-S15, AC-b9) : aucun panneau.
+    expect(cliquer(lienAuRepos(texte, "Mes tâches"))).toBe(true)
+    expect(panneau()).toBeNull()
+    // Au clavier : le lien atteint, la touche Menu ou Maj+F10 lui envoie `contextmenu` ; le menu du navigateur ne s'ouvre pas.
+    act(() => lienAuRepos(texte, "Mes tâches").focus())
+    expect(menuContextuel(lienAuRepos(texte, "Mes tâches"))).toBe(false)
     await focusSur(libelle())
     expect(libelle()).toHaveValue("Mes tâches")
     expect(screen.getByRole("radio", { name: "Page de la plateforme" })).toHaveAttribute("aria-checked", "true")
@@ -221,8 +233,8 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     act(() => bouton("Ailleurs").focus())
     expect(panneau()).toBeNull()
     expect(texte).toHaveValue(TEXTE)
-    // Échap dans le panneau : il se ferme, le focus revient au champ, le curseur après le lien.
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    // Échap dans le panneau, ouvert d'un clic droit : il se ferme, le focus revient au champ, le curseur après le lien.
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     fireEvent.keyDown(libelle(), { key: "Escape" })
     expect(panneau()).toBeNull()
@@ -272,10 +284,10 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     await waitFor(() => expect(liste).toHaveValue("a `b\nVoir [[prive/moi/taches|Mes courses]] c`"))
   })
 
-  it("should open a link of the second item of a list clicked at rest, and remove it for the text it shows", async () => {
+  it("should open a link of the second item of a list from its context menu at rest, and remove it for the text it shows", async () => {
     monter([bloc(ID.puces, "list", null, { items: ["un [[prive/moi/notes]]", "Voir [[prive/moi/taches|Mes tâches]] demain"] })])
     const liste = champDe("un [[prive/moi/notes]]\nVoir [[prive/moi/taches|Mes tâches]] demain")
-    expect(cliquer(within(couche(liste, ".oto-block-copie")).getByRole("link", { name: "Mes tâches" }))).toBe(false)
+    expect(menuContextuel(within(couche(liste, ".oto-block-copie")).getByRole("link", { name: "Mes tâches" }))).toBe(false)
     await focusSur(libelle())
     expect(libelle()).toHaveValue("Mes tâches")
     fireEvent.click(bouton("Retirer le lien"))
@@ -288,7 +300,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     const web = bloc(ID.web, "paragraph", "Doc https://exemple.fr fin")
     const { relire } = monter([bloc(ID.texte, "paragraph", TEXTE), web], CIBLES)
     const texte = champ(NOM)
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     fireEvent.change(libelle(), { target: { value: "x".repeat(201) } })
     fireEvent.click(bouton("Appliquer"))
@@ -304,7 +316,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
 
     // Une adresse nue vers une page : aucune page choisie.
     act(() => bouton("Ailleurs").focus())
-    const doc = champ("Modifier ce texte — Doc exemple.fr fin")
+    const doc = champ("Modifier ce texte — Doc https://exemple.fr fin")
     act(() => doc.focus())
     placer(doc, 8)
     expect(screen.queryByRole("button", { name: "Retirer le lien" })).toBeNull()
@@ -315,7 +327,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
 
     // Le texte a changé depuis l'ouverture : rien n'est écrit, le panneau se ferme, le message reste sous le champ.
     act(() => bouton("Ailleurs").focus())
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     relire([{ ...bloc(ID.texte, "paragraph", `Revoir ${TEXTE.slice(5)}`), revision: 4 }, web])
     await waitFor(() => expect(texte).toHaveValue(`Revoir ${TEXTE.slice(5)}`))
@@ -331,7 +343,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     const ouvrir = vi.spyOn(window, "open").mockReturnValue(null)
     monter([bloc(ID.texte, "paragraph", TEXTE)], CIBLES)
     const texte = champ(NOM)
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     fireEvent.click(bouton("Ouvrir"))
     expect(ouvrir).toHaveBeenCalledWith("/n/prive/moi/taches#k1", "_blank", "noopener,noreferrer")
@@ -356,7 +368,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     const nu = "Voir [[prive/moi/taches]] demain"
     monter([bloc(ID.texte, "paragraph", nu)], CIBLES)
     const texte = champDe(nu)
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     expect(libelle()).toHaveValue("Mes tâches")
     // Appliquer sans rien changer ne fige pas le titre en libellé.
@@ -365,7 +377,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     expect(texte).toHaveValue(nu)
     // Une autre page choisie : « Libellé » montre son titre, et le lien s'écrit sans libellé.
     act(() => bouton("Ailleurs").focus())
-    cliquer(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte, "Mes tâches"))
     await focusSur(libelle())
     const recherche = screen.getByRole("textbox", { name: "Chercher une page" })
     fireEvent.change(recherche, { target: { value: "gri" } })
@@ -389,7 +401,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     placer(texte, 45)
     expect(libelle()).toHaveValue("")
     expect(screen.queryByRole("button", { name: "Retirer le lien" })).toBeNull()
-    expect(texte).toHaveAccessibleDescription("Lien vers « exemple.fr ». Alt+Entrée pour le modifier.")
+    expect(texte).toHaveAccessibleDescription("Lien vers « https://exemple.fr ». Alt+Entrée pour le modifier.")
 
     expect(fireEvent.keyDown(texte, { key: "Escape" })).toBe(false)
     expect(panneau()).toBeNull()

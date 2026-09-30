@@ -119,7 +119,7 @@ test.describe("E05-S13 : les retours du soir", () => {
         // AC-13, AC-17, AC-20 : le Contexte de l'équipe, ses deux encarts, et aucun « Déplacer » en tête.
         await page.goto(`${ESPACE.adresse}/n/${CHEMINS.contexteDeLEquipe}`)
         const aQuoiSert = await ouvrirAQuoiSert(page)
-        await attendre(aQuoiSert.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
+        await attendre(aQuoiSert.getByText(`Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe ${EQUIPE.nom}, lit à chaque conversation.`)).toBeVisible()
         await expect(aQuoiSert.getByText("Vous l'écrivez comme n'importe quelle page.")).toBeVisible()
         await expect(aQuoiSert.getByText("Reçu par")).toHaveCount(0)
         await expect(aQuoiSert.getByRole("definition")).toHaveCount(0)
@@ -133,7 +133,7 @@ test.describe("E05-S13 : les retours du soir", () => {
 
         // AC-17 : la phrase de Tout le monde et celle de Privé.
         await page.goto(`${ESPACE.adresse}/n/contexte`)
-        await attendre((await ouvrirAQuoiSert(page)).getByText(/^Ce que les assistants de tous les membres de .+ lisent à chaque conversation\.$/)).toBeVisible()
+        await attendre((await ouvrirAQuoiSert(page)).getByText(/^Ce que votre Claude\/ChatGPT\/Mistral, comme celui de chaque membre de .+, lit à chaque conversation\.$/)).toBeVisible()
         rail = await ouvrirLeRail(page, largeur)
         const prive = await rail.locator('a[href^="/n/private/"][href$="/contexte"]').first().getAttribute("href")
         if (largeur < 768) await page.keyboard.press("Escape")

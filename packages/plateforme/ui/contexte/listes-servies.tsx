@@ -4,10 +4,15 @@
 // que servie, en police mono. Monté dans la carte d'une partie par la vue « Contexte », sous l'éditeur
 // d'un Contexte écrivable, et sous les blocs de l'encart « Contexte · Tout le monde » d'Organisation. Server
 // Component. Remplace `ListesDIndex` (M71), qui ne rendait que les listes d'index, en anglais. Sans lui, la personne
-// lit le texte anglais brut que reçoit son assistant.
+// lit le texte anglais brut que reçoit son assistant. E11-S15 (AC-a1) : « Rangés sous ce contexte » et « Pages
+// citées » dans l'encart repliable (`LinkedContent`) de l'écran d'un Contexte, ouvert, sur toute la largeur.
 import type { ReactNode } from "react"
+import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr/ArrowSquareOut"
+import { TreeStructure } from "@phosphor-icons/react/dist/ssr/TreeStructure"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { LIEN } from "../components/classes"
+import { AnimatedIcon } from "../ds/react/icon"
+import { LinkedContent } from "../ds/react/linked-content"
 import { dateLisible } from "../format/dates"
 import { LIGNES_SERVIES, nomDuBloc, type EquipesNommees } from "./libelles"
 import type { Legende, LigneServie, MorceauServi } from "./parties-du-contexte"
@@ -61,6 +66,12 @@ function Ligne({ ligne, ...navigation }: Navigation & { ligne: LigneServie }): R
   }
 }
 
+/**
+ * Les listes d'index d'un Contexte (E11-S15, AC-a1) dans l'encart repliable des encarts « Sous-pages » et « Cite »
+ * de l'écran d'un Contexte (`LinkedContent`), même glyphe, ouvert à l'arrivée : la vue est faite pour les lire.
+ */
+const GLYPHES_DES_INDEX = { children: TreeStructure, linked: ArrowSquareOut } as const
+
 function Liste({ morceau, id, ...navigation }: Navigation & { morceau: Extract<MorceauServi, { genre: "liste" }>; id: string }) {
   const lignes = morceau.lignes.length > 0 && (
     <ul aria-labelledby={morceau.legende ? id : undefined} className="flex flex-col gap-1.5">
@@ -73,6 +84,14 @@ function Liste({ morceau, id, ...navigation }: Navigation & { morceau: Extract<M
     </ul>
   )
   if (!morceau.legende) return lignes
+  const { genre } = morceau.legende
+  if (genre === "children" || genre === "linked") {
+    return (
+      <LinkedContent open icon={<AnimatedIcon as={GLYPHES_DES_INDEX[genre]} size="xs" />} title={<span id={id}>{legende(morceau.legende)}</span>}>
+        {lignes}
+      </LinkedContent>
+    )
+  }
   return (
     <div className="flex flex-col gap-1.5">
       <p id={id} className="font-medium text-ink">

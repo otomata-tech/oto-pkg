@@ -10,6 +10,9 @@
 // fonction de l'écran (`liensDuTexte`) avant d'être écrit : un lien qui ne se relirait pas tel quel, ou une adresse
 // autre que `https://`, n'est jamais écrit (`security-patterns.md § XSS Prevention`). Le panneau vit dans le flux,
 // dans la rangée, comme la liste de « @ » : un portail sortirait le focus de la rangée et retirerait un bloc neuf.
+//
+// E11-S15 : un clic sur un lien au repos le suit ; le menu contextuel (clic droit, touche Menu, Maj+F10) ouvre le
+// panneau (AC-b9, remplace AC-b2 et HN-E11S06-2). Ses champs de texte ne sont pas relus par le correcteur (AC-b7).
 import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react"
 import { LABEL_MAX } from "../../../schemas/link-syntax"
 import type { SearchMatch } from "../../../schemas/search"
@@ -168,9 +171,12 @@ export function useLienAuCurseur(texte: string, champ: RefObject<HTMLTextAreaEle
       libelle.current?.focus()
       return true
     },
-    /** Un clic simple sur un lien rendu au repos (AC-b2) : rien n'est suivi, le panneau s'ouvre ; Ctrl, ⌘, Maj ou le bouton du milieu le suivent. */
-    cliquer(evenement: MouseEvent<HTMLElement>) {
-      if (!actif || evenement.button !== 0 || evenement.ctrlKey || evenement.metaKey || evenement.shiftKey) return
+    /**
+     * Le menu contextuel d'un lien rendu au repos (E11-S15, AC-b9, qui remplace le clic simple d'AC-b2) : clic droit,
+     * touche Menu ou Maj+F10 sur le lien ; le menu du navigateur ne s'ouvre pas, le panneau s'ouvre. Un clic suit le lien.
+     */
+    menuContextuel(evenement: MouseEvent<HTMLElement>) {
+      if (!actif) return
       const ancre = evenement.target instanceof Element ? evenement.target.closest("a[data-lien]") : null
       if (!ancre || !evenement.currentTarget.contains(ancre)) return
       // Le rang d'un lien se compte dans le texte rendu : l'élément d'une liste, ou le texte entier d'un autre bloc.
@@ -236,6 +242,7 @@ function ChoixDeLaPage({ page, choisir, erreur }: { page: Page | null; choisir: 
         <Input
           size="sm"
           autoComplete="off"
+          spellCheck={false}
           value={requete}
           aria-autocomplete="list"
           aria-controls={ouverte ? id : undefined}
@@ -338,7 +345,7 @@ export function PanneauDuLien({ cle, texte, ouvert, liens, idDescription, lien }
         {LIEN_DU_BLOC.decrit(texteMontre(ouvert.lu, liens.cibles))}
       </p>
       <Field label={LIEN_DU_BLOC.libelle} error={alerteDu(formulaire.refus, "libelle")}>
-        <Input ref={lien.libelle} size="sm" value={formulaire.libelle} onChange={(evenement) => formulaire.setLibelle(evenement.target.value)} onKeyDown={entree} />
+        <Input ref={lien.libelle} size="sm" spellCheck={false} value={formulaire.libelle} onChange={(evenement) => formulaire.setLibelle(evenement.target.value)} onKeyDown={entree} />
       </Field>
       <SegmentedControl label={LIEN_DU_BLOC.destination} options={DESTINATIONS} value={formulaire.vers} onChange={(valeur) => formulaire.setVers(valeur === "web" ? "web" : "page")} />
       {formulaire.vers === "page" ? (

@@ -17,6 +17,26 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.2 — 2026-09-30
+
+### Assistants
+- `context` shows up to three candidate procedures with their title and summary, and the assistant picks the one that fits the request, searching or asking only when none does.
+- A procedure `context` serves comes with the other candidates: when the request is about one of them instead, the assistant reads that one rather than following the served steps.
+- What's new lists each content once, at its latest version.
+- « Procedures you can run » gives the 15 most used procedures with their summary and the next ones by title only, so every procedure stays listed in fewer characters.
+
+### Hosts
+- Install: upgrade to 1.1.2; nothing else to do (no migration, no export added, changed or removed).
+- API: `GET /api/platform/search/recent` (optional `exclude=<path>`) serves the caller's recent contents, which the editor's « @ » list shows before anything is typed; served by `handlePlateforme`, nothing to mount.
+- UI: a bare web address in a text shows its scheme, host and the end of its path, the middle cut by an ellipsis, instead of its domain alone; the host shown, in its tooltip and accessible name too, is the one the browser opens (a backslash or a user name cannot disguise it, an international domain shows in punycode), never its user name or password.
+- UI: the « Contexte » view (`/context`) explains under its title what the context is, how it is served and in which order it is built; « Rangés sous ce contexte » and « Pages citées » sit in the foldable panel of a Context screen, open.
+- UI: a link to a Context and its line in a page's side panels show the Context's name as elsewhere on screen (« Contexte · SAV »), not its stored title; a hand-written label is kept.
+- UI: a page's side panels cut a long title with an ellipsis and no longer show summaries; a page stays centred at 110 to 150 % browser zoom without horizontal scroll; « Partager sur le web » opens anchored to its button, at most 70 % of the window high.
+- UI: `/connect` separates the steps of the connection guide; « Ce que les assistants… » now reads « Ce que votre Claude/ChatGPT/Mistral… »; a data table's « Importer un fichier… » moves to its header buttons, dropping a `.csv` on the table still works.
+- UI: in the editor, a simple table has a tinted header and cell borders on hover or focus only; table, file and image blocks follow the design system; an image keeps its proportions; a block's handle menu fits its entries; bold, italic, code and strikethrough render at rest; editing a link shows no spell-check underline; a left click opens a link, a right click (or Menu, Shift+F10) edits it; « @ » lists your recent contents, the page being edited excepted, before anything is typed.
+- UI: the editor selects whole blocks: ⌘A (Ctrl+A) a second time in a field, Escape then Shift+↑↓, Shift/Ctrl/⌘+click on the handles, a rectangle drawn from the margin, a drag that leaves its block; Delete, ⌘X and ⌥↑↓ act on the selection in one write with a single « Annuler », ⌘Z outside a field undoes it; ⌘C copies its markdown, the same as the `.md` export.
+- API: a `POST /api/platform/nodes` from the screens takes as many operations as a page holds blocks (1,000), so a selection is deleted or moved in one write; `write` from an assistant keeps its 50 operations per call.
+
 ## 1.1.1 — 2026-09-30
 
 ### Hosts

@@ -6,8 +6,8 @@
 // case) se pose sur la première ligne de son élément, jamais sur une ligne repliée. Seul le premier niveau reçoit un
 // repère dessiné ; un sous-élément garde sa marque écrite (E10-S04, AC-b2 ; HN-E11S06-7).
 //
-// Au focus, ou sans lien, la copie est le texte brut, muet (`aria-hidden`, invisible) : le champ se lit au travers.
-// Au repos avec des liens, elle rend chaque élément par `EnLigne`, visible, liens cliquables, et tient lieu du rendu
+// Au focus, ou sans lien ni marque, la copie est le texte brut, muet (`aria-hidden`, invisible) : le champ se lit au
+// travers. Au repos avec des liens ou des marques (E11-S15, AC-b6), elle rend chaque élément par `EnLigne`, visible, liens cliquables, et tient lieu du rendu
 // au repos d'un Texte : les repères suivent alors le texte qu'on voit. Les cases restent de vrais `input` nommés,
 // hors de la partie muette. Sans elle, une puce, un numéro ou une case se dessinaient par ligne de champ, lignes
 // repliées comprises (retour de démo, fiche D132).

@@ -1,5 +1,6 @@
 // Bloc « Procedures you can run » de `context` (E03-S08, AC4, AC6 ; H35, P37) : les procédures publiées
-// que la personne lit, chacune par son résumé, qui dit comment on la demande, triées par l'usage de la
+// que la personne lit, les 15 premières par leur résumé, qui dit comment on la demande, les suivantes par leur
+// titre (E11-S16), triées par l'usage de la
 // personne et de ses équipes sur 90 jours, puis par chemin ; 60 lignes au plus (sans taille, E11-S03), la
 // dernière ligne comptant celles qui ne sont pas listées. Sans lui, le modèle ne sait pas quelles
 // procédures existent hors de la phrase routée.
@@ -20,10 +21,17 @@ import { byPath } from "./contexts"
 /** Procédures listées au plus (H35). */
 const PROCEDURES_MAX = 60
 
+/**
+ * Les plus utilisées, listées par leur résumé ; les suivantes, par leur titre seul (E11-S16, décision de JB) :
+ * les 40 premières du jeu à l'échelle (`tests/integration/fixtures/scale-routing.cases.ts`) tiennent en 3 932 caractères
+ * au lieu de 6 836, et chacune reste visible.
+ */
+const PROCEDURES_WITH_SUMMARY = 15
+
 /** Fenêtre de l'usage compté (H35). */
 const USAGE_DAYS = 90
 
-type Procedure = { id: string; path: string; summary: string }
+type Procedure = { id: string; path: string; title: string; summary: string }
 
 /**
  * Les procédures publiées de l'organisation que la personne lit (niveau ≥ 1 en un lot, après la
@@ -34,7 +42,7 @@ async function readableProcedures(db: PlatformDb, identity: Identity): Promise<P
     db,
     "context: procedures",
     (sql) => sql<Procedure[]>`
-      select id, path, summary from platform.nodes
+      select id, path, title, summary from platform.nodes
        where org_id = ${identity.org.id} and status = 'published' and kind = 'procedure'`,
   )
   const levels = await nodeLevels(db, identity, rows.map((row) => row.id))
@@ -89,15 +97,16 @@ async function usageByPath(db: PlatformDb, identity: Identity): Promise<Map<stri
 
 /**
  * Le texte du bloc (AC4, AC6) : « ## Procedures you can run (<n>) », puis une ligne par procédure dans
- * l'ordre reçu, 60 au plus, sans taille (E11-S03, AC-b1) ; dès qu'une procédure n'est pas listée, la
- * dernière ligne la compte. Aucune : « None published yet. ». Formats de
- * `SERVED_PROCEDURES`, que l'écran relit (E05-S13, AC-16) ; exporté pour son test de parité, sans base.
+ * l'ordre reçu, 60 au plus, sans taille (E11-S03, AC-b1) : les 15 premières par leur résumé, les suivantes par
+ * leur titre (E11-S16) ; dès qu'une procédure n'est pas listée, la dernière ligne la compte. Aucune : « None
+ * published yet. ». Formats de `SERVED_PROCEDURES`, que l'écran relit (E05-S13, AC-16) : une ligne par titre
+ * garde la forme d'une ligne par résumé ; exporté pour son test de parité, sans base.
  */
-export function proceduresText(procedures: readonly Pick<Procedure, "path" | "summary">[], prefix: string): ContextBlock {
+export function proceduresText(procedures: readonly Pick<Procedure, "path" | "title" | "summary">[], prefix: string): ContextBlock {
   const { title, item, separator, none, moreStart, moreEnd } = SERVED_PROCEDURES
   const header = `${title} (${procedures.length})`
   if (procedures.length === 0) return { name: "procedures", text: `${header}\n${none}` }
-  const lines = procedures.map((procedure) => `${item}${procedure.path}${separator}${procedure.summary}`)
+  const lines = procedures.map((procedure, rank) => `${item}${procedure.path}${separator}${rank < PROCEDURES_WITH_SUMMARY ? procedure.summary : procedure.title}`)
   const text = (shown: number) => {
     const more = shown < lines.length ? [`${moreStart}${lines.length - shown}${moreEnd}${prefix}_find, type procedure.`] : []
     return [header, ...lines.slice(0, shown), ...more].join("\n")

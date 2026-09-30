@@ -20,7 +20,7 @@ describe("segmentsEnLigne (AC5)", () => {
     // Ni HTML ni lien interne mal formé : le texte reste tel quel ; un lien markdown vers le web se lit par son texte (E05-S11).
     ["[[Ventes/Grille]] et [le site](https://exemple.test) <b>gras</b>", [{ genre: "texte", texte: "[[Ventes/Grille]] et " }, { genre: "web", adresse: "https://exemple.test", libelle: "le site" }, { genre: "texte", texte: " <b>gras</b>" }]],
     // Un lien markdown dans du code reste du code ; une adresse nue se lit par son domaine.
-    ["`[a](https://a.fr)` puis https://www.b.fr/c", [{ genre: "code", texte: "[a](https://a.fr)" }, { genre: "texte", texte: " puis " }, { genre: "web", adresse: "https://www.b.fr/c", libelle: "b.fr" }]],
+    ["`[a](https://a.fr)` puis https://www.b.fr/c", [{ genre: "code", texte: "[a](https://a.fr)" }, { genre: "texte", texte: " puis " }, { genre: "web", adresse: "https://www.b.fr/c", libelle: "https://www.b.fr/c" }]],
     // Une suite d'accents graves n'est fermée que par la suivante de même longueur, comme la publication la lit (N70, M15).
     ["``a`[[ventes/grille]]`", [{ genre: "texte", texte: "``a" }, { genre: "code", texte: "[[ventes/grille]]" }]],
   ])("should read %j", (texte, attendus) => {
@@ -40,7 +40,7 @@ describe("segmentsEnLigne (AC5)", () => {
   const jusquALaBorne = (motif: string) => motif.repeat(Math.floor(BORNE / motif.length))
   it.each<[string, string, (segments: ReturnType<typeof segmentsEnLigne>) => void]>([
     ["dots inside the address", `https://x.fr/${".".repeat(BORNE - 14)}a`, (segments) => expect(segments).toEqual([expect.objectContaining({ genre: "web", adresse: `https://x.fr/${".".repeat(BORNE - 14)}a` })])],
-    ["closing punctuation to the end", `https://x.fr/${").".repeat(Math.floor((BORNE - 13) / 2))}`, (segments) => expect(segments[0]).toEqual({ genre: "web", adresse: "https://x.fr/", libelle: "x.fr" })],
+    ["closing punctuation to the end", `https://x.fr/${").".repeat(Math.floor((BORNE - 13) / 2))}`, (segments) => expect(segments[0]).toEqual({ genre: "web", adresse: "https://x.fr/", libelle: "https://x.fr/" })],
     ["one schema after another", jusquALaBorne("https://"), (segments) => expect(segments).toHaveLength(1)],
     ["schemas that never open", jusquALaBorne("http:/"), (segments) => expect(segments).toEqual([{ genre: "texte", texte: jusquALaBorne("http:/") }])],
     ["addresses between code spans", jusquALaBorne("`a` https://a.fr "), (segments) => expect(segments.filter((segment) => segment.genre === "web")).toHaveLength(Math.floor(BORNE / 17))],
@@ -67,17 +67,47 @@ describe("titreDuLien (E05-S11, AC-27)", () => {
     // Un chemin qui porte le nom d'une propriété d'objet ne lit pas le prototype.
     expect(titreDuLien({ chemin: "constructor", libelle: "" }, cibles)).toBe("constructor")
   })
+
+  it("should name a cited Contexte as the screen names it, under its stored title or no label, a hand-written label kept (E11-S15, AC-a9)", () => {
+    const cibles = { "sav/contexte": { titre: "Contexte · SAV", chemin: "sav/contexte", titreEnregistre: "Contexte" } }
+    expect(titreDuLien({ chemin: "sav/contexte", libelle: "Contexte" }, cibles)).toBe("Contexte · SAV")
+    expect(titreDuLien({ chemin: "sav/contexte", libelle: "" }, cibles)).toBe("Contexte · SAV")
+    expect(titreDuLien({ chemin: "sav/contexte", libelle: "notre SAV" }, cibles)).toBe("notre SAV")
+  })
 })
 
-describe("libelleDUneAdresse (E05-S11, fiche D107)", () => {
+describe("libelleDUneAdresse (E11-S15, AC-b10)", () => {
   it.each([
-    ["https://exemple.fr/devis", "exemple.fr"],
-    ["https://www.exemple.fr/", "exemple.fr"],
-    ["http://docs.exemple.fr/document/d/1AbC/edit?usp=sharing", "docs.exemple.fr"],
+    // Jusqu'à 40 caractères, entière, requête comprise.
+    ["https://exemple.fr/devis", "https://exemple.fr/devis"],
+    ["https://www.exemple.fr/?q=devis", "https://www.exemple.fr/?q=devis"],
+    // Sans chemin, rien à couper, quelle que soit sa longueur.
+    ["https://un-sous-domaine-assez-long.exemple-de-domaine.fr", "https://un-sous-domaine-assez-long.exemple-de-domaine.fr"],
+    // Au-delà : schéma, domaine, et les 12 derniers caractères du chemin.
+    ["https://oto-steel.vercel.app/n/private/jean_baptiste/test_ctx", "https://oto-steel.vercel.app/…ste/test_ctx"],
+    // La requête et le fragment d'une adresse coupée tombent : la fin du chemin nomme la ressource.
+    ["http://docs.exemple.fr/document/d/1AbC/edit?usp=sharing", "http://docs.exemple.fr/…/d/1AbC/edit"],
+    ["https://docs.exemple.fr/guide/installation#configuration", "https://docs.exemple.fr/…installation"],
+    // Un chemin court se garde entier, l'ellipse dit ce qui tombe après lui.
+    ["https://exemple.fr/devis?utm_source=lettre-du-mois-de-septembre", "https://exemple.fr/devis…"],
     // Une adresse à mot de passe se construit à l'exécution (testing-strategy.md § Anti-patterns : check:public).
-    [`https://${["alice", "secret"].join(":")}@exemple.fr/`, "exemple.fr"],
-  ])("should show %s by its domain alone", (adresse, libelle) => {
+    [`https://${["alice", "secret"].join(":")}@exemple.fr/`, "https://exemple.fr/"],
+    [`https://${["alice", "secret"].join(":")}@docs.exemple.fr/document/d/1AbCdEfGh/edit`, "https://docs.exemple.fr/…bCdEfGh/edit"],
+    // L'hôte montré est celui que le navigateur ouvre : une barre oblique inverse coupe l'autorité comme `/`.
+    ["https://evil.example\\@good.example/chemin", "https://evil.example/…ample/chemin"],
+    // Un domaine international en punycode, un chemin encodé lu en clair.
+    ["https://bücher.example/katalog", "https://xn--bcher-kva.example/katalog"],
+    ["https://exemple.fr/caf%C3%A9", "https://exemple.fr/café"],
+  ])("should show %s as %s", (adresse, libelle) => {
     expect(libelleDUneAdresse(adresse)).toBe(libelle)
+  })
+
+  it("should read a hostile address of 100,000 characters in linear time", () => {
+    for (const adresse of [`https://exemple.fr/${"a/".repeat(50_000)}`, `https://${"@".repeat(100_000)}`, `https://exemple.fr/${"?#".repeat(50_000)}`, `https://${"\\@".repeat(50_000)}`, `https://${"a".repeat(100_000)}`]) {
+      const debut = performance.now()
+      libelleDUneAdresse(adresse)
+      expect(performance.now() - debut).toBeLessThan(1_000)
+    }
   })
 })
 

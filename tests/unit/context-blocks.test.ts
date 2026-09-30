@@ -135,10 +135,15 @@ function orderedIds(simulated: readonly string[]): Record<string, string> {
   return Object.fromEntries([...simulated].sort().map((id, rank) => [id, `${prefix}-0000-4000-8000-${rank.toString(16).padStart(12, "0")}`]))
 }
 
-/** La ligne du routage : la dernière du bloc code, sous « ## This request » (E05-S12, AC-9). */
-function routingLineOf(text: string): string | undefined {
-  const lines = text.split("\n")
-  return lines[lines.indexOf("## This request") + 1]
+/**
+ * La ligne du routage et ses candidates (E11-S16, AC-a1) : la fin du bloc code, sous « ## This request » (E05-S12,
+ * AC-9), jusqu'au bloc suivant.
+ */
+function routingLineOf(text: string): string {
+  const title = "## This request\n"
+  const start = text.indexOf(title) + title.length
+  const end = text.indexOf("\n\n", start)
+  return text.slice(start, end === -1 ? undefined : end)
 }
 
 describe("codeBlock", () => {
@@ -164,58 +169,56 @@ describe("codeBlock", () => {
     )
   })
 
-  // E03-S02, AC8 : sans étape servie, la consigne dépend de la demande (H37) ; E11-S04 (AC-b3,
-  // HN-E11S04-6) : une question propose aussi, après sa réponse, toutes les candidates montrées.
-  it("should ask which one to run for an action, answer then offer the candidates for a question, and say when nothing matches (AC8)", () => {
-    const candidates = [candidate("ventes/relance_prospects", 0.62), candidate("ventes/qualifier_prospects", 0.6)]
-    const line = (phrase: string, fields: { candidates: Candidate[]; kind: RequestKind }) =>
-      codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase, served: null, ...fields }).text.split("\n").at(-1) ?? ""
-
-    expect(line("prospects", { candidates, kind: "action" })).toBe(
-      "Request « prospects »: no clear match. Candidates: ventes/relance_prospects (0.62), ventes/qualifier_prospects (0.60). Ask the user which one to run; do not guess.",
+  // E11-S16 (AC-a1, AC-a3) : sans étape servie, les candidates par titre et résumé et une seule consigne,
+  // quel que soit le genre de la phrase : l'assistant choisit celle qui correspond ; rien ne correspond, il le dit.
+  it("should list the closest procedures by title and summary with one instruction for any request, and say when nothing matches (AC8)", () => {
+    const candidates = [
+      { ...candidate("ventes/relance_prospects", 0.62), title: "Relancer les prospects", summary: "Relance les prospects à traiter." },
+      { ...candidate("ventes/qualifier_prospects", 0.6), title: "Qualifier les prospects", summary: "Complète les fiches des prospects." },
+    ]
+    const routing = (phrase: string, fields: { candidates: Candidate[]; kind: RequestKind }) =>
+      routingLineOf(codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase, served: null, ...fields }).text)
+    const closest = [
+      "- ventes/relance_prospects — Relancer les prospects: Relance les prospects à traiter. (0.62)",
+      "- ventes/qualifier_prospects — Qualifier les prospects: Complète les fiches des prospects. (0.60)",
+      "Read the one that fits the request with acme_read, if any; otherwise search with acme_find or ask the user.",
+    ]
+    // AC-a4 : la règle du routage renvoie aux candidates, au lieu de faire demander.
+    expect(workspaceRules("acme")).toContain(
+      "\n- When a request matches a procedure, its steps come right after this part: follow them in order. Otherwise the closest procedures are listed there: use the one that fits, or search; ask the user when nothing fits.\n",
     )
     const question = "Combien de prospects avons-nous à Valbrune, et lesquels ?"
-    expect(line(question, { candidates, kind: "data" })).toBe(
-      `Request « ${question} »: no clear match. Candidates: ventes/relance_prospects (0.62), ventes/qualifier_prospects (0.60). It is a question: answer it without changing data, searching with acme_find, acme_read or acme_call table.rows; then offer the user all the candidates above as choices, and run one only if they pick it.`,
-    )
-    expect(line(question, { candidates: [], kind: "data" })).toBe(
+    for (const [phrase, kind] of [["prospects", "action"], [question, "data"], ["Comment je relance ?", "how"], ["Peux-tu relancer ?", "request"]] as const) {
+      expect(routing(phrase, { candidates, kind })).toBe([`Request « ${phrase} »: no clear match. Closest procedures:`, ...closest].join("\n"))
+    }
+    expect(routing(question, { candidates: [], kind: "data" })).toBe(
       `Request « ${question} »: no procedure matches. It is a question: search with acme_find, acme_read or acme_call table.rows and answer it.`,
     )
-    expect(line("donne-moi une recette de crêpes", { candidates: [], kind: "action" })).toBe(
+    expect(routing("donne-moi une recette de crêpes", { candidates: [], kind: "action" })).toBe(
       "Request « donne-moi une recette de crêpes »: no procedure matches. Say so instead of guessing; acme_find can search pages, tables and functions.",
     )
-    expect(line("x".repeat(250), { candidates: [], kind: "action" }).startsWith(`Request « ${"x".repeat(200)} »: no procedure`)).toBe(true)
+    expect(routing("x".repeat(250), { candidates: [], kind: "action" }).startsWith(`Request « ${"x".repeat(200)} »: no procedure`)).toBe(true)
   })
 
-  // E11-S04 (AC-b3, HN-E11S04-6, -14, -15) : une demande « comment » ou polie ne suit aucune procédure
-  // d'elle-même ; toutes les candidates montrées sont proposées, une seule quand il n'y en a qu'une.
-  it("should explain served steps for a how question, and offer every candidate shown for a how question or a polite request", () => {
-    const project = candidate("todo/creer_un_projet", 0.62)
-    const task = candidate("todo/ajouter_une_tache", 0.58)
-    const served = candidate("todo/creer_un_projet", 0.78)
-    const line = (phrase: string, kind: RequestKind, candidates: Candidate[], matched: Candidate | null = null) =>
-      codeBlock({ prefix: "demo", code: "7K3Q-M2XA", phrase, served: matched, candidates, kind }).text.split("\n").at(-1) ?? ""
+  // E11-S16 (AC-a2) : la procédure servie l'est si la demande porte sur son titre ; les autres candidates, par titre et
+  // résumé, avec la consigne de lire plutôt celle qui correspond ; E11-S04 (AC-b3) : une demande « comment » explique.
+  it("should serve the steps when the request is about their title, list the other candidates to read instead, and explain for a how question", () => {
+    const served = { ...candidate("todo/creer_un_projet", 0.78), title: "Créer un nouveau projet", summary: "Crée un projet de la todo." }
+    const task = { ...candidate("todo/ajouter_une_tache", 0.58), title: "Ajouter une tâche", summary: "Ajoute une tâche à ma todo." }
+    const routing = (phrase: string, kind: RequestKind, candidates: Candidate[]) =>
+      routingLineOf(codeBlock({ prefix: "demo", code: "7K3Q-M2XA", phrase, served, candidates, kind }).text)
     const how = "Comment je crée un projet ?"
     const asked = "Peux-tu créer un projet ?"
+    const matched = (phrase: string) => `Request « ${phrase} » matches todo/creer_un_projet (score 0.78): its steps follow, if the request is about « Créer un nouveau projet ».`
+    const others = [
+      "Other candidates:",
+      "- todo/ajouter_une_tache — Ajouter une tâche: Ajoute une tâche à ma todo. (0.58)",
+      "If the request is about one of them instead, read that one with demo_read and follow it rather than these steps.",
+    ]
 
-    expect(line(how, "how", [served, task], served)).toBe(
-      `Request « ${how} » matches todo/creer_un_projet (score 0.78): its steps follow. Other candidates: todo/ajouter_une_tache (0.58). It asks how: explain these steps, and run them only if the user asks.`,
-    )
-    expect(line(asked, "request", [served, task], served)).toBe(
-      `Request « ${asked} » matches todo/creer_un_projet (score 0.78): its steps follow. Other candidates: todo/ajouter_une_tache (0.58).`,
-    )
-    expect(line(how, "how", [project, task])).toBe(
-      `Request « ${how} »: no clear match. Candidates: todo/creer_un_projet (0.62), todo/ajouter_une_tache (0.58). It asks how to do something: offer the user all the candidates above as choices, read the one they pick with demo_read and explain its steps; run nothing unless the user asks.`,
-    )
-    expect(line(asked, "request", [project, task])).toBe(
-      `Request « ${asked} »: no clear match. Candidates: todo/creer_un_projet (0.62), todo/ajouter_une_tache (0.58). It asks for an action: offer the user all the candidates above as choices, and run only the one they pick, after their yes.`,
-    )
-    expect(line(asked, "request", [project])).toBe(
-      `Request « ${asked} »: no clear match. Candidates: todo/creer_un_projet (0.62). It asks for an action: offer the user all the candidates above as choices, and run only the one they pick, after their yes.`,
-    )
-    expect(line(how, "how", [])).toBe(
-      `Request « ${how} »: no procedure matches. Say so instead of guessing; demo_find can search pages, tables and functions.`,
-    )
+    expect(routing(asked, "request", [served, task])).toBe([matched(asked), ...others].join("\n"))
+    expect(routing(how, "how", [served, task])).toBe([matched(how), ...others, "It asks how: explain these steps, and run them only if the user asks."].join("\n"))
+    expect(routing(asked, "action", [served])).toBe(matched(asked))
   })
 })
 
@@ -472,8 +475,11 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(portable("C
   })
 })
 
+/** Nœuds de O que Léa lit, un par ligne des nouveautés après « annonces » et « ventes/devis » (E11-S16, AC-b1). */
+const NEWS_NODES = ["guide", "contexte", "ventes", "ventes/contexte", "ventes/devis/modele", "ventes/x", "ventes/x/y"]
+
 describe.skipIf(!sqlConfigured)(portable("what's new (E03-S08, AC2, AC3)"), { timeout: REAL_BASE_TIMEOUT }, () => {
-  it("should list the visible versions and the activations since the previous ctx in this organisation, most recent first, 10 lines counted after the filter (AC2)", async () => {
+  it("should list the last visible version of each node and the activations since the previous ctx in this organisation, most recent first, 10 lines counted after the filter (AC2 ; E11-S16, AC-b1)", async () => {
     const tables = oTables()
     tables.ctx.push(
       { code: "AAAA-0001", org_id: O.id, user_id: PEOPLE.lea.id, created_at: "2026-09-20T10:00:00.000Z" },
@@ -483,9 +489,14 @@ describe.skipIf(!sqlConfigured)(portable("what's new (E03-S08, AC2, AC3)"), { ti
     tables.node_versions.push(
       // La plus récente, mais illisible de Léa : elle ne prend pas une des 10 lignes.
       version("support/faq", 3, "FAQ révisée", "2026-09-24T11:00:00.000Z"),
+      // Huit versions d'un même nœud : une ligne, la dernière (E11-S16, AC-b1).
       ...[2, 3, 4, 5, 6, 7, 8, 9].map((revision) => version("annonces", revision, `Annonce ${revision}`, `2026-09-23T0${revision - 1}:00:00.000Z`)),
       version("ventes/devis", 2, "Devis révisé", "2026-09-22T09:00:00.000Z"),
-      version("annonces", 1, "Annonce 1", "2026-09-21T09:00:00.000Z"),
+      // Sept autres nœuds lus de Léa : les lignes 4 à 10.
+      ...NEWS_NODES.map((path, rank) => version(path, 2, `Révision ${rank}`, `2026-09-22T0${8 - rank}:00:00.000Z`)),
+      version("annonces", 1, "Annonce 1", "2026-09-21T10:00:00.000Z"),
+      // Onzième nœud : au-delà des 10 lignes.
+      version("ventes/tarifs", 2, "Tarifs révisés", "2026-09-21T09:00:00.000Z"),
       version("ventes/tarifs", 1, "Tarifs", "2026-09-19T09:00:00.000Z"),
       // Sur la base réelle, la requête ne se lit plus : une page de versions de P, plus récentes que celles
       // de O et que Léa, membre de P, lit sous l'isolation, remplirait la lecture sans le filtre de l'organisation.
@@ -506,8 +517,9 @@ describe.skipIf(!sqlConfigured)(portable("what's new (E03-S08, AC2, AC3)"), { ti
       [
         "## What's new since 2026-09-20",
         "- Connector mail activated (2026-09-24)",
-        ...[9, 8, 7, 6, 5, 4, 3, 2].map((revision) => `- annonces v${revision} (2026-09-23): Annonce ${revision}`),
+        "- annonces v9 (2026-09-23): Annonce 9",
         "- ventes/devis v2 (2026-09-22): Devis révisé",
+        ...NEWS_NODES.map((path, rank) => `- ${path} v2 (2026-09-22): Révision ${rank}`),
       ].join("\n"),
     )
 
@@ -665,7 +677,7 @@ describe.skipIf(!sqlConfigured)(portable("recent content (E03-S08, AC5 ; E05-S12
 
 // E11-S03 (AC-b1, HN-E11S03-15, fiche D134) : plus de taille par bloc ; les bornes en lignes restent, et un arrêt se dit.
 describe.skipIf(!sqlConfigured)(portable("the dynamic blocks served whole (E03-S08, AC6 ; E11-S03, AC-b1)"), { timeout: REAL_BASE_TIMEOUT }, () => {
-  it("should serve what's new and recent documents whole, and the procedures up to 60 lines with a last line counting the others", async () => {
+  it("should serve what's new and recent documents whole, and the procedures up to 60 lines, the first 15 by summary, then by title, with a last line counting the others", async () => {
     const items = Array.from({ length: 10 }, (_, index) => ({
       at: `2026-09-23T0${9 - index}:00:00.000Z`,
       line: `- annonces v${10 - index} (2026-09-23): ${"Une annonce au titre long ".repeat(3)}${10 - index}`,
@@ -676,16 +688,15 @@ describe.skipIf(!sqlConfigured)(portable("the dynamic blocks served whole (E03-S
     expect(news).toEqual({ name: "news", text: newsLines.join("\n") })
     expect(news?.text.length).toBeGreaterThan(600)
 
-    const procedure = (index: number, summary: string): ContentNode => ({ path: `annonces/p${String(index).padStart(2, "0")}`, kind: "procedure", summary })
+    const procedure = (index: number, summary: string): ContentNode => ({ path: `annonces/p${String(index).padStart(2, "0")}`, kind: "procedure", title: `Procédure ${index}`, summary })
     const long = Array.from({ length: 70 }, (_, index) => procedure(index, `Procédure ${index} : ${"étape détaillée ".repeat(9)}`.trim()))
     const longRef = await seedO(oTables(long))
     const procedures = await proceduresBlock(await longRef.db("marc"), longRef.identityOf("marc"))
     const lines = procedures.text.split("\n")
     expect(procedures.cut).toBe(true)
-    // Plus longues que l'ancienne taille de 8 000 : 60 lignes, puis celle qui compte les autres.
-    expect(procedures.text.length).toBeGreaterThan(8_000)
+    // 60 lignes, puis celle qui compte les autres ; les 15 premières par leur résumé, les suivantes par leur titre (E11-S16).
     expect(lines[0]).toBe("## Procedures you can run (70)")
-    expect(lines.slice(1, -1)).toEqual(long.slice(0, 60).map((node) => `- ${node.path}: ${node.summary}`))
+    expect(lines.slice(1, -1)).toEqual(long.slice(0, 60).map((node, rank) => `- ${node.path}: ${rank < 15 ? node.summary : node.title}`))
     expect(lines.at(-1)).toBe(`… and 10 more: find them with ${longRef.org.prefix}_find, type procedure.`)
     // Plus de procédures qu'une lecture n'en rend (`supabase-patterns.md § Error Handling`) : toutes comptées.
     const short = Array.from({ length: 1005 }, (_, index) => procedure(index, `Procédure ${index}.`))

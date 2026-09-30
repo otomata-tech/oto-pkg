@@ -8,7 +8,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
-import type { Person } from "../helpers/reference-org"
+import { ORG, PEOPLE, type Person } from "../helpers/reference-org"
 import { seedReferenceOrg, type ReferenceOrgSql } from "../helpers/reference-org-sql"
 import { seedWithAdmin, sqlConfigured, type SeededData, portable } from "../helpers/sql"
 
@@ -96,5 +96,22 @@ describe.skipIf(!sqlConfigured)(portable("GET /api/platform/search?q= (AC-a7)"),
       body: { data: { matches: [{ path: "annonces", kind: "page", title: "Annonces", snippet: "**grille** des tarifs 2026" }], more: 0 } },
     })
     expect(await lireSous("search?q=%20%20", "claire")).toMatchObject({ status: 400, body: { error: { code: "invalid_arguments" } } })
+  })
+})
+
+// E11-S15 (AC-b4) : la liste de « @ », avant toute frappe, par le service du bloc « Recent content » (`recentDocuments`).
+describe.skipIf(!sqlConfigured)(portable("GET /api/platform/search/recent (E11-S15, AC-b4)"), { timeout: NETWORK_TIMEOUT }, () => {
+  it("should serve the caller's recent contents that she reads, as search matches without a snippet, but the page being edited", async () => {
+    // Paul (Support) a lu « Annonces », une page de Support, puis, plus récemment, une page de Ventes, qu'il ne lit pas :
+    // les deux premières reviennent, la plus récente d'abord.
+    const lu = (target: string, heures: number) => ({ org_id: ORG.id, user_id: PEOPLE.paul.id, tool: `${ref.org.prefix}_read`, target, ts: new Date(Date.now() - heures * 3_600_000).toISOString() })
+    await ref.write({ journal: [lu("annonces", 3), lu("support/faq", 2), lu("ventes/devis", 1)] })
+    const faq = { path: "support/faq", kind: "page", title: "support/faq", snippet: null }
+    const annonces = { path: "annonces", kind: "page", title: "Annonces", snippet: null }
+
+    expect(await lireSous("search/recent", "paul")).toEqual({ status: 200, body: { data: { matches: [faq, annonces] } } })
+    // La page qu'on édite ne se propose pas à elle-même ; un chemin mal formé est une erreur de saisie.
+    expect(await lireSous("search/recent?exclude=support%2Ffaq", "paul")).toEqual({ status: 200, body: { data: { matches: [annonces] } } })
+    expect(await lireSous("search/recent?exclude=Support%2FFaq", "paul")).toMatchObject({ status: 400, body: { error: { code: "invalid_arguments" } } })
   })
 })

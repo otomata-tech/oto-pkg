@@ -11,6 +11,9 @@
 // milieu franchi, le défilement entretenu aux bords, l'enregistrement au dépôt seulement, le clic avalé.
 // Changé : les rangées sont lues sous la racine de l'éditeur (`[data-cle]`), et c'est la fenêtre qui défile
 // (l'îlot de la plateforme ne défile pas) ; un pas attend que le rendu l'ait posé avant le suivant.
+//
+// E11-S17 (AC-a8) : la poignée d'un bloc sélectionné parmi d'autres glisse le groupe, qui passe une voisine au milieu de
+// celle qui le précède ou le suit ; interrompu, l'éditeur remet lui-même l'ordre d'avant.
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent, type RefObject } from "react"
 
 /** En deçà, c'est un clic : le menu de la poignée s'ouvre sans déplacer le bloc. */
@@ -31,20 +34,34 @@ export type PoigneeGlissee = {
 
 type Parametres = {
   racine: RefObject<HTMLElement | null>
-  /** Un rang de plus ou de moins, dans le modèle seulement. */
-  glisser: (cle: string, pas: -1 | 1) => void
+  /**
+   * Un rang de plus ou de moins, dans le modèle seulement. Un groupe (E11-S17, AC-a8) rend le rang où il a posé la
+   * rangée tenue : regroupé au premier pas, il ne la décale pas toujours d'un seul rang.
+   */
+  glisser: (cle: string, pas: -1 | 1) => number | void
   /** Le geste est fini : l'ordre part. */
   deposer: (cle: string) => void
+  /** Les rangées qui se glissent avec la rangée tenue, elle comprise : les blocs sélectionnés, ou elle seule (AC-a8). */
+  groupe: (cle: string) => readonly string[]
+  /** Un geste interrompu : `true` quand l'éditeur a remis lui-même l'ordre d'avant (un groupe) ; sinon, pas à pas. */
+  revenir: (cle: string) => boolean
 }
 
 /** `decalage` : les rangs gagnés depuis l'appui (négatif vers le haut), que défait un geste annulé. */
 type Geste = { cle: string; depart: number; aBouge: boolean; attendu: number | null; decalage: number }
 
-/** Le rang de la rangée tenue parmi les rangées, et le milieu de chacune, lus dans le DOM. */
-function mesurer(racine: HTMLElement | null, cle: string): { rang: number; milieux: number[] } {
+/**
+ * Le rang de la rangée tenue parmi les rangées, le premier et le dernier rang de son groupe, et le milieu de chacune, lus
+ * dans le DOM : le groupe passe une voisine quand le pointeur franchit le milieu de celle qui le précède ou le suit.
+ */
+function mesurer(racine: HTMLElement | null, cle: string, groupe: readonly string[]): { rang: number; premier: number; dernier: number; milieux: number[] } {
   const rangees = racine ? [...racine.querySelectorAll<HTMLElement>("[data-cle]")] : []
+  const rangs = rangees.flatMap((rangee, rang) => (groupe.includes(rangee.dataset.cle ?? "") ? [rang] : []))
+  const rang = rangees.findIndex((rangee) => rangee.dataset.cle === cle)
   return {
-    rang: rangees.findIndex((rangee) => rangee.dataset.cle === cle),
+    rang,
+    premier: Math.min(rang, ...rangs),
+    dernier: Math.max(rang, ...rangs),
     milieux: rangees.map((rangee) => {
       const boite = rangee.getBoundingClientRect()
       return boite.top + boite.height / 2
@@ -104,16 +121,16 @@ export function useGlisser(parametres: Parametres): { enCours: string | null; po
         courant.aBouge = true
         setEnCours(courant.cle)
       }
-      const { rang, milieux } = mesurer(lus.current.racine.current, courant.cle)
+      const { rang, premier, dernier, milieux } = mesurer(lus.current.racine.current, courant.cle, lus.current.groupe(courant.cle))
       // Le pas précédent n'est pas encore rendu : une décision sur les anciennes positions sauterait un cran.
       if (courant.attendu !== null && rang !== courant.attendu) return
-      const suivant = milieux[rang + 1]
-      const precedent = milieux[rang - 1]
+      const suivant = milieux[dernier + 1]
+      const precedent = milieux[premier - 1]
       const pas = suivant !== undefined && evenement.clientY > suivant ? 1 : precedent !== undefined && evenement.clientY < precedent ? -1 : 0
       if (pas !== 0) {
-        courant.attendu = rang + pas
         courant.decalage += pas
-        lus.current.glisser(courant.cle, pas)
+        const pose = lus.current.glisser(courant.cle, pas)
+        courant.attendu = typeof pose === "number" ? pose : rang + pas
       }
       entretenirLeDefilement(evenement.clientY)
     },
@@ -131,6 +148,7 @@ export function useGlisser(parametres: Parametres): { enCours: string | null; po
       if (!courant) return
       // Un geste interrompu par le système (`pointercancel` : appel, défilement tactile) ne dépose rien : le bloc
       // reprend sa place d'origine, sans quoi l'écran montrerait un ordre que rien n'a enregistré.
+      if (lus.current.revenir(courant.cle)) return
       const retour = courant.decalage > 0 ? -1 : 1
       for (let reste = Math.abs(courant.decalage); reste > 0; reste -= 1) lus.current.glisser(courant.cle, retour)
     },

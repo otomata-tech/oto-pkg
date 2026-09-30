@@ -112,10 +112,11 @@ test.describe("édition sans friction (E05-S10, partie a)", () => {
         await page.keyboard.press("Enter")
         await page.keyboard.type(` et https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOp/edit ${horodatage}`)
         await envoyer(page)
-        // Hors du focus, les liens se lisent dans la phrase (E05-S11, AC-26) : la page par son titre, l'adresse par son domaine.
+        // Hors du focus, les liens se lisent dans la phrase (E05-S11, AC-26) : la page par son titre, l'adresse coupée au
+        // milieu et nommée entière (E11-S15, AC-b10).
         const liens = page.locator(".oto-block-rendu").filter({ hasText: horodatage })
         await expect(liens.getByRole("link", { name: new RegExp(PROCEDURE) })).toHaveAttribute("href", `/n/${CHEMINS.procedure}`)
-        await expect(liens.getByRole("link", { name: "docs.exemple.fr" })).toHaveAttribute("title", "https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOp/edit")
+        await expect(liens.getByRole("link", { name: "https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOp/edit" })).toHaveAttribute("title", "https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOp/edit")
         await expect(page.getByRole("group", { name: "Liens de ce bloc" })).toHaveCount(0)
         await capturer(page, testInfo, `liens-${nom}`)
 

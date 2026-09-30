@@ -80,7 +80,9 @@ describe("EcranDeNoeud, the encarts streamed while the links are read (E11-S05, 
     )
     servir({ data: { links_out: [], links_out_total: 0, links_in: [{ path: "conseil/guide", title: "Guide du conseil" }], links_in_total: 1 } })
     const html = await new Response(flux).text()
-    expect(html.split("Cas unique de relance").length - 1).toBe(1)
+    // Le nom est rendu une fois ; son infobulle (`title`, nom coupé d'E11-S15 AC-a2) le porte une fois aussi.
+    expect(html.split(">Cas unique de relance<").length - 1).toBe(1)
+    expect(html.split('title="Cas unique de relance"').length - 1).toBe(1)
     expect(html).toContain("Lecture des liens…")
     expect(html).toContain("Guide du conseil")
   })

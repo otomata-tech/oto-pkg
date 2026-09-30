@@ -3,11 +3,12 @@
 // Les gestes de l'éditeur, servis à ses rangées par un contexte (E05-S02, AC22) : une rangée reçoit
 // des données, jamais une fonction (`portage-ecrans.md § 2`), et lit ici ce que font ses boutons, son
 // champ et son clavier. Sans lui, chaque rangée recevrait une douzaine de rappels en props.
-import { createContext, useContext, type FocusEvent, type KeyboardEvent } from "react"
+import { createContext, useContext, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react"
 import type { Tableau } from "./blocs-de-page"
 import type { Genre } from "./envoi-de-fichier"
 import type { OptionDuDepot } from "./gestes-des-fichiers"
 import type { PoigneeGlissee } from "./glisser"
+import type { GesteDeGroupe } from "./groupe"
 import type { BlocEdite, Choix, Forme, Retiree } from "./modele"
 
 export type Gestes = {
@@ -85,6 +86,12 @@ export type Gestes = {
   selectionner: (cle: string, totale: boolean) => void
   /** Le menu ouvert par une sélection se ferme : Échap, la frappe suivante, un clic ailleurs (AC-28). */
   fermerLeMenu: () => void
+  /** ⌘A ou Ctrl+A une seconde fois dans un champ : tous les blocs de la page sont sélectionnés (E11-S17, AC-a2). */
+  toutSelectionnerLesBlocs: () => void
+  /** Un clic sur la poignée : Maj l'étend à la sélection, Ctrl ou ⌘ l'y ajoute ou l'en retire, seul il ouvre le menu (AC-a4). */
+  cliquerLaPoignee: (cle: string, evenement: MouseEvent<HTMLElement>) => void
+  /** « Annuler » d'un geste sur une sélection de blocs (AC-a6, AC-a8). */
+  annulerLeGroupe: (groupe: GesteDeGroupe) => void
 }
 
 export const ContexteDesGestes = createContext<Gestes | null>(null)

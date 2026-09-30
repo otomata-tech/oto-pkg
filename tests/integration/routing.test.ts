@@ -17,6 +17,7 @@ import { CANDIDATES_SHOWN, decide, rankCandidates, routingSettings } from "../..
 import { ACME_PEOPLE, ACME_PROCEDURES, ACME_TEAMS, acmeProfile, seedNodesOf, type AcmeTeam } from "./fixtures/acme"
 import { ACME_AMBIGUOUS, ACME_FORMULATIONS, ACME_NEGATIVES, ACME_PARAPHRASES, type RoutingCase } from "./fixtures/acme-routing.cases"
 import { TODO_CASES, TODO_PROCEDURES, type TodoRoutingCase } from "./fixtures/todo-routing.cases"
+import { SCALE_CASES, SCALE_FORMULATIONS, SCALE_PROCEDURES, type ScaleRoutingCase } from "./fixtures/scale-routing.cases"
 
 const NETWORK_TIMEOUT = 180_000
 const SETUP_TIMEOUT = 240_000
@@ -174,6 +175,74 @@ describe.skipIf(!sqlConfigured)(
         return outcome.served === null
       }
       expect(outcomes.filter((outcome) => !verdict(outcome)).map(({ phrase, served, shown }) => ({ phrase, served, shown }))).toEqual([])
+    })
+  },
+)
+
+// Jeu « à l'échelle » : soixante procédures d'organisation, dont des voisines volontaires, la personne
+// membre, sans bonus d'équipe ni d'usage, au réglage par défaut. Le sujet (E11-S16, AC-a6) : quand les
+// procédures se comptent par dizaines, la demandée est servie ou parmi les candidates que l'assistant départage.
+describe.skipIf(!sqlConfigured)(
+  sqlConfigured ? "routing without a host among sixty procedures" : `routing without a host among sixty procedures (${SQL_SKIP_REASON})`,
+  { timeout: NETWORK_TIMEOUT },
+  () => {
+    let fx: SqlFixtures
+    let db: PlatformDb
+    let member: Identity
+
+    beforeAll(async () => {
+      fx = createSqlFixtures()
+      const host = `t${hex(4)}.example.invalid`
+      const org = await fx.createOrg({ name: "Scale Test", hosts: [host] })
+      await fx.createTree(org.id)
+      const user = await fx.createUser({ fullName: "Membre Échelle" })
+      await fx.addMember(org.id, user.id, { role: "member" })
+      await fx.seedNodes(org.id, SCALE_PROCEDURES)
+      db = fx.as(user)
+      member = await resolveIdentity(db, host, { userId: user.id, email: user.email })
+    }, SETUP_TIMEOUT)
+
+    afterAll(async () => {
+      await fx?.cleanup()
+    }, SETUP_TIMEOUT)
+
+    it("should serve ≥ 95 % of the formulations, show the asked procedure among the candidates, and serve nothing off topic", async () => {
+      const outcomes: (ScaleRoutingCase & { served: string | null; top: string | null; shown: string[] })[] = []
+      for (let at = 0; at < SCALE_CASES.length; at += CONCURRENCY) {
+        const batch = SCALE_CASES.slice(at, at + CONCURRENCY)
+        outcomes.push(
+          ...(await Promise.all(
+            batch.map(async (scaleCase) => {
+              const candidates = await rankCandidates(db, member, { query: scaleCase.phrase, limit: CANDIDATES_SHOWN })
+              const shown = candidates.map((candidate) => candidate.path)
+              return { ...scaleCase, served: decide(candidates, routingSettings(null))?.path ?? null, top: shown[0] ?? null, shown }
+            }),
+          )),
+        )
+      }
+      const formulations = outcomes.filter((outcome) => outcome.kind === "formulation")
+      const paraphrases = outcomes.filter((outcome) => outcome.kind === "paraphrase")
+      const count = (all: typeof outcomes, kept: (outcome: (typeof outcomes)[number]) => boolean) => `${all.filter(kept).length}/${all.length}`
+      console.log(
+        `[routage échelle] ${SCALE_PROCEDURES.length} procédures, ${outcomes.length} phrases ; formulations servies ${count(formulations, (o) => o.served === o.path)}, ` +
+          `paraphrases servies ${count(paraphrases, (o) => o.served === o.path)}, en tête ${count(paraphrases, (o) => o.top === o.path)}, ` +
+          `montrées ${count(paraphrases, (o) => o.shown.includes(o.path ?? ""))}`,
+      )
+      for (const outcome of outcomes.filter((candidate) => candidate.path && candidate.served !== candidate.path)) {
+        const rank = outcome.shown.indexOf(outcome.path ?? "")
+        console.log(`  · ${outcome.kind} « ${outcome.phrase} » → ${outcome.served ?? "rien de servi"} (rang ${rank === -1 ? "absent" : rank + 1})`)
+      }
+
+      // AC-a1 : trois candidates montrées au plus, sur une phrase qui en a davantage au-dessus de 0,30.
+      const wide = "Peux-tu relancer les clients qui n'ont pas répondu à nos devis ?"
+      expect((await rankCandidates(db, member, { query: wide, limit: 50 })).length).toBeGreaterThan(3)
+      expect(outcomes.find((outcome) => outcome.phrase === wide)?.shown).toHaveLength(3)
+      expect(formulations.length).toBe(SCALE_FORMULATIONS.length)
+      expect(formulations.filter((outcome) => outcome.served === outcome.path).length / formulations.length).toBeGreaterThanOrEqual(0.95)
+      const missed = outcomes.filter(
+        (outcome) => (outcome.expect === "shown" && !outcome.shown.includes(outcome.path ?? "")) || (outcome.expect === "never" && outcome.served !== null),
+      )
+      expect(missed.map(({ phrase, served, shown }) => ({ phrase, served, shown }))).toEqual([])
     })
   },
 )

@@ -2,7 +2,8 @@
 
 // « @ » dans un bloc (E05-S10, AC-a9, décision de JB du 2026-09-27) : un « @ » tapé en début de texte ou après
 // un blanc ouvre, sous le champ, la liste des contenus que la personne peut lire, cherchés par le service de
-// l'outil `find` (`GET /api/platform/search`, la recherche de la palette ⌘K, `useRechercheDeContenus`) dès deux lettres ; le choix remplace
+// l'outil `find` (`GET /api/platform/search`, la recherche de la palette ⌘K, `useRechercheDeContenus`) dès deux lettres, et
+// avant toute frappe ses contenus récents (`GET /api/platform/search/recent`, E11-S15, AC-b4) ; le choix remplace
 // « @… » par le lien `[[chemin|titre]]` existant, que la publication écrit dans `links` et que l'écran rend par
 // son titre. Aucun type de bloc nouveau. Les flèches parcourent la liste, Entrée ou Tab choisit, Échap ferme ;
 // le focus reste dans le champ, qui désigne l'option active (`aria-activedescendant`). Sans lui, citer un
@@ -36,7 +37,15 @@ export function lienVers(trouve: Pick<SearchMatch, "path" | "title">): string {
   return titre ? `[[${trouve.path}|${titre}]]` : `[[${trouve.path}]]`
 }
 
-const PHRASES: Record<Exclude<RechercheDeContenus["etat"], "lue">, string> = { repos: CITER.invite, "en-cours": CITER.recherche, "en-panne": CITER.panne }
+const PHRASES: Record<Exclude<RechercheDeContenus["etat"], "lue" | "recents">, string> = { repos: CITER.invite, "en-cours": CITER.recherche, "en-panne": CITER.panne }
+
+/** La phrase au-dessus de la liste : aucune quand des trouvés s'y lisent, sauf les récents, qui se nomment. */
+function phraseDe(resultat: RechercheDeContenus): string {
+  if (resultat.etat === "lue") return resultat.trouves.length === 0 ? CITER.aucun : ""
+  // Sans récent, la liste reste celle d'avant AC-b4 : l'invite à taper.
+  if (resultat.etat === "recents") return resultat.trouves.length === 0 ? CITER.invite : CITER.recents
+  return PHRASES[resultat.etat]
+}
 
 type ListeACiterProps = {
   id: string
@@ -101,8 +110,8 @@ export function ListeACiter({ id, resultat, actif, choisir }: ListeACiterProps) 
   // (`accessibility-patterns.md § Régions dynamiques`).
   const [montee, setMontee] = useState(false)
   useEffect(() => setMontee(true), [])
-  const trouves = resultat.etat === "lue" ? resultat.trouves : []
-  const phrase = resultat.etat === "lue" ? (trouves.length === 0 ? CITER.aucun : "") : PHRASES[resultat.etat]
+  const trouves = "trouves" in resultat ? resultat.trouves : []
+  const phrase = phraseDe(resultat)
   return (
     <div className="oto-pop oto-citer">
       <p role="status" className="oto-caption px-2 py-1 empty:hidden">

@@ -21,6 +21,7 @@ import { JOURNAL_PATH } from "../../schemas/journal"
 import { changesHeader, currentHeader, headerChangeText, missingHeader, readHeaderPatch, targetHeader } from "../tables/evolution"
 import type { ToolOutput } from "../tool-output"
 import { placeBlocks } from "./document"
+import { BLOCKS_MAX, OPS_MAX } from "./limits"
 import type { WorkBlock } from "./op-kit"
 import { applyOps } from "./ops"
 import { publishNode, type PublishResult } from "./publish"
@@ -51,6 +52,15 @@ function parseBody(input: unknown): WriteNodeBody {
  */
 function tolerantFor(body: WriteNodeBody, origin: WriteOrigin): boolean {
   return origin.kind === "human" ? body.tolerant === true : origin.file !== undefined
+}
+
+/**
+ * Les opérations d'un appel (fiche D153) : une écriture de l'écran (porte `POST nodes`) en porte autant qu'une page a de
+ * blocs au plus, pour qu'une sélection de blocs se supprime ou se déplace en une écriture (E11-S17, AC-a6, AC-a8) ;
+ * un assistant, 50. Décidé par la porte, jamais par le corps.
+ */
+function opsMaxFor(origin: WriteOrigin): number {
+  return origin.kind === "human" ? BLOCKS_MAX : OPS_MAX
 }
 
 /** Un `.md` déposé par lien (E10-S02, AC-f7, AC-f8) : écrit entier, sans borne de section, et qui remplace tout le corps. */
@@ -170,7 +180,7 @@ async function saveEdits(db: PlatformDb, identity: Identity, edit: Edit): Promis
   const file = uploadedFile(edit.origin)
   const base = file?.replace ? [] : current
   // Les fichiers cités, relus avant l'écriture (E10-S02, AC-d3).
-  const applied = await attachFiles(db, identity, { node, current, created: edit.created, tolerant }, applyOps(base, body.ops ?? [], { path: node.path, revision: node.revision, tolerant, wholeFile: file !== undefined }))
+  const applied = await attachFiles(db, identity, { node, current, created: edit.created, tolerant }, applyOps(base, body.ops ?? [], { path: node.path, revision: node.revision, tolerant, wholeFile: file !== undefined, opsMax: opsMaxFor(edit.origin) }))
   const next: WorkBlock[] = placeBlocks(applied.blocks)
   const header = edit.created ? null : pendingHeader(body, node)
   const table = node.kind === "table" ? tableHeaderEdit(edit, draft, identity.org.prefix) : null
@@ -288,7 +298,7 @@ async function create(db: PlatformDb, identity: Identity, body: WriteNodeBody, o
     throw new PlatformError("forbidden", reservedTo("write", `under ${parentAt}`, await whoToAsk(db, identity, await ownerOf(db, parent.node.id))))
   }
   // Rien n'est écrit tant que les opérations ne sont pas passées (AC22) : elles s'appliquent d'abord à vide.
-  const planned = applyOps([], body.ops ?? [], { path, tolerant: tolerantFor(body, origin), wholeFile: uploadedFile(origin) !== undefined })
+  const planned = applyOps([], body.ops ?? [], { path, tolerant: tolerantFor(body, origin), wholeFile: uploadedFile(origin) !== undefined, opsMax: opsMaxFor(origin) })
   refuseFilesOnCreate(planned.blocks, { path, tolerant: tolerantFor(body, origin) })
   const spec = { path, parent: parent.node, kind, title: body.title, summary: body.summary }
   // Le nœud, son brouillon et son contenu dans une seule transaction (E01-S10, AC-x4) : une création arrêtée

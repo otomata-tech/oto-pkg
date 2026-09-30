@@ -8,18 +8,40 @@ import { useRef, useState } from "react"
 import { SEARCH_QUERY_MAX, type SearchMatch } from "../../schemas/search"
 import { appelerPlateforme } from "./client"
 
-/** `plus` : les contenus trouvés au-delà de ceux servis (`more`). */
-export type RechercheDeContenus = { etat: "repos" } | { etat: "en-cours" } | { etat: "lue"; trouves: SearchMatch[]; plus: number } | { etat: "en-panne" }
+/** `plus` : les contenus trouvés au-delà de ceux servis (`more`) ; `recents` : ceux de la personne, avant toute frappe (E11-S15, AC-b4). */
+export type RechercheDeContenus =
+  | { etat: "repos" }
+  | { etat: "en-cours" }
+  | { etat: "lue"; trouves: SearchMatch[]; plus: number }
+  | { etat: "recents"; trouves: SearchMatch[] }
+  | { etat: "en-panne" }
 
 /** Une recherche part après une courte pause de frappe, et à partir de deux caractères. */
 const PAUSE_MS = 250
 const CARACTERES_MIN = 2
 
-/** Une requête après la pause de frappe ; une réponse dépassée est ignorée ; moins de deux caractères, le repos. */
+/**
+ * Une requête après la pause de frappe ; une réponse dépassée est ignorée ; moins de deux caractères, le repos. `recents`
+ * lit les contenus récents (`GET /api/platform/search/recent`), sans pause : rien n'est tapé ; `exclure` : la page qu'on
+ * édite, qui ne s'y propose pas.
+ */
 export function useRechercheDeContenus() {
   const [resultat, setResultat] = useState<RechercheDeContenus>({ etat: "repos" })
   const minuterie = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const derniere = useRef("")
+  // La dernière demande : une requête, ou les récents (`null`) ; la réponse d'une autre est ignorée.
+  const derniere = useRef<string | null>("")
+
+  function recents(exclure: string) {
+    // Déjà demandés depuis la dernière requête : une seule lecture par ouverture.
+    if (derniere.current === null) return
+    clearTimeout(minuterie.current)
+    derniere.current = null
+    setResultat({ etat: "en-cours" })
+    void appelerPlateforme<{ matches: SearchMatch[] }>({ methode: "GET", ressource: `search/recent?exclude=${encodeURIComponent(exclure)}` }).then((reponse) => {
+      if (derniere.current !== null) return
+      setResultat(reponse.erreur ? { etat: "en-panne" } : { etat: "recents", trouves: reponse.data.matches })
+    })
+  }
 
   function chercher(saisie: string) {
     clearTimeout(minuterie.current)
@@ -35,5 +57,5 @@ export function useRechercheDeContenus() {
     }, PAUSE_MS)
   }
 
-  return { resultat, chercher }
+  return { resultat, chercher, recents }
 }

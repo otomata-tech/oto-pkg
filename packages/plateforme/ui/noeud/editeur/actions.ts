@@ -28,6 +28,7 @@ import { clavier } from "./clavier"
 import type { FichiersDeLEditeur } from "./envoi-de-fichier"
 import type { Gestes } from "./gestes"
 import { gestesDesFichiers } from "./gestes-des-fichiers"
+import { gestesDuGroupe } from "./gestes-du-groupe"
 import { gestesDuMenu } from "./gestes-du-menu"
 import * as modeleDEdition from "./modele"
 import { avecTexte, formeDe, type BlocEdite, type Choix, type Focus, type Rangee, type Retiree, type Suite } from "./modele"
@@ -338,19 +339,35 @@ type ActionsPropres = {
   deposer: (cle: string) => void
 }
 
+/** Ce que la sélection de blocs lit, en plus des gestes des rangées (E11-S17, lot a). */
+type ActionsDuGroupe = Omit<ReturnType<typeof gestesDuGroupe>, "annulerLeGroupe"> & {
+  /** ⌘Z pendant l'annonce d'un geste qu'on peut annuler (AC-a6) : `false`, rien à annuler. */
+  annulerLAnnonce: () => boolean
+}
+
 /**
- * Les gestes servis aux rangées et aux lignes d'état par le contexte de l'éditeur, sauf la poignée glissée et le
- * menu ouvert par la sélection (E05-S11, AC-28), que l'éditeur y ajoute ; `ActionsPropres`, en plus, pour ce que
- * l'éditeur arme lui-même.
+ * Les gestes servis aux rangées et aux lignes d'état par le contexte de l'éditeur, sauf la poignée glissée, le
+ * menu ouvert par la sélection (E05-S11, AC-28) et la sélection de blocs (E11-S17), que l'éditeur y ajoute ;
+ * `ActionsPropres` et `ActionsDuGroupe`, en plus, pour ce que l'éditeur arme lui-même.
  */
-export function actionsDeLEditeur(etat: EtatDeLEditeur): Omit<Gestes, "poignee" | "selectionner" | "fermerLeMenu"> & ActionsPropres {
+export function actionsDeLEditeur(
+  etat: EtatDeLEditeur,
+): Omit<Gestes, "poignee" | "selectionner" | "fermerLeMenu" | "toutSelectionnerLesBlocs" | "cliquerLaPoignee"> & ActionsPropres & ActionsDuGroupe {
   const supprimer = suppression(etat)
   const { envoyerLeTexte, retirerSiVide } = textes(etat, supprimer)
   const { retablirSuppression, fondre, ...struct } = structure(etat, envoyerLeTexte)
   const { envois } = etat
   const menu = gestesDuMenu(etat, envoyerLeTexte)
+  const groupe = gestesDuGroupe(etat)
   return {
     ...struct,
+    ...groupe,
+    annulerLAnnonce: () => {
+      const annonce = envois.annonce
+      if (annonce?.retiree) retablirSuppression(annonce.retiree)
+      else if (annonce?.groupe) groupe.annulerLeGroupe(annonce.groupe)
+      return annonce?.retiree !== undefined || annonce?.groupe !== undefined
+    },
     supprimer,
     ...sorties(etat, envoyerLeTexte, retirerSiVide),
     ...menu,

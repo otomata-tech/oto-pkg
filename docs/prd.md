@@ -252,11 +252,9 @@ ne décide jamais seule. Son score, entre 0 et 1, vient du plein texte français
 le titre et le résumé (qui porte les façons de demander la procédure, enrichies des demandes lues au
 journal), plus des bonus d'équipe et d'usage. Les étapes ne sont servies que si le meilleur candidat
 passe le seuil et distance nettement le deuxième (0,65 et 0,1 au départ, réglables par
-organisation) ; sinon, les candidats et une consigne : pour une action, demander laquelle lancer ;
-pour une question de données (« combien », « lesquels »), chercher et répondre, puis proposer les
-candidats en choix ; pour une question « comment » ou une demande polie, proposer les candidats en
-choix et ne lancer que celui choisi. Toujours tous les candidats montrés, jamais le premier seul
-(ADR-003 § 2). Les candidats
+organisation) ; sinon, les trois candidats les plus proches par titre et résumé, et l'assistant lit
+celui qui correspond à la demande, ou cherche, ou demande quand aucun ne correspond. Toujours tous
+les candidats montrés, jamais le premier seul (ADR-003 § 2). Les candidats
 suivants restent visibles, et `call` garde la main : une mauvaise reconnaissance ne déclenche
 jamais plus que ce que l'utilisateur confirme.
 

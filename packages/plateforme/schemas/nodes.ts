@@ -54,6 +54,11 @@ export function normalizeTitle(title: string): string {
  */
 export const OP_TEXT_MAX = 40_000
 export const PAGE_MAX = 300_000
+/**
+ * Blocs d'une page, d'une procédure ou d'un Contexte : borne du service, et opérations d'une écriture faite depuis
+ * l'écran (fiche D153), que l'écran dit avant d'envoyer un geste sur une sélection de blocs (E11-S17, AC-a6, AC-a8).
+ */
+export const BLOCKS_MAX = 1_000
 /** Titre et résumé d'un nœud : 200 caractères au plus (`writeNodeSchema`), que l'écran coupe avant d'envoyer (E10-S01). */
 export const NODE_HEAD_MAX = 200
 

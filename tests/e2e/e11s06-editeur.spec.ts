@@ -128,8 +128,9 @@ test.describe("listes et liens dans l'éditeur (E11-S06)", () => {
       await controlerLesReperes(puces, [true, true, false])
       await capturer(page, testInfo, `e11s06-listes-${mode}-${largeur}`)
 
-      // Un clic sur le lien au repos ouvre le panneau, focus dans « Libellé » ; le nouveau libellé s'applique (AC-b2, AC-b4).
-      await puces.locator("xpath=..").getByRole("link", { name: "Mes tâches" }).click()
+      // Un clic droit sur le lien au repos ouvre le panneau, focus dans « Libellé » (E11-S15, AC-b9, qui remplace AC-b2) ;
+      // le nouveau libellé s'applique (AC-b4).
+      await puces.locator("xpath=..").getByRole("link", { name: "Mes tâches" }).click({ button: "right" })
       const libelle = page.getByRole("textbox", { name: "Libellé" })
       await expect(libelle).toBeFocused()
       await expect(page.getByRole("group", { name: "Modifier le lien" })).toBeVisible()

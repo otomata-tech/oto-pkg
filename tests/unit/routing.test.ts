@@ -270,7 +270,7 @@ describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on 
             routeRow(path, { s_summary: 1, s_title: 0.7, lexical: 1, query_lexemes: 3 }),
             routeRow("ventes/relance_prospects", { s_summary: 0.45, s_title: 0.4, lexical: 0.33, query_lexemes: 3 }),
             routeRow("ventes/qualifier_prospects", { s_summary: 0.4, s_title: 0.3, lexical: 0.33, query_lexemes: 3 }),
-            // Quatrième candidat de score ≥ 0,30 (0,34) : trois au plus sont montrés.
+            // Quatrième candidat de score ≥ 0,30 (0,34) : trois au plus sont montrés (E11-S16, AC-a1).
             routeRow("ventes/point_pipeline", { s_summary: 0.3, s_title: 0.2, lexical: 0.33, query_lexemes: 3 }),
           ],
           reverse: servedBlocks,
@@ -286,9 +286,17 @@ describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on 
           select type, text, data, key from platform.blocks where node_id = ${ref.nodeId(path)} and state = 'published' order by position`
         const steps = renderBlocks([...published], { headingBase: 3 })
         const [code, procedure, everyone] = text.split("\n\n## ")
-        // E05-S12 (AC-9) : la ligne du routage finit le bloc code, sous ses règles, juste avant les étapes.
-        expect(code.split("\n").at(-1)).toBe(
-          "Request « relance les devis en attente » matches ventes/relance_devis (score 1.00): its steps follow. Other candidates: ventes/relance_prospects (0.43), ventes/qualifier_prospects (0.40).",
+        // E05-S12 (AC-9) : la ligne du routage finit le bloc code, sous ses règles, juste avant les étapes ; E11-S16
+        // (AC-a1, AC-a2) : les autres candidates par titre et résumé, et la consigne de lire plutôt celle qui correspond.
+        const other = (otherPath: string, score: string) => `- ${otherPath} — ${acmeNode(otherPath).title}: ${acmeNode(otherPath).summary} (${score})`
+        expect(code.slice(code.indexOf("Request « "))).toBe(
+          [
+            `Request « relance les devis en attente » matches ventes/relance_devis (score 1.00): its steps follow, if the request is about « ${relance.title} ».`,
+            "Other candidates:",
+            other("ventes/relance_prospects", "0.43"),
+            other("ventes/qualifier_prospects", "0.40"),
+            `If the request is about one of them instead, read that one with ${ref.org.prefix}_read and follow it rather than these steps.`,
+          ].join("\n"),
         )
         // E03-S06 (AC7) : la ligne qui dit comment recopier un bloc `call` en appel, après la consigne.
         const callLine = `A \`\`\`call block holds <function> <arguments JSON>: run it with ${ref.org.prefix}_call {"function": "<function>", "arguments": <arguments JSON>}, replacing each "<…>" value with the real one.`

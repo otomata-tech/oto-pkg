@@ -554,6 +554,57 @@ describe("EditeurDeBlocs, glisser-déposer (E05-S10, AC-a3)", () => {
     await unTour()
     expect(api.envoyes).toHaveLength(0)
   })
+
+  // E11-S17 (AC-a8) : la poignée d'un bloc sélectionné parmi d'autres glisse le groupe, regroupé dans l'ordre de la page.
+  describe("a selection of blocks (E11-S17, AC-a8)", () => {
+    const ORDRE_SERVI = ["Modifier ce titre — Objet", "Modifier ce texte — Objet de la relance", "Modifier ce code — select 1", "Modifier cette liste — Lire le devis Écrire"]
+    const ordre = () => screen.getAllByRole("textbox").map((element) => element.getAttribute("aria-label"))
+
+    /** Ctrl+clic sur le titre et le code (deux blocs non contigus), puis le code tenu par sa poignée et glissé sous le milieu de la liste (140). */
+    function glisserLeTitreEtLeCode() {
+      Object.assign(window, { PointerEvent: PointerEventDeTest })
+      monter()
+      rangeesDe40Px()
+      fireEvent.click(bouton("Actions sur ce bloc — Objet"), { ctrlKey: true })
+      fireEvent.click(bouton("Actions sur ce bloc — select 1"), { ctrlKey: true })
+      const poignee = bouton("Actions sur ce bloc — select 1")
+      fireEvent.pointerDown(poignee, { clientY: 100, button: 0, pointerId: 1 })
+      fireEvent.pointerMove(poignee, { clientY: 150, pointerId: 1 })
+      return poignee
+    }
+
+    it("should move the group past the middle it crosses, send one write of move_block in page order on drop, and put it back on « Annuler »", async () => {
+      const poignee = glisserLeTitreEtLeCode()
+      expect(ordre()).toEqual([ORDRE_SERVI[1], ORDRE_SERVI[3], ORDRE_SERVI[0], ORDRE_SERVI[2]])
+      expect(api.envoyes).toHaveLength(0)
+      fireEvent.pointerUp(poignee, { clientY: 150, pointerId: 1 })
+      fireEvent.click(poignee)
+      expect(screen.queryByRole("menu")).toBeNull()
+      await waitFor(() => expect(api.envoyes).toHaveLength(1))
+      expect(api.envoyes[0].ops).toEqual([
+        { op: "move_block", block: ID.titre, after_block: ID.liste },
+        { op: "move_block", block: ID.code, after_block: ID.titre },
+      ])
+      expect(statut("2 blocs déplacés.")).toBeDefined()
+
+      fireEvent.click(bouton("Annuler"))
+      await waitFor(() => expect(api.envoyes).toHaveLength(2))
+      expect(api.envoyes[1].ops).toEqual([
+        { op: "move_block", block: ID.titre },
+        { op: "move_block", block: ID.code, after_block: ID.objet },
+      ])
+      expect(ordre()).toEqual(ORDRE_SERVI)
+    })
+
+    it("should put the group back in its order and send nothing when the system cancels the gesture (pointercancel)", async () => {
+      const poignee = glisserLeTitreEtLeCode()
+      expect(ordre()).not.toEqual(ORDRE_SERVI)
+      fireEvent.pointerCancel(poignee, { pointerId: 1 })
+      expect(ordre()).toEqual(ORDRE_SERVI)
+      await unTour()
+      expect(api.envoyes).toHaveLength(0)
+    })
+  })
 })
 
 describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
@@ -691,9 +742,10 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     const rendu = texte.parentElement?.querySelector(".oto-block-rendu")
     if (!(rendu instanceof HTMLElement)) throw new Error("rendu au repos absent")
     expect(texte).toHaveAttribute("data-rendu")
-    expect(screen.getByRole("textbox", { name: /^Modifier ce texte — Voir docs\.exemple\.fr et/ })).toBe(texte)
-    expect(rendu).toHaveTextContent("Voir docs.exemple.fr et les tarifs")
-    const web = within(rendu).getByRole("link", { name: "docs.exemple.fr" })
+    expect(screen.getByRole("textbox", { name: /^Modifier ce texte — Voir https:\/\/docs\.exemple\.fr\/…tUvWxYz\/edit et/ })).toBe(texte)
+    expect(rendu).toHaveTextContent("Voir https://docs.exemple.fr/…tUvWxYz/edit et les tarifs")
+    // Coupée à l'écran (E11-S15, AC-b10), l'adresse se nomme entière.
+    const web = within(rendu).getByRole("link", { name: adresse })
     expect(web).toHaveAttribute("href", adresse)
     expect(web).toHaveAttribute("title", adresse)
     expect(web).toHaveAttribute("target", "_blank")
@@ -712,6 +764,8 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async (adresse, init) => {
+        // Aucun contenu récent (E11-S15, AC-b4) : « @ » seul garde l'invite à taper.
+        if (String(adresse).includes("/api/platform/search/recent")) return new Response(JSON.stringify({ data: { matches: [] } }), { status: 200, headers: { "content-type": "application/json" } })
         if (!String(adresse).includes("/api/platform/search?")) return ecriture ? ecriture(adresse, init) : new Response(null, { status: 500 })
         recherches.push(String(adresse))
         const matches = [

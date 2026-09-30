@@ -235,3 +235,65 @@
   background: var(--island);
   pointer-events: none;
 }
+
+/* ── le tableau simple, lu comme écrit (E11-S15, AC-b1) : l'en-tête sur `--oto-bg`, le primary à faible opacité mêlé à l'îlot, opaque pour que les lignes passent dessous ; ses intitulés à l'encre, la seule paire qui tienne 4,5:1 sur ce fond dans les huit teintes de nuit (`--faint` 2,5:1, `--mute` 4,2:1). */
+.oto-table[data-simple] thead th {
+  background: var(--oto-bg);
+  color: var(--ink);
+}
+
+/* Dans l'éditeur, le champ d'une cellule se fond dans sa cellule : sa bordure paraît au survol de la cellule, et au focus ; un champ en lecture seule garde son fond, qui dit qu'on n'y écrit pas. */
+.oto-table[data-simple] .oto-input:not([readonly]) {
+  border-color: transparent;
+  background: transparent;
+}
+
+.oto-table[data-simple] :is(th, td):hover .oto-input:not([readonly]) {
+  border-color: var(--island-bd);
+}
+
+.oto-table[data-simple] :is(th, td) .oto-input:not([readonly]):focus-visible {
+  border-color: var(--primary);
+}
+
+/* ── le menu de la poignée (E11-S15, AC-b5) : sa hauteur suit ses entrées, celles d'un tableau comprises, sans barre de défilement ; bornée à la fenêtre, moins les 8 px que `useAnchor` laisse de chaque côté et le filet du panneau. */
+.oto-pop.oto-menu-de-poignee > .oto-menu {
+  max-block-size: calc(100dvh - var(--space-5));
+}
+
+/* ── la sélection de blocs (E11-S17, AC-a9) : un bloc sélectionné porte le fond d'Oto et un contour à l'encre d'Oto (`--oto-ink`, le primary des textes : `--primary` seul ne tient pas 3:1 sur un fond clair) ; un contour (`outline`), la boîte ne bouge pas ; sa gouttière reste révélée, pour glisser le groupe par une poignée (AC-a8). */
+.oto-block-row[data-selectionnee] {
+  background-color: var(--oto-bg);
+  outline: 1px solid var(--oto-ink);
+  border-radius: var(--r-ctrl);
+}
+
+.oto-block-row[data-selectionnee] > .oto-block-gutter {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Le texte d'un bloc sélectionné ne montre pas sa sélection de texte : un glissé sorti de son bloc prend des blocs entiers, le navigateur garde celle du champ jusqu'au lâcher (AC-a1). */
+.oto-block-row[data-selectionnee] .oto-block-field::selection {
+  background-color: transparent;
+}
+
+/* Le rectangle tiré depuis la marge (AC-a5) : le contour et un voile du fond d'Oto ; le pointeur passe au travers. */
+.oto-rectangle-de-selection {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid var(--oto-ink);
+  background-color: color-mix(in srgb, var(--oto-bg) 60%, transparent);
+  pointer-events: none;
+}
+
+/* En couleurs forcées, le fond ne se voit plus : le contour du système (`Highlight`) dit la sélection (AC-a9). */
+@media (forced-colors: active) {
+  .oto-block-row[data-selectionnee] {
+    outline: 2px solid Highlight;
+  }
+
+  .oto-rectangle-de-selection {
+    border-color: Highlight;
+  }
+}

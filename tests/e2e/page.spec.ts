@@ -145,7 +145,7 @@ test.describe("page d'un nœud", () => {
       await rail.getByRole("link", { name: `Contexte · ${EQUIPE.nom}` }).click()
       await attendre(page).toHaveURL(`${ESPACE.adresse}/n/${CHEMINS.contexteDeLEquipe}`)
       const note = await ouvrirAQuoiSert(page)
-      await attendre(note.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
+      await attendre(note.getByText(`Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe ${EQUIPE.nom}, lit à chaque conversation.`)).toBeVisible()
       await expect(note.getByRole("definition")).toHaveCount(0)
       await expect(page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("list", { name: "Ordre de lecture" })).toBeVisible()
       await capturerLesThemes(page, testInfo, `contexte-${mode}`)

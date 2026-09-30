@@ -11,6 +11,9 @@ Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣
 |----|-------|--------|
 | E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | ✅ `@otomata_tech/oto_platform` 1.0.0 publié avec provenance (2026-09-29) ; oto-pkg public, oto-saas privé |
 | E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | ✅ fusionné, bout en bout vert, Démo vidée |
+| E11-S15 | Retours sur la 1.1.1 : écrans d'un contenu, éditeur et blocs, version corrective 1.1.2 | ✅ livrée dans la 1.1.2 (verify vert : 368 fichiers, 3 870 tests ; suites Supabase sur le projet de test : 155/155) |
+| E11-S16 | `context` à l'échelle : trois candidates par titre et résumé, l'assistant arbitre (ADR-003 § 2 amendé), une nouveauté par contenu, procédures utiles au-delà de 15 par titre | ✅ livrée dans la 1.1.2 |
+| E11-S17 | Sélection de blocs dans l'éditeur (lot a) ; éditeur visuel (lots 0, b à f) | ✅ lot a livré dans la 1.1.2 (sélection de blocs) ; lots 0, b à f reportés avec ADR-021 |
 
 ## Contenus riches et retours de la démo (epics E10 et E11) : 1.1.0 publiée, 1.1.1 corrective
 
@@ -23,8 +26,8 @@ E11-S03, E11-S02, E10-S02) réunies en `20260930100000_v1_1_0.sql` au contenu id
 Version mineure, cassante sur les adresses (ADR-020, D131) : sa PR Renovate se relit à la main chez
 l'hôte (D121) : `renovate/preset.json` ne fusionne seules que les correctives, une mineure attend
 une revue sous le label `oto-platform-minor`. 1.1.0 publiée, mais ne se construit pas chez un hôte ;
-1.1.1 corrective en cours (changelog du 2026-09-30), tag et suites aux actions de JB ci-dessous ; restes
-sans urgence : M86 à M88, M90 à M93.
+1.1.1 corrective en cours (changelog du 2026-09-30), tag et suites aux actions de JB ci-dessous ; 1.1.2
+corrective (E11-S15, E11-S16, E11-S17 lot a) publiée ; restes sans urgence : M86 à M88, M90 à M96.
 
 ## Stories V2 (marquées, non planifiées)
 
@@ -82,6 +85,9 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M91 | E11-S02 : `ui/noeud/en-tete-modifiable.tsx` l. 10-11 : le commentaire dit encore qu'un nœud neuf est « jamais publié » ; `FileDOperations` : `brouillon` et `ecrit` de l'instantané sans lecteur ; `EN_TETE.enregistre`, `EN_TETE.aRenvoyer` morts. |
 | M92 | Cycles d'imports hors de la garde de `tests/unit/import-cycles.test.ts` (`coding-standards.md § Imports`) : `ui/noeud/editeur/actions.ts` ↔ `gestes-des-fichiers.ts` et ↔ `gestes-du-menu.ts`, `server/files/store.ts` ↔ `s3.ts`. Aucun ne lit de valeur au chargement aujourd'hui ; les casser, puis ajouter `ui` et `server` à `GUARDED_FACES`. |
 | M93 | La ligne de base V1 ne s'installe pas par `supabase db push` sur un projet Supabase où `pg_trgm` existe déjà (`permission denied to set parameter "pg_trgm.similarity_threshold"`, 42501 : la bibliothèque n'est pas chargée dans la session) ; contournement écrit dans `packages/plateforme/migrations/README.md` (Installer sur un hôte neuf). Corriger dans la ligne de base elle-même n'est pas possible (fichier appliqué, figé) : `db prepare` ou une migration préalable qui charge la bibliothèque, à décider ; puis un test sur un Postgres où l'extension préexiste. |
+| M94 | E11-S15 (HN-E11S15-a6) : le résumé que la base pose sur un Contexte d'équipe ou de Tout le monde (déclencheur de `20260928100000_platform_base_v1.sql`, `20260929090000_platform_e05s13.sql`, script `scripts/demo/30-arbre.mjs`) dit encore « Ce que les assistants… » : le passer à « Ce que votre Claude/ChatGPT/Mistral… » par une migration (et la reprise des résumés posés), dans une 1.2.0. |
+| M95 | E11-S15 (AC-b3) : une image garde ses proportions par `h-auto` et `object-contain`, sans `height` ; la cause de l'étirement observé en 1.1.1 n'est établie que dans le code : la confirmer à la campagne visuelle (M96), à chaque largeur (`small`, `medium`, `full`), et la reprendre si l'image s'étire encore. |
+| M96 | E11-S15 : campagne visuelle, dans les deux thèmes, d'AC-a3 (zoom 110, 125 et 150 % : page centrée, sans défilement horizontal), AC-a4 (« Partager sur le web » ancré, entier, borné à 70 %), AC-a5 (filet entre les étapes de `/connect` et de « Brancher »), AC-a8 (explication de la vue « Contexte ») et AC-b7 (aucun soulignement rouge en éditant un lien) ; les causes d'a3, a4 et b7 n'y sont établies que dans le code. |
 
 ## Actions réservées à JB
 
@@ -96,6 +102,8 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | Après le bucket et la migration de 1.1.0 | Jouer `tests/e2e/e10s02-voir.spec.ts` (AC-c6, F1 à F16 et O1 à O7, en-têtes reçus, « Voir », lien public ; sautée sans stockage) et la campagne de dépôt sur le bucket réel (image, PDF, `.html` : déposer, voir, relire, voir par un lien public), avec le contrôle visuel dans les deux thèmes ; AC-f17 : banc sur claude.ai (artefact publié, `source_url`) et ChatGPT (formulaire) avec un rapport HTML de 100 ko, résultat noté dans `docs/mcp-golden-queries.md` ; rejouer les golden queries qui mènent à `read` et à `call` (descriptions allongées, journal des révisions du 2026-09-30). |
 | Quand JB le veut | Trancher la fiche D118 (duplication d'une page qui a des fichiers) : la story avance sous l'option recommandée, la copie des objets. |
 | Après la fusion d'E11-S07 | Projet Supabase de test : ajouter `/auth/confirm` aux adresses de retour autorisées (`uri_allow_list`, `pnpm auth:settings --to <ref> --site-url <url> --redirect <motif> --apply`), puis retirer à la main le motif de `/auth/confirmer`. oto-saas, en prenant la version : renommer ses dossiers de routes, monter l'API sous `api/platform/[...route]`, mettre à jour son middleware (`/auth/confirm` public) et l'exclusion d'en-têtes des routes HTML (`api/platform/…/html`). Renvoyer les invitations en attente de Démo, dont le lien vise `/auth/confirmer` (404). |
+| Maintenant | Variables Vercel d'oto-saas : le bucket nommé est `platform-files`, qui n'existe pas (`NoSuchBucket` au dépôt d'un fichier ou d'une image) ; celui du projet est `oto-platform-files` : corriger la variable, puis redéployer. |
+| 1.1.2 commitée et poussée, CI verte | Tag `v1.1.2` (`README.md § Publier une version`), puis `npm view @otomata_tech/oto_platform@1.1.2 version` ; oto-saas : monter à 1.1.2 (corrective, aucune migration). |
 | 1.1.1 commitée et poussée, CI verte (job `packed-host-build` compris) | Tag `v1.1.1` (`README.md § Publier une version`), puis `npm view @otomata_tech/oto_platform@1.1.1 version`. oto-saas : monter directement de 1.0.0 à 1.1.1 (1.1.0 ne se construit pas chez un hôte) ; relire à la main (mineure cassante sur les adresses, ADR-020, D121, D131 ; renommages : ligne « Après la fusion d'E11-S07 »), `oto-platform migrations sync`, application de `20260930100000_v1_1_0.sql` à sa base (la production), puis `pnpm build`. |
 | Après la publication de 1.1.1 | E11-S09 AC-15 : banc Le Chat (signature `initialize` de Mistral relevée, puis la ligne de `hostFamily`) ; bancs d'E10-S02 AC-f17 sur claude.ai et ChatGPT (ligne « Après le bucket et la migration de 1.1.0 »). |
 | Avant le premier client | Remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (inscriptions, connexions et vérifications 30, rafraîchissements 150, par 5 minutes et par IP). |

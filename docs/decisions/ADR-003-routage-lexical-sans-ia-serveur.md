@@ -27,14 +27,14 @@ entité « projet » (`_project` sur chaque appel) que le banc a jugée coûteus
    une faute de frappe par le lexique.
 2. **Seuil et écart** : les étapes complètes ne sont servies que si le meilleur candidat dépasse
    le seuil et distance nettement le deuxième (0,65 et 0,1 par défaut, les valeurs calibrées sur la
-   maquette, 132 phrases) ; sinon les candidats avec score, et une consigne qui dépend de la
-   demande : pour une action, demander laquelle exécuter ; pour une question de données, chercher
-   avec `find`, `read` ou `table.rows` et répondre, puis proposer les candidats en choix ; pour une
-   question « comment » ou une demande polie, proposer les candidats en choix et n'exécuter que
-   celui que la personne choisit. Toujours tous les candidats montrés, jamais le premier seul
-   (amendement E11-S04, validé par le responsable d'Oto : sans étapes servies, une question de
-   données propose aussi les candidates). Jamais une devinette. Les candidats
-   suivants restent visibles même quand une procédure est servie. **Seuil et écart se règlent par
+   maquette, 132 phrases) ; sinon les trois candidats les plus proches, chacun par son titre, son
+   résumé et son score, et une seule consigne : lire celui qui correspond à la demande, sinon
+   chercher ou demander à l'utilisateur. Le modèle juge si la phrase demande d'agir, d'expliquer ou
+   de répondre ; le score lexical ne départage pas deux voisines que leur titre distingue (« relancer
+   les devis », « relancer les tickets »), le modèle si. Une procédure servie l'est « si la demande
+   porte sur son titre » : les autres candidats suivent, avec la consigne de lire plutôt celui qui
+   correspond (amendement E11-S16, décision de JB, qui remplace la consigne par genre de phrase
+   d'E11-S04). Toujours tous les candidats montrés, jamais le premier seul. **Seuil et écart se règlent par
    organisation** (`orgs.settings.routing`), sur le jeu de phrases de test, pour 95 % au moins de
    bonnes reconnaissances.
 3. **Mesure continue sans host** : les données de test de chaque organisation portent des

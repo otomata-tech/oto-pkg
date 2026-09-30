@@ -44,7 +44,10 @@ function position(cote: Cote, align: Alignement, rect: DOMRect, taille: { fw: nu
 
 /**
  * Pose un flottant contre son déclencheur : le côté demandé s'il tient, sinon l'opposé, puis calé
- * dans la fenêtre ; replacé au défilement et au redimensionnement plutôt que refermé.
+ * dans la fenêtre ; replacé au défilement et au redimensionnement plutôt que refermé. Changé (E11-S15,
+ * AC-a4) : replacé aussi quand sa propre taille change — un panneau dont le contenu arrive après
+ * l'ouverture (« Partager sur le web » lit son lien) restait calé sur sa première hauteur, loin de son
+ * bouton ou hors de la fenêtre.
  */
 export function useAnchor(
   anchorRef: RefLue,
@@ -73,11 +76,15 @@ export function useAnchor(
     const options = { passive: true, capture: true }
     window.addEventListener("scroll", place, options)
     window.addEventListener("resize", place, options)
+    const flottant = floatRef.current
+    const observateur = flottant && typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => place()) : null
+    if (flottant) observateur?.observe(flottant)
     return () => {
       window.removeEventListener("scroll", place, options)
       window.removeEventListener("resize", place, options)
+      observateur?.disconnect()
     }
-  }, [open, place])
+  }, [open, place, floatRef])
 
   return placed
 }

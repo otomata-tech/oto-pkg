@@ -181,7 +181,7 @@ test.describe("procédure et contexte", () => {
       // Les notes sont dans la colonne d'annexes, à côté du document (E05-S09 c1, comme `page.spec.ts`).
       // Repliée à l'arrivée (E11-S05, AC-e2) : ouverte par Entrée.
       const annexes = await ouvrirAQuoiSert(page)
-      await attendre(annexes.getByText(`Ce que les assistants des membres de l'équipe ${EQUIPE.nom} lisent à chaque conversation.`)).toBeVisible()
+      await attendre(annexes.getByText(`Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe ${EQUIPE.nom}, lit à chaque conversation.`)).toBeVisible()
       await expect(page.getByRole("note", { name: "Voici ce que votre agent va lire" }).getByRole("list", { name: "Ordre de lecture" })).toBeVisible()
       await capturer(page, testInfo, `contexte-equipe-${theme}`)
 

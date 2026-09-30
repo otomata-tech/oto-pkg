@@ -40,11 +40,12 @@ export const ANNEXES = {
 
 /**
  * La première phrase, par portée (D128, textes de JB) ; le Privé d'une autre personne, au même modèle : le lire ou
- * l'écrire ne le fait pas recevoir (HN-E05S04-22).
+ * l'écrire ne le fait pas recevoir (HN-E05S04-22). E11-S15 (AC-a6) : l'assistant se nomme « votre
+ * Claude/ChatGPT/Mistral » ; la personne reconnaît le sien.
  */
 export function aQuoiSert(portee: Portee): string {
-  if (portee.genre === "all") return "Ce que les assistants de tous les membres de l'organisation lisent à chaque conversation."
-  if (portee.genre === "equipe") return `Ce que les assistants des membres de l'équipe ${portee.nom} lisent à chaque conversation.`
+  if (portee.genre === "all") return "Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'organisation, lit à chaque conversation."
+  if (portee.genre === "equipe") return `Ce que votre Claude/ChatGPT/Mistral, comme celui de chaque membre de l'équipe ${portee.nom}, lit à chaque conversation.`
   if (portee.genre === "private") return "Ce que votre assistant lit à chaque conversation ; vous seul le recevez."
   return "Ce que l'assistant de la personne de cet espace lit à chaque conversation ; elle seule le reçoit."
 }
@@ -96,6 +97,30 @@ export const CONTEXTE_SERVI = {
   vide: "L'assistant ne reçoit rien de ce contexte pour l'instant.",
   aucuneNouveaute: "Aucune nouveauté n'est servie à l'assistant en ce moment.",
   fin: "Fin du texte",
+} as const
+
+/**
+ * Ce que la vue « Contexte » explique sous son titre (E11-S15, AC-a8), tiré du service et dit sans jargon : ce qu'est le
+ * contexte (`mcp/tools.ts`, description de `context`), comment il vit (servi par l'outil `context`, relu à chaque
+ * conversation, seul le publié ; relu quand un Contexte reçu change : `server/ctx.ts`, `requireCtx`), la procédure servie
+ * quand le routage la reconnaît dans la demande (`decide` de `server/routing.ts` : seuil et écart), et son ordre (`assembleContext` de
+ * `server/context/index.ts`, `contextPaths` et `contextBody` de `blocks/contexts.ts`, les blocs `news`, `procedures`,
+ * `recent`, le plafond de `engine.ts`). Aucune borne chiffrée : elles vivent dans `server/`, que l'écran ne lit pas.
+ */
+export const EXPLICATION_DU_CONTEXTE = {
+  ceQuEst: "Le contexte, c'est ce que votre Claude/ChatGPT/Mistral lit au début de chaque conversation sur votre travail, avant de vous répondre.",
+  fonctionnement:
+    "Oto le lui donne par son outil « context », au début de chaque nouvelle conversation : ce que vous publiez dans un Contexte y arrive dès la suivante, un brouillon jamais. Si la version publiée d'un Contexte que vous recevez change pendant une conversation, l'assistant relit le contexte avant de continuer.",
+  ordre: "Il est assemblé dans cet ordre :",
+  etapes: [
+    "les règles d'Oto, les mêmes pour tous (non montrées ici) ;",
+    "la procédure qui correspond à votre demande, quand Oto en reconnaît clairement une (non montrée ici) ;",
+    "le Contexte de Tout le monde, puis le vôtre (Privé), puis celui de chacune de vos équipes : chacun s'ouvre sur quelques faits (l'organisation, vous, l'équipe et ses connecteurs), puis son texte, puis la liste des contenus rangés dessous et des pages qu'il cite, par leur titre et leur résumé, sans leur contenu ;",
+    "les nouveautés depuis votre dernière conversation : contenus publiés et connecteurs activés ;",
+    "les procédures publiées que vous pouvez lire, les plus utilisées par vous et vos équipes d'abord ;",
+    "vos contenus récents : les pages et tableaux que vous avez lus ou écrits ces derniers temps.",
+  ],
+  plafond: "Le tout a une longueur maximale : ce qui dépasse est coupé, et le texte le signale.",
 } as const
 
 /** « page », « tableau » : la nature d'un contenu récent servi (`page`, `table`) ; une autre, telle que servie. */

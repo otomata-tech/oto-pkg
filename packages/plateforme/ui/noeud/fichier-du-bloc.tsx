@@ -60,6 +60,12 @@ export function largeurDe(valeur: unknown): ImageWidth {
 const LARGEURS: Record<ImageWidth, string> = { small: "max-w-[33%]", medium: "max-w-[66%]", full: "max-w-full" }
 
 /**
+ * Une image garde ses proportions à toute largeur (E11-S15, AC-b3) : sa hauteur suit sa largeur (`h-auto`), et si une
+ * feuille de l'hôte fixait ses deux dimensions, l'image tiendrait dans sa boîte sans être déformée (`object-contain`).
+ */
+const PROPORTIONS = "h-auto max-w-full object-contain"
+
+/**
  * L'adresse de « Voir » (AC-c1) : un PDF, un `txt` ou un `csv` à la route de lecture, `inline` ; un `html` ou un `md` à
  * la visionneuse, l'adresse de la page où l'on est suivie de `?view=<id>` (relative : `/n/<chemin>` comme `/p/<jeton>/…`) ;
  * `null` pour ce qui ne se voit pas. `route` : les routes d'un lien public (AC-c5), `FILES_ROUTE` sinon.
@@ -95,12 +101,12 @@ export function ImageAgrandissable({ source, alt, largeur, jointe }: ImageProps)
         onClick={() => setOuverte(true)}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- source d'un bloc (route du paquet ou hôte quelconque) : next/image exigerait de déclarer chaque hôte, et ui/ n'importe pas Next */}
-        <img src={source} alt={alt} referrerPolicy="no-referrer" loading="lazy" className="max-w-full rounded-md" onError={jointe ? () => setPerdue(true) : undefined} />
+        <img src={source} alt={alt} referrerPolicy="no-referrer" loading="lazy" className={`rounded-md ${PROPORTIONS}`} onError={jointe ? () => setPerdue(true) : undefined} />
       </button>
       {ouverte && (
         <Dialog open onClose={() => setOuverte(false)} title={FICHIERS.imageAgrandie(alt)} size="lg">
           {/* eslint-disable-next-line @next/next/no-img-element -- même source que l'image de la page */}
-          <img src={source} alt={alt} referrerPolicy="no-referrer" className="mx-auto max-h-[75vh] max-w-full" />
+          <img src={source} alt={alt} referrerPolicy="no-referrer" className={`mx-auto max-h-[75vh] ${PROPORTIONS}`} />
         </Dialog>
       )}
     </>
@@ -151,7 +157,8 @@ export function CarteDeFichier({ id, nom, taille, routeDesFichiers = FILES_ROUTE
   const servi = useDisponible(id, routeDesFichiers === FILES_ROUTE)
   const glyphe = type === null ? FichierQuelconque : (GLYPHES[type] ?? (IMAGE_TYPES.includes(type) ? FileImage : FichierQuelconque))
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg p-3 ring-1 ring-mute">
+    // La ligne d'un fichier du design system (`oto-file`, E11-S15, AC-b2) : filet, rayon et surface de carte ; elle se replie sous ses boutons.
+    <div className="oto-file flex-wrap">
       <Icon as={glyphe} size="md" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-ink">{nom}</p>

@@ -3,7 +3,7 @@ import { linksIn } from "../../packages/plateforme/schemas/link-syntax"
 import { citationAuCurseur, lienVers } from "../../packages/plateforme/ui/noeud/editeur/citer"
 import { segmentsEnLigne } from "../../packages/plateforme/ui/noeud/en-ligne"
 
-// Les liens d'un bloc (E05-S10) : une adresse collée devient un lien, nommé par son domaine (AC-a8 ; E05-S11, D107) ;
+// Les liens d'un bloc (E05-S10) : une adresse collée devient un lien, coupée au milieu à l'écran (AC-a8 ; E11-S15, AC-b10) ;
 // « @ » lit la citation que le curseur termine et insère le lien `[[chemin|titre]]` que la publication extrait (AC-a9).
 
 describe("adresse web dans un bloc (AC-a8)", () => {
@@ -11,7 +11,7 @@ describe("adresse web dans un bloc (AC-a8)", () => {
     const longue = "https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit?usp=sharing"
     expect(segmentsEnLigne(`Voir ${longue}. Et [[ventes/tarifs]], puis \`https://code.exemple\`.`)).toEqual([
       { genre: "texte", texte: "Voir " },
-      { genre: "web", adresse: longue, libelle: "docs.exemple.fr" },
+      { genre: "web", adresse: longue, libelle: "https://docs.exemple.fr/…tUvWxYz/edit" },
       { genre: "texte", texte: ". Et " },
       { genre: "lien", chemin: "ventes/tarifs", reference: null, libelle: "" },
       { genre: "texte", texte: ", puis " },

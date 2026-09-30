@@ -17,6 +17,12 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.1 — 2026-09-30
+
+### Hosts
+- Install: 1.1.0 did not build in a host that installs the package from npm (an import cycle in `schemas/`, `next build` failing with « Cannot access … before initialization » on the page that imports `publicFilesRoute`): upgrade to 1.1.1. From 1.1.0, nothing else to do (no migration, no export changed); from 1.0.0, go straight to 1.1.1 and follow the steps of 1.1.0 below (renamed addresses, migration `20260930100000_v1_1_0.sql`).
+- Migrations: known issue: on a Supabase project where `pg_trgm` already exists, `supabase db push` of the V1 baseline stops on `permission denied to set parameter "pg_trgm.similarity_threshold"` (42501); workaround in `migrations/README.md` (« Installer sur un hôte neuf », « Défaut connu »).
+
 ## 1.1.0 — 2026-09-30
 
 ### Assistants

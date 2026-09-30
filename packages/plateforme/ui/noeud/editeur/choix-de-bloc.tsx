@@ -13,7 +13,7 @@
 // E10-S02 (lot b) : le groupe « Insérer » du « + » propose aussi « Image » et « Fichier » quand le stockage est activé
 // (AC-b1, AC-b2, AC-b7) ; « / » ne les propose pas : il change un Texte en bloc, un fichier se joint après un bloc.
 import { useEffect, useState, type KeyboardEvent } from "react"
-import { normalizeTitle } from "../../../schemas/blocks-render"
+import { normalizeTitle } from "../../../schemas/nodes"
 import { fuzzyScore } from "../../ds/react/command-palette"
 import type { MenuItem } from "../../ds/react/overlays"
 import { CHOIX_DE_BLOC, FORMES } from "../libelles"

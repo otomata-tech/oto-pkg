@@ -4,6 +4,7 @@ import { parseEnv } from "util"
 import { defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
 import { localUrls } from "./scripts/lib/test-db-local.mjs"
+import { testProjectRefusal } from "./tests/helpers/test-project-guard.mjs"
 
 // Les tests d'intégration RLS tournent sur le projet Supabase cloud : ils lisent l'URL, la clé
 // anon et la clé secrète dans `.env` puis `.env.local` (le second l'emporte, l'environnement du
@@ -12,7 +13,8 @@ import { localUrls } from "./scripts/lib/test-db-local.mjs"
 // connexion d'administration des tests (`tests/helpers/admin-sql.ts`, E01-S09) : lectures de
 // catalogue et sessions aux claims choisis, que PostgREST ne sert pas. Le port de base (E01-S10) : la
 // connexion du serveur (`PLATFORM_DATABASE_URL`) et celle d'administration des suites portables
-// (`PLATFORM_ADMIN_DATABASE_URL`, `tests/helpers/sql.ts`). `util.parseEnv` (Node) plutôt
+// (`PLATFORM_ADMIN_DATABASE_URL`, `tests/helpers/sql.ts`). `SUPABASE_PROJECT_ID` et
+// `PLATFORM_TEST_PROJECT_ID` servent la garde du projet de test, plus bas. `util.parseEnv` (Node) plutôt
 // que `loadEnv` de Vite : `vite` n'est pas une dépendance directe, pnpm ne le résout pas ici.
 function loadTestEnv(): Record<string, string> {
   const env: Record<string, string> = {}
@@ -23,7 +25,7 @@ function loadTestEnv(): Record<string, string> {
     for (const [key, value] of Object.entries(parsed)) {
       const kept =
         key.startsWith("NEXT_PUBLIC_") ||
-        ["SUPABASE_SECRET_KEY", "SUPABASE_DB_URL", "PLATFORM_DATABASE_URL", "PLATFORM_ADMIN_DATABASE_URL", "PLATFORM_TEST_DB"].includes(key)
+        ["SUPABASE_SECRET_KEY", "SUPABASE_DB_URL", "PLATFORM_DATABASE_URL", "PLATFORM_ADMIN_DATABASE_URL", "PLATFORM_TEST_DB", "SUPABASE_PROJECT_ID", "PLATFORM_TEST_PROJECT_ID"].includes(key)
       if (kept && value !== undefined && process.env[key] === undefined) env[key] = value
     }
   }
@@ -47,6 +49,11 @@ if (localDb) {
   testEnv.PLATFORM_DATABASE_URL = urls.app
   testEnv.PLATFORM_ADMIN_DATABASE_URL = urls.admin
 }
+
+// Aucune suite ne part vers un autre projet que celui de `PLATFORM_TEST_PROJECT_ID` : jugé sur les
+// variables que verront les suites (celles du processus, recouvertes par `testEnv`).
+const refusal = testProjectRefusal({ ...process.env, ...testEnv })
+if (refusal) throw new Error(refusal)
 
 export default defineConfig({
   plugins: [react()],

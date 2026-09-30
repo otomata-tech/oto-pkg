@@ -128,14 +128,14 @@ describe.skipIf(!sqlConfigured)(
       await sql?.end({ timeout: 5 })
     }, SETUP_TIMEOUT)
 
-    it.skipIf(!supabaseConfigured)(onProject("should keep no foreign key to auth.users, the 32 person columns still uuid (AC1)"), async () => {
+    it.skipIf(!supabaseConfigured)(onProject("should keep no foreign key to auth.users, the 33 person columns still uuid (AC1)"), async () => {
       const keys = await sql`select conrelid::regclass::text as tbl, conname from pg_catalog.pg_constraint
                               where confrelid = 'auth.users'::regclass and connamespace = 'platform'::regnamespace`
       expect(plain(keys)).toEqual([])
       const columns = await sql`select table_name || '.' || column_name as col, data_type from information_schema.columns
                                  where table_schema = 'platform' and table_name || '.' || column_name = any(${ALL_PERSON_COLUMNS})
                                  order by 1`
-      expect(ALL_PERSON_COLUMNS).toHaveLength(32)
+      expect(ALL_PERSON_COLUMNS).toHaveLength(33)
       expect(plain(columns)).toEqual([...ALL_PERSON_COLUMNS].sort().map((col) => ({ col, data_type: "uuid" })))
     })
 

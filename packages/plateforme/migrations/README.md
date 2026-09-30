@@ -149,6 +149,14 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
 2. `pnpm exec oto-platform migrations sync --to supabase/migrations`, puis le workflow de
    migrations de l'hôte, ou `supabase db push --db-url '<url>?sslmode=require'`.
 
+   **Défaut connu** : sur un projet Supabase où `pg_trgm` existe déjà avant la ligne de base,
+   `supabase db push` s'arrête sur `permission denied to set parameter "pg_trgm.similarity_threshold"`
+   (42501) : `create extension if not exists` ne charge pas la bibliothèque dans la session, et un
+   rôle non superutilisateur ne pose pas le paramètre d'une bibliothèque non chargée. Contournement :
+   appliquer les fichiers de `supabase/migrations/` dans l'ordre, chacun en une transaction, sur une
+   connexion qui a d'abord lu `select extensions.similarity('a', 'a')`, puis inscrire l'historique
+   par `supabase migration repair --status applied <versions> --db-url <url>`.
+
 ## Hôtes déjà installés : marquer la ligne de base V1 appliquée
 
 Un hôte qui a appliqué la chaîne jusqu'à `20260927200000_platform_retraits_v1.sql` porte déjà le schéma

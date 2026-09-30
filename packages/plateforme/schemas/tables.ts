@@ -7,8 +7,7 @@
 // l'en-tête (clé, cycle, options par type) sont dans `server/tables/header.ts` ; ceux d'un filtre,
 // qui dépendent des colonnes, dans `server/tables/filters.ts`.
 import * as z from "zod/v4"
-import { normalizeTitle } from "./blocks-render"
-import { nodePathSchema } from "./nodes"
+import { nodePathSchema, normalizeTitle } from "./nodes"
 
 /** Les huit types de colonne de la V1 (H90), dans l'ordre des refus. */
 export const COLUMN_TYPES = ["text", "number", "date", "datetime", "bool", "enum", "email", "url"] as const

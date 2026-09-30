@@ -427,6 +427,57 @@ export type Database = {
           },
         ]
       }
+      files: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          mime: string
+          name: string
+          node_id: string
+          org_id: string
+          size: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mime: string
+          name: string
+          node_id: string
+          org_id: string
+          size: number
+          status: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mime?: string
+          name?: string
+          node_id?: string
+          org_id?: string
+          size?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "files_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "files_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       identities: {
         Row: {
           created_at: string
@@ -1251,6 +1302,77 @@ export type Database = {
           },
         ]
       }
+      upload_tickets: {
+        Row: {
+          base_revision: number | null
+          created_at: string
+          ctx: string | null
+          expires_at: string
+          form_token_hash: string
+          id: string
+          key: string | null
+          kind: string
+          mode: string
+          name: string | null
+          org_id: string
+          publish: boolean | null
+          summary: string | null
+          target_path: string
+          title: string | null
+          token_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          base_revision?: number | null
+          created_at?: string
+          ctx?: string | null
+          expires_at: string
+          form_token_hash: string
+          id?: string
+          key?: string | null
+          kind: string
+          mode: string
+          name?: string | null
+          org_id: string
+          publish?: boolean | null
+          summary?: string | null
+          target_path: string
+          title?: string | null
+          token_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          base_revision?: number | null
+          created_at?: string
+          ctx?: string | null
+          expires_at?: string
+          form_token_hash?: string
+          id?: string
+          key?: string | null
+          kind?: string
+          mode?: string
+          name?: string | null
+          org_id?: string
+          publish?: boolean | null
+          summary?: string | null
+          target_path?: string
+          title?: string | null
+          token_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_tickets_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1267,6 +1389,10 @@ export type Database = {
       block_search_text: {
         Args: { p_data: Json; p_key: string; p_text: string; p_type: string }
         Returns: string
+      }
+      consume_upload_ticket: {
+        Args: { p_form: boolean; p_hash: string; p_org: string }
+        Returns: Json
       }
       create_org: {
         Args: {
@@ -1290,10 +1416,15 @@ export type Database = {
           p_title: string
         }
         Returns: {
+          copied_files: Json
           copy_id: string
           copy_path: string
           source_id: string
         }[]
+      }
+      ensure_private_space: {
+        Args: { p_org: string; p_user: string }
+        Returns: undefined
       }
       forget_user: { Args: { p_user: string }; Returns: undefined }
       hook_before_user_created: { Args: { event: Json }; Returns: Json }
@@ -1400,6 +1531,10 @@ export type Database = {
           name: string
           user_id: string
         }[]
+      }
+      public_file_by_token: {
+        Args: { p_file: string; p_org: string; p_token: string }
+        Returns: Json
       }
       public_node_by_token: {
         Args: { p_org: string; p_path?: string; p_token: string }

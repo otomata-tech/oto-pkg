@@ -6,7 +6,8 @@ Texte complet : `.method/conventions/deployment-patterns.md`. La fiche suffit po
 - Une migration passe en local, puis en staging, puis en production (`supabase db push --linked`), vérifiée à chaque étape. § Workflow
 - Aucune migration destructive sans rollback prévu ; additive d'abord : ajouter, migrer les données, retirer l'ancien. § Règles
 - Le rollback d'une migration est documenté en commentaire `-- ROLLBACK:` en fin de fichier. § Rollback SQL
-- La CI ne rejoue ni type-check, ni lint, ni tests : elle vérifie les migrations, le build et la portabilité (job `bare-postgres`). § Vérification locale via `/commit-push`
+- La CI ne rejoue ni type-check, ni lint, ni tests : elle vérifie les migrations, le build, le build d'un hôte (job `packed-host-build`) et la portabilité (job `bare-postgres`). § Vérification locale via `/commit-push`
+- Le paquet se prouve construit chez un hôte par le job `packed-host-build` (paquet empaqueté, installé depuis son `.tgz` dans une copie de l'application de référence, `next build`) ; un tag ne part que d'un commit où il est vert. § Build comme un hôte
 - Avant un déploiement : aucun `console.log` oublié, aucun secret dans le code, `pnpm audit:lh` vert. § Pre-deploy checklist
 - Après un déploiement, sur l'URL de production : vraie 404, preview en `noindex`, Lighthouse aux seuils, compression et `cache-control` `immutable` servis, `is-agentic` sans issue `essential`. § Contrôles post-déploiement
 - Toujours un rollback pour le code et pour la base ; déployer petit, une fonctionnalité à la fois ; surveiller après chaque déploiement. § Règles de déploiement

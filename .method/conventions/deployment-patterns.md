@@ -65,10 +65,21 @@ NEXT_PUBLIC_SITE_URL=
 # 2. pnpm lint
 # 3. pnpm test
 # Puis commit + push si tout passe.
-# La CI GitHub ne rejoue pas ces checks : elle vérifie les migrations et le build, puis la
-# portabilité sur un Postgres nu (job bare-postgres : `db prepare`, la ligne de base et les
-# suites portables).
+# La CI GitHub ne rejoue pas ces checks : elle vérifie les migrations et le build, le build d'un
+# hôte qui installe le paquet empaqueté (job packed-host-build), puis la portabilité sur un
+# Postgres nu (job bare-postgres : `db prepare`, la ligne de base et les suites portables).
 ```
+
+### Build comme un hôte
+
+Le `build` du workspace lit le paquet par un lien vers ses sources ; un hôte l'installe depuis son
+archive, et son bundler, qui lit `"sideEffects": false`, peut ouvrir une face par n'importe lequel de
+ses modules. Seul ce second chemin montre ce que voit l'hôte : un cycle d'imports lu au chargement, un
+fichier absent de `files`. Le job `packed-host-build` de `.github/workflows/ci.yml` le joue
+(`scripts/ci/packed-host-build.mjs` : `pnpm pack`, copie de l'application de référence hors du dépôt,
+installation depuis le `.tgz`, `next build`), et un tag de version ne part que d'un commit où il est
+vert. **Vérifiable :** le job `packed-host-build` passe sur le commit tagué ; en local,
+`node scripts/ci/packed-host-build.mjs` se termine par « se construit chez un hôte ».
 
 ### Pre-deploy checklist
 - [ ] Tous les tests passent

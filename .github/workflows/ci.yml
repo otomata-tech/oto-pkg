@@ -1,6 +1,7 @@
 # CI — contrôle des migrations et build
 # Type-check, lint et tests restent en local via commit-push ; la CI lance `check:migrations`
-# (FR-INST-04) puis `build`, et prouve la portabilité du schéma (E01-S09) : la ligne de base s'installe
+# (FR-INST-04) puis `build`, le build d'un hôte qui installe le paquet empaqueté (`packed-host-build`), et
+# prouve la portabilité du schéma (E01-S09) : la ligne de base s'installe
 # sur un Postgres sans Supabase (`bare-postgres`). La ligne de base V1 égale l'ancienne chaîne : comparaison
 # jouée une fois, hors de la CI (E01-S12 partie d ; un dépôt neuf n'a pas l'historique de la chaîne, D96).
 name: CI — Build
@@ -33,6 +34,29 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # Le build ci-dessus lit le paquet par le lien du workspace ; un hôte l'installe depuis son archive, où
+  # son bundler applique `"sideEffects": false` et peut ouvrir une face par n'importe quel module. Ce job
+  # construit l'application de référence hors du dépôt, le paquet installé depuis `pnpm pack`
+  # (`deployment-patterns.md § Build comme un hôte`).
+  packed-host-build:
+    name: Build as a host (packed package)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack, install in a copy of the reference host, next build
+        run: node scripts/ci/packed-host-build.mjs
 
   # AC10, AC12, AC13 : sur un postgres:16 vierge (sa distribution porte moddatetime, que le Postgres
   # managé de Scaleway refuse), `db prepare` deux fois, la ligne de base par la CLI Supabase, puis la

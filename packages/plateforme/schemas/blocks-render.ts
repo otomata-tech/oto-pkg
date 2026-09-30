@@ -19,7 +19,7 @@ import { blockInputSchema, chars, isBlankLine, trimBlanks, type BlockInput } fro
 import { fileBaseName } from "./csv"
 import { filePath, fileSizeText, fileTypeOf } from "./files"
 import { closesFence, LINE_SEPARATORS, openingFence, type Fence } from "./link-syntax"
-import { NODE_HEAD_MAX, OP_TEXT_MAX } from "./nodes"
+import { NODE_HEAD_MAX, normalizeTitle, OP_TEXT_MAX } from "./nodes"
 
 /**
  * Forme minimale d'un bloc : celle de `BlockInput` (E01-S06), d'une ligne de `blocks`, ou d'un bloc
@@ -231,11 +231,6 @@ export function renderBlocks<B extends BlockLike>(blocks: readonly B[], options:
 }
 
 // ------------------------------------------------------------------------------------- Sections
-
-/** Titre comparable (H54) : sans accent, sans casse, sans espace de bord ; « Étapes » = « etapes ». */
-export function normalizeTitle(title: string): string {
-  return title.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase()
-}
 
 /** Niveau et texte d'un titre que le schéma partagé accepte ; `null` pour tout autre bloc. */
 function headingOf(block: BlockLike): { level: 1 | 2 | 3 | 4 | 5; text: string } | null {

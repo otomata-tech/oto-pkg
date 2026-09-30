@@ -84,6 +84,13 @@ trois traitements contradictoires du même cas (throw / return / redirect).
 Alias `@/` vers `src/`. L'ordre des groupes est appliqué par la règle ESLint `import/order` —
 ne pas le vérifier à la main.
 
+Aucun cycle d'imports évalués (`import type` n'en est pas un) entre les modules de `schemas/`, `api/`
+et `mcp/` du paquet : chez un hôte, le bundler (`"sideEffects": false`) peut charger en premier
+n'importe quel module d'une face, et une valeur lue au chargement à travers un cycle n'y est pas
+encore initialisée. Une fonction dont l'import fermerait un cycle descend dans un module que tous
+ses lecteurs importent sans cycle. **Vérifiable :** `tests/unit/import-cycles.test.ts` (graphe des imports de ces faces) et
+`tests/unit/schemas-load-order.test.ts` (chaque module de `schemas/` chargé en premier, Node natif).
+
 ## Error Handling
 
 - Jamais de catch vide

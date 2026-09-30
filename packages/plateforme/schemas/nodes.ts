@@ -39,6 +39,15 @@ export function slugOf(text: string, max: number): string {
 }
 
 /**
+ * Titre comparable (H54) : sans accent, sans casse, sans espace de bord ; « Étapes » = « etapes ». Ici et non
+ * dans `blocks-render.ts`, qui le lit aussi : `tables.ts` le lit, et `blocks-render.ts` dépend de `tables.ts`
+ * par `csv.ts` ; l'y importer fermerait un cycle (`coding-standards.md § Imports`).
+ */
+export function normalizeTitle(title: string): string {
+  return title.normalize("NFD").replace(/\p{M}/gu, "").trim().toLowerCase()
+}
+
+/**
  * Texte d'une opération de `write` (banc E04, mesure 4 : un appel porte ~47 000 caractères) et caractères rendus
  * d'une page : bornes du service (`server/nodes/limits.ts`), que l'écran dit avant d'envoyer un collage ou un
  * fichier importé (E10-S01, AC-a1, AC-a3).

@@ -12,6 +12,7 @@ Texte complet : `.method/conventions/coding-standards.md`. La fiche suffit pour 
 - Une valeur d'une liste fermée (codes d'erreur `PLATFORM_ERROR_CODES`) se reconnaît par la liste elle-même (`find`, `includes`), jamais par une expression régulière qui en recopie la forme. § DRY
 - Toute surface nouvelle porte ce qui casse sans elle aujourd'hui ; sans justification au présent, la retirer au lieu de la documenter. § DRY
 - Les imports de l'hôte passent par l'alias `@/` vers `src/`. § Imports
+- Aucun cycle d'imports évalués entre les modules de `schemas/`, `api/` et `mcp/` du paquet : chez un hôte, n'importe quel module d'une face peut se charger en premier ; `tests/unit/import-cycles.test.ts` le vérifie. § Imports
 - Une Server Action rend `{ data }` ou `{ error }`, jamais une exception vers le client. § Error Handling
 - Tout composant d'interface gère chargement, erreur et vide. § Error Handling
 - Toute réponse Supabase : lire son `.error` et le traiter. § Error Handling

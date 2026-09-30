@@ -34,7 +34,6 @@ export {
   renderBlocks,
   splitSections,
   findSections,
-  normalizeTitle,
   sectionOfBlock,
   callLocation,
   formatCallLocation,
@@ -206,7 +205,7 @@ export type { PublicTable } from "./node-gestures"
 export { PUBLIC_TABLE_ROWS_MAX } from "./node-gestures"
 // E10-S01 : Markdown et CSV. Le fichier d'une page (export et import), la lecture, la déduction, le contrôle et
 // l'écriture d'un CSV, les bornes d'un import et les corps de `tables/import` et des exports.
-export { NODE_HEAD_MAX, nodeExportQuerySchema, OP_TEXT_MAX, PAGE_MAX, slugOf } from "./nodes"
+export { NODE_HEAD_MAX, nodeExportQuerySchema, normalizeTitle, OP_TEXT_MAX, PAGE_MAX, slugOf } from "./nodes"
 export { pageMarkdown, readPageMarkdown } from "./blocks-render"
 export type { MarkdownFile } from "./blocks-render"
 export { columnNameOf, columnNames, CSV_SEPARATORS, detectSeparator, fileBaseName, fileExtension, IMPORT_NAME_MAX, keyValue, parseCsv, rowCells, segmentOf, toCsv, withLineKey } from "./csv"

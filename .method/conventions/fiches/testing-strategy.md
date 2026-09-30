@@ -14,6 +14,7 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - Tester le comportement, jamais l'implémentation ni le CSS : aucune assertion sur un attribut `style` ou une valeur CSS. § Anti-patterns
 - Un test de recherche sème un mot propre à lui, absent des autres contenus semés du fichier. § Anti-patterns
 - Mocker les seules frontières (base, API) ; chaque `it` passe lancé seul, pose sa précondition et consomme un état sur une ressource à lui. § Anti-patterns
+- Un ordre de chargement de module se teste dans un Node natif (`tests/helpers/native-load-first.mjs`), jamais par `import()` sous Vitest, qui rend `undefined` au lieu de lever à travers un cycle. § Anti-patterns
 - Jamais de `sleep` : `waitFor` ou `findBy` ; un focus après une action asynchrone se lit par `await waitFor(() => expect(document.activeElement)…)`. § Anti-patterns
 - Aucun test sous jsdom ni spec Playwright ne charge `cli/db-prepare.mjs` ni `scripts/lib/env.mjs` : la règle TLS vient de `cli/ssl-option.mjs` ; un fichier jsdom qui importe une aide SQL porte `// @vitest-environment node`. § Anti-patterns
 - « Objet vide » s'affirme par `toEqual({})`, jamais par `{}` dans `toMatchObject` ou `objectContaining`. § Anti-patterns
@@ -49,4 +50,5 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - Une clause facultative d'un service mesuré par un budget de requêtes passe par un paramètre nul, jamais par un fragment `sql` ; un plafond ne se relève pas pour un fragment. § Anti-patterns
 - Une spec sur l'organisation jetable pose elle-même la précondition d'une partie calculée (contenus récents, nouveautés bornées). § Anti-patterns
 - Un membre inséré sans `profile.handle` (outillage, Démo) reçoit son handle de la base et son espace privé (`ensure_private_space`) : `private/<handle>` et son Contexte existent après l'ajout. § Base de test
+- Les tests ne visent jamais la production : `PLATFORM_TEST_PROJECT_ID` déclare le projet de test, et la mise en place de Vitest et de Playwright refuse tout autre projet dans `SUPABASE_PROJECT_ID` ou les URL de Supabase, avant toute suite (`tests/helpers/test-project-guard.mjs`). § Base de test locale
 - Une suite du paquet prend ses personnes dans `createSqlFixtures`, ses jetons dans `createLocalFixtures` (`sessionFor`, `verifyToken` passé à la porte) et se garde par `sqlConfigured` ; seules les suites de l'adaptateur Supabase, listées dans `tests/unit/gardes-supabase.test.ts`, gardent le projet. § Base de test locale

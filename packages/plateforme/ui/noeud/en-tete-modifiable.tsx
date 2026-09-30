@@ -51,8 +51,8 @@ type ChampDEnTeteProps = Servi & {
 /** Un refus qui attend la relecture : la valeur servie au départ, celle saisie, la lecture servie au refus. */
 type Relecture = { depart: string; saisi: string; lecture: string }
 
-/** Le texte d'un champ d'une ligne : un saut de ligne collé devient un blanc. */
-const uneLigne = (texte: string) => texte.replace(/[\r\n]+/gu, " ")
+/** Le texte d'un champ d'une ligne : un saut de ligne collé devient un blanc. Repris par le résumé d'un repli (`repli-edite.tsx`). */
+export const uneLigne = (texte: string) => texte.replace(/[\r\n]+/gu, " ")
 
 /** L'envoi d'un champ par la file, et sa relecture après un refus `stale_revision` (AC16 d'E05-S02). */
 function useChampDEnTete({ champ, valeur, revisionServie, tamponServi }: Servi & { champ: Champ }) {

@@ -142,6 +142,10 @@ franchit une de ces règles passe par un ADR.
   de ces codes ou dépend d'une de ces limites est un défaut.
 - **Un refus est décidé par le service, jamais lu dans « aucune ligne rendue »** :
   `security-patterns.md § Droits dans le service`.
+- **Le port de stockage (ADR-016) ne lit d'un `HEAD` que l'existence et la taille de l'objet**,
+  jamais son type : Supabase Storage relit un objet `text/html` en `text/plain`, et le type relu
+  varie d'un fournisseur S3 à l'autre. Le bucket en mémoire des tests joue ce fournisseur le plus
+  strict. **Vérifiable :** `rg -n "head\??\.mime" packages/plateforme/server` ne trouve rien.
 - **La face SQL ne pose aucun état de session, et n'en hérite d'aucun** : le pooler de
   Supabase en mode transaction rend une connexion serveur à d'autres clients de `platform_app` sans
   la remettre à zéro, et un rôle ou des claims posés pour la connexion passent aux transactions

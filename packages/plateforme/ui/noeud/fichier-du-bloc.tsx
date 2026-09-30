@@ -52,11 +52,6 @@ const GLYPHES: Partial<Record<FileType, Glyphe>> = {
   pptx: FilePpt,
 }
 
-/** La largeur d'une image (AC-b3) : `small`, `medium`, sinon `full`, le défaut. */
-export function largeurDe(valeur: unknown): ImageWidth {
-  return valeur === "small" || valeur === "medium" ? valeur : "full"
-}
-
 const LARGEURS: Record<ImageWidth, string> = { small: "max-w-[33%]", medium: "max-w-[66%]", full: "max-w-full" }
 
 /**

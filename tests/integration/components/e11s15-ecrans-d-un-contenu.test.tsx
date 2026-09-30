@@ -11,7 +11,7 @@ import { ContexteDeLHote, EcranDeNoeud } from "@otomata_tech/oto_platform/ui"
 import { DepotSurLeTableau } from "../../../packages/plateforme/ui/coque/import-de-fichier"
 import { ContexteServi } from "../../../packages/plateforme/ui/contexte/contexte-servi"
 import { EcranDuContexte } from "../../../packages/plateforme/ui/contexte/ecran-du-contexte"
-import { EXPLICATION_DU_CONTEXTE } from "../../../packages/plateforme/ui/contexte/libelles"
+import { EXPLICATION_DU_CONTEXTE, NOMS_DES_BLOCS } from "../../../packages/plateforme/ui/contexte/libelles"
 import { GuideDeBranchement } from "../../../packages/plateforme/ui/connexion/guide-de-branchement"
 import { AccessPanel } from "../../../packages/plateforme/ui/ds/react/access-panel"
 import { simulerLesDialogues } from "../../helpers/dialogue"
@@ -232,5 +232,18 @@ describe("the « Contexte » view explained (E11-S15, AC-a8)", () => {
     expect(within(aide).getByText(EXPLICATION_DU_CONTEXTE.ceQuEst)).toBeInTheDocument()
     expect(within(aide).getByText(EXPLICATION_DU_CONTEXTE.fonctionnement)).toBeInTheDocument()
     expect(within(aide).getAllByRole("listitem").map((etape) => etape.textContent)).toEqual([...EXPLICATION_DU_CONTEXTE.etapes])
+  })
+
+  // Le conteneur de `render` tient lieu de `.oto-content` : un de ses enfants directs est cadré par `.oto-content > *`,
+  // dont la marge `auto` s'efface sous la marge propre d'un encart (`.oto-linked`) ; l'encart, dans la colonne de ses
+  // voisins, en suit l'alignement et la largeur (`portage-ecrans.md § 0`).
+  it.each([
+    ["the parts", { data: { apercu: { data: { text: "", budget: 35_000, blocks: [] } }, contextes: {}, equipes: [] } }, () => screen.getByRole("region", { name: NOMS_DES_BLOCS.news })],
+    ["the failure", { error: "Une erreur est survenue. Réessayez." }, () => screen.getByRole("alert")],
+  ] as const)("should put the explanation in the column of %s, not beside it at the level of the screen", (_, resultat, voisin) => {
+    const { container } = render(<EcranDuContexte resultat={resultat} Lien={LienDeTest} prefixeDesPages="/n/" ici="/context" />)
+    const colonne = screen.getByRole("group", { name: "À quoi sert cette page" }).parentElement
+    expect(colonne?.parentElement).toBe(container)
+    expect(colonne).toContainElement(voisin())
   })
 })

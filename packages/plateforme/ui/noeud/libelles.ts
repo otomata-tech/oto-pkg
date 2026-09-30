@@ -70,10 +70,12 @@ export const TABLEAU_EDITE = {
   alignements: { aucun: "Aucun", left: "Gauche", center: "Centre", right: "Droite" },
 } as const
 
-/** Un repli dans l'éditeur (E10-S06, AC-b4) : ses deux champs. */
+/** Un repli dans l'éditeur (E10-S06, AC-b4) : ses deux champs et son chevron. */
 export const REPLI_EDITE = {
   resume: (mots: string) => `Résumé du repli — ${mots}`,
   corps: (mots: string) => `Corps du repli — ${mots}`,
+  /** Le chevron du repli dans l'éditeur, nommé par ce qu'il fera, comme celui d'une branche de l'arbre. */
+  plier: (ouvert: boolean, mots: string) => `${ouvert ? "Replier" : "Déplier"} le corps — ${mots}`,
 } as const
 
 /** Les annonces des niveaux de liste (E10-S06, AC-a6) : rien n'a changé, et pourquoi ; la borne est celle du contrôle (`MESSAGES_DU_BLOC`). */

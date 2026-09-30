@@ -17,6 +17,15 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.3 — 2026-09-30
+
+### Hosts
+- Install: upgrade to 1.1.3; nothing else to do (no migration, no export added, changed or removed).
+- UI: on the « Contexte » view (`/context`), « À quoi sert cette page » sits in the column of the view's parts, aligned and as wide as they are, instead of against the left edge on a wide window.
+- API: an HTML file uploads on a storage that rewrites its type (Supabase Storage reads it back as `text/plain`): `POST /api/platform/files/<id>/complete` and the one-time upload link check the object's size only, no longer answering `conflict` « does not match its request ».
+- UI: a page with an image (attached or `https`) no longer fails on the server (« Application error », since 1.1.0) when read through its public link (`/p/<token>`), by a reader without write access (`/n/<path>`) or in the viewer of a `.md` file: the block rendering called a function of a `"use client"` module, which the server cannot call.
+- UI: in the editor, a toggle is drawn as it reads (the same pill, chevron and panel): its summary and body read as rendered text until focused (their border shows on hover), and its chevron folds and unfolds the body on screen only (the fold is not saved).
+
 ## 1.1.2 — 2026-09-30
 
 ### Assistants

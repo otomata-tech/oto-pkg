@@ -28,7 +28,7 @@
 //
 // E11-S15 (AC-b1) : l'en-tête d'un tableau simple sur le fond teinté du primary (`data-simple`, `editeur.css`).
 import { Suspense, use, type ReactNode } from "react"
-import { LIST_DEPTH_MAX, simpleTableOf } from "../../schemas/blocks"
+import { LIST_DEPTH_MAX, simpleTableOf, type ImageWidth } from "../../schemas/blocks"
 import { filePath } from "../../schemas/files"
 import { fencedParts } from "../../schemas/link-syntax"
 import { isRecord } from "../../schemas/tables"
@@ -40,7 +40,7 @@ import { LinkedContent } from "../ds/react/linked-content"
 import { ReaderHeading, ReaderList, ReaderParagraph } from "../ds/react/reader"
 import { texteDUnAppel } from "../procedure/libelles"
 import { adresseSansIdentifiants, cibleDe, estUnTableau, libelleDUneAdresse, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
-import { CarteDeFichier, ImageAgrandissable, largeurDe } from "./fichier-du-bloc"
+import { CarteDeFichier, ImageAgrandissable } from "./fichier-du-bloc"
 import { GlypheDeNature } from "./glyphes"
 import { ECRAN } from "./libelles"
 import { ciblesLues } from "./sous-pages"
@@ -286,6 +286,14 @@ function Preformate({ id, legende, texte }: { id?: string; legende: string; text
       </pre>
     </figure>
   )
+}
+
+/**
+ * La largeur d'une image (AC-b3) : `small`, `medium`, sinon `full`, le défaut. Ici et non dans `fichier-du-bloc.tsx`
+ * (`"use client"`), dont le serveur ne peut appeler aucun export (`portage-ecrans.md § 2`).
+ */
+export function largeurDe(valeur: unknown): ImageWidth {
+  return valeur === "small" || valeur === "medium" ? valeur : "full"
 }
 
 /**

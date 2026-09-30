@@ -240,6 +240,23 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       }).toEqual({ otherPerson: "not_found", notUploaded: "conflict", stillPending: "pending", mismatch: "conflict", rowGone: 0, objectGone: false, again: "not_found" })
     })
 
+    it("should confirm an HTML file that the storage reads back as text/plain, like Supabase Storage, on its size alone", async () => {
+      await page("ventes/f_html")
+      const lea = as("lea")
+      const html = bytesOf("<h1>Rapport</h1>")
+      const { data } = await requestFileUpload(lea.db, lea.identity, { node: "ventes/f_html", name: "rapport.html", mime: "text/html", size: html.byteLength })
+      const sent = await memory.fetch(data.upload.url, { method: "PUT", headers: data.upload.headers, body: html })
+      const confirmed = await outcome(completeFileUpload(lea.db, lea.identity, data.id))
+      const [row] = await fx.admin<{ status: string }[]>`select status from platform.files where id = ${data.id}`
+      expect({ uploaded: sent.status, readBack: await memory.head(objectKey(o.org.id, data.id)), code: confirmed.code, data: confirmed.value?.data, status: row?.status }).toEqual({
+        uploaded: 200,
+        readBack: { size: html.byteLength, mime: "text/plain" },
+        code: undefined,
+        data: { id: data.id, name: "rapport.html", size: html.byteLength, mime: "text/html" },
+        status: "ready",
+      })
+    })
+
     it("should read the write right again: a node rule removed since the request refuses the confirmation, before any update of files", async () => {
       const node = await page("ventes/f_retire")
       const paul = as("paul")

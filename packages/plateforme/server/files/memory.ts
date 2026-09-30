@@ -74,7 +74,9 @@ export function memoryFileStore(now: () => number = Date.now): MemoryFileStore {
     async head(key: string) {
       guard("head")
       const object = objects.get(key)
-      return object ? { size: object.bytes.byteLength, mime: object.mime } : null
+      // Comme Supabase Storage, qui ne rend jamais un objet en `text/html` (il le relit en `text/plain`) : le
+      // bucket le plus strict connu, pour qu'aucun test ne compte sur le type relu (HN-E10S02-114).
+      return object ? { size: object.bytes.byteLength, mime: object.mime === "text/html" ? "text/plain" : object.mime } : null
     },
     async copy(from: string, to: string) {
       guard("copy")

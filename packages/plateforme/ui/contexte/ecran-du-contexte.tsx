@@ -52,12 +52,16 @@ export function EcranDuContexte({ resultat, Lien, prefixeDesPages, ici }: EcranD
   return (
     <>
       <ScreenHeader title={CONTEXTE_SERVI.titre} icon={<Icon as={Info} size="sm" />} />
-      <Explication />
-      {resultat.error !== undefined ? (
-        <ErreurDeLecture message={resultat.error} href={ici} Lien={Lien} />
-      ) : (
-        <ContexteServi donnees={resultat.data} Lien={Lien} prefixeDesPages={prefixeDesPages} ici={ici} />
-      )}
+      {/* L'encart dans la colonne de la vue, jamais en frère au niveau de l'écran : là, `.oto-content > *` le centrait
+          par sa marge `auto`, que `.oto-linked { margin: 0 }`, chargée après, efface (portage-ecrans.md § 0). */}
+      <div className="flex flex-col gap-5">
+        <Explication />
+        {resultat.error !== undefined ? (
+          <ErreurDeLecture message={resultat.error} href={ici} Lien={Lien} />
+        ) : (
+          <ContexteServi donnees={resultat.data} Lien={Lien} prefixeDesPages={prefixeDesPages} ici={ici} />
+        )}
+      </div>
     </>
   )
 }

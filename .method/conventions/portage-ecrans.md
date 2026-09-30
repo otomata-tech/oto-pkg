@@ -24,6 +24,14 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
 - **Le contenu est un bloc conteneur** : `.oto-content` est `position: relative`, la racine `.oto` n'étant
   pas `<html>` ; sans lui, un élément absolu du contenu (un texte `sr-only`) allonge le document sous le
   bureau. **Vérifiable :** `tests/e2e/connect.spec.ts` exige que la fenêtre ne défile pas.
+- **Un élément ajouté à un écran se place dans le conteneur de mise en page de ses voisins** (la colonne
+  de la vue, `TwoColumns`, `.oto-content-max`), jamais en frère de ce conteneur au niveau de l'écran : un
+  enfant direct de `.oto-content` n'est centré que par la marge `auto` de `.oto-content > *`, que la marge
+  propre d'un composant, chargée après à même spécificité (`.oto-linked { margin: 0 }`), efface ; il se
+  colle alors à gauche dès que le contenu dépasse `--content-max`. **Vérifiable :** en revue, aucun encart
+  (`LinkedContent`) ni autre composant à marge propre n'est rendu à la racine d'un écran ; le test de
+  composant de l'écran affirme que l'élément partage le parent de ses voisins, lui-même enfant direct du
+  conteneur de `render` (`e11s15-ecrans-d-un-contenu.test.tsx`).
 
 ## 1. Navigation reçue de l'hôte, par props
 
@@ -45,6 +53,14 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
 - **Vérifiable :** aucune prop fonction ou composant sur un fichier `"use client"` de `ui/` monté par un
   Server Component ; les composants de `ui/ds/react/` et les crochets de `ui/coque/` en reçoivent, montés
   seulement par des composants clients.
+- **Un module rendu par le serveur ne fait d'un export d'un module `"use client"` qu'une balise ou une prop
+  passée telle quelle** (`<ImageAgrandissable />`, `as={CarteDeFichier}`), jamais un appel, une lecture de
+  propriété ni une valeur rangée dans un objet : côté serveur, chaque export d'un module client, fonction
+  ordinaire comprise, est une référence client que le rendu refuse d'appeler (« Attempted to call … from the
+  server »), alors que jsdom, le type-check et ESLint l'exécutent sans rien voir. Une fonction ordinaire
+  partagée par le serveur et un îlot vit dans un module sans directive (`largeurDe` et `baliseDuTitre` dans
+  `rendu-des-blocs.tsx`). **Vérifiable :** `tests/unit/frontiere-client-serveur.test.ts`, sur les modules que
+  le serveur atteint depuis le barrel de `ui/` et `src/app/` sans franchir un module client.
 - **Un îlot survit à la relecture** (`useRafraichir()`, `router.refresh()` dans Next) : ses props
   changent, ses champs restent. Un champ non contrôlé (`defaultValue`) garde la valeur de son premier
   montage, et `form.reset()` y ramène : l'envoi suivant réécrirait un état que personne n'a choisi.

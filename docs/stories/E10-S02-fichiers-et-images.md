@@ -135,7 +135,7 @@ personne sans jeton de session** : le ticket prouve qui et où, le droit se reli
   **When** elle envoie `POST /api/plateforme/files/<id>/complete`
   **Then** le service vérifie l'écriture sur le nœud, lit l'objet (`head`), et passe la ligne à
   `ready` si sa taille et son type sont ceux de la ligne.
-  **And** un objet absent rend `conflict`. Une taille ou un type différent rend `conflict` ;
+  **And** un objet absent rend `conflict`. Une taille différente rend `conflict` (le type relu n'est plus comparé : HN-E10S02-114, version 1.1.3) ;
   l'objet et la ligne sont alors supprimés. Une ligne inconnue, déjà `ready` ou d'une autre
   personne rend `not_found`.
 - [ ] **AC-a5 — Lecture.**
@@ -621,7 +621,7 @@ joigne la plateforme. Deux voies s'ajoutent, sans outil nouveau (ADR-002) :
 |-------|------|------|
 | Fichier servi en `text/html` depuis l'origine de l'hôte | Fermé, sauf la route isolée d'AC-c3 : CSP `sandbox` sans `allow-same-origin`, refus hors iframe par `Sec-Fetch-Dest` ; depuis le bucket, `html` et `md` toujours en `attachment` | AC-c6 ; disposition d'un `html` |
 | Script d'un `svg` | Fermé : rendu par `<img>`, `attachment` à la navigation | Disposition de l'URL d'un `svg` |
-| Type déclaré par le client | Fermé : type et taille signés dans l'URL d'envoi, contrôlés par `head` ; type de lecture fixé par `response-content-type` ; par lien, type fixé par l'extension de `name` | Taille ou type différent à `complete` |
+| Type déclaré par le client | Fermé : type et taille signés dans l'URL d'envoi, taille contrôlée par `head`, type imposé par la signature (HN-E10S02-114) ; type de lecture fixé par `response-content-type` ; par lien, type fixé par l'extension de `name` | Taille ou type différent à `complete` |
 | Nom d'origine dans la clé | Fermé : clé `<org_id>/<id>` | Unitaire sur la clé |
 | Autre organisation, nœud illisible, fichier `pending` | Fermé : `not_found` | Intégration |
 | Fichier d'un autre nœud cité dans un bloc ou lu par `read {file}` | Fermé : refusé par `writeNode` et par `read` ; la duplication copie | AC-d2, AC-d3, AC-e3 |

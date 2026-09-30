@@ -264,7 +264,8 @@ export async function storeFile(db: PlatformDb, identity: Identity, file: { node
     const answer = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: new Blob([file.bytes]), signal: AbortSignal.timeout(STORE_TIMEOUT_MS), redirect: "error" })
     if (!answer.ok) throw new Error(`storage answered ${answer.status}`)
     const head = await store.head(key)
-    if (!head || head.size !== size || head.mime !== mime) throw new Error("stored object does not match")
+    // La taille seule, comme la confirmation (`completeFileUpload`) : le type relu n'est pas celui envoyé partout.
+    if (!head || head.size !== size) throw new Error("stored object does not match")
   } catch (error) {
     console.error(`[platform] files: upload left pending ${key}`, error instanceof Error ? error.message : error)
     throw new PlatformError("conflict", `${file.name} could not be stored (file storage unreachable): nothing was attached. Ask for a new upload link and send it again.`)
@@ -284,9 +285,13 @@ async function pendingFile(db: PlatformDb, identity: Identity, id: string): Prom
 
 /**
  * La confirmation d'un envoi (AC-a4) : la ligne `pending` de l'appelant, l'écriture sur son nœud, l'objet lu
- * (`HEAD`). Taille et type égaux à ceux de la ligne : `ready`. Objet absent : `conflict`. Taille ou type
- * différent : la ligne puis l'objet supprimés, `conflict`. Ligne inconnue, déjà `ready` ou d'une autre
- * personne : `not_found`.
+ * (`HEAD`). Taille égale à celle de la ligne : `ready`. Objet absent : `conflict`. Taille différente : la ligne
+ * puis l'objet supprimés, `conflict`. Ligne inconnue, déjà `ready` ou d'une autre personne : `not_found`.
+ *
+ * Le type relu n'est pas comparé (ADR-016 § 4, HN-E10S02-114) : Supabase Storage relit un objet `text/html` en
+ * `text/plain`, et la comparaison refusait tout fichier HTML. Il ne garde rien : l'URL d'envoi signe déjà le
+ * type de l'extension, et aucune lecture ne sert le type de l'objet (`readResponse` le tire du nom, la route
+ * isolée d'ADR-017 pose le sien, `objectText` lit en `application/octet-stream`).
  */
 export async function completeFileUpload(db: PlatformDb, identity: Identity, fileId: unknown): Promise<Mutation<FileReady>> {
   const id = fileIdOf(fileId)
@@ -296,11 +301,11 @@ export async function completeFileUpload(db: PlatformDb, identity: Identity, fil
   await requireNodeLevel(db, identity, { id: file.node_id, path: file.path }, "write")
   const head = await onStorage("head", () => store.head(objectKey(identity.org.id, file.id)))
   if (!head) throw new PlatformError("conflict", `${file.name} has not been uploaded: send it to its upload address, then confirm.`)
-  if (head.size !== file.size || head.mime !== file.mime) {
+  if (head.size !== file.size) {
     await inTransaction(db, "files: mismatch", (sql) => sql`
       delete from platform.files where org_id = ${identity.org.id} and id = ${file.id} and status = 'pending'`)
     await removeObjects(identity.org.id, [file.id])
-    throw new PlatformError("conflict", `${file.name} does not match its request (size or type): upload it again.`)
+    throw new PlatformError("conflict", `${file.name} does not match its request (size): upload it again.`)
   }
   await markReady(db, identity, file, { label: "files: complete", advice: "upload it again" })
   const data: FileReady = { id: file.id, name: file.name, size: file.size, mime: file.mime }

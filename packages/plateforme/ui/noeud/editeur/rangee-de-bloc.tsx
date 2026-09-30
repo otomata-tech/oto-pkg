@@ -49,10 +49,9 @@ import { AnimatedIcon } from "../../ds/react/icon"
 import { DropdownMenu, type MenuItem } from "../../ds/react/overlays"
 import { Button, IconButton } from "../../ds/react/primitives"
 import { texteLu } from "../en-ligne"
-import { largeurDe } from "../fichier-du-bloc"
 import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC, SELECTION } from "../libelles"
 import { FICHIERS } from "../libelles-des-fichiers"
-import { baliseDuTitre, RenduDUnBloc } from "../rendu-des-blocs"
+import { baliseDuTitre, largeurDe, RenduDUnBloc } from "../rendu-des-blocs"
 import type { Position } from "./blocs-de-page"
 import { ChampDeBloc, type LiensDesBlocs } from "./champ-de-bloc"
 import { itemsDuChoix } from "./choix-de-bloc"
@@ -210,7 +209,7 @@ function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, suivreLaCe
   const { cle, bloc } = rangee
   const mots = premiersMots(bloc)
   if (forme === "tableau") return <TableauEdite cle={cle} bloc={bloc} decritPar={decritPar} lectureSeule={verrouille} suivre={suivreLaCellule} />
-  if (forme === "repli") return <RepliEdite cle={cle} bloc={bloc} mots={mots} decritPar={decritPar} lectureSeule={verrouille} />
+  if (forme === "repli") return <RepliEdite cle={cle} bloc={bloc} mots={mots} decritPar={decritPar} lectureSeule={verrouille} liens={liens} />
   return (
     <ChampDeBloc
       cle={cle}

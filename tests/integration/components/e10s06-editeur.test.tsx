@@ -470,6 +470,51 @@ describe("EditeurDeBlocs, repli (AC-b4)", () => {
     expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "toggle", text: "Le corps", data: { summary: "Détails" } } }])
   })
 
+  // 1.1.3 : le dessin de la lecture (pastille, chevron, panneau), le corps replié au chevron, l'état jamais envoyé (HN-E10S06-22).
+  it("should draw the toggle as read, fold its body from the chevron without sending, and unfold it on Enter in the summary", async () => {
+    const repli = bloc("fc000000-0000-4000-8000-00000000000c", "toggle", "Le **corps**", { summary: "Détails" })
+    monter([repli])
+    const resume = zone(champ("Résumé du repli — Détails"))
+    const corps = zone(champ("Corps du repli — Détails"))
+    const panneau = corps.closest(".oto-linked-body")
+    const pastille = resume.closest(".oto-linked-head")
+    expect(pastille?.parentElement).toHaveClass("oto-linked")
+    expect(panneau?.parentElement).toBe(pastille?.parentElement)
+    // Au repos, le corps se lit comme en lecture, ses marques rendues sur le champ.
+    expect(corps).toHaveAttribute("data-rendu")
+    expect(within(corps.parentElement ?? corps).getByText("corps").tagName).toBe("STRONG")
+    // Le chevron, un bouton natif de la pastille (Entrée et Espace viennent du navigateur), dit l'état du corps.
+    const chevron = bouton("Replier le corps — Détails")
+    expect(chevron.tagName).toBe("BUTTON")
+    expect(pastille).toContainElement(chevron)
+    expect(chevron.querySelector(".oto-linked-chevron")).not.toBeNull()
+    expect(chevron).toHaveAttribute("aria-expanded", "true")
+    expect(chevron).toHaveAttribute("aria-controls", panneau?.id)
+    // Le résumé s'écrit sur une ligne ; passer au chevron n'envoie rien, replier cache le corps.
+    act(() => resume.focus())
+    taper(resume, "Détails\nde la relance")
+    act(() => chevron.focus())
+    fireEvent.click(chevron)
+    expect(chevron).toHaveAttribute("aria-expanded", "false")
+    expect(chevron).toHaveAccessibleName("Déplier le corps — Détails de la relance")
+    expect(panneau).not.toBeVisible()
+    fireEvent.click(chevron)
+    expect(panneau).toBeVisible()
+    fireEvent.click(chevron)
+    // Entrée dans le résumé d'un repli replié : le corps se déplie et prend le focus.
+    act(() => resume.focus())
+    fireEvent.keyDown(resume, { key: "Enter" })
+    await focusSur(corps)
+    expect(chevron).toHaveAttribute("aria-expanded", "true")
+    expect(panneau).toBeVisible()
+    taper(corps, "Le **corps** relu")
+    ailleurs()
+    await waitFor(() => expect(api.envoyes).toHaveLength(1))
+    expect(api.envoyes[0].ops).toEqual([
+      { op: "replace_block", block: repli.id, revision: 3, input: { type: "toggle", text: "Le **corps** relu", data: { summary: "Détails de la relance" } } },
+    ])
+  })
+
   it("should refuse a toggle inside the body", async () => {
     const repli = bloc("fc000000-0000-4000-8000-00000000000c", "toggle", "Corps", { summary: "Détails" })
     monter([repli])

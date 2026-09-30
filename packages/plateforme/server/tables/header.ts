@@ -17,7 +17,7 @@ import {
   type TableHeader,
   type TableLifecycle,
 } from "../../schemas"
-import { isRecord } from "../../schemas/tables"
+import { isRecord, KEY_COLUMN_TYPES } from "../../schemas/tables"
 import { boundedList } from "../errors"
 
 type Problems = string[]
@@ -28,9 +28,6 @@ const ATTRIBUTES = {
   lifecycle: Object.keys(tableLifecycleSchema.shape),
   review: Object.keys(tableReviewSchema.shape),
 }
-
-/** Types qui peuvent porter la clé d'une ligne (N1). */
-const KEY_TYPES: readonly ColumnType[] = ["text", "email", "url", "number"]
 
 /** Types qui prennent `max_length` (AC1). */
 export const LENGTH_TYPES: readonly ColumnType[] = ["text", "email", "url"]
@@ -117,11 +114,14 @@ function columnProblems(columns: readonly IndexedColumn[]): Problems {
   })
 }
 
+/** « text, email, url, number or date » : les types de clé dits depuis leur liste unique. */
+const KEY_TYPES_SAID = `${KEY_COLUMN_TYPES.slice(0, -1).join(", ")} or ${KEY_COLUMN_TYPES.at(-1)}`
+
 function keyProblems(key: unknown, columns: readonly IndexedColumn[], names: readonly string[]): Problems {
   if (typeof key !== "string") return []
   if (!names.includes(key)) return [`key: unknown column ${key}. Columns: ${boundedList(names)}.`]
   const column = columns.find((candidate) => candidate.column.name === key)?.column
-  if (column && !KEY_TYPES.includes(column.type)) return [`key: the key column must be text, email, url or number; ${key} is ${column.type}.`]
+  if (column && !KEY_COLUMN_TYPES.includes(column.type)) return [`key: the key column must be ${KEY_TYPES_SAID}; ${key} is ${column.type}.`]
   return []
 }
 

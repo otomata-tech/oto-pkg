@@ -308,6 +308,10 @@
 .oto-code:hover .oto-code-copy,
 .oto-code:focus-within .oto-code-copy { opacity: 1; }
 
+/* Un bloc de code ou de diagramme d'un contenu (`data-kind`) : fond sombre et coins arrondis, pour qu'il se lise comme du code. */
+.oto-code[data-kind] { border-color: var(--code-bd); background: var(--code-bg); color: var(--code-fg); }
+.oto-code[data-kind] .oto-code-head { border-block-end-color: var(--code-bd); color: var(--code-mute); }
+
 .oto-code pre { margin: 0; padding: var(--space-3); overflow-x: auto; line-height: var(--lh-normal); }
 .oto-code code { font-family: inherit; }
 
@@ -325,6 +329,19 @@
   user-select: none;
   font-variant-numeric: tabular-nums;
 }
+
+/* Un diagramme dessiné (`diagramme-mermaid.tsx`) : sur la surface d'une carte, aux couleurs du thème de mermaid choisi pour le mode ; un dessin plus large que la colonne défile dans son cadre, jamais la page. Son texte se replie dessous. */
+.oto-diagramme-dessin {
+  border: 1px solid var(--island-bd);
+  border-radius: var(--r-card);
+  background: var(--card);
+  padding: var(--space-3);
+  overflow-x: auto;
+  text-align: center;
+}
+.oto-diagramme-code { margin-block-start: var(--space-1-5); }
+.oto-diagramme-code > summary { inline-size: fit-content; cursor: pointer; }
+.oto-diagramme-code[open] > summary { margin-block-end: var(--space-1-5); }
 
 /* Tree : l'indentation est une variable de profondeur posée par l'enveloppe ; imbriquer des `<ul>` casserait la navigation au clavier à plat. */
 

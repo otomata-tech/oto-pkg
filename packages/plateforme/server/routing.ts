@@ -9,6 +9,7 @@
 // lecture par clé de service, les seuils en constantes seules (→ réglage par organisation), la
 // pénalité de voisine et `s_trigger` (→ `s_summary`, P37), le genre en paramètre (→ procédure, N18).
 import * as z from "zod/v4"
+import { normalizeTitle } from "../schemas"
 import { ACCESS_LEVELS, nodeLevels } from "./access"
 import type { PlatformDb } from "./db"
 import { fromDatabaseError, inTransaction, PlatformError, READ_PAGE_ROWS } from "./errors"
@@ -182,9 +183,10 @@ export async function loadRoutingSettings(db: PlatformDb, orgId: string): Promis
 
 /**
  * Le genre d'une demande (E11-S04, AC-b2) : `how` demande comment faire, `request` demande poliment une
- * action, `data` pose une question de données, `action` demande d'agir.
+ * action, `data` pose une question de données, `action` demande d'agir ; `edit` (E11-S19, AC-d3) demande de
+ * modifier un contenu.
  */
-export type RequestKind = "how" | "request" | "data" | "action"
+export type RequestKind = "how" | "request" | "data" | "action" | "edit"
 
 // Un mot ou une formule suivis d'une frontière de mot (H37, N1).
 const BOUNDARY = String.raw`(?:$|[\s,?!.])`
@@ -207,6 +209,31 @@ const REQUEST_FORMULAS = [
   "vous voulez bien",
 ]
 const REQUEST = new RegExp(`^(?:${REQUEST_FORMULAS.join("|")})${BOUNDARY}`)
+// HN-E11S19-6 : les verbes d'une demande de modifier un texte, liste fermée, à l'impératif en tête ou à l'infinitif
+// après une formule de demande. Ni « ajoute » (une création, souvent une procédure), ni « supprime », « retire »,
+// « efface » : une suppression passe par `node.trash`, `table.delete_rows` ou l'en-tête d'un tableau, pas par find → write.
+const EDIT_VERBS = [
+  "modifie",
+  "modifier",
+  "corrige",
+  "corriger",
+  "change",
+  "changer",
+  "remplace",
+  "remplacer",
+  "mets à jour",
+  "mettre à jour",
+  "réécris",
+  "réécrire",
+  "reformule",
+  "reformuler",
+  "renomme",
+  "renommer",
+]
+const EDIT = new RegExp(`^(?:(?:${REQUEST_FORMULAS.join("|")}) )?(?:${EDIT_VERBS.join("|")})${BOUNDARY}`)
+// HN-E11S19-7 (H37 amendée) : une question dont la personne est le sujet et un tiers l'objet (« Qu'est-ce que je lui
+// réponds ? ») demande quoi faire, pas une donnée ; « Qu'est-ce que j'ai à faire ? » reste une question de données.
+const ACTION_QUESTION = new RegExp(`^(?:qu'est-ce que |qu'est-ce qu'|que )(?:je|on|nous|dois-je|puis-je|faut-il) (?:lui|leur)${BOUNDARY}`)
 // H37, N1 : un interrogatif suivi d'une frontière de mot ; « est-ce qu' » sans condition. « comment »
 // est une demande `how` (AC-b2).
 const INTERROGATIVE = new RegExp(
@@ -215,15 +242,51 @@ const INTERROGATIVE = new RegExp(
 
 /**
  * Après `trim`, sans casse et l'apostrophe typographique ramenée à `'` : `how` quand la phrase commence
- * par « comment », `request` par une formule de demande, `data` quand elle finit par « ? » ou commence
- * par un interrogatif (H37, N1), `action` sinon. Chaque genre a sa consigne quand aucune étape n'est
- * servie (`server/context/blocks/code.ts`).
+ * par « comment », `edit` par un verbe d'édition (après une formule de demande au besoin), `request` par une
+ * formule de demande, `action` pour une question sur quoi faire à un tiers, `data` quand elle finit par « ? »
+ * ou commence par un interrogatif (H37, N1), `action` sinon. Sans candidate, `data` et `edit` ont leur
+ * consigne (`server/context/blocks/code.ts`).
  */
 export function requestKind(phrase: string): RequestKind {
   const text = phrase.trim().toLowerCase().replace(/’/g, "'")
   if (HOW.test(text)) return "how"
+  if (EDIT.test(text)) return "edit"
   if (REQUEST.test(text)) return "request"
+  if (ACTION_QUESTION.test(text)) return "action"
   return text.endsWith("?") || INTERROGATIVE.test(text) ? "data" : "action"
+}
+
+/** Longueur d'un mot compté par `wordsInCommon` ; en dessous, surtout des mots vides (« les », « une »). */
+const COMMON_WORD_MIN = 4
+/** Deux mots de même racine approchée : mêmes cinq premières lettres (« relance », « relancer »). */
+const COMMON_STEM = 5
+
+/** Les mots d'un texte, en minuscules, avec leur forme sans casse ni accents. */
+function wordsOf(text: string): { word: string; bare: string }[] {
+  return text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= COMMON_WORD_MIN)
+    .map((word) => ({ word, bare: normalizeTitle(word) }))
+}
+
+function sameWord(a: string, b: string): boolean {
+  return a === b || (a.length >= COMMON_STEM && b.length >= COMMON_STEM && a.slice(0, COMMON_STEM) === b.slice(0, COMMON_STEM))
+}
+
+/**
+ * Les mots de la demande trouvés dans le titre ou le résumé d'une candidate (E11-S19, AC-d2, HN-E11S19-5), une fois
+ * chacun, dans l'ordre de la demande : quatre lettres au moins, comparés sans casse ni accents, égaux ou de mêmes cinq
+ * premières lettres. Une approche des lexèmes du score, pour qu'un auteur sache quels mots ajouter au résumé.
+ */
+export function wordsInCommon(phrase: string, candidate: Pick<Candidate, "title" | "summary">): string[] {
+  const found = wordsOf(`${candidate.title} ${candidate.summary}`).map((entry) => entry.bare)
+  const seen = new Set<string>()
+  return wordsOf(phrase).flatMap(({ word, bare }) => {
+    if (seen.has(bare) || !found.some((other) => sameWord(bare, other))) return []
+    seen.add(bare)
+    return [word]
+  })
 }
 
 /** Une question de données (H37, N1) : elle appelle « cherche et réponds » (`structuredContent.data_question`). */

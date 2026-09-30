@@ -3,7 +3,7 @@
 // Les gestes de l'éditeur, servis à ses rangées par un contexte (E05-S02, AC22) : une rangée reçoit
 // des données, jamais une fonction (`portage-ecrans.md § 2`), et lit ici ce que font ses boutons, son
 // champ et son clavier. Sans lui, chaque rangée recevrait une douzaine de rappels en props.
-import { createContext, useContext, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react"
+import { createContext, useContext, useInsertionEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent } from "react"
 import type { Tableau } from "./blocs-de-page"
 import type { Genre } from "./envoi-de-fichier"
 import type { OptionDuDepot } from "./gestes-des-fichiers"
@@ -92,9 +92,41 @@ export type Gestes = {
   cliquerLaPoignee: (cle: string, evenement: MouseEvent<HTMLElement>) => void
   /** « Annuler » d'un geste sur une sélection de blocs (AC-a6, AC-a8). */
   annulerLeGroupe: (groupe: GesteDeGroupe) => void
+  /** Un bloc lu reçoit le focus (tabulation, toucher) : son champ se monte et prend le focus, le curseur à `curseur` (1.1.3). */
+  ouvrirLeChamp: (cle: string, curseur: number) => void
+  /** Le champ monté d'un bloc prend le focus, ou son panneau « Lien » s'ouvre : il reste monté quand le pointeur s'en va (1.1.3). */
+  activerLeChamp: (cle: string) => void
 }
 
 export const ContexteDesGestes = createContext<Gestes | null>(null)
+
+type Appelable = (...parametres: unknown[]) => unknown
+
+/** Pour chaque geste de `modele` (la poignée comprise, un objet de gestes), une enveloppe qui appelle celui que `lire` rend. */
+function enveloppes<T extends object>(modele: T, lire: () => T): T {
+  const stables: Record<string, unknown> = {}
+  for (const [nom, valeur] of Object.entries(modele)) {
+    // Un geste est une fonction, ou un objet de fonctions (`poignee`) ; les deux se relisent par leur nom.
+    const courant = () => (lire() as Record<string, unknown>)[nom]
+    stables[nom] = typeof valeur === "function" ? (...parametres: unknown[]) => (courant() as Appelable)(...parametres) : enveloppes(valeur as object, courant as () => object)
+  }
+  // Les mêmes noms que `modele`, chacun une fonction ou un objet de fonctions de même signature.
+  return stables as T
+}
+
+/**
+ * Les gestes servis par le contexte, les mêmes d'un rendu à l'autre : chacun appelle celui du dernier rendu, et un
+ * geste ne fige donc jamais un état périmé. Sans eux, chaque rendu de l'éditeur (chaque frappe) rendait à nouveau
+ * toutes les rangées, qui lisent ce contexte. Relus avant tout effet de mise en page, ceux des rangées comprises.
+ */
+export function useGestesStables(courants: Gestes): Gestes {
+  const lus = useRef(courants)
+  useInsertionEffect(() => {
+    lus.current = courants
+  })
+  const [stables] = useState(() => enveloppes(courants, () => lus.current))
+  return stables
+}
 
 export function useGestes(): Gestes {
   const gestes = useContext(ContexteDesGestes)

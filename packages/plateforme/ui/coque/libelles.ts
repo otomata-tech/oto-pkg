@@ -13,9 +13,8 @@ export const RAIL = {
   connecteurs: "Connecteurs",
 } as const
 
-/** Le menu de l'entreprise (AC-a4) : deux groupes d'oto-frontend, les écrans de la plateforme rangés dessous (E05-S11, AC-33). */
+/** Le menu de l'entreprise (AC-a4) : les réglages d'oto-frontend, les écrans de la plateforme rangés dessous (E05-S11, AC-33). */
 export const ENTREPRISE = {
-  suivi: "Suivi de l’entreprise",
   reglages: "Réglages de l’entreprise",
   usage: "Usage",
   journal: "Journal",

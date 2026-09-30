@@ -195,7 +195,7 @@ describe.skipIf(!sqlConfigured)(portable("table.rows on a real database"), { tim
       for (const other of [{ filter: { ville: "Valbrune" } }, { q: "atelier" }, { sort: { column: "ville" } }]) {
         expect(await refusal({ limit: 5, cursor: first.data.next_cursor, ...other })).toMatchObject({
           code: "invalid_arguments",
-          message: "This cursor belongs to another query (filter, q or sort changed): start again without cursor.",
+          message: "This cursor belongs to another query (filter, q, match or sort changed): start again without cursor.",
         })
       }
       const invalid = { code: "invalid_arguments", message: "Invalid cursor: pass the next_cursor of the previous page unchanged, or omit it." }
@@ -276,6 +276,22 @@ describe.skipIf(!sqlConfigured)(portable("table.rows on a real database"), { tim
       expect(keys(await rows({ q: "coudray MAIRIE" }))).toEqual(["Mairie de Coudray"])
       expect(keys(await rows({ q: "valbrune nina" }))).toEqual(["Atelier 2"])
       expect(keys(await rows({ q: "valbrune inconnu" }))).toEqual([])
+    })
+
+    // E11-S19 (AC-f1 à AC-f3, HN-E11S19-11) : en OU, au moins un mot, le plus de mots d'abord, `sort` départage ; le ET reste le défaut.
+    it("should keep the rows with at least one word of q under match any, most words first, then by sort, with a cursor of its own", async () => {
+      expect(keys(await rows({ q: "valbrune sophie" }))).toEqual(["École de Valbrune"])
+      expect(keys(await rows({ q: "valbrune sophie", match: "all" }))).toEqual(["École de Valbrune"])
+      const any = await rows({ q: "valbrune sophie", match: "any" })
+      expect([keys(any), any.data.total]).toEqual([["École de Valbrune", "Atelier 2", "Boulangerie Fournier"], 3])
+      expect(keys(await rows({ q: "valbrune sophie", match: "any", sort: { column: "entreprise", direction: "desc" } }))).toEqual(["École de Valbrune", "Boulangerie Fournier", "Atelier 2"])
+      expect(keys(await rows({ q: "valbrune inconnu", match: "any" }))).toEqual(["Atelier 2", "Boulangerie Fournier", "École de Valbrune"])
+      const first = await rows({ q: "valbrune sophie", match: "any", limit: 1 })
+      expect(keys(await rows({ q: "valbrune sophie", match: "any", limit: 1, cursor: first.data.next_cursor }))).toEqual(["Atelier 2"])
+      expect(await refusal({ q: "valbrune sophie", limit: 1, cursor: first.data.next_cursor })).toMatchObject({
+        code: "invalid_arguments",
+        message: "This cursor belongs to another query (filter, q, match or sort changed): start again without cursor.",
+      })
     })
 
     it("should serve host and worker in the provenance when stored, and never the ctx code (AC-d4)", async () => {

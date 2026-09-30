@@ -38,7 +38,8 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
    lien et l'envoi fait échouer l'envoi.
    Un fichier à joindre est envoyé par le serveur au stockage d'ADR-016, par l'URL présignée du
    port, sous les contrôles d'une demande d'envoi (type, taille, quota).
-5. **Refus avant consommation** : une requête qui porte un en-tête `Origin` (un navigateur, ou un
+5. **Refus avant consommation** : une autre méthode que `POST` (`forbidden` en texte brut, comme
+   une requête à `Origin` : un `GET` d'un navigateur n'en porte pas), une requête qui porte un en-tête `Origin` (un navigateur, ou un
    fichier HTML vu dans la visionneuse qui connaîtrait le jeton), une forme de jeton invalide, un corps trop gros. Ces
    refus ne consomment pas le ticket.
 6. **Canal qui reste ouvert** : quiconque voit le lien dans les 15 minutes (conversation partagée,

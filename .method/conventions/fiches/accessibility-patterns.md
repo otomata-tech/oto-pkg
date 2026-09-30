@@ -6,7 +6,7 @@ Texte complet : `.method/conventions/accessibility-patterns.md`. La fiche suffit
 - L'ordre de tabulation suit l'ordre visuel, aucun `tabIndex` supérieur à 0, tout élément interactif est focusable. § Ordre de focus
 - Le focus visible des primitives Shadcn reste : aucun `outline-none` sans `focus-visible:ring-*` sur le même élément, aucune règle globale `*:focus { outline: none }`. § Ordre de focus
 - Aucun `onClick` sur un `div` ou un `span` : un `<button>`. § Ordre de focus
-- `outline-hidden` n'est admis que sur le champ d'un bloc de l'éditeur (`champ-de-bloc.tsx`), dont la rangée révèle sa gouttière au `:focus-within`. § Ordre de focus
+- `outline-hidden` n'est admis que sur le champ d'un bloc de l'éditeur (`champ-de-bloc.tsx`) et sur le bloc lu qui le précède (`champ-au-repos.tsx`), dont la rangée révèle sa gouttière au `:focus-within`. § Ordre de focus
 - Escape ferme une modale ou un menu, les flèches parcourent listes et menus. § Raccourcis clavier
 - Un lien d'évitement, premier élément du `body`, mène à `#main-content`. § Skip link
 - Chaque champ a un `label` associé, son erreur liée par `aria-describedby` en `role="alert"`, l'obligation dite en `sr-only`, un groupe en `fieldset` et `legend`. § Formulaires

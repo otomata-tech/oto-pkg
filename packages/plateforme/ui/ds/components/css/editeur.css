@@ -34,9 +34,15 @@
 .oto-block-field[data-kind="code"] {
   font-family: var(--mono);
   font-size: var(--fs-xs);
-  background-color: var(--field);
+  /* Le fond sombre du code lu (`misc.css`, `.oto-code[data-kind]`) : le bloc se lit comme du code dès l'édition. */
+  background-color: var(--code-bg);
+  color: var(--code-fg);
+  caret-color: var(--code-fg);
+  border-color: var(--code-bd);
+  border-radius: var(--r-card);
   white-space: pre-wrap;
 }
+.oto-block-field[data-kind="code"]::placeholder { color: var(--code-mute); }
 
 /* ── la liste des contenus à citer (AC-a9) : la surface d'un menu, posée dans le flux sous le champ, que l'îlot ne rogne pas. */
 .oto-pop.oto-citer {
@@ -125,6 +131,21 @@
 
 .oto-block-pile > :is(.oto-block-field, .oto-inline-field):focus + .oto-block-rendu {
   visibility: hidden;
+}
+
+/* ── le bloc lu (1.1.3) : un bloc qu'on ne touche pas garde son texte brut dans un `span` aux classes du champ, qui le replie comme le `<textarea>` qui le remplace au toucher ; lecture seule et invite, dans le gris du champ, sauf le code et le diagramme, qui gardent l'encre du fond sombre (`--code-fg`). */
+.oto-block-field[data-au-repos] {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+}
+
+.oto-block-field[data-au-repos][aria-readonly="true"]:not([data-rendu], [data-kind="code"]) {
+  color: var(--mute);
+}
+
+.oto-block-field[data-au-repos] > .oto-block-invite {
+  color: var(--mute);
 }
 
 /* ── les éléments d'une liste (E11-S06, lot a) : une copie du texte du champ, aux classes du champ, que le navigateur replie comme lui ; posée au-dessus du champ (elle le précède, pour que ses cases viennent avant lui au clavier), elle laisse passer le pointeur, sauf sur une case ou un lien. */

@@ -6,9 +6,9 @@
 import type { LookupAddress } from "node:dns"
 import { describe, expect, it } from "vitest"
 import { UPLOAD_BYTES_MAX } from "../../packages/plateforme/schemas"
-import { fetchSource, isPublicAddress, SOURCE_FAILURES, type Resolve, type SourceGet } from "../../packages/plateforme/server/uploads-fetch"
+import { fetchSource, isPublicAddress, SOURCE_FAILURES, textSourceFailure, type Resolve, type SourceGet } from "../../packages/plateforme/server/uploads-fetch"
 
-type Reply = { status?: number; location?: string; length?: number; chunks?: Uint8Array[]; hang?: boolean }
+type Reply = { status?: number; location?: string; length?: number; type?: string; chunks?: Uint8Array[]; hang?: boolean }
 
 /** Un faux réseau : chaque requête résout son hôte par le `lookup` de la connexion, puis rend la réponse de son adresse. */
 function network(replies: Record<string, Reply>): { get: SourceGet; requested: string[]; read: () => number } {
@@ -31,7 +31,7 @@ function network(replies: Record<string, Reply>): { get: SourceGet; requested: s
             yield chunk
           }
         }
-        resolve({ status: reply.status ?? 200, location: reply.location ?? null, length: reply.length ?? null, body: body(), discard: () => undefined })
+        resolve({ status: reply.status ?? 200, location: reply.location ?? null, length: reply.length ?? null, type: reply.type ?? null, body: body(), discard: () => undefined })
       })
     })
   return { get, requested, read: () => read }
@@ -131,7 +131,7 @@ describe("download of a source_url (AC-f12, AC-f13)", () => {
       toHttp: await fetchSource("https://files.example.org/0", { resolve, get: toHttp.get }),
       three: await fetchSource("https://files.example.org/0", { resolve, get: three.get }),
       four: await fetchSource("https://files.example.org/0", { resolve, get: four.get }),
-    }).toEqual({ toHttp: { failure: SOURCE_FAILURES.scheme }, three: { bytes: bytes("ok") }, four: { failure: SOURCE_FAILURES.redirects } })
+    }).toEqual({ toHttp: { failure: SOURCE_FAILURES.scheme }, three: { bytes: bytes("ok"), type: null }, four: { failure: SOURCE_FAILURES.redirects } })
     expect(four.requested).toHaveLength(4)
   })
 
@@ -143,7 +143,7 @@ describe("download of a source_url (AC-f12, AC-f13)", () => {
       "https://files.example.org/announced": { length: UPLOAD_BYTES_MAX + 1, chunks: [big] },
       "https://files.example.org/streamed": { chunks: [big, big, big, big, big, big] },
       "https://files.example.org/gone": { status: 404 },
-      "https://files.example.org/r.md": { chunks: [bytes("# Rapport\n"), bytes("Texte.")] },
+      "https://files.example.org/r.md": { type: "text/markdown; charset=utf-8", chunks: [bytes("# Rapport\n"), bytes("Texte.")] },
     })
     const download = (path: string) => fetchSource(`https://files.example.org/${path}`, { resolve, get: net.get, timeoutMs: 50 })
     expect({
@@ -157,9 +157,23 @@ describe("download of a source_url (AC-f12, AC-f13)", () => {
       announced: { failure: SOURCE_FAILURES.tooLarge },
       streamed: { failure: SOURCE_FAILURES.tooLarge },
       gone: { failure: "source_url answered 404" },
-      served: { bytes: bytes("# Rapport\nTexte.") },
+      served: { bytes: bytes("# Rapport\nTexte."), type: "text/markdown; charset=utf-8" },
     })
     // Refusée à sa taille annoncée, la réponse n'est pas lue ; lue, elle s'arrête au morceau qui passe 1 Mo.
     expect(net.read()).toBe(5 * big.byteLength + bytes("# Rapport\nTexte.").byteLength)
+  })
+})
+
+describe("the type a markdown file or a CSV is downloaded under (FB-0014, HN-E10S02-118)", () => {
+  it.each([
+    ["text/markdown; charset=utf-8", null],
+    ["text/plain", null],
+    ["TEXT/CSV", null],
+    ["application/octet-stream", null],
+    [null, null],
+    ["text/html; charset=UTF-8", "source_url serves text/html, not a text file: a markdown file or a CSV is read from text/markdown, text/plain or text/csv"],
+    ["application/json", "source_url serves application/json, not a text file: a markdown file or a CSV is read from text/markdown, text/plain or text/csv"],
+  ])("should read %s as: %s", (type, failure) => {
+    expect(textSourceFailure(type)).toBe(failure)
   })
 })

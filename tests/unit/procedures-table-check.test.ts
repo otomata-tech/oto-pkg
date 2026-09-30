@@ -81,7 +81,8 @@ describe.skipIf(!sqlConfigured)(portable("publishing a procedure that releases r
     expect(refused).toMatchObject({
       code: "invalid_arguments",
       message: [
-        `Publication of ${PATH} refused: 1 problem(s). The draft is kept; nothing was published.`,
+        // E11-S18 (AC-1) : rien d'écrit ; le brouillon d'avant l'appel reste, le bloc s'y corrige.
+        `Publication of ${PATH} refused: 1 problem(s). Nothing was written; the draft saved before this call stays.`,
         `- ${problem}`,
         'Fix them with acme_write (ops on the sections), then publish again. Format and rules: acme_read {"path": "write.procedure"}.',
         "Writing it in several calls? Pass publish: false until the last one.",

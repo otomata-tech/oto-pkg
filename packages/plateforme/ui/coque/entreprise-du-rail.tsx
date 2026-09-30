@@ -8,7 +8,8 @@
 // avec un accès en cours) ; le logo de l'organisation remplace le mark (E09-S01). E05-S11 (AC-33) : deux
 // groupes, « Réglages de l'entreprise » (Organisation, Équipes & accès) avant « Suivi de l'entreprise » ;
 // « Membres & équipes » disparaît. E05-S13 (AC-10) : Journal dans les réglages ; Usage caché et Retours au staff, par
-// les adresses que l'hôte donne. Retiré : la bascule d'entreprise (une organisation par adresse,
+// les adresses que l'hôte donne. 1.1.3 : « Suivi de l'entreprise » disparaît, Usage et Retours hors du menu
+// (`ecrans.ts`), un seul groupe reste, sans sous-titre. Retiré : la bascule d'entreprise (une organisation par adresse,
 // ADR-004 : aucun service ne liste celles d'une personne), TanStack Query.
 import { AnimatedIcon } from "../ds/react/icon"
 import type { MenuItem } from "../ds/react/overlays"
@@ -21,7 +22,6 @@ import type { AdressesDuRail } from "./types"
 
 const GROUPES: readonly { rangement: Rangement; titre: string }[] = [
   { rangement: "reglages", titre: ENTREPRISE.reglages },
-  { rangement: "suivi", titre: ENTREPRISE.suivi },
 ]
 
 /**

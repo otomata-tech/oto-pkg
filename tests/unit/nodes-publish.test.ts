@@ -11,7 +11,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { renderBlocks, type BlockInput } from "../../packages/plateforme/schemas"
 import { readNode } from "../../packages/plateforme/server/nodes/read"
-import { writeNode } from "../../packages/plateforme/server/nodes/write"
+import { writeNode, type WriteOrigin } from "../../packages/plateforme/server/nodes/write"
 import { addBlocks, CONTENT_AT, contentTables, identityOf, nodeId, openDraftRow, type Person } from "../helpers/reference-org"
 import { seedReferenceOrg, type ReferenceOrgSql } from "../helpers/reference-org-sql"
 import type { Tables } from "../helpers/simulated-db"
@@ -66,10 +66,10 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
   const content = (tables: Tables) => replaceContent(seed, ref, tables)
 
   /** `write` publiant par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde ici le brouillon. */
-  async function write(person: Person, input: Record<string, unknown>, hook?: SpyHook) {
+  async function write(person: Person, input: Record<string, unknown>, hook?: SpyHook, origin: WriteOrigin = { kind: "agent", ctx: null }) {
     const spied = spyDb(await ref.db(person), hook)
     const body = "publish" in input ? input : { ...input, publish: false }
-    const outcome = await writeNode(spied.db, who(person), body, { kind: "agent", ctx: null }).then(
+    const outcome = await writeNode(spied.db, who(person), body, origin).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),
     )
@@ -109,9 +109,10 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       await content(crTest())
       const lea = await write("lea", { path: "ventes/cr_test", base_revision: 0, ops: [{ op: "append", section: "Décisions", text: "Autre." }], publish: undefined })
       expect(lea.error).toBeNull()
-      expect(lea.result?.text.split("\n").slice(1)).toEqual([
-        "Published ventes/cr_test revision 1 (1 section, 3 blocks). Next write: base_revision 1.",
-        "Renamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here.",
+      // Une ligne pour l'écriture publiée (E11-S18, AC-4) ; le chemin se choisit par `node.move` (AC-6).
+      expect(lea.result?.text.split("\n")).toEqual([
+        expect.stringMatching(/^Published ventes\/cr_test revision 1 \(1 section, 3 blocks\): appended to « Décisions » \(\+6 → [0-9]+ characters\)\. Next write: base_revision 1\.$/),
+        'Renamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here. To choose the path, call acme_call node.move {"path": "ventes/cr_de_test_final", "new_path": "<path>"}.',
       ])
       expect(publishCalls(lea.calls)).toHaveLength(1)
 
@@ -126,7 +127,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17), l'ancienne restant un alias ; au niveau
       // écriture depuis E11-S02 (AC-a3, HN-E11S02-18).
       expect(alone.result?.text).toBe(
-        "Published ventes/cr_test revision 1 (1 section, 2 blocks). Next write: base_revision 1.\nRenamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here.",
+        'Published ventes/cr_test revision 1 (1 section, 2 blocks). Next write: base_revision 1.\nRenamed: now at ventes/cr_de_test_final; the old path ventes/cr_test still leads here. To choose the path, call acme_call node.move {"path": "ventes/cr_de_test_final", "new_path": "<path>"}.',
       )
       expect(await nodeRow("ventes/cr_de_test_final")).toMatchObject({ status: "published", revision: 1, title: "CR de test final" })
       expect(ref.readable((await blocksOf("ventes/cr_de_test_final")).map((row) => [row.id, row.state]))).toEqual(draftIds.map((id) => [id, "published"]))
@@ -140,7 +141,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       await content(table)
       const published = await write("lea", { path: "ventes/suivi", base_revision: 1, publish: true })
       expect(published.result?.text).toBe(
-        "Published ventes/suivi revision 2. Next write: base_revision 2.\nRenamed: now at ventes/suivi_des_prospects; the old path ventes/suivi still leads here.",
+        'Published ventes/suivi revision 2. Next write: base_revision 2.\nRenamed: now at ventes/suivi_des_prospects; the old path ventes/suivi still leads here. To choose the path, call acme_call node.move {"path": "ventes/suivi_des_prospects", "new_path": "<path>"}.',
       )
       expect(ref.readable(publishCalls(published.calls).map(publishArgs))).toEqual([{ p_node: nodeId("ventes/suivi"), p_base_revision: 1, p_draft_stamp: sameInstant(CONTENT_AT) }])
     })
@@ -166,17 +167,19 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       // Une autre publication passe entre la lecture et `publish_node` : révision 3, que `publish_node` refuse (`PT409`).
       const published = beforePublish(() => seed.admin`select platform.publish_node(${ref.nodeId("ventes/devis")}::uuid, 2)`)
       await content(pending())
+      const screenOrigin: WriteOrigin = { kind: "human" }
+      const refusedByPublish = "stale revision: ventes/devis is at revision 3, not 2. Nothing was published. Read it again, then retry."
+      expect((await write("claire", { path: "ventes/devis", base_revision: 2, publish: true }, published, screenOrigin)).error).toMatchObject({ code: "stale_revision", message: refusedByPublish })
+      // Un assistant : la course interrompt son écriture atomique, rejouée une fois, qui dit l'état d'après (E11-S18, HN-E11S18-2).
+      await content(pending())
       const raced = await write("claire", { path: "ventes/devis", base_revision: 2, publish: true }, published)
-      expect(raced.error).toMatchObject({
-        code: "stale_revision",
-        message: "stale revision: ventes/devis is at revision 3, not 2. Nothing was published. Read it again, then retry.",
-      })
+      expect(raced.error).toMatchObject({ code: "stale_revision", message: expect.stringMatching(/^stale revision: ventes\/devis is at revision 3, not 2\. Nothing was written\. Current state:\n/) })
       // Le brouillon enregistré de nouveau entre la lecture de son tampon et `publish_node` : la révision reste 2,
-      // `publish_node` refuse le tampon lu (`PT409`, M02).
+      // `publish_node` refuse le tampon lu (`PT409`, M02) ; l'écran, dont la publication n'est pas rejouée.
       const moved = "stale revision: ventes/devis changed while publishing (its draft was saved meanwhile). Nothing was published. Read it again with draft: true, then retry."
       const saved = beforePublish(() => seed.admin`update platform.node_drafts set title = 'Autre titre' where node_id = ${ref.nodeId("ventes/devis")}`)
       await content(pending())
-      expect((await write("claire", { path: "ventes/devis", base_revision: 2, publish: true }, saved)).error).toMatchObject({ code: "stale_revision", message: moved })
+      expect((await write("claire", { path: "ventes/devis", base_revision: 2, publish: true }, saved, screenOrigin)).error).toMatchObject({ code: "stale_revision", message: moved })
       await content(pending())
       const screen = await write("claire", { path: "ventes/devis", base_revision: 2, publish: true, draft_stamp: "2026-09-21T00:00:00+00:00" })
       expect(screen.error).toMatchObject({ code: "stale_revision", message: moved, details: { revision: 2 } })

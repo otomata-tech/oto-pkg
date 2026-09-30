@@ -81,6 +81,11 @@
   --ring-solid:        color-mix(in srgb, var(--primary) 22%, var(--island));
   --skeleton:          var(--card);
   --skeleton-sheen:    color-mix(in srgb, var(--ink) 6%, transparent);
+  /* Le bloc de code : sombre de jour comme de nuit, dans la teinte du rail, pour qu'il se lise comme du code. */
+  --code-bg:   color-mix(in srgb, var(--rail-tint) 55%, #0a0908);
+  --code-fg:   color-mix(in srgb, var(--rail-tint) 10%, #ffffff);
+  --code-mute: color-mix(in srgb, var(--rail-tint) 40%, #ffffff);
+  --code-bd:   color-mix(in srgb, #ffffff 12%, var(--code-bg));
 }
 .oto[data-oto-theme="manuscrit"] {
   --primary:#f0b41e; --primary-on:#141210; --primary-text:#8c6912;

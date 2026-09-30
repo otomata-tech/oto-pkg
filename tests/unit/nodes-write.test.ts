@@ -158,7 +158,8 @@ describe.skipIf(!sqlConfigured)(portable("write on a real database"), { timeout:
       await content(base())
       const lea = await write("lea", input, { asIs: true })
       expect(lea.result?.text).toBe(
-        "Draft of ventes/cr_test created (revision 0): added « Décisions » (34 characters).\nPublished ventes/cr_test revision 1 (1 section, 2 blocks). Next write: base_revision 1.",
+        // Une ligne, sans brouillon (E11-S18, AC-4).
+        "Published ventes/cr_test revision 1 (1 section, 2 blocks): added « Décisions » (34 characters). Next write: base_revision 1.",
       )
       expect(lea.result?.data).toMatchObject({ path: "ventes/cr_test", revision: 1, status: "published", has_draft: false, draft_stamp: null })
       expect(await nodeRow("ventes/cr_test")).toMatchObject({ status: "published", revision: 1 })

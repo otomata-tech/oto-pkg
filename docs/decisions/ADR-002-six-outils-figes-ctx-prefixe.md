@@ -36,11 +36,19 @@ hosts sans confusion.
    Contexte que `context` attendait pour la personne (Tout le monde, son Privé si elle a un
    `handle`, chacune de ses équipes), la révision publiée lue à l'émission. Il devient invalide
    quand l'un de ceux-là change de contenu servi : première publication, retrait, ou republication
-   différente. Le refus nomme les chemins dans l'ordre des parties, bornés à 20 (« context has
-   changed (<chemins>): call <préfixe>_context again… ») ; il suffit, le modèle se rafraîchit seul.
-   La publication d'un autre Contexte, ou une republication à l'identique, ne l'invalide pas. Un
-   code sans `contexts` (émis avant 1.1.0) est périmé. `feedback` accepte un code connu mais
-   périmé. `rules_version` reste compté, plus lu par la garde (amendement E11-S03, fiche D132).
+   différente. Le refus nomme les chemins dans l'ordre des parties, bornés à 20, puis porte un
+   **nouveau code**, émis pour la personne, et la partie de chaque Contexte changé telle que
+   `context` la sert maintenant (« context has changed (<chemins>). New ctx: <code>: retry this
+   call with it… ») : l'appel se rejoue avec ce code, sans `context` ; la lecture reste forcée, le
+   Contexte change la règle. Émission ou lecture en panne : le refus d'avant (« call
+   <préfixe>_context again… »). L'auteur d'un Contexte n'est pas refusé par sa propre écriture :
+   `write` avance la ligne de son code à la révision publiée, si ce code gardait la précédente
+   (policy `ctx_update_own`, colonne `contexts` seule). `context` accepte `since_ctx`, un code
+   précédent de la personne : il ne rend alors que le routage, les parties changées et un code (le
+   même si rien n'a changé) (amendement E11-S19). La publication d'un autre Contexte, ou une
+   republication à l'identique, ne l'invalide pas. Un code sans `contexts` (émis avant 1.1.0) est
+   périmé. `feedback` accepte un code connu mais périmé. `rules_version` reste compté, plus lu par
+   la garde (amendement E11-S03, fiche D132).
 3. **Le préfixe de l'organisation** est dans le nom des outils (`acme_context`…), calculé à
    chaque requête depuis l'organisation de l'adresse ; descriptions et messages citent le même
    préfixe. Court, en ASCII, fixé à l'arrivée du client et **jamais changé**. La description de

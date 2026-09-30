@@ -15,6 +15,7 @@ import type { TableHeader, TableHeaderPatch } from "../../schemas/tables"
 import { ACCESS_LEVELS, describeOwner, requireNodeLevel, reservedTo, type AccessLevel, type Owner } from "../access"
 import type { PlatformDb } from "../db"
 import { inTransaction, invalidInput, PlatformError } from "../errors"
+import { FUNCTIONS_PATH } from "../find"
 import type { Identity } from "../identity"
 import { wellFormed } from "../journal"
 import { JOURNAL_PATH } from "../../schemas/journal"
@@ -33,6 +34,7 @@ import { staleState } from "./read-format"
 import { ownerOf, teamOf } from "./view"
 import { insertNode, provenanceOf, savedResult, type Saved, type WriteOrigin } from "./write-result"
 import { attachFiles, refuseFilesOnCreate } from "./write-files"
+import { keepAuthorCtx, writeAtomically, writesAtomically } from "./write-atomic"
 
 export type { WriteOrigin } from "./write-result"
 
@@ -77,12 +79,28 @@ async function whoToAsk(db: PlatformDb, identity: Identity, owner: Owner | null)
 export function checkPath(identity: Identity, path: string): void {
   // Un nœud à ce chemin masquerait le journal que `read` y sert (AC12 d'E05-S05, HN-E05S05-8).
   if (path === JOURNAL_PATH) throw new PlatformError("invalid_arguments", "journal is reserved: it serves the call journal. Choose another path.")
+  // E11-S19 (AC-e3) : `read` y liste les fonctions que la personne peut appeler.
+  if (path === FUNCTIONS_PATH) throw new PlatformError("invalid_arguments", "functions is reserved: it lists the functions you can run. Choose another path.")
   refuseUnderRoot(path)
   const space = /^private\/([^/]+)$/.exec(path)
   const handle = identity.member.profile.handle
   if (space && space[1] !== handle) {
-    throw new PlatformError("forbidden", `private/${space[1]} is not your personal space${handle ? `: write in private/${handle}` : ""}.`)
+    // Le compte et l'organisation de l'appel disent la cause : un connecteur ouvert sous un autre compte ou vers
+    // une autre organisation (le handle est propre à chacune), ou une identité sans handle (accès de l'équipe plateforme).
+    const signedIn = `this connection is signed in as ${identity.user.email} in ${identity.org.name}`
+    const own = handle ? `, where your personal space is private/${handle}` : "; you have no personal space here"
+    throw new PlatformError("forbidden", `private/${space[1]} is not your personal space: ${signedIn}${own}.`)
   }
+}
+
+/**
+ * Un titre sans `base_revision` sur son propre espace (`private/<handle>`) : l'assistant voulait y créer une page,
+ * pas renommer l'espace ; le refus `stale_revision` le lui dit.
+ */
+function pageInOwnSpace(identity: Identity, node: NodeRow, body: WriteNodeBody): string {
+  const handle = identity.member.profile.handle
+  const meant = handle !== undefined && node.path === `private/${handle}` && body.title !== undefined && body.base_revision === undefined
+  return meant ? ` ${node.path} is your personal space itself: to create a page in it, write at ${node.path}/<page>.` : ""
 }
 
 function checkOneLine(body: WriteNodeBody): void {
@@ -115,7 +133,7 @@ function checkKinds(body: WriteNodeBody, node: NodeRow, prefix: string): void {
 }
 
 /** Refus d'une révision absente ou périmée (AC21) : rien n'est écrit, l'état actuel est rendu. */
-async function staleRevision(db: PlatformDb, node: NodeRow, base: number | undefined): Promise<PlatformError> {
+async function staleRevision(db: PlatformDb, node: NodeRow, base: number | undefined, note = ""): Promise<PlatformError> {
   const blocks = node.kind === "table" ? [] : await loadBlocks(db, node.id, "published")
   const first =
     base === undefined
@@ -123,7 +141,7 @@ async function staleRevision(db: PlatformDb, node: NodeRow, base: number | undef
       : `stale revision: ${node.path} is at revision ${node.revision}, not ${base}.`
   return new PlatformError(
     "stale_revision",
-    `${first} Nothing was written. Current state:\n${staleState(node, blocks)}\nRead what you need, then write again with base_revision ${node.revision}.`,
+    `${first} Nothing was written.${note} Current state:\n${staleState(node, blocks)}\nRead what you need, then write again with base_revision ${node.revision}.`,
     { revision: node.revision },
   )
 }
@@ -211,6 +229,7 @@ async function saveEdits(db: PlatformDb, identity: Identity, edit: Edit): Promis
     meta: table?.target,
     stamp,
     provenance: provenanceOf(identity, edit.origin),
+    prefix: identity.org.prefix,
   })
   return { blocks: saved.blocks, stamp: saved.stamp, touched: applied.touched, header, headerChange: table?.text, keptAsText: applied.keptAsText }
 }
@@ -228,7 +247,7 @@ function pendingHeader(body: WriteNodeBody, node: NodeRow): { title?: string; su
 
 /**
  * Publie après l'écriture (ou seule) : le niveau écriture, déjà exigé, suffit (E11-S02, H63) ; un refus de
- * la publication garde le brouillon (N28).
+ * la publication garde le brouillon de l'écran (N28), jamais celui d'un assistant (E11-S18, AC-1).
  */
 async function publishAfter(db: PlatformDb, identity: Identity, edit: Edit, saved: Saved | null): Promise<PublishResult> {
   const { node } = edit
@@ -240,7 +259,8 @@ async function publishAfter(db: PlatformDb, identity: Identity, edit: Edit, save
 /**
  * Le brouillon écrit au besoin (`created` : déjà écrit, dans la transaction de la création), puis la
  * publication, sauf `publish: false` (E11-S02, AC-b1 ; le défaut se lit ici, HN-E11S02-21), hors de la
- * transaction de l'écriture : un refus de publier garde le brouillon (AC29, N28).
+ * transaction de l'écriture : un refus de publier garde le brouillon de l'écran (AC29, N28) ; celui d'un assistant
+ * annule toute l'écriture (`write-atomic.ts`, E11-S18, AC-1).
  */
 async function finish(db: PlatformDb, identity: Identity, edit: Edit, created?: Saved): Promise<ToolOutput> {
   const { body, node } = edit
@@ -249,12 +269,14 @@ async function finish(db: PlatformDb, identity: Identity, edit: Edit, created?: 
   const published = body.publish !== false ? await publishAfter(db, identity, edit, saved) : null
   const owner = await ownerOf(db, node.id)
   const output = savedResult({ identity, edit, saved, published, teamId: teamOf(owner) })
-  // E05-S10, AC-b12 : l'adresse a suivi le titre publié, pour l'écran comme pour un assistant (HN-E05S10e-5).
+  // E05-S10, AC-b12 : l'adresse a suivi le titre publié, pour l'écran comme pour un assistant (HN-E05S10e-5) ; le chemin
+  // se choisit ensuite par `node.move` (E11-S18, AC-6).
   const renamed = published?.renamed
   if (!renamed) return output
+  const choose = `To choose the path, call ${identity.org.prefix}_call node.move {"path": "${renamed.to}", "new_path": "<path>"}.`
   return {
     ...output,
-    text: `${output.text}\n${renamedLine(renamed)}`,
+    text: `${output.text}\n${renamedLine(renamed)} ${choose}`,
     data: { ...output.data, path: renamed.to, renamed_from: renamed.from },
     target: renamed.to,
   }
@@ -285,7 +307,9 @@ async function create(db: PlatformDb, identity: Identity, body: WriteNodeBody, o
   // Un parent atteint par un ancien chemin (E03-S07) : le chemin demandé ne suivrait pas le sien.
   if (parent?.movedFrom) {
     const redirected = `${parent.node.path}${path.slice(parentAt.length)}`
-    throw new PlatformError("invalid_arguments", `Cannot create ${path}: ${parentAt} moved to ${parent.node.path}. Create ${redirected} instead.`)
+    // E11-S18 (AC-6) : un contenu à ranger ailleurs se déplace par `node.move`, il ne se recrée pas.
+    const move = `to move an existing page there, call ${identity.org.prefix}_call node.move`
+    throw new PlatformError("invalid_arguments", `Cannot create ${path}: ${parentAt} moved to ${parent.node.path}. Create ${redirected} instead; ${move}.`)
   }
   if (!parent) {
     const closest = (await closestExisting(db, identity, path)).path
@@ -337,6 +361,14 @@ function createsElsewhere(body: WriteNodeBody, found: { node: NodeRow; movedFrom
  */
 export async function writeNode(db: PlatformDb, identity: Identity, input: unknown, origin: WriteOrigin): Promise<ToolOutput> {
   const body = parseBody(input)
+  // Un assistant qui publie écrit tout ou rien (E11-S18, AC-1) ; l'écran et `publish: false` gardent leur brouillon.
+  if (!writesAtomically(body, origin)) return writeParsed(db, identity, body, origin)
+  const output = await writeAtomically(db, identity, body, () => writeParsed(db, identity, body, origin))
+  return keepAuthorCtx(db, identity, origin, output)
+}
+
+/** `writeNode` après la lecture du corps, dans la transaction d'une écriture atomique ou non. */
+async function writeParsed(db: PlatformDb, identity: Identity, body: WriteNodeBody, origin: WriteOrigin): Promise<ToolOutput> {
   checkPath(identity, body.path)
   // Un ancien chemin se cherche aussi avant une création (E03-S07 AC15) : celui d'un nœud invisible
   // est refusé comme un chemin pris (N31), sans insertion ; celui d'un nœud visible le modifie (AC7).
@@ -378,6 +410,6 @@ async function edit(
   checkKinds(edits, node, identity.org.prefix)
   checkOneLine(edits)
   if (level < ACCESS_LEVELS.write) await requireNodeLevel(db, identity, { id: node.id, path: node.path }, writes ? "write" : "publish")
-  if (edits.base_revision !== node.revision) throw await staleRevision(db, node, edits.base_revision)
+  if (edits.base_revision !== node.revision) throw await staleRevision(db, node, edits.base_revision, pageInOwnSpace(identity, node, edits))
   return finish(db, identity, { node, level, created: false, body: edits, origin, patch })
 }

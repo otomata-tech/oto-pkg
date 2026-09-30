@@ -129,6 +129,14 @@ describe("inferTable and the proposed key (AC-b2)", () => {
     expect(inferTable([["x".repeat(201)], ["b"]], ["nom"]).key).toBeNull()
   })
 
+  it("should propose a first column of dates, distinct once read, and never a column of decimal numbers (FB-0014)", () => {
+    expect(inferTable([["29/09/2026", "12,5"], ["2026-09-30", "3"]], ["jour", "montant"]).key).toBe("jour")
+    // 29/09/2026 et 2026-09-29 sont la même date : la colonne n'a pas de valeurs distinctes.
+    expect(inferTable([["29/09/2026", "a"], ["2026-09-29", "b"]], ["jour", "nom"]).key).toBe("nom")
+    expect(inferTable([["12,5", "1"], ["3", "2"]], ["prix", "rang"]).key).toBe("rang")
+    expect(inferTable([["1.5"], ["2.5"]], ["prix"]).key).toBeNull()
+  })
+
   it("should generate a ligne column, ligne_2 when the name is taken, numbered on four digits", () => {
     expect(withLineKey(["a"], [["x"], ["y"]])).toEqual({ key: "ligne", names: ["ligne", "a"], rows: [["0001", "x"], ["0002", "y"]] })
     expect(withLineKey(["ligne"], [["x"]]).key).toBe("ligne_2")

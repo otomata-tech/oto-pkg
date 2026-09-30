@@ -130,16 +130,23 @@ describe("door without session (AC-f4, AC-f11)", () => {
     opened.clients.length = 0
   })
 
-  it("should route POST uploads/<token> alone to the door, and POST uploads/<token>/form to the form route", () => {
+  it("should route uploads/<token> alone to the door, whatever its method, and POST uploads/<token>/form to the form route", () => {
     expect([
-      isUploadRoute(["uploads", TOKEN], "POST"),
-      isUploadRoute(["uploads", TOKEN], "GET"),
-      isUploadRoute(["uploads", TOKEN, "form"], "POST"),
-      isUploadRoute(["uploads"], "POST"),
+      isUploadRoute(["uploads", TOKEN]),
+      isUploadRoute(["uploads", TOKEN, "form"]),
+      isUploadRoute(["uploads"]),
       isUploadFormRoute(["uploads", TOKEN, "form"], "POST"),
       isUploadFormRoute(["uploads", TOKEN, "form"], "GET"),
       isUploadFormRoute(["uploads", TOKEN, "x"], "POST"),
-    ]).toEqual([true, false, false, false, true, false, false])
+    ]).toEqual([true, false, false, true, false, false])
+  })
+
+  it("should refuse another method than POST with forbidden, in plain text, before the token and the database: nothing consumed (FB-0014)", async () => {
+    const refusals = await Promise.all(["GET", "PUT", "HEAD"].map((method) => answer(new Request(`https://${HOST}/api/platform/uploads/${TOKEN}`, { method }))))
+    const forbidden = { status: 403, headers: lowered, verified: 0, body: "forbidden: Only POST is accepted here: send the file with curl --data-binary, or use the form link.\n" }
+    expect(refusals).toEqual([forbidden, forbidden, forbidden])
+    // Aucun client de base : le ticket, que seule la consommation sous `anon` sert, reste libre.
+    expect(opened.clients).toEqual([])
   })
 
   it("should refuse any Origin, null or a third site, before the token, the body and the database (1)", async () => {

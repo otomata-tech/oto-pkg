@@ -51,9 +51,14 @@ identifiants stables fabriqués par le serveur.
 3. **Brouillon et publication** (page, procédure, Contexte, en-tête de tableau). **Écrire publie** :
    une écriture de l'écran ou de `write` est publiée dans la foulée, au niveau écriture ; l'écran
    regroupe les frappes et publie 3 s après la dernière et en quittant la page. Un brouillon ne reste
-   que si un assistant le demande (`publish: false`) ou si la publication est refusée (contrôle d'une
-   procédure, en-tête de tableau, Contexte vide non confirmé) ; il est partagé, et la publication
-   suivante le publie entier. Modifier écrit l'état `draft` : la première modification ouvre le
+   que si un assistant le demande (`publish: false`) ou si la publication d'une écriture de l'écran est
+   refusée (contrôle d'une procédure, en-tête de tableau, Contexte vide non confirmé) : il y sauve la
+   frappe d'une personne ; il est partagé, et la publication suivante le publie entier. **Une écriture
+   d'assistant qui publie est entière ou rien** (amendement E11-S18, décision de JB) : création du nœud,
+   brouillon, publication et chemin qui suit le titre tiennent dans une transaction, et un refus de la
+   publication n'écrit rien, ni nœud, ni brouillon, ni bloc ; un brouillon écrit avant l'appel reste tel
+   qu'il était. Le refus le dit (« Nothing was written. »), et un retrait de colonne à confirmer donne
+   l'appel entier à refaire, `confirm_remove` en plus. Modifier écrit l'état `draft` : la première modification ouvre le
    brouillon et copie les blocs publiés, avec les mêmes `id`. Publier remplace l'état `published`
    par le brouillon, incrémente `nodes.revision`, prend un instantané des blocs dans
    `node_versions`, réécrit les liens, puis efface le brouillon. L'en-tête d'un tableau suit la même

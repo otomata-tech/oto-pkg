@@ -9,6 +9,7 @@ import { ACCEPTES, LIMITES } from "../../../packages/plateforme/ui/noeud/editeur
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import { FICHIERS } from "../../../packages/plateforme/ui/noeud/libelles-des-fichiers"
 import { RenduDUnBloc } from "../../../packages/plateforme/ui/noeud/rendu-des-blocs"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { simulerLesDialogues } from "../../helpers/dialogue"
 import { bloc, ID, PAGE } from "../../helpers/noeud"
 
@@ -193,8 +194,10 @@ describe("EditeurDeBlocs — an image (AC-b1)", () => {
   it("should show a local block with the preview and the progress of a pasted image, write the image by its file only after the confirmation, then serve it and revoke the preview", async () => {
     const { appels, ecritures } = simulerLeStockage()
     render(<Editeur />)
+    // Le collage va au `<textarea>` : le champ s'ouvre d'abord (1.1.3).
+    const champ = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     await act(async () => {
-      coller(champDuTexte(), png())
+      coller(champ, png())
     })
     await waitFor(() => expect(EnvoiSimule.envois).toHaveLength(1))
     const [envoi] = EnvoiSimule.envois
@@ -312,8 +315,9 @@ describe("EditeurDeBlocs — limits and refusals (AC-b4)", () => {
   it("should show a refusal of the service in the local block, translated by its code, and keep it removable", async () => {
     const { ecritures } = simulerLeStockage({ refus: { statut: 413, code: "too_large", details: { reason: "quota" } } })
     render(<Editeur />)
+    const champ = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     await act(async () => {
-      coller(champDuTexte(), png())
+      coller(champ, png())
     })
     expect(await screen.findByText(FICHIERS.quota(tailleLisible(ORG_QUOTA_BYTES)))).toHaveAttribute("role", "alert")
     fireEvent.click(screen.getByRole("button", { name: FICHIERS.retirerNom("plan.png") }))
@@ -324,8 +328,9 @@ describe("EditeurDeBlocs — limits and refusals (AC-b4)", () => {
   it("should interrupt the upload on « Annuler » and remove the local block, neither confirming nor writing", async () => {
     const { appels, ecritures } = simulerLeStockage()
     render(<Editeur />)
+    const champ = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     await act(async () => {
-      coller(champDuTexte(), png())
+      coller(champ, png())
     })
     await waitFor(() => expect(EnvoiSimule.envois).toHaveLength(1))
     await act(async () => {
@@ -418,8 +423,9 @@ describe("EditeurDeBlocs — files disabled (AC-b7)", () => {
     const menu = within(screen.getByRole("menu"))
     expect([menu.queryByRole("menuitem", { name: FICHIERS.image }), menu.queryByRole("menuitem", { name: FICHIERS.fichier })]).toEqual([null, null])
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
+    const champ = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     await act(async () => {
-      coller(champDuTexte(), png())
+      coller(champ, png())
     })
     await waitFor(() => expect(annonce(FICHIERS.desactives)).toBe(true))
     expect(screen.getByRole("img", { name: "Plan" })).toHaveAttribute("src", "https://exemple.test/plan.png")

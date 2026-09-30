@@ -1,8 +1,8 @@
 "use client"
 
 // Une rangée de l'éditeur (E05-S02 ; E05-S08, AC1 à AC9 ; E05-S09, partie c1 ; E05-S10, AC-a2 à AC-a4, AC-a8) :
-// la gouttière (« Ajouter un bloc après » et la poignée « Actions sur ce bloc »), puis le champ du bloc,
-// toujours monté (fiche D21 B). La poignée ouvre sous elle le menu du
+// la gouttière (« Ajouter un bloc après » et la poignée « Actions sur ce bloc »), puis le champ du bloc, monté quand
+// le bloc est touché, lu sinon (1.1.3, qui remplace le champ toujours monté de la fiche D21 B). La poignée ouvre sous elle le menu du
 // bloc (monter, descendre, style, dupliquer, supprimer), au clic comme au clavier (Entrée, Espace ; Échap le
 // ferme et rend le focus), et se glisse-dépose ; aucune de ces actions ne vit hors du menu. Un titre écrit
 // reste dans son élément de titre (AC7) ; un bloc qu'on n'écrit pas est rendu en lecture, déplaçable,
@@ -33,7 +33,10 @@
 // poignée ; une image se décrit dans son bloc et choisit sa largeur au menu (AC-b3) ; un CSV joint s'y convertit (AC-b6).
 //
 // E11-S17 (lot a) : un bloc sélectionné est surligné ; Maj+clic, Ctrl+clic ou ⌘+clic sur la poignée prend des blocs (AC-a4).
-import { useId, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react"
+//
+// 1.1.3 : un diagramme s'écrit comme le code, son dessin dessous hors du focus (`DiagrammeEcrit`). La rangée est
+// mémoïsée : une frappe ne rend que la sienne ; les entrées de ses menus se construisent au premier geste qui peut les ouvrir.
+import { memo, useId, useState, type DragEvent, type ReactNode } from "react"
 import { ArrowDown } from "@phosphor-icons/react/dist/csr/ArrowDown"
 import { ArrowUp } from "@phosphor-icons/react/dist/csr/ArrowUp"
 import { Copy } from "@phosphor-icons/react/dist/csr/Copy"
@@ -48,6 +51,7 @@ import { BlockRow } from "../../ds/react/block-row"
 import { AnimatedIcon } from "../../ds/react/icon"
 import { DropdownMenu, type MenuItem } from "../../ds/react/overlays"
 import { Button, IconButton } from "../../ds/react/primitives"
+import { DiagrammeMermaid } from "../diagramme-mermaid"
 import { texteLu } from "../en-ligne"
 import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC, SELECTION } from "../libelles"
 import { FICHIERS } from "../libelles-des-fichiers"
@@ -55,6 +59,7 @@ import { baliseDuTitre, largeurDe, RenduDUnBloc } from "../rendu-des-blocs"
 import type { Position } from "./blocs-de-page"
 import { ChampDeBloc, type LiensDesBlocs } from "./champ-de-bloc"
 import { itemsDuChoix } from "./choix-de-bloc"
+import { sortirDuBlocAuClavier } from "./clavier"
 import { ConflitDeBloc } from "./conflit-de-bloc"
 import { enDepot, type Depot, type Genre } from "./envoi-de-fichier"
 import { DepotEnCours, FichierEdite } from "./fichier-edite"
@@ -74,6 +79,8 @@ type RangeeDeBlocProps = {
   selectionnee: boolean
   /** Tout le texte du bloc est sélectionné : le menu de la poignée est ouvert, le focus reste au champ (E05-S11, AC-28). */
   menuOuvert: boolean
+  /** Le bloc touché : son champ de texte est monté, ceux des autres blocs ne le sont pas. */
+  ouvert: boolean
   /** Un autre bloc est en conflit : ce champ est en lecture seule jusqu'à son règlement (HN-E05S08-3). */
   verrouillee: boolean
   erreur: string | null
@@ -137,61 +144,6 @@ function itemsDuMenu(menu: Menu, gestes: Gestes): MenuItem[] {
   ]
 }
 
-/** Les formes dont le champ garde `Tab` (E10-S06, AC-a6, AC-b1) : de leur poignée, `Tab` sort du bloc. */
-const GARDENT_TAB: ReadonlySet<Forme> = new Set(["puces", "numerotee", "tableau"])
-
-/**
- * Un élément de la tabulation, rendu : `tabIndex` positif ou nul, ni désactivé, ni sous `[hidden]`, `[inert]` ou dans un
- * `<details>` fermé, ni caché par le style (`checkVisibility`, là où le navigateur l'a ; jsdom ne calcule pas le rendu).
- */
-function tabulable(element: HTMLElement): boolean {
-  return (
-    element.tabIndex >= 0 &&
-    !element.matches(":disabled") &&
-    element.closest("[hidden], [inert], details:not([open]) > :not(summary)") === null &&
-    (typeof element.checkVisibility !== "function" || element.checkVisibility())
-  )
-}
-
-/** `element` suit `repere` dans le document, hors de lui. */
-const apres = (repere: Element, element: Element) => !repere.contains(element) && (repere.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-
-/**
- * Retire des éléments de la tabulation le temps de l'action par défaut de `Tab`, qui suit le `keydown`, et les y rend au
- * tour suivant, que le focus ait bougé ou non ; chacun retrouve son attribut `tabindex` tel qu'il était.
- */
-function horsDeLaTabulationUnInstant(elements: HTMLElement[]) {
-  const avant = elements.map((element) => ({ element, attribut: element.getAttribute("tabindex") }))
-  for (const element of elements) element.tabIndex = -1
-  setTimeout(() => {
-    for (const { element, attribut } of avant) {
-      if (attribut === null) element.removeAttribute("tabindex")
-      else element.setAttribute("tabindex", attribut)
-    }
-  }, 0)
-}
-
-/**
- * `Tab` sur la poignée d'une liste à puces ou numérotée, ou d'un tableau (AC-a6) : le champ qui suit la poignée garde
- * `Tab`, le focus va donc au premier élément après la rangée. Rien après elle (la fin de la page) : la touche reste au
- * navigateur, qui sort de la page, les champs de la rangée hors de la tabulation le temps de son geste. `Maj+Tab` et
- * les autres touches restent au menu.
- */
-function sortirDuBlocAuClavier(evenement: KeyboardEvent<HTMLButtonElement>, forme: Forme | null) {
-  if (evenement.key !== "Tab" || evenement.shiftKey || evenement.altKey || evenement.ctrlKey || evenement.metaKey) return
-  if (forme === null || !GARDENT_TAB.has(forme)) return
-  const poignee = evenement.currentTarget
-  const rangee = poignee.closest("[data-cle]")
-  if (!rangee) return
-  const suivant = Array.from(rangee.ownerDocument.body.querySelectorAll<HTMLElement>("*")).find((element) => apres(rangee, element) && tabulable(element))
-  if (!suivant) {
-    horsDeLaTabulationUnInstant(Array.from(rangee.querySelectorAll<HTMLElement>("*")).filter((element) => apres(poignee, element) && tabulable(element)))
-    return
-  }
-  evenement.preventDefault()
-  suivant.focus()
-}
-
 type BlocEcritProps = {
   rangee: Rangee
   forme: Forme
@@ -199,33 +151,57 @@ type BlocEcritProps = {
   verrouille: boolean
   liens: LiensDesBlocs
   menuOuvert: boolean
+  /** Le bloc touché : son champ de texte est monté ; les autres se lisent (`champ-de-bloc.tsx`). */
+  ouvert: boolean
   /** La cellule d'un tableau simple qui prend le focus : la rangée la tient pour son menu (E10-S06, AC-b2). */
   suivreLaCellule: (position: Position) => void
   invite?: string
 }
 
+/**
+ * Un diagramme écrit (1.1.3) : son texte dans son champ ; hors du focus, et non vide, son dessin dessous
+ * (`diagramme-mermaid.tsx`), qui dit « Diagramme invalide » si mermaid ne le lit pas. Pendant la frappe, rien ne se
+ * redessine.
+ */
+function DiagrammeEcrit({ texte, children }: { texte: string; children: ReactNode }) {
+  const [ecrit, setEcrit] = useState(false)
+  return (
+    <div onFocus={() => setEcrit(true)} onBlur={() => setEcrit(false)}>
+      {children}
+      {!ecrit && texte.trim() !== "" && (
+        <div className="mt-2">
+          <DiagrammeMermaid texte={texte} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Les champs d'un tableau ou d'un repli (E10-S06), ou le champ de texte de toute autre forme écrite. */
-function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, suivreLaCellule, decritPar, invite }: Omit<BlocEcritProps, "erreur"> & { decritPar?: string }) {
+function ChampsDuBloc({ rangee, forme, verrouille, liens, menuOuvert, ouvert, suivreLaCellule, decritPar, invite }: Omit<BlocEcritProps, "erreur"> & { decritPar?: string }) {
   const { cle, bloc } = rangee
   const mots = premiersMots(bloc)
   if (forme === "tableau") return <TableauEdite cle={cle} bloc={bloc} decritPar={decritPar} lectureSeule={verrouille} suivre={suivreLaCellule} />
   if (forme === "repli") return <RepliEdite cle={cle} bloc={bloc} mots={mots} decritPar={decritPar} lectureSeule={verrouille} liens={liens} />
-  return (
+  const champ = (
     <ChampDeBloc
       cle={cle}
       texte={texteDe(bloc)}
       nom={`Modifier ${FORMES[forme].champ} — ${mots}`}
       decritPar={decritPar}
-      genre={bloc.type}
+      // Un diagramme s'écrit sur le fond sombre et dans la chasse du code (`editeur.css`, `data-kind="code"`).
+      genre={forme === "diagramme" ? "code" : bloc.type}
       debut={forme === "numerotee" ? debutDe(bloc) : null}
       cases={casesCochees(bloc)}
       lectureSeule={verrouille}
-      // Le code et un appel inchangé se lisent tels quels, comme à l'écran de lecture (M59) : ni lien ni rendu au repos.
-      liens={forme === "code" || bloc.type === "call" ? null : liens}
+      // Le code, un diagramme et un appel inchangé se lisent tels quels, comme à l'écran de lecture (M59) : ni lien ni rendu au repos.
+      liens={forme === "code" || forme === "diagramme" || bloc.type === "call" ? null : liens}
       menuOuvert={menuOuvert}
+      ouvert={ouvert}
       invite={invite}
     />
   )
+  return forme === "diagramme" ? <DiagrammeEcrit texte={texteDe(bloc)}>{champ}</DiagrammeEcrit> : champ
 }
 
 /** Le champ d'un bloc écrit, dans son élément : un titre reste un titre, nommé par son texte (AC7). */
@@ -276,12 +252,20 @@ function useDepotSurLaRangee(cle: string, verrouillee: boolean) {
   }
 }
 
-export function RangeeDeBloc(props: RangeeDeBlocProps) {
+/**
+ * Une rangée : rendue à nouveau quand ses propres données changent, jamais pour la frappe dans une autre (ses gestes
+ * et ses liens sont les mêmes d'un rendu de l'éditeur à l'autre). Sans quoi chaque touche rendait toute la page.
+ */
+export const RangeeDeBloc = memo(function RangeeDeBloc(props: RangeeDeBlocProps) {
   const { rangee, premiere, derniere, tenue, menuOuvert, verrouillee, erreur, conflit, liens, rendu, invite } = props
   const gestes = useGestes()
   const depot = useDepotSurLaRangee(rangee.cle, verrouillee)
   // La cellule courante d'un tableau simple, où son menu ajoute et retire (E10-S06, AC-b2).
   const [cellule, setCellule] = useState<Position>({ ligne: 0, colonne: 0 })
+  // Les entrées des menus (« + » et poignée) ne se construisent qu'une fois un menu demandé : au clic ou à ↓ dans la
+  // rangée, dans le même geste que son ouverture, ou quand la sélection de tout le texte ouvre celui de la poignée.
+  const [menusDemandes, setMenusDemandes] = useState(false)
+  const demanderLesMenus = () => setMenusDemandes(true)
   const etatDeLaSelection = useId()
   const { cle, bloc } = rangee
   // Le bloc local d'un envoi : ni « + » ni poignée, seulement « Annuler » (E10-S02, AC-b4).
@@ -298,7 +282,7 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
   ) : bloc.type === "image" || bloc.type === "file" ? (
     <FichierEdite rangee={rangee} erreur={erreur} lectureSeule={verrouillee} prefixe={liens.prefixe} />
   ) : forme ? (
-    <BlocEcrit rangee={rangee} forme={forme} erreur={erreur} verrouille={verrouillee} liens={liens} menuOuvert={menuOuvert} suivreLaCellule={setCellule} invite={invite} />
+    <BlocEcrit rangee={rangee} forme={forme} erreur={erreur} verrouille={verrouillee} liens={liens} menuOuvert={menuOuvert} ouvert={props.ouvert} suivreLaCellule={setCellule} invite={invite} />
   ) : (
     <RenduDUnBloc bloc={bloc} Lien="a" hrefDuChemin={(chemin) => `${liens.prefixe}${chemin}`} cibles={liens.cibles} rendu={rendu} />
   )
@@ -348,7 +332,10 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
       // Un bouton cliqué ne prend pas le focus sous Safari et Firefox macOS : l'appui dit que la rangée reste (M30).
       onPointerDown={() => gestes.appuyerDansLaRangee(cle)}
       onBlur={(evenement) => gestes.quitterLaRangee(cle, evenement)}
-      insert={<DropdownMenu side="bottom" align="start" trigger={plus} items={itemsDuChoix((choix) => gestes.inserer(cle, choix), joindre)} />}
+      // Un clic ou ↓ dans la rangée, avant l'ouverture qu'il porte peut-être : les menus ont leurs entrées quand ils s'ouvrent.
+      onClickCapture={demanderLesMenus}
+      onKeyDownCapture={(evenement) => evenement.key === "ArrowDown" && demanderLesMenus()}
+      insert={<DropdownMenu side="bottom" align="start" trigger={plus} items={menusDemandes ? itemsDuChoix((choix) => gestes.inserer(cle, choix), joindre) : []} />}
       // Le bloc en conflit se règle dans son panneau : sa poignée n'ouvre pas de menu.
       handle={
         conflit ? (
@@ -360,7 +347,7 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
             align="start"
             className="oto-menu-de-poignee"
             trigger={poignee}
-            items={itemsDuMenu(menu, gestes)}
+            items={menusDemandes || menuOuvert ? itemsDuMenu(menu, gestes) : []}
             ouvertSansFocus={menuOuvert}
             surFermeture={gestes.fermerLeMenu}
           />
@@ -370,4 +357,4 @@ export function RangeeDeBloc(props: RangeeDeBlocProps) {
       {contenu}
     </BlockRow>
   )
-}
+})

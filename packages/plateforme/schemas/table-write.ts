@@ -221,7 +221,7 @@ export const tableImportArgsSchema = z.strictObject({
     ),
   key: oneLine
     .optional()
-    .describe("The column that identifies a row, as named on the header line, e.g. Nom (default: the key of the table; with create, the first column whose values are all present and distinct)."),
+    .describe("The column that identifies a row, as named on the header line, e.g. Nom (default: the key of the table; with create, the first text, whole-number, email or date column whose values are all present and distinct)."),
   create: z
     .strictObject({
       title: oneLine.describe("Title of the new table, e.g. Clients."),

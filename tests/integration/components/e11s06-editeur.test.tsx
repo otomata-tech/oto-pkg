@@ -5,6 +5,7 @@ import { ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import type { CiblesDesLiens } from "../../../packages/plateforme/ui/noeud/en-ligne"
+import { ouvrirLeChamp, texteDuBloc } from "../../helpers/champ-du-bloc"
 import { bloc, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur après les retours de la démo (E11-S06) : une puce, un numéro ou une case par élément d'une liste, portés
@@ -57,24 +58,33 @@ function zone(element: HTMLElement): HTMLTextAreaElement {
   return element
 }
 
-const champ = (nom: string) => zone(screen.getByRole("textbox", { name: nom }))
+/** Le champ d'un bloc, ouvert et focalisé : un bloc qu'on ne touche pas se lit, son focus monte le `<textarea>` (1.1.3). */
+const champ = (nom: string) => ouvrirLeChamp(nom)
 
-/** Le champ d'un bloc par son texte. */
-function champDe(valeur: string): HTMLTextAreaElement {
-  const trouve = screen.getAllByRole("textbox").find((element) => element instanceof HTMLTextAreaElement && element.value === valeur)
+/** Le bloc par son texte, lu ou déjà ouvert, sans l'ouvrir : relu après chaque ouverture ou fermeture. */
+function champDe(valeur: string): HTMLElement {
+  const trouve = screen
+    .getAllByRole("textbox")
+    .find((element) => element.hasAttribute("data-champ") && texteDuBloc(element.getAttribute("aria-label") ?? "", element.parentElement ?? undefined) === valeur)
   if (!trouve) throw new Error(`champ « ${valeur} » attendu`)
-  return zone(trouve)
+  return trouve
+}
+
+/** Le champ d'un bloc par son texte, ouvert et focalisé : le curseur s'y pose. */
+function ouvrirDe(valeur: string): HTMLTextAreaElement {
+  const lu = champDe(valeur)
+  return ouvrirLeChamp(lu.getAttribute("aria-label") ?? "", lu.parentElement ?? undefined)
 }
 
 /** Une couche posée sur le champ, dans sa case : la copie d'une liste, ou le rendu au repos d'un Texte. */
-function couche(element: HTMLTextAreaElement, classe: ".oto-block-copie" | ".oto-block-rendu"): HTMLElement {
+function couche(element: HTMLElement, classe: ".oto-block-copie" | ".oto-block-rendu"): HTMLElement {
   const trouvee = element.parentElement?.querySelector(classe)
   if (!(trouvee instanceof HTMLElement)) throw new Error(`${classe} absente`)
   return trouvee
 }
 
 /** Le repère dessiné de chaque élément de la copie d'une liste, vide pour un élément sans repère. */
-const reperesDe = (element: HTMLTextAreaElement) =>
+const reperesDe = (element: HTMLElement) =>
   Array.from(couche(element, ".oto-block-copie").querySelectorAll(".oto-block-element"), (un) => un.querySelector(".oto-block-repere")?.textContent ?? "")
 
 /** Le curseur posé dans le champ, puis la touche relâchée, où React relit la sélection (`onSelect`). */
@@ -102,7 +112,7 @@ function cliquer(lien: HTMLElement, init: MouseEventInit = {}): boolean {
  */
 const menuContextuel = (lien: HTMLElement) => fireEvent.contextMenu(lien)
 
-const lienAuRepos = (element: HTMLTextAreaElement, nom: string) => within(couche(element, ".oto-block-rendu")).getByRole("link", { name: nom })
+const lienAuRepos = (element: HTMLElement, nom: string) => within(couche(element, ".oto-block-rendu")).getByRole("link", { name: nom })
 
 const TROUVES = [
   { path: "ventes/grille_tarifaire", kind: "page", title: "Grille tarifaire", snippet: null },
@@ -162,7 +172,8 @@ describe("EditeurDeBlocs, un repère par élément (E11-S06, AC-a1 à AC-a5)", (
     act(() => liste.focus())
     expect(within(copie).queryByRole("link")).toBeNull()
     expect(copie).toHaveTextContent("[[prive/moi/taches|Mes tâches]]")
-    expect(reperesDe(liste)).toEqual(["•", "•"])
+    // Le focus a monté le champ à la place du bloc lu : il se relit.
+    expect(reperesDe(champDe(valeur))).toEqual(["•", "•"])
   })
 })
 
@@ -206,24 +217,27 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     relire([{ ...bloc(ID.objet, "paragraph", "Objet d'un autre"), revision: 4 }, lie])
     await screen.findByText(/Ce bloc a changé pendant que vous écriviez/)
+    // Au repos, le bloc lu se dit en lecture seule ; ouvert, son champ l'est.
+    const lu = screen.getByRole("textbox", { name: NOM })
+    expect(lu).toHaveAttribute("aria-readonly", "true")
+    expect(cliquer(lienAuRepos(lu, "Mes tâches"))).toBe(true)
+    expect(menuContextuel(lienAuRepos(lu, "Mes tâches"))).toBe(true)
     const texte = champ(NOM)
     expect(texte).toHaveAttribute("readonly")
-    expect(cliquer(lienAuRepos(texte, "Mes tâches"))).toBe(true)
-    expect(menuContextuel(lienAuRepos(texte, "Mes tâches"))).toBe(true)
-    act(() => texte.focus())
     placer(texte, 10)
     expect(panneau()).toBeNull()
   })
 
   it("should follow a link at rest on a plain click, open the panel from its context menu, by the pointer or the keyboard, focus in « Libellé », close it without writing when the focus leaves the row", async () => {
     monter([bloc(ID.texte, "paragraph", TEXTE)], CIBLES)
-    const texte = champ(NOM)
+    // Le bloc, lu ou ouvert par le panneau, relu à chaque geste (1.1.3).
+    const texte = () => screen.getByRole("textbox", { name: NOM })
     // Un clic suit le lien (E11-S15, AC-b9) : aucun panneau.
-    expect(cliquer(lienAuRepos(texte, "Mes tâches"))).toBe(true)
+    expect(cliquer(lienAuRepos(texte(), "Mes tâches"))).toBe(true)
     expect(panneau()).toBeNull()
     // Au clavier : le lien atteint, la touche Menu ou Maj+F10 lui envoie `contextmenu` ; le menu du navigateur ne s'ouvre pas.
-    act(() => lienAuRepos(texte, "Mes tâches").focus())
-    expect(menuContextuel(lienAuRepos(texte, "Mes tâches"))).toBe(false)
+    act(() => lienAuRepos(texte(), "Mes tâches").focus())
+    expect(menuContextuel(lienAuRepos(texte(), "Mes tâches"))).toBe(false)
     await focusSur(libelle())
     expect(libelle()).toHaveValue("Mes tâches")
     expect(screen.getByRole("radio", { name: "Page de la plateforme" })).toHaveAttribute("aria-checked", "true")
@@ -232,18 +246,19 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     fireEvent.change(libelle(), { target: { value: "Autre chose" } })
     act(() => bouton("Ailleurs").focus())
     expect(panneau()).toBeNull()
-    expect(texte).toHaveValue(TEXTE)
+    expect(texteDuBloc(NOM)).toBe(TEXTE)
     // Échap dans le panneau, ouvert d'un clic droit : il se ferme, le focus revient au champ, le curseur après le lien.
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(texte(), "Mes tâches"))
     await focusSur(libelle())
     fireEvent.keyDown(libelle(), { key: "Escape" })
     expect(panneau()).toBeNull()
-    await focusSur(texte)
-    expect(texte.selectionStart).toBe(39)
+    const ouvert = zone(texte())
+    await focusSur(ouvert)
+    expect(ouvert.selectionStart).toBe(39)
     // Ctrl ou ⌘ : le lien est suivi, aucun panneau.
     act(() => bouton("Ailleurs").focus())
-    expect(cliquer(lienAuRepos(texte, "Mes tâches"), { ctrlKey: true })).toBe(true)
-    expect(cliquer(lienAuRepos(texte, "Mes tâches"), { metaKey: true })).toBe(true)
+    expect(cliquer(lienAuRepos(texte(), "Mes tâches"), { ctrlKey: true })).toBe(true)
+    expect(cliquer(lienAuRepos(texte(), "Mes tâches"), { metaKey: true })).toBe(true)
     expect(panneau()).toBeNull()
     expect(api.envoyes).toEqual([])
   })
@@ -251,7 +266,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
   it("should lead to the panel with Alt+Enter from a list, and apply a new label to the link alone, as a keystroke, the focus back in the field after the link", async () => {
     const avant = "un\nVoir [[prive/moi/taches|Mes tâches]] demain"
     monter([bloc(ID.puces, "list", null, { items: ["un", "Voir [[prive/moi/taches|Mes tâches]] demain"] })])
-    const liste = champDe(avant)
+    const liste = ouvrirDe(avant)
     act(() => liste.focus())
     placer(liste, 12)
     expect(fireEvent.keyDown(liste, { key: "Enter", altKey: true })).toBe(false)
@@ -272,7 +287,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     // Un accent grave ouvert sur le premier élément se ferme sur le second : lu entier, le texte n'aurait pas de lien.
     const avant = "a `b\nVoir [[prive/moi/taches|Mes tâches]] c`"
     monter([bloc(ID.puces, "list", null, { items: ["a `b", "Voir [[prive/moi/taches|Mes tâches]] c`"] })])
-    const liste = champDe(avant)
+    const liste = ouvrirDe(avant)
     act(() => liste.focus())
     placer(liste, "a `b\nVoir [[".length)
     expect(panneau()).not.toBeNull()
@@ -286,9 +301,11 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
 
   it("should open a link of the second item of a list from its context menu at rest, and remove it for the text it shows", async () => {
     monter([bloc(ID.puces, "list", null, { items: ["un [[prive/moi/notes]]", "Voir [[prive/moi/taches|Mes tâches]] demain"] })])
-    const liste = champDe("un [[prive/moi/notes]]\nVoir [[prive/moi/taches|Mes tâches]] demain")
-    expect(menuContextuel(within(couche(liste, ".oto-block-copie")).getByRole("link", { name: "Mes tâches" }))).toBe(false)
+    const avant = "un [[prive/moi/notes]]\nVoir [[prive/moi/taches|Mes tâches]] demain"
+    expect(menuContextuel(within(couche(champDe(avant), ".oto-block-copie")).getByRole("link", { name: "Mes tâches" }))).toBe(false)
     await focusSur(libelle())
+    // Le panneau a monté le champ du bloc, sans le focus : il se relit.
+    const liste = zone(champDe(avant))
     expect(libelle()).toHaveValue("Mes tâches")
     fireEvent.click(bouton("Retirer le lien"))
     await waitFor(() => expect(liste).toHaveValue("un [[prive/moi/notes]]\nVoir Mes tâches demain"))
@@ -299,8 +316,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
   it("should refuse without writing a label too long, an address other than https://, and no page chosen, then close on a link changed since it opened", async () => {
     const web = bloc(ID.web, "paragraph", "Doc https://exemple.fr fin")
     const { relire } = monter([bloc(ID.texte, "paragraph", TEXTE), web], CIBLES)
-    const texte = champ(NOM)
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(screen.getByRole("textbox", { name: NOM }), "Mes tâches"))
     await focusSur(libelle())
     fireEvent.change(libelle(), { target: { value: "x".repeat(201) } })
     fireEvent.click(bouton("Appliquer"))
@@ -312,7 +328,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     fireEvent.change(adresse, { target: { value: "javascript:alert(1)" } })
     fireEvent.keyDown(adresse, { key: "Enter" })
     expect(screen.getByText("Une adresse web commence par https:// et ne contient pas d'espace.")).toHaveAttribute("role", "alert")
-    expect(texte).toHaveValue(TEXTE)
+    expect(texteDuBloc(NOM)).toBe(TEXTE)
 
     // Une adresse nue vers une page : aucune page choisie.
     act(() => bouton("Ailleurs").focus())
@@ -327,8 +343,10 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
 
     // Le texte a changé depuis l'ouverture : rien n'est écrit, le panneau se ferme, le message reste sous le champ.
     act(() => bouton("Ailleurs").focus())
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(screen.getByRole("textbox", { name: NOM }), "Mes tâches"))
     await focusSur(libelle())
+    // Le panneau a monté le champ du bloc : il se relit, avant que son nom ne suive le texte relu.
+    const texte = zone(screen.getByRole("textbox", { name: NOM }))
     relire([{ ...bloc(ID.texte, "paragraph", `Revoir ${TEXTE.slice(5)}`), revision: 4 }, web])
     await waitFor(() => expect(texte).toHaveValue(`Revoir ${TEXTE.slice(5)}`))
     fireEvent.click(bouton("Appliquer"))
@@ -342,8 +360,7 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     simulerLaRecherche()
     const ouvrir = vi.spyOn(window, "open").mockReturnValue(null)
     monter([bloc(ID.texte, "paragraph", TEXTE)], CIBLES)
-    const texte = champ(NOM)
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(screen.getByRole("textbox", { name: NOM }), "Mes tâches"))
     await focusSur(libelle())
     fireEvent.click(bouton("Ouvrir"))
     expect(ouvrir).toHaveBeenCalledWith("/n/prive/moi/taches#k1", "_blank", "noopener,noreferrer")
@@ -360,16 +377,17 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     fireEvent.keyDown(recherche, { key: "Enter" })
     expect(within(screen.getByRole("group", { name: "Modifier le lien" })).getByText("ventes/grille_remises")).toBeInTheDocument()
     fireEvent.click(bouton("Appliquer"))
-    await waitFor(() => expect(texte).toHaveValue("Voir [[ventes/grille_remises|Mes tâches]] demain"))
+    await waitFor(() => expect(texteDuBloc(NOM)).toBe("Voir [[ventes/grille_remises|Mes tâches]] demain"))
   })
 
   it("should show the title of the chosen page in « Libellé » for a link written without a label, and write the link still without one", async () => {
     simulerLaRecherche()
     const nu = "Voir [[prive/moi/taches]] demain"
     monter([bloc(ID.texte, "paragraph", nu)], CIBLES)
-    const texte = champDe(nu)
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(champDe(nu), "Mes tâches"))
     await focusSur(libelle())
+    // Le panneau a monté le champ du bloc : il se relit.
+    const texte = zone(champDe(nu))
     expect(libelle()).toHaveValue("Mes tâches")
     // Appliquer sans rien changer ne fige pas le titre en libellé.
     fireEvent.click(bouton("Appliquer"))
@@ -377,15 +395,16 @@ describe("EditeurDeBlocs, le panneau « Lien » (E11-S06, lot b)", () => {
     expect(texte).toHaveValue(nu)
     // Une autre page choisie : « Libellé » montre son titre, et le lien s'écrit sans libellé.
     act(() => bouton("Ailleurs").focus())
-    menuContextuel(lienAuRepos(texte, "Mes tâches"))
+    menuContextuel(lienAuRepos(champDe(nu), "Mes tâches"))
     await focusSur(libelle())
+    const rouvert = zone(champDe(nu))
     const recherche = screen.getByRole("textbox", { name: "Chercher une page" })
     fireEvent.change(recherche, { target: { value: "gri" } })
     await screen.findAllByRole("option")
     fireEvent.keyDown(recherche, { key: "Enter" })
     expect(libelle()).toHaveValue("Grille tarifaire")
     fireEvent.click(bouton("Appliquer"))
-    await waitFor(() => expect(texte).toHaveValue("Voir [[ventes/grille_tarifaire]] demain"))
+    await waitFor(() => expect(rouvert).toHaveValue("Voir [[ventes/grille_tarifaire]] demain"))
   })
 
   it("should prefill a web link, offer no « Retirer le lien » for a bare address, and after Escape in the field stay closed until the cursor leaves the link", async () => {

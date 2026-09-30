@@ -202,7 +202,7 @@ describe.skipIf(!sqlConfigured)(portable("the table functions through acme_call"
       })
       expect(argumentsOf(tableRows)).toMatchObject({
         properties: {
-          q: { description: 'Words to find, without case or accents, in any order: each word must appear in a text, email, url or enum column or in the key, e.g. "mairie valbrune" (default: none).' },
+          q: { description: 'Words to find, without case or accents, in any order: each word must appear (unless match is any) in a text, email, url or enum column or in the key, e.g. "mairie valbrune" (default: none).' },
         },
       })
       expect(tableRelease.description).toBe(

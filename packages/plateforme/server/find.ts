@@ -9,14 +9,14 @@
 // nœuds (→ `search_content`), « its "Étapes" section », la ligne « The best match is weak » (N14).
 // Repris d'Oto (`oto_mcp/search.py` l. 63-65 et 223-235) : un extrait sur une ligne, une liste coupée
 // qui le dit (N15, N16). Retiré : fusion de sources, sémantique, `limit` en argument, projets.
-import { blockRef } from "../schemas"
+import { blockRef, orderBlocks, sectionOfBlock } from "../schemas"
 import { ACCESS_LEVELS, nodeLevels } from "./access"
 import type { CatalogFunction } from "./catalog/define"
 import { findFunction, isActive, looksLikeFunction, searchFunctions } from "./catalog/registry"
 import type { PlatformDb } from "./db"
 import { inTransaction } from "./errors"
 import type { Identity } from "./identity"
-import { clip, MAX_TARGET_CHARS } from "./journal"
+import { clip, cut, MAX_TARGET_CHARS } from "./journal"
 import { formatScore, roundScore } from "./routing"
 import type { ToolOutput } from "./tool-output"
 
@@ -52,10 +52,18 @@ type SearchRow = {
   rank: number
 }
 
-/** Où la requête a été trouvée dans un nœud (AC16) ; `block` est la référence courte du bloc. */
-type Place = { match: string; block: string | null; block_type: string | null; column: string | null; snippet: string }
+/**
+ * Où la requête a été trouvée dans un nœud (AC16) ; `block` est la référence courte du bloc. `section` (E11-S19,
+ * AC-e4) : le titre de la section d'un bloc de page, nul avant le premier titre ; absent pour une ligne de tableau.
+ * `blockId` : l'identifiant du bloc, lu par le service, jamais servi.
+ */
+type Place = { match: string; block: string | null; block_type: string | null; column: string | null; snippet: string; section?: string | null; blockId: string | null }
 
-type NodeMatch = { path: string; kind: string; title: string; summary: string; score: number; places: Place[] }
+/**
+ * Un nœud trouvé ; `revision` (E11-S19, AC-e5) : sa révision publiée, lue pour un nœud dont des blocs de page sont
+ * montrés ; `editable` : la personne l'écrit. `nodeId` et `editable` ne sont jamais servis en données.
+ */
+type NodeMatch = { nodeId: string; path: string; kind: string; title: string; summary: string; score: number; places: Place[]; revision?: number; editable?: boolean }
 
 type FunctionMatch = { fn: CatalogFunction; score: number }
 
@@ -67,9 +75,9 @@ function oneLine(text: string): string {
 /** Un emplacement ; `block`, `block_type` et `column` sont nuls hors d'un bloc (AC16). */
 function placeOf(row: SearchRow): Place {
   const snippet = oneLine(row.snippet ?? "")
-  if (row.match !== "block" || row.block_id === null) return { match: row.match, block: null, block_type: null, column: null, snippet }
+  if (row.match !== "block" || row.block_id === null) return { match: row.match, block: null, block_type: null, column: null, snippet, blockId: null }
   const block = blockRef({ id: row.block_id, key: row.block_key })
-  return { match: row.match, block, block_type: row.block_type, column: row.column_name, snippet }
+  return { match: row.match, block, block_type: row.block_type, column: row.column_name, snippet, blockId: row.block_id }
 }
 
 /**
@@ -81,7 +89,7 @@ function groupMatches(rows: readonly SearchRow[]): { nodes: NodeMatch[]; moreNod
   const byNode = new Map<string, NodeMatch>()
   for (const row of rows) {
     const found = byNode.get(row.node_id)
-    const node = found ?? { path: row.path, kind: row.kind, title: row.title, summary: row.summary, score: 0, places: [] }
+    const node = found ?? { nodeId: row.node_id, path: row.path, kind: row.kind, title: row.title, summary: row.summary, score: 0, places: [] }
     node.score = Math.max(node.score, Math.min(1, row.rank / RANK_SPAN))
     node.places.push(placeOf(row))
     if (!found) byNode.set(row.node_id, node)
@@ -96,6 +104,37 @@ function firstSentence(description: string): string {
   return `${(end === -1 ? description : description.slice(0, end)).trim()}.`
 }
 
+/** Le chemin réservé de `read` qui liste toutes les fonctions (E11-S19, AC-e3, HN-E11S19-8), comme `journal` (P22). */
+export const FUNCTIONS_PATH = "functions"
+
+/** La phrase d'une fonction dans la liste (E11-S19, AC-e3) : une description de l'ERP sans point ne l'allonge pas au-delà. */
+const FUNCTION_LINE_MAX = 200
+
+/**
+ * `read {"path": "functions"}` (E11-S19, AC-e3) : toutes les fonctions actives, groupées par connecteur (ordre
+ * alphabétique des connecteurs, puis des noms), chacune avec sa classe et la première phrase de sa description, puis
+ * les contrats à lire avant d'écrire. Sans elle, `find` en rend trois au plus : une absence ne s'affirmait pas.
+ */
+export function functionCatalog(active: readonly CatalogFunction[], contracts: readonly string[], prefix: string): ToolOutput {
+  const sorted = [...active].sort((a, b) => a.connector.localeCompare(b.connector) || a.name.localeCompare(b.name))
+  const connectors = [...new Set(sorted.map((fn) => fn.connector))]
+  const lines = [
+    `${sorted.length} functions you can run, by connector:`,
+    ...connectors.flatMap((connector) => [
+      `${connector}:`,
+      ...sorted.filter((fn) => fn.connector === connector).map((fn) => `- ${fn.name} (${fn.class}): ${cut(firstSentence(fn.description), FUNCTION_LINE_MAX)}`),
+    ]),
+    ...(contracts.length > 0 ? [`Contracts to read before writing: ${contracts.join(", ")}.`] : []),
+    `Read a contract with ${prefix}_read {"path": "<function>"}, then run it with ${prefix}_call.`,
+  ]
+  return {
+    text: lines.join("\n"),
+    data: { functions: sorted.map((fn) => ({ name: fn.name, connector: fn.connector, class: fn.class })), contracts: [...contracts] },
+    nextActions: [`${prefix}_read`],
+    target: FUNCTIONS_PATH,
+  }
+}
+
 function functionLines(functions: readonly FunctionMatch[], prefix: string): string[] {
   return [
     ...functions.map(
@@ -108,15 +147,22 @@ function functionLines(functions: readonly FunctionMatch[], prefix: string): str
 function blockLine(place: Place): string {
   return place.block_type === "row"
     ? `   - row ${place.block}: ${place.snippet}`
-    : `   - block ${place.block} (${place.block_type}): ${place.snippet}`
+    : `   - block ${place.block} (${place.block_type})${place.section ? ` in « ${place.section} »` : ""}: ${place.snippet}`
 }
 
-/** Un nœud en une ligne, titre ou résumé remplacé par son extrait quand la requête y est, puis ses blocs. */
-function nodeLines(node: NodeMatch, index: number): string[] {
+/**
+ * Un nœud en une ligne, titre ou résumé remplacé par son extrait quand la requête y est, puis ses blocs, puis, pour
+ * une personne qui l'écrit et des blocs de page montrés, l'appel qui l'édite (E11-S19, AC-e5), comme `read` le finit.
+ */
+function nodeLines(node: NodeMatch, index: number, prefix: string): string[] {
   const title = node.places.find((place) => place.match === "title")?.snippet ?? oneLine(node.title)
   const summary = node.places.find((place) => place.match === "summary")?.snippet ?? oneLine(node.summary)
   const blocks = node.places.filter((place) => place.match === "block").map(blockLine)
-  return [`${index + 1}. ${node.path} (${node.kind}, score ${formatScore(node.score)}): ${title}. ${summary}`, ...blocks]
+  const edit =
+    node.editable && node.revision !== undefined
+      ? [`   To edit: ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "ops": [...]}.`]
+      : []
+  return [`${index + 1}. ${node.path} (${node.kind}, score ${formatScore(node.score)}): ${title}. ${summary}`, ...blocks, ...edit]
 }
 
 /**
@@ -140,7 +186,7 @@ function renderFind(result: {
   if (nodes.length === 0 && functions.length === 0) {
     return `No match for « ${query} ». Ask the user to rephrase or to say what they are looking for; do not guess.`
   }
-  const lines = [`Top matches for « ${query} »:`, ...nodes.flatMap(nodeLines)]
+  const lines = [`Top matches for « ${query} »:`, ...nodes.flatMap((node, index) => nodeLines(node, index, prefix))]
   if (result.moreNodes > 0) lines.push(`More nodes match (at least ${result.moreNodes}): add words or set type to narrow the search.`)
   if (nodes.length > 0) lines.push(`Read one with ${prefix}_read {"path": "<path>"}; a procedure's steps are in its sections.`)
   if (nodes.some((node) => node.places.some((place) => place.block_type === "row"))) {
@@ -171,7 +217,55 @@ async function readableRows(db: PlatformDb, identity: Identity, query: string, t
         from platform.search_content(p_org => ${identity.org.id}, p_query => ${query}, ${kinds}p_limit => ${SEARCH_ROWS}) s`
   })
   const levels = await nodeLevels(db, identity, [...new Set(rows.map((row) => row.node_id))])
-  return rows.filter((row) => (levels.get(row.node_id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read)
+  return { rows: rows.filter((row) => (levels.get(row.node_id) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.read), levels }
+}
+
+/** Un bloc de page trouvé (pas une ligne de tableau), dont la section se lit. */
+function isPageBlock(place: Place): place is Place & { blockId: string } {
+  return place.match === "block" && place.block_type !== "row" && place.blockId !== null
+}
+
+/**
+ * La section de chaque bloc de page montré et la révision de son nœud (E11-S19, AC-e4, AC-e5), en une transaction :
+ * les titres publiés et les blocs trouvés de ces nœuds seulement, puis `sectionOfBlock` dans l'ordre du document ; aucune
+ * lecture sans bloc de page montré. `editable` : niveau écriture, déjà calculé pour le filtre (`levels`).
+ */
+async function withSections(db: PlatformDb, identity: Identity, nodes: NodeMatch[], levels: ReadonlyMap<string, number>): Promise<void> {
+  const shown = nodes.filter((node) => node.places.some(isPageBlock))
+  if (shown.length === 0) return
+  const ids = shown.map((node) => node.nodeId)
+  const blockIds = shown.flatMap((node) => node.places.filter(isPageBlock).map((place) => place.blockId))
+  const org = identity.org.id
+  const [blocks, revisions] = await inTransaction(db, "find: sections", (sql) =>
+    Promise.all([
+      sql<{ node_id: string; id: string; type: string; text: string | null; data: unknown; position: number | null }[]>`
+        select node_id, id, type, text, data, position from platform.blocks
+         where org_id = ${org} and state = 'published' and node_id = any(${ids}) and (type = 'heading' or id = any(${blockIds}))`,
+      sql<{ id: string; revision: number }[]>`select id, revision from platform.nodes where org_id = ${org} and id = any(${ids})`,
+    ]),
+  )
+  for (const node of shown) {
+    const ordered = orderBlocks(blocks.filter((block) => block.node_id === node.nodeId))
+    for (const place of node.places.filter(isPageBlock)) {
+      place.section = ordered.some((block) => block.id === place.blockId) ? sectionOfBlock(ordered, place.blockId) : null
+    }
+    node.revision = revisions.find((row) => row.id === node.nodeId)?.revision
+    node.editable = node.kind !== "table" && (levels.get(node.nodeId) ?? ACCESS_LEVELS.none) >= ACCESS_LEVELS.write
+  }
+}
+
+/** Un nœud en données (AC16) : ses champs servis, sans l'identifiant du nœud ni ceux des blocs. */
+function matchData(node: NodeMatch) {
+  const places = node.places.map((place) => ({
+    match: place.match,
+    block: place.block,
+    block_type: place.block_type,
+    column: place.column,
+    snippet: place.snippet,
+    ...(place.section === undefined ? {} : { section: place.section }),
+  }))
+  const revision = node.revision === undefined ? {} : { revision: node.revision }
+  return { path: node.path, kind: node.kind, title: node.title, summary: node.summary, score: roundScore(node.score), places, ...revision }
 }
 
 /**
@@ -187,13 +281,15 @@ export async function find(
 ): Promise<ToolOutput> {
   const { query, type } = input
   const prefix = identity.org.prefix
-  const { nodes, moreNodes } = type === "function" ? { nodes: [], moreNodes: 0 } : groupMatches(await readableRows(db, identity, query, type))
+  const readable = type === "function" ? null : await readableRows(db, identity, query, type)
+  const { nodes, moreNodes } = readable === null ? { nodes: [], moreNodes: 0 } : groupMatches(readable.rows)
+  if (readable) await withSections(db, identity, nodes, readable.levels)
   const active = catalog.functions.filter((fn) => isActive(fn, catalog.activeConnectors))
   const functions = type === undefined || type === "function" ? matchFunctions(active, query) : []
   return {
     text: renderFind({ query, type, nodes, moreNodes, functions, prefix }),
     data: {
-      matches: nodes.map((node) => ({ ...node, score: roundScore(node.score) })),
+      matches: nodes.map(matchData),
       more_nodes: moreNodes,
       functions: functions.map(({ fn, score }) => ({ name: fn.name, class: fn.class, connector: fn.connector, score: roundScore(score) })),
     },

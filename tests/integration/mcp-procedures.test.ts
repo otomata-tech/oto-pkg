@@ -121,7 +121,8 @@ describe.skipIf(!sqlConfigured || privatePending)(
       expect([refused.isError, refused.text]).toEqual([
         true,
         [
-          `Publication of ${path} refused: 1 problem(s). The draft is kept; nothing was published.`,
+          // E11-S18 (AC-1) : rien d'écrit par ce refus ; le brouillon écrit avant par `publish: false` reste.
+          `Publication of ${path} refused: 1 problem(s). Nothing was written; the draft saved before this call stays.`,
           `- section « Étapes », call block 3 (step 4): unknown function « mail.send »; ${prefix}_find with type function lists the functions`,
           `Fix them with ${prefix}_write (ops on the sections), then publish again. Format and rules: ${prefix}_read {"path": "write.procedure"}.`,
           "Writing it in several calls? Pass publish: false until the last one.",

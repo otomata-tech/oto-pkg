@@ -63,6 +63,8 @@ test.describe("selection of blocks in the editor (E11-S17, lot a)", () => {
       const depart = await champs[0].boundingBox()
       if (!depart) throw new Error("premier champ sans boîte")
       await page.mouse.move(depart.x + 12, depart.y + depart.height / 2)
+      // Le survol monte le champ du bloc lu : le glissé part du `<textarea>`, jamais du bloc lu qu'il remplace.
+      await expect(champs[0]).toHaveJSProperty("tagName", "TEXTAREA")
       await page.mouse.down()
       const troisieme = await centre(champs[2])
       await page.mouse.move(troisieme.x, troisieme.y, { steps: 12 })
@@ -76,8 +78,15 @@ test.describe("selection of blocks in the editor (E11-S17, lot a)", () => {
       await expect(selectionnes(page)).toHaveCount(2)
       await expect(page.getByRole("group", { name: "2 blocs sélectionnés" })).toBeFocused()
       await expect(statut(page, "2 blocs sélectionnés")).toHaveCount(1)
-      // Aucun champ ne garde de sélection de texte.
-      expect(await champs[0].evaluate((champ) => (champ instanceof HTMLTextAreaElement ? champ.selectionStart === champ.selectionEnd : false))).toBe(true)
+      // Aucun champ ne garde de sélection de texte : un champ resté ouvert a la sienne vide ; un bloc relu (la souris l'a
+      // quitté) n'est touché par aucune sélection du document.
+      expect(
+        await champs[0].evaluate((champ) => {
+          if (champ instanceof HTMLTextAreaElement) return champ.selectionStart === champ.selectionEnd
+          const selection = champ.ownerDocument.getSelection()
+          return selection === null || selection.isCollapsed || !selection.containsNode(champ, true)
+        }),
+      ).toBe(true)
       await capturer(page, testInfo, `e11s17-glisse-${mode}-${largeur}`)
 
       // AC-a6 : Suppr, une écriture ; « Annuler » les rétablit tous, à leur place.

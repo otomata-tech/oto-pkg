@@ -1,14 +1,15 @@
 "use client"
 
 // L'éditeur de blocs d'une page (E05-S02 ; E05-S08, AC1 à AC7 ; E05-S09, partie c1), au niveau écriture :
-// chaque bloc écrit est un champ toujours monté (fiche D21 B), son texte part par la file en opérations par
+// chaque bloc écrit se lit, et devient un champ quand on le touche (1.1.3, qui remplace le champ toujours monté de la
+// fiche D21 B : un `<textarea>` par bloc figeait une page de trois cents blocs) ; son texte part par la file en opérations par
 // bloc quand le focus le quitte, sur ⌘S ou après 1 200 ms sans frappe, et chaque geste de structure part
 // tout de suite. Il porte la publication, les lignes d'état et le conflit au bloc (plus de bandeau du
 // brouillon depuis E11-S02, AC-c3).
 // Il reçoit des données et du `ReactNode` déjà rendu, jamais une fonction (AC22). Sans lui, pas d'édition.
 //
 // Porté d'oto-frontend (`components/editor/block-editor.tsx`). Repris : l'orchestration (modèle local,
-// focus posé impérativement, clavier, différé), les champs toujours montés, le corps de lecture du design
+// focus posé impérativement, clavier, différé), le corps de lecture du design
 // system (`Reader`), « Bloc supprimé. » et « Annuler ». Retiré : l'écriture du corps entier (→
 // opérations par bloc), la synchronisation par comparaison de corps (`memeCorps`).
 //
@@ -29,14 +30,14 @@
 // E11-S17 (lot a) : ses rangées vivent dans la zone des blocs, où se tient la sélection de blocs entiers
 // (`selection-de-blocs.ts`) : surlignés, annoncés dans une région vivante montée vide, la zone nommée par leur nombre
 // quand elle a le focus ; le menu d'un bloc sélectionné parmi d'autres supprime et déplace le groupe.
-import { useState, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import type { BlockView, NodeKind } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
 import { Reader } from "../../ds/react/reader"
 import type { CiblesDesLiens } from "../en-ligne"
 import { EDITEUR, SELECTION } from "../libelles"
 import { Publication } from "../publication"
-import { ContexteDesGestes } from "./gestes"
+import { ContexteDesGestes, useGestesStables } from "./gestes"
 import { useGlisser } from "./glisser"
 import { AlerteDEdition, IndicationDEnregistrement, LigneDAnnonce } from "./lignes-d-etat"
 import type { Rangee } from "./modele"
@@ -84,10 +85,12 @@ type RangeesProps = {
   depots: Readonly<Record<string, Depot>>
   /** Les blocs sélectionnés (E11-S17, lot a). */
   selection: ReadonlySet<string>
+  /** Le bloc touché, dont le champ est monté (1.1.3). */
+  ouvert: string | null
 }
 
 /** Les rangées, une par bloc, rendues par leur clé de rendu, jamais par leur rang ; le Texte d'une page vide porte l'invite. */
-function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues, fichiers, depots, selection }: RangeesProps) {
+function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues, fichiers, depots, selection, ouvert }: RangeesProps) {
   const invite = estLaPageVide(modele) ? EDITEUR.invite : undefined
   return modele.map((rangee, rang) => (
     <RangeeDeBloc
@@ -98,6 +101,7 @@ function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, reference
       tenue={tenue === rangee.cle}
       selectionnee={selection.has(rangee.cle)}
       menuOuvert={menuOuvert === rangee.cle}
+      ouvert={ouvert === rangee.cle}
       // Un conflit ouvert : les autres champs sont en lecture seule jusqu'à son règlement (HN-E05S08-3).
       verrouillee={conflit !== null && conflit.cle !== rangee.cle}
       erreur={erreurs[rangee.cle] ?? null}
@@ -126,13 +130,15 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
   const fermerLeMenu = () => setMenuOuvert(null)
   const selection = useSelectionDeBlocs({ modele: editeur.modele, actions: editeur.actions, fermerLeMenu })
   const glisser = useGlisser({ racine: editeur.racine, glisser: selection.glisser, deposer: selection.deposer, groupe: selection.groupe, revenir: selection.revenir })
-  const liens: LiensDesBlocs = { prefixe: props.prefixeDesPages, cibles: props.cibles, lecture: props.liens }
+  // Le même objet d'un rendu à l'autre : une rangée qui le reçoit n'est rendue à nouveau que pour son propre bloc.
+  const { prefixeDesPages, cibles, liens: lecture } = props
+  const liens = useMemo<LiensDesBlocs>(() => ({ prefixe: prefixeDesPages, cibles, lecture }), [prefixeDesPages, cibles, lecture])
   // Tout le texte d'un bloc sélectionné ouvre le menu de sa poignée ; une autre sélection le referme (AC-28). Des blocs
   // sélectionnés n'en ouvrent aucun : un glissé qui passe sur tout un texte prend des blocs (E11-S17, AC-a1).
   const selectionner = (cle: string, totale: boolean) => {
     if (selection.cles.length === 0) setMenuOuvert((ouvert) => (totale ? cle : ouvert === cle ? null : ouvert))
   }
-  const gestes = {
+  const gestes = useGestesStables({
     ...editeur.actions,
     poignee: glisser.poignee,
     selectionner,
@@ -141,7 +147,9 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
     cliquerLaPoignee: selection.cliquerLaPoignee,
     supprimer: selection.supprimer,
     deplacer: selection.deplacer,
-  }
+    ouvrirLeChamp: editeur.ouvrirLeChamp,
+    activerLeChamp: editeur.activerLeChamp,
+  })
   return (
     <ContexteDesGestes.Provider value={gestes}>
       <Reader ref={editeur.racine}>
@@ -170,6 +178,7 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
             fichiers={editeur.fichiers.stockage.actif}
             depots={editeur.fichiers.depots}
             selection={selection.ensemble}
+            ouvert={editeur.ouvert}
           />
           <RectangleDeSelection rectangle={selection.rectangle} />
           <p role="status" className="oto-sr-only">

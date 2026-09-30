@@ -102,10 +102,29 @@ describe("catalog (AC23)", () => {
       "table.delete_rows",
       "node.discard_draft",
       "node.trash",
+      // E11-S18 (AC-5, AC-12) : déplacer, écrire par lot.
+      "node.move",
+      "node.write_many",
       // E10-S02 (lot f) : le dépôt par lien à usage unique.
       "upload.link",
     ])
     expect(callExamples(catalogFunctions(), NONE)).toEqual(["table.rows"])
+  })
+
+  // E11-S18 (AC-5, AC-12) : deux fonctions d'écriture natives, aux schémas stricts, trouvées par les mots d'un assistant.
+  it("should serve node.move and node.write_many as native write functions, strict, and find node.move by the words of a move", () => {
+    const writing = ["node.move", "node.write_many"].map((name) => findFunction(catalogFunctions(), name))
+    expect(writing.map((fn) => [fn?.name, fn?.class, fn?.origin, fn?.summarize])).toEqual([
+      ["node.move", "write", "paquet", undefined],
+      ["node.write_many", "write", "paquet", undefined],
+    ])
+    for (const fn of writing) expect(fn?.schema.safeParse({ ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
+    const many = findFunction(catalogFunctions(), "node.write_many")
+    expect(many?.schema.safeParse({ pages: [{ path: "sav/fiche", markdown: "# Fiche" }] }).success).toBe(false)
+    expect(many?.schema.safeParse({ pages: Array.from({ length: 51 }, (_, rank) => ({ path: `sav/p${rank}` })) }).success).toBe(false)
+    for (const query of ["move rename node path", "déplacer renommer dossier", "reorganize folder"]) {
+      expect(searchFunctions(catalogFunctions(), query, 3)[0]?.fn.name, query).toBe("node.move")
+    }
   })
 
   // E11-S02 (AC-h1, HN-E11S02-6) : les trois fonctions qui suppriment, en deux temps, natives, aux schémas stricts.

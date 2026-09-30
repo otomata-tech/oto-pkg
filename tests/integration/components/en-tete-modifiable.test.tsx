@@ -7,6 +7,7 @@ import { CorpsDuNoeud } from "../../../packages/plateforme/ui/noeud/corps-du-noe
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import { ResumeModifiable, TitreModifiable } from "../../../packages/plateforme/ui/noeud/en-tete-modifiable"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { PAGE, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 // Le titre et le résumé écrits en place (E05-S02, AC16 ; E05-S10, AC-a1, AC-a10), sous la file d'écriture de
@@ -71,7 +72,7 @@ describe("titre et résumé en place (AC-a1 ; AC16 d'E05-S02)", () => {
     expect(champResume()).toHaveAccessibleDescription("Le routage lit le titre et le résumé.")
 
     // Un bloc enregistré d'abord (Échap l'envoie, E05-S08) : le tampon avance (M02).
-    const texte = screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     fireEvent.change(texte, { target: { value: "Objet revu" } })
     fireEvent.keyDown(texte, { key: "Escape" })
     await waitFor(() => expect(api.envoyes).toHaveLength(1))

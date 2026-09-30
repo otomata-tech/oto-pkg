@@ -57,7 +57,7 @@ export default async function RetoursPage({
       Lien={Link}
       hrefDeFiltre={hrefDeFiltre}
       hrefDeConversation={hrefDeConversation}
-      // Les adresses du rail du staff, que le layout lui donne aussi : Retours y est, seul de « Suivi de l'entreprise ».
+      // Les adresses du rail du staff, que le layout lui donne aussi : Retours, hors du menu, n'a pas de fil.
       fil={{ adresses: { ...ADRESSES, retours: "/admin/feedback" }, administre: identite !== null }}
     />
   )

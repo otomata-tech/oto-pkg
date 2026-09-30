@@ -4,10 +4,11 @@ import { CHEMINS, EQUIPE, ESPACE, PROCEDURE as TITRE_DE_LA_PROCEDURE, SANS_ESPAC
 import { attendreLEnregistrement, lireLeHtml, ouvrirAQuoiSert, seConnecterSurLEspace } from "./fixtures/noeud"
 
 // Contrôle visuel connecté des écrans d'une procédure et d'un Contexte (E05-S04, AC16 ; E05-S08, AC10 :
-// champs toujours montés ; M59, fiche D104 : l'écran d'une procédure est celui d'une page) : le compte E2E,
+// chaque bloc se lit, son champ monté au survol ou au focus depuis la 1.1.3 ; M59, fiche D104 : l'écran d'une
+// procédure est celui d'une page) : le compte E2E,
 // administrateur de l'organisation de la campagne et responsable de son équipe (`espace.ts`), en clair puis en sombre. Le rail
 // mène à la procédure semée (une procédure est une page de l'arbre, E05-S09 AC-a5), dont
-// l'écran montre le résumé et ses appels déjà écrits, en texte, dans des champs de Texte (dans le HTML servi
+// l'écran montre le résumé et ses appels déjà écrits, en texte, dans des blocs de Texte (dans le HTML servi
 // avant l'hydratation), ni champ d'appel, ni contrôle du brouillon, ni « Tester une phrase », ni insertion
 // d'appel au menu ; sa version publiée se lit comme une page. Sur la procédure jetable
 // `private/<handle>/essai_procedure` (créée par le test si elle manque, avec un premier paragraphe ; le
@@ -121,7 +122,7 @@ test.describe("procédure et contexte", () => {
       await seConnecterSurLEspace(page, { email, password })
 
       // L'écran de la procédure, depuis le rail : une page de l'arbre, sans page de liste (E05-S09, AC-a5) ;
-      // le résumé, et chaque appel déjà écrit à sa place, en texte, dans un champ de Texte toujours monté :
+      // le résumé, et chaque appel déjà écrit à sa place, en texte, dans un bloc de Texte lu, nommé comme son champ :
       // le HTML servi les porte avant l'hydratation (E05-S08, AC1 ; M59).
       const rail = page.getByRole("navigation", { name: "Navigation principale" })
       await rail.getByRole("link", { name: TITRE_DE_LA_PROCEDURE }).click()
@@ -129,7 +130,7 @@ test.describe("procédure et contexte", () => {
       // La page se compile à son premier appel : son chargement peut durer bien au-delà des 5 s par défaut.
       await attendre(page.getByText(/^Complète les fiches des prospects \(contact, email, montant estimé\)/)).toBeVisible()
       for (const fonction of ["table.schema", "table.claim", "table.write", "table.release"]) {
-        await expect(page.getByRole("textbox", { name: `Modifier ce texte — ${fonction}` })).toHaveValue(new RegExp(`^Appel de ${fonction.replace(".", "\\.")}`))
+        await expect(page.getByRole("textbox", { name: `Modifier ce texte — ${fonction}` })).toHaveText(new RegExp(`^Appel de ${fonction.replace(".", "\\.")}`))
       }
       const servie = await lireLeHtml(page, `/n/${PROCEDURE}`)
       for (const retire of ["Arguments (JSON)", "Contrôle du brouillon", "Tester une phrase", "Appel · "]) expect(servie).not.toContain(retire)
@@ -164,7 +165,9 @@ test.describe("procédure et contexte", () => {
       // Le « + » ouvre le choix du bloc (E10-S06, AC-a1) : un Texte.
       await cliquerDansLaRangee(page.getByRole("button", { name: "Ajouter un bloc après — Premier paragraphe." }))
       await page.getByRole("menuitem", { name: "Texte", exact: true }).click()
-      await page.getByRole("textbox", { name: "Modifier ce texte — bloc vide" }).fill(ETAPE)
+      const etape = page.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })
+      await etape.focus()
+      await etape.fill(ETAPE)
       await page.keyboard.press("Escape")
       await attendreLEnregistrement(page)
       await attendreLaPublication(page, essai, ETAPE, true)

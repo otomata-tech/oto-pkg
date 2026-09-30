@@ -6,9 +6,10 @@ import { ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { ListeACiter } from "../../../packages/plateforme/ui/noeud/editeur/citer"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
+import { ouvrirLeChamp, texteDuBloc } from "../../helpers/champ-du-bloc"
 import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
-// L'éditeur de blocs (E05-S08, champs toujours montés ; E05-S02 pour ce qui ne dépend pas du mode ; E05-S10,
+// L'éditeur de blocs (E05-S08 ; depuis la 1.1.3, un bloc se lit et son focus monte son champ, `ouvrirLeChamp` ; E05-S02 pour ce qui ne dépend pas du mode ; E05-S10,
 // partie a : menu de la poignée, glisser-déposer, blocs vides, un seul titre, publication seule, liens), sous
 // sa file d'écriture : `fetch` simulé pour `POST /api/platform/nodes`, relecture de la page espionnée ; une
 // relecture se joue en rerendant l'éditeur avec les blocs relus. « Ailleurs » est un bouton hors de
@@ -16,8 +17,8 @@ import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 type Montage = { blocs?: BlockView[]; tampon?: string | null; revision?: number }
 
-/** Un bloc que l'écran n'écrit pas (un diagramme) : il se lit, se déplace, se duplique et se supprime. */
-const DIAGRAMME = bloc("f5000000-0000-4000-8000-000000000005", "mermaid", "graph TD")
+/** Un bloc que l'écran n'écrit pas (un contenu cité ; un diagramme s'écrit depuis la 1.1.3) : il se lit, se déplace, se duplique et se supprime. */
+const CITE = bloc("f5000000-0000-4000-8000-000000000005", "reference", null, { path: "ventes/suivi" })
 const rafraichir = vi.fn()
 let api: ReturnType<typeof simulerLAPI>
 
@@ -39,6 +40,7 @@ function monter(montage: Montage = {}) {
 
 const bouton = (nom: string) => screen.getByRole("button", { name: nom })
 
+/** Le champ déjà ouvert du bloc nommé, sans l'ouvrir : un bloc lu lève (il s'ouvre par `ouvrirLeChamp`). */
 function champ(nom: string): HTMLTextAreaElement {
   const element = screen.getByRole("textbox", { name: nom })
   if (!(element instanceof HTMLTextAreaElement)) throw new Error(`champ « ${nom} » attendu`)
@@ -95,28 +97,32 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, "clipboard")
 })
 
-describe("EditeurDeBlocs, champs montés (AC1, AC9)", () => {
-  it("should mount every writable block as a named field without a click, none focused, a heading in its element, the other blocks read, and no « Modifier ce bloc »", () => {
-    monter({ blocs: [...PAGE, DIAGRAMME] })
+describe("EditeurDeBlocs, champs des blocs (AC1, AC9)", () => {
+  it("should name every writable block as a textbox without a click, read with no field mounted, none focused, a heading in its element, the other blocks read, and no « Modifier ce bloc »", () => {
+    monter({ blocs: [...PAGE, CITE] })
     expect(screen.getAllByRole("textbox").map((element) => element.getAttribute("aria-label"))).toEqual([
       "Modifier ce titre — Objet",
       "Modifier ce texte — Objet de la relance",
       "Modifier ce code — select 1",
       "Modifier cette liste — Lire le devis Écrire",
     ])
+    // Aucun champ monté tant qu'aucun bloc n'est touché (1.1.3).
+    expect(document.querySelector("textarea")).toBeNull()
     expect(document.activeElement).toBe(document.body)
-    expect(champ("Modifier ce titre — Objet").closest("h2")).toHaveAttribute("id", "objet")
-    // Une liste à puces écrite est dessinée par le design system (ses puces : `e11s06-editeur.test.tsx`) ; sa
-    // hauteur est celle de ses lignes dès le rendu du serveur, avant toute mesure (M30).
-    const liste = champ("Modifier cette liste — Lire le devis Écrire")
+    expect(screen.getByRole("textbox", { name: "Modifier ce titre — Objet" }).closest("h2")).toHaveAttribute("id", "objet")
+    // Une liste à puces écrite est dessinée par le design system (ses puces : `e11s06-editeur.test.tsx`) ; lue, elle
+    // est atteinte au clavier.
+    const liste = screen.getByRole("textbox", { name: "Modifier cette liste — Lire le devis Écrire" })
     expect(liste).toHaveAttribute("data-kind", "list")
-    expect(liste).toHaveAttribute("rows", "2")
+    expect(liste).toHaveAttribute("tabindex", "0")
     // Un bloc qu'on n'écrit pas se lit dans sa rangée, avec sa gouttière (HN-E05S08-5).
-    expect(screen.getByText("Diagramme (texte)")).toBeInTheDocument()
-    for (const geste of ["Ajouter un bloc après — graph TD", "Actions sur ce bloc — graph TD", "Actions sur ce bloc — Objet de la relance"]) expect(bouton(geste)).toBeInTheDocument()
+    expect(screen.getByText("ventes/suivi")).toBeInTheDocument()
+    for (const geste of ["Ajouter un bloc après — ventes/suivi", "Actions sur ce bloc — ventes/suivi", "Actions sur ce bloc — Objet de la relance"]) expect(bouton(geste)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^Modifier ce bloc/ })).toBeNull()
     // Les lignes d'état sont montées vides : elles n'annoncent que ce qui change ensuite.
     for (const region of screen.getAllByRole("status")) expect(region).toBeEmptyDOMElement()
+    // Ouvert, son champ a la hauteur de ses lignes avant toute mesure (M30).
+    expect(ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire")).toHaveAttribute("rows", "2")
   })
 })
 
@@ -125,7 +131,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
   it("should send a modified field once when the focus leaves it, as when following a link, adopt the returned revision, say it, and send nothing unchanged", async () => {
     const lache = api.retenir()
     monter()
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     ecrire(texte, "Objet revu")
     ailleurs()
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
@@ -140,14 +146,16 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
     lache()
     await waitFor(() => expect(statut("Enregistré.")).toHaveAttribute("aria-busy", "false"))
 
-    // ⌘S envoie sans quitter le champ, sur la révision rendue (4) ; un champ inchangé qu'on quitte n'envoie rien.
-    ecrire(texte, "Objet revu encore")
-    fireEvent.keyDown(texte, { key: "s", ctrlKey: true })
+    // ⌘S envoie sans quitter le champ, sur la révision rendue (4) ; un champ inchangé qu'on quitte n'envoie rien. Le
+    // champ quitté s'est démonté : il se rouvre.
+    const encore = ouvrirLeChamp("Modifier ce texte — Objet revu")
+    ecrire(encore, "Objet revu encore")
+    fireEvent.keyDown(encore, { key: "s", ctrlKey: true })
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[1].ops?.[0]).toMatchObject({ op: "replace_block", block: ID.objet, revision: 4 })
-    expect(document.activeElement).toBe(texte)
+    expect(document.activeElement).toBe(encore)
     ailleurs()
-    act(() => champ("Modifier ce titre — Objet").focus())
+    ouvrirLeChamp("Modifier ce titre — Objet")
     ailleurs()
     await unTour()
     expect(api.envoyes).toHaveLength(2)
@@ -155,7 +163,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
 
   it("should send a field's text 1 200 ms after the last keystroke, in a single replace_block", () => {
     monter()
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     vi.useFakeTimers()
     ecrire(texte, "Objet r")
     act(() => vi.advanceTimersByTime(1_000))
@@ -168,7 +176,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
 
   it("should keep a refused field's message under it, focus kept, send nothing, and give its last saved content back", async () => {
     monter()
-    const titre = champ("Modifier ce titre — Objet")
+    const titre = ouvrirLeChamp("Modifier ce titre — Objet")
     ecrireEtEchapper(titre, "x".repeat(201))
     const message = await screen.findByRole("alert")
     expect(message).toHaveTextContent("Un titre compte 200 caractères au plus.")
@@ -184,7 +192,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
 
   it("should delete an emptied block with « Annuler » once the focus leaves its row, and keep an empty new block without sending", async () => {
     monter()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "   ")
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "   ")
     // La poignée de la même rangée garde le bloc vide : il n'est retiré qu'à la sortie de sa rangée.
     act(() => bouton("Actions sur ce bloc — bloc vide").focus())
     await unTour()
@@ -203,7 +211,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
     await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
     ailleurs()
     await unTour()
-    expect(champ("Modifier ce texte — bloc vide")).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toBeInTheDocument()
     expect(api.envoyes).toHaveLength(1)
   })
 
@@ -219,7 +227,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
     expect(document.activeElement).toBe(document.body)
     fireEvent.pointerUp(poignee)
     fireEvent.click(poignee)
-    expect(champ("Modifier ce texte — bloc vide")).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toBeInTheDocument()
     expect(poignee).toHaveAttribute("aria-expanded", "true")
     expect(api.envoyes).toHaveLength(0)
   })
@@ -227,8 +235,8 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
   // Une navigation du client (retour du navigateur) démonte l'éditeur sans `blur` ni `beforeunload`.
   it("should send the text still waiting for its 1 200 ms when the editor goes away without the field losing the focus (HN-E05S08-16)", async () => {
     const { unmount } = render(editeur({}))
-    // Tapé sans focus : aucune sortie de champ ne l'envoie, seul le démontage.
-    fireEvent.change(champ("Modifier ce texte — Objet de la relance"), { target: { value: "Objet revu" } })
+    // Tapé dans le champ ouvert, que le focus ne quitte pas : aucune sortie de champ ne l'envoie, seul le démontage.
+    fireEvent.change(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), { target: { value: "Objet revu" } })
     expect(api.envoyes).toHaveLength(0)
     unmount()
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
@@ -239,8 +247,7 @@ describe("EditeurDeBlocs, envoi du texte (AC2)", () => {
 describe("EditeurDeBlocs, clavier (AC3)", () => {
   it("should split at the caret on Enter, a heading giving a Texte, send both parts, and focus the part after", async () => {
     monter()
-    const titre = champ("Modifier ce titre — Objet")
-    act(() => titre.focus())
+    const titre = ouvrirLeChamp("Modifier ce titre — Objet")
     titre.setSelectionRange(3, 3)
     fireEvent.keyDown(titre, { key: "Enter" })
     const suite = await screen.findByRole("textbox", { name: "Modifier ce texte — et" })
@@ -255,7 +262,7 @@ describe("EditeurDeBlocs, clavier (AC3)", () => {
 
   it("should turn a Texte into a heading by its prefix, leave a list on Enter on its last empty line, and merge into the block before on Backspace at the start", async () => {
     monter()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "# Objet de la relance")
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "# Objet de la relance")
     // Le bloc change d'élément : son champ est remonté dans le titre, le focus l'y suit.
     const devenu = await screen.findByRole("textbox", { name: "Modifier ce titre — Objet de la relance" })
     expect(devenu.closest("h2")).not.toBeNull()
@@ -264,15 +271,14 @@ describe("EditeurDeBlocs, clavier (AC3)", () => {
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops?.[0]).toMatchObject({ op: "replace_block", block: ID.objet, input: { type: "heading", text: "Objet de la relance", data: { level: 1 } } })
 
-    const liste = champ("Modifier cette liste — Lire le devis Écrire")
+    const liste = ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire")
     ecrire(liste, "Lire le devis\nÉcrire le brouillon\n")
     liste.setSelectionRange(liste.value.length, liste.value.length)
     fireEvent.keyDown(liste, { key: "Enter" })
     await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
-    expect(champ("Modifier cette liste — Lire le devis Écrire")).toHaveValue("Lire le devis\nÉcrire le brouillon")
+    expect(texteDuBloc("Modifier cette liste — Lire le devis Écrire")).toBe("Lire le devis\nÉcrire le brouillon")
 
-    const titre = champ("Modifier ce titre — Objet de la relance")
-    act(() => titre.focus())
+    const titre = ouvrirLeChamp("Modifier ce titre — Objet de la relance")
     titre.setSelectionRange(0, 0)
     fireEvent.keyDown(titre, { key: "Backspace" })
     const fondu = await screen.findByRole("textbox", { name: "Modifier ce titre — ObjetObjet de la relance" })
@@ -287,8 +293,7 @@ describe("EditeurDeBlocs, clavier (AC3)", () => {
 
   it("should move a block with ⌥↑, the focus kept in its field, and send the text on Escape before focusing the row's handle", async () => {
     monter()
-    const liste = champ("Modifier cette liste — Lire le devis Écrire")
-    act(() => liste.focus())
+    const liste = ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire")
     fireEvent.keyDown(liste, { key: "ArrowUp", altKey: true })
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops).toEqual([{ op: "move_block", block: ID.liste, after_block: ID.objet }])
@@ -302,7 +307,7 @@ describe("EditeurDeBlocs, clavier (AC3)", () => {
 })
 
 describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
-  it("should open under the handle a menu to move, restyle among one « Titre » and seven styles, duplicate and delete, with no such button outside it", async () => {
+  it("should open under the handle a menu to move, restyle among one « Titre » and eight styles, duplicate and delete, with no such button outside it", async () => {
     monter()
     expect(screen.queryByRole("button", { name: /^(Monter|Descendre|Supprimer|Dupliquer)$/ })).toBeNull()
     ajouterUnTexteApres("Objet de la relance")
@@ -321,6 +326,8 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
       ["Liste à cocher", "false"],
       ["Citation", "false"],
       ["Code", "false"],
+      // 1.1.3 : « Diagramme » s'ajoute.
+      ["Diagramme", "false"],
       // E10-S06 (AC-a3) : « Repli » s'ajoute ; les blocs « Insérer » n'y figurent pas.
       ["Repli", "false"],
     ])
@@ -334,7 +341,7 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "heading", text: "Budget", data: { level: 1 } } }])
     // L'ancre du bloc neuf est la référence que rend son écriture.
-    await waitFor(() => expect(champ("Modifier ce titre — Budget").closest("h2")).toHaveAttribute("id", "e0000001"))
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Modifier ce titre — Budget" }).closest("h2")).toHaveAttribute("id", "e0000001"))
   })
 
   it("should open the menu from the keyboard, close it on Escape with the focus back on the handle, and move a block by « Monter », the last one not going down", async () => {
@@ -359,38 +366,37 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
   })
 
   it("should give a block written by the assistant a menu without style, duplicate it, delete it with its revision, and bring it back by « Annuler » without id", async () => {
-    monter({ blocs: [...PAGE.slice(0, 2), DIAGRAMME] })
-    const menu = menuDu("graph TD")
+    monter({ blocs: [...PAGE.slice(0, 2), CITE] })
+    const menu = menuDu("ventes/suivi")
     expect(menu.getByText("Ce bloc se modifie par votre assistant.")).toBeInTheDocument()
     expect(menu.queryAllByRole("menuitemradio")).toHaveLength(0)
     fireEvent.click(menu.getByRole("menuitem", { name: "Dupliquer" }))
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
-    expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", block: DIAGRAMME.id, input: { type: "mermaid", text: "graph TD", data: {} } }])
-    expect(screen.getAllByText("Diagramme (texte)")).toHaveLength(2)
+    expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", block: CITE.id, input: { type: "reference", data: { path: "ventes/suivi" } } }])
+    expect(screen.getAllByText("ventes/suivi")).toHaveLength(2)
 
     // Le premier des deux, celui qui était servi.
-    fireEvent.click(screen.getAllByRole("button", { name: "Actions sur ce bloc — graph TD" })[0])
+    fireEvent.click(screen.getAllByRole("button", { name: "Actions sur ce bloc — ventes/suivi" })[0])
     fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Supprimer" }))
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
-    expect(api.envoyes[1].ops).toEqual([{ op: "delete_block", block: DIAGRAMME.id, revision: 3 }])
-    // Le focus va au bloc d'avant, dans son champ, en fin de texte.
-    const avant = champ("Modifier ce texte — Objet de la relance")
-    await waitFor(() => expect(document.activeElement).toBe(avant))
-    expect(avant).toHaveProperty("selectionStart", "Objet de la relance".length)
+    expect(api.envoyes[1].ops).toEqual([{ op: "delete_block", block: CITE.id, revision: 3 }])
+    // Le focus va au bloc d'avant, dans son champ ouvert, en fin de texte.
+    await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — Objet de la relance")))
+    expect(champ("Modifier ce texte — Objet de la relance")).toHaveProperty("selectionStart", "Objet de la relance".length)
     expect(statut("Bloc supprimé.")).toBeDefined()
 
     fireEvent.click(bouton("Annuler"))
     await waitFor(() => expect(api.envoyes).toHaveLength(3))
-    expect(api.envoyes[2].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "mermaid", text: "graph TD", data: {} } }])
+    expect(api.envoyes[2].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "reference", data: { path: "ventes/suivi" } } }])
   })
 
   it("should read a heading of level 2 or 3 as « Titre », in the element of its level, without rewriting its level", async () => {
     const ancien = { ...bloc("a7000000-0000-4000-8000-000000000007", "heading", "Suite", { level: 3 }), revision: 2 }
     monter({ blocs: [ancien] })
-    expect(champ("Modifier ce titre — Suite").closest("h4")).not.toBeNull()
+    expect(screen.getByRole("textbox", { name: "Modifier ce titre — Suite" }).closest("h4")).not.toBeNull()
     expect(menuDu("Suite").getByRole("menuitemradio", { name: "Titre" })).toHaveAttribute("aria-checked", "true")
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
-    ecrireEtEchapper(champ("Modifier ce titre — Suite"), "Suite revue")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce titre — Suite"), "Suite revue")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops?.[0]).toMatchObject({ input: { type: "heading", text: "Suite revue", data: { level: 3 } } })
   })
@@ -398,8 +404,7 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
   it("should show a nested list one item per line, two spaces per level, and send the typing with its children, ordered and start kept (E10-S04, AC-b2)", () => {
     const items = ["a", { text: "b", children: { items: ["c", { text: "d", children: { items: ["e"], ordered: true, start: 3 } }] } }]
     monter({ blocs: [{ ...bloc("a8000000-0000-4000-8000-000000000008", "list", null, { items, ordered: true, start: 2 }), revision: 2 }] })
-    const liste = screen.getByRole("textbox", { name: /^Modifier .* — a b/ })
-    if (!(liste instanceof HTMLTextAreaElement)) throw new Error("champ attendu")
+    const liste = ouvrirLeChamp(/^Modifier .* — a b/)
     expect(liste).toHaveValue("a\nb\n  - c\n  - d\n    3. e")
     vi.useFakeTimers()
     ecrire(liste, "a\nb\n  - c\n  - d\n    3. e\n    4. f")
@@ -413,8 +418,8 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
   it("should settle the status line when a queued gesture has nothing left to send, its block deleted meanwhile", async () => {
     monter()
     const lache = api.retenir()
-    ecrireEtEchapper(champ("Modifier ce titre — Objet"), "Objet revu")
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte revu")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce titre — Objet"), "Objet revu")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte revu")
     choisir("Texte revu", "Supprimer")
     lache()
     // Le remplacement du bloc supprimé ne part pas : seule sa suppression suit l'écriture retenue.
@@ -428,14 +433,15 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
     monter({ blocs: [] })
     expect(screen.queryByText("Cette page n'a pas encore de contenu.")).toBeNull()
     expect(screen.queryByRole("button", { name: "Commencer à écrire" })).toBeNull()
-    const premier = champ("Modifier ce texte — bloc vide")
-    expect(premier).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
+    // Lu, il dit son invite ; ouvert, son champ la porte.
+    const invite = "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)"
+    expect(screen.getByRole("textbox", { name: "Modifier ce texte — bloc vide" })).toHaveAttribute("aria-placeholder", invite)
+    expect(ouvrirLeChamp("Modifier ce texte — bloc vide")).toHaveAttribute("placeholder", invite)
     // Vide, quitté, il ne part pas et reste là.
-    act(() => premier.focus())
     ailleurs()
     await unTour()
     expect(api.envoyes).toEqual([])
-    ecrireEtEchapper(champ("Modifier ce texte — bloc vide"), "Premier bloc")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — bloc vide"), "Premier bloc")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", input: { type: "paragraph", text: "Premier bloc", data: {} } }])
   })
@@ -445,15 +451,14 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
     choisir("Seul bloc", "Supprimer")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(api.envoyes[0].ops).toEqual([{ op: "delete_block", block: ID.objet, revision: 3 }])
-    const vide = champ("Modifier ce texte — bloc vide")
-    expect(vide).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
-    await waitFor(() => expect(document.activeElement).toBe(vide))
+    // Le focus l'ouvre : son champ porte l'invite.
+    await waitFor(() => expect(document.activeElement).toBe(champ("Modifier ce texte — bloc vide")))
+    expect(champ("Modifier ce texte — bloc vide")).toHaveAttribute("placeholder", "Commencer à écrire... Utilisez '@' pour citer un autre contenu (page, tableau, procédure)")
   })
 
   it("should open the choice of « / » on the Texte of an empty page, and insert after it from its « + » (AC-g2)", () => {
     monter({ blocs: [] })
-    const texte = champ("Modifier ce texte — bloc vide")
-    act(() => texte.focus())
+    const texte = ouvrirLeChamp("Modifier ce texte — bloc vide")
     fireEvent.change(texte, { target: { value: "/" } })
     expect(screen.getByRole("listbox", { name: "Blocs à insérer" })).toBeInTheDocument()
     fireEvent.change(texte, { target: { value: "" } })
@@ -464,7 +469,7 @@ describe("EditeurDeBlocs, menu de la poignée (E05-S10, AC-a2, AC-a5)", () => {
   it("should tick a checklist line from its box, the state sent at once", async () => {
     const cases = bloc("c8000000-0000-4000-8000-000000000008", "checklist", null, { items: [{ text: "Lire", checked: false }, { text: "Écrire", checked: true }] })
     monter({ blocs: [cases] })
-    expect(champ("Modifier cette liste à cocher — Lire Écrire")).toHaveValue("Lire\nÉcrire")
+    expect(texteDuBloc("Modifier cette liste à cocher — Lire Écrire")).toBe("Lire\nÉcrire")
     const lire = screen.getByRole("checkbox", { name: "Cocher « Lire »" })
     expect(lire).not.toBeChecked()
     expect(screen.getByRole("checkbox", { name: "Cocher « Écrire »" })).toBeChecked()
@@ -612,7 +617,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     monter()
     expect(screen.queryByRole("button", { name: "Publier" })).toBeNull()
     vi.useFakeTimers()
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     ecrire(texte, "Objet r")
     await act(() => vi.advanceTimersByTimeAsync(2_000))
     fireEvent.change(texte, { target: { value: "Objet revu" } })
@@ -639,7 +644,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     }],
   ])("should send the waiting text then publish at once when %s", async (_cas, sortir) => {
     monter()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Objet revu")
     act(sortir)
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[0].ops?.[0]).toMatchObject({ op: "replace_block", input: { text: "Objet revu" } })
@@ -650,7 +655,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
 
   it("should send a text over the keepalive limit (64 KiB) without keepalive when the tab closes, so that it still leaves", async () => {
     monter()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "a".repeat(70_000))
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "a".repeat(70_000))
     act(() => window.dispatchEvent(new Event("pagehide")))
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.fetchMock.mock.calls.map(([, init]) => init?.keepalive)).toEqual([undefined, true])
@@ -658,7 +663,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
 
   it("should publish when the host navigates away, the editor going with the page", async () => {
     const { demonter } = monter()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Objet revu")
     demonter()
     await waitFor(() => expect(api.envoyes).toHaveLength(2))
     expect(api.envoyes[1]).toMatchObject({ publish: true })
@@ -666,13 +671,13 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
 
   it("should say a stale publication, keep the text, and publish again on « Réessayer »", async () => {
     monter()
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     ecrireEtEchapper(texte, "Objet revu")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     api.refuser("stale_revision", 409)
     act(() => window.dispatchEvent(new Event("pagehide")))
     expect(await screen.findByText("La page a changé pendant que vous écriviez : votre texte est gardé, il sera publié à votre prochaine modification.")).toHaveAttribute("role", "alert")
-    expect(champ("Modifier ce texte — Objet revu")).toHaveValue("Objet revu")
+    expect(texteDuBloc("Modifier ce texte — Objet revu")).toBe("Objet revu")
     expect(rafraichir).toHaveBeenCalledTimes(1)
     fireEvent.click(bouton("Réessayer"))
     await waitFor(() => expect(api.envoyes).toHaveLength(3))
@@ -685,7 +690,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
     monter()
     expect(screen.queryByText(/La publication revient/)).toBeNull()
     vi.useFakeTimers()
-    ecrire(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    ecrire(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Objet revu")
     await act(() => vi.advanceTimersByTimeAsync(1_200))
     expect(api.envoyes.map((corps) => corps.publish)).toEqual([false])
     expect(statut("Enregistré.")).toBeDefined()
@@ -700,8 +705,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
       window.dispatchEvent(depart)
       return depart.defaultPrevented
     }
-    const texte = champ("Modifier ce texte — Objet de la relance")
-    act(() => texte.focus())
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     expect(quitter()).toBe(false)
     fireEvent.change(texte, { target: { value: "Objet revu" } })
     expect(quitter()).toBe(true)
@@ -714,7 +718,7 @@ describe("EditeurDeBlocs, publication seule (E05-S10, AC-a6)", () => {
 describe("EditeurDeBlocs, brouillon (AC9 d'E05-S02 ; E11-S02, AC-c3)", () => {
   it("should say nothing of a draft, the person's or one an assistant left, and publish the shared draft whole after the next keystroke", async () => {
     monter({ tampon: null })
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Objet revu")
     await waitFor(() => expect(api.envoyes).toHaveLength(1))
     expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
     expect(screen.queryByRole("link", { name: "Voir la version publiée" })).toBeNull()
@@ -724,7 +728,7 @@ describe("EditeurDeBlocs, brouillon (AC9 d'E05-S02 ; E11-S02, AC-c3)", () => {
     monter({ tampon: "2026-09-24T09:00:00.000000+00:00" })
     expect(screen.queryByText(/Brouillon non publié/)).toBeNull()
     vi.useFakeTimers()
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Objet revu")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Objet revu")
     await act(() => vi.advanceTimersByTimeAsync(3_000))
     // La publication part sur le tampon rendu par l'écriture : le brouillon partagé, entier.
     expect(api.envoyes.at(-1)).toMatchObject({ publish: true, draft_stamp: expect.any(String) })
@@ -736,9 +740,9 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
   it("should read a pasted address and a cited page as links in the sentence, over the same field, and no row of links under it", () => {
     monter()
     const adresse = "https://docs.exemple.fr/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit"
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     ecrire(texte, `Voir ${adresse} et [[ventes/tarifs|les tarifs]]`)
-    // Le rendu est posé sur le champ, dans sa case : le même `<textarea>`, jamais remonté, porte le texte brut.
+    // Le rendu est posé sur le champ ouvert, dans sa case : le même `<textarea>`, jamais remonté, porte le texte brut.
     const rendu = texte.parentElement?.querySelector(".oto-block-rendu")
     if (!(rendu instanceof HTMLElement)) throw new Error("rendu au repos absent")
     expect(texte).toHaveAttribute("data-rendu")
@@ -776,7 +780,7 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
       }),
     )
     monter()
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     ecrire(texte, "Voir @")
     expect(await screen.findByText("Tapez au moins deux lettres du contenu à citer.")).toBeInTheDocument()
     fireEvent.change(texte, { target: { value: "Voir @gri" } })
@@ -812,7 +816,7 @@ describe("EditeurDeBlocs, liens d'un bloc (E05-S10, AC-a8, AC-a9 ; E05-S11, AC-2
       }),
     )
     monter()
-    const liste = champ("Modifier cette liste — Lire le devis Écrire")
+    const liste = ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire")
     ecrire(liste, "Lire le devis\nÉcrire @gri")
     await screen.findByRole("option")
     expect(fireEvent.keyDown(liste, { key: "Tab" })).toBe(false)
@@ -835,10 +839,10 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
   it("should reread on stale_revision, put the changed block in conflict with the final text prefilled by the saved version, lock the other fields, then save the final text on the new revision", async () => {
     const { relire } = monter()
     api.refuser("stale_revision", 409)
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte de Léa")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte de Léa")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
-    // Le champ reste monté : ce qu'on y tape entre le refus et la relecture va dans « Votre texte ».
-    ecrire(champ("Modifier ce texte — Texte de Léa"), "Texte de Léa, suite")
+    // Le champ s'écrit encore : ce qu'on y tape entre le refus et la relecture va dans « Votre texte ».
+    ecrire(ouvrirLeChamp("Modifier ce texte — Texte de Léa"), "Texte de Léa, suite")
     const claire = [PAGE[0], { ...bloc(ID.objet, "paragraph", "Texte de Claire"), revision: 4 }, PAGE[2], PAGE[3]]
     relire({ blocs: claire })
 
@@ -847,10 +851,9 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
     expect(screen.getByRole("textbox", { name: "Version enregistrée" })).toHaveValue("Texte de Claire")
     expect(screen.getByRole("textbox", { name: "Texte final" })).toHaveValue("Texte de Claire")
     expect(bouton("Copier mon texte")).toBeInTheDocument()
-    // Les autres champs se lisent sans s'écrire, et le disent (HN-E05S08-3).
-    const autre = champ("Modifier ce titre — Objet")
-    expect(autre).toHaveAttribute("readonly")
-    act(() => autre.focus())
+    // Les autres champs se lisent sans s'écrire, et le disent (HN-E05S08-3) : lus, puis ouverts.
+    expect(screen.getByRole("textbox", { name: "Modifier ce titre — Objet" })).toHaveAttribute("aria-readonly", "true")
+    expect(ouvrirLeChamp("Modifier ce titre — Objet")).toHaveAttribute("readonly")
     await waitFor(() => expect(statut("Réglez d'abord le bloc en conflit.")).toBeDefined())
     choisir("Objet", "Supprimer")
     expect(api.envoyes).toHaveLength(1)
@@ -874,7 +877,8 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
       { op: "replace_block", block: ID.objet, revision: 5, input: { type: "paragraph", text: "Texte final", data: {} } },
     ])
     await waitFor(() => expect(document.activeElement).toBe(bouton("Actions sur ce bloc — Texte final")))
-    expect(champ("Modifier ce titre — Objet")).not.toHaveAttribute("readonly")
+    expect(screen.getByRole("textbox", { name: "Modifier ce titre — Objet" })).not.toHaveAttribute("aria-readonly")
+    expect(ouvrirLeChamp("Modifier ce titre — Objet")).not.toHaveAttribute("readonly")
   })
 
   it("should keep a block modified while being deleted, and let an abandoned text give way to the saved version, the queue running again", async () => {
@@ -886,11 +890,11 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
     const claire = [PAGE[0], { ...bloc(ID.objet, "paragraph", "Texte de Claire"), revision: 4 }, PAGE[2], PAGE[3]]
     relire({ blocs: claire })
     expect(await screen.findByText("Ce bloc a été modifié pendant que vous le supprimiez : il est gardé.")).toHaveAttribute("role", "alert")
-    expect(champ("Modifier ce texte — Texte de Claire")).toHaveValue("Texte de Claire")
+    expect(texteDuBloc("Modifier ce texte — Texte de Claire")).toBe("Texte de Claire")
 
     // Léa écrit B, que Claire modifie de nouveau : conflit ; elle abandonne son texte.
     api.refuser("stale_revision", 409)
-    ecrireEtEchapper(champ("Modifier ce texte — Texte de Claire"), "Texte de Léa")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Texte de Claire"), "Texte de Léa")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(2))
     relire({ blocs: [PAGE[0], { ...bloc(ID.objet, "paragraph", "Texte de Claire, bis"), revision: 5 }, PAGE[2], PAGE[3]] })
     fireEvent.click(await screen.findByRole("button", { name: "Abandonner mon texte" }))
@@ -902,11 +906,11 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
     fireEvent.click(bouton("Abandonner"))
     await waitFor(() => expect(document.activeElement).toBe(bouton("Actions sur ce bloc — Texte de Claire, bis")))
     expect(screen.queryByRole("textbox", { name: "Texte final" })).toBeNull()
-    expect(champ("Modifier ce texte — Texte de Claire, bis")).toHaveValue("Texte de Claire, bis")
+    expect(texteDuBloc("Modifier ce texte — Texte de Claire, bis")).toBe("Texte de Claire, bis")
 
     // La file repart : le geste suivant part, sur la version gardée.
     const envoyes = api.envoyes.length
-    ecrireEtEchapper(champ("Modifier cette liste — Lire le devis Écrire"), "Lire")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire"), "Lire")
     await waitFor(() => expect(api.envoyes).toHaveLength(envoyes + 1))
     expect(api.envoyes[envoyes].ops?.[0]).toMatchObject({ op: "replace_block", block: ID.liste, revision: 3 })
   })
@@ -914,7 +918,7 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
   it("should offer to reinsert a text whose block was deleted meanwhile, and ask for a retry when the page was published meanwhile", async () => {
     const { relire } = monter()
     api.refuser("stale_revision", 409)
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte de Léa")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte de Léa")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     relire({ blocs: [PAGE[0], PAGE[2], PAGE[3]] })
     expect(await screen.findByText("Ce bloc a été supprimé pendant que vous écriviez.")).toBeInTheDocument()
@@ -925,7 +929,7 @@ describe("EditeurDeBlocs, conflit au bloc (AC6)", () => {
     expect(api.envoyes[1].ops).toEqual([{ op: "insert_after", block: ID.titre, input: { type: "paragraph", text: "Texte de Léa", data: {} } }])
 
     api.refuser("stale_revision", 409)
-    ecrireEtEchapper(champ("Modifier cette liste — Lire le devis Écrire"), "Lire le devis")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire"), "Lire le devis")
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(2))
     relire({ blocs: [PAGE[0], PAGE[2], PAGE[3]], revision: 5 })
     expect(await screen.findByText("La page a changé pendant que vous écriviez : réessayez.")).toHaveAttribute("role", "alert")
@@ -941,20 +945,20 @@ describe("EditeurDeBlocs, refus et pannes (AC18 d'E05-S02)", () => {
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
     monter()
     api.refuser("forbidden", 403)
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte refusé")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte refusé")
     expect(await screen.findByText("Vous n'avez pas le droit de modifier cette page. Votre texte est toujours là : copiez-le avant de quitter l'écran.")).toHaveAttribute("role", "alert")
     fireEvent.click(bouton("Copier mon texte"))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("Texte refusé"))
     expect(await screen.findByRole("button", { name: "Texte copié" })).toBeInTheDocument()
-    expect(champ("Modifier ce texte — Texte refusé")).toHaveValue("Texte refusé")
+    expect(texteDuBloc("Modifier ce texte — Texte refusé")).toBe("Texte refusé")
   })
 
   it("should keep the following gestures waiting behind a network failure, and send them after « Réessayer »", async () => {
     monter()
     api.couper()
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte 1")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte 1")
     expect(await screen.findByText("La requête n'a pas abouti. Réessayez dans un instant : votre texte est toujours là.")).toHaveAttribute("role", "alert")
-    ecrireEtEchapper(champ("Modifier cette liste — Lire le devis Écrire"), "Lire")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier cette liste — Lire le devis Écrire"), "Lire")
     expect(api.envoyes).toHaveLength(1)
 
     // L'alerte part avec « Réessayer » : le focus va à la poignée du bloc du geste refusé.
@@ -976,7 +980,7 @@ describe("EditeurDeBlocs, refus et pannes (AC18 d'E05-S02)", () => {
   ])("should say $cas near the kept text, without rereading the page", async ({ code, statut: statutHttp, message, gestes }) => {
     monter()
     api.refuser(code, statutHttp)
-    ecrireEtEchapper(champ("Modifier ce texte — Objet de la relance"), "Texte long")
+    ecrireEtEchapper(ouvrirLeChamp("Modifier ce texte — Objet de la relance"), "Texte long")
     expect(await screen.findByText(message)).toHaveAttribute("role", "alert")
     for (const geste of gestes) expect(bouton(geste)).toBeInTheDocument()
     expect(rafraichir).not.toHaveBeenCalled()

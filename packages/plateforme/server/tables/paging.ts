@@ -76,7 +76,7 @@ export function sortRows(entries: readonly RowEntry[], header: TableHeader, sort
 // ------------------------------------------------------------------------------------ Curseur (N7)
 
 const INVALID_CURSOR = "Invalid cursor: pass the next_cursor of the previous page unchanged, or omit it."
-const OTHER_QUERY = "This cursor belongs to another query (filter, q or sort changed): start again without cursor."
+const OTHER_QUERY = "This cursor belongs to another query (filter, q, match or sort changed): start again without cursor."
 
 /** Un objet aux clés triées, pour qu'un même filtre écrit dans un autre ordre donne la même empreinte. */
 function canonical(value: unknown): unknown {
@@ -89,10 +89,14 @@ function canonical(value: unknown): unknown {
   )
 }
 
-/** L'empreinte d'une requête : le tableau, `filter`, `q` (sans casse ni accent) et `sort` ; ni `columns` ni `limit`. */
-export function queryPrint(nodeId: string, query: { filter?: unknown; q?: string; sort?: TableSort }): string {
+/**
+ * L'empreinte d'une requête : le tableau, `filter`, `q` (sans casse ni accent), `sort`, et `match: "any"` avec `q`
+ * (E11-S19, AC-f3 : son ordre n'est pas celui du ET ; sans lui, l'empreinte d'avant) ; ni `columns` ni `limit`.
+ */
+export function queryPrint(nodeId: string, query: { filter?: unknown; q?: string; sort?: TableSort; match?: "all" | "any" }): string {
   const sort = query.sort ? [query.sort.column, query.sort.direction ?? "asc"] : null
-  return fingerprint(JSON.stringify([nodeId, canonical(query.filter ?? null), query.q === undefined ? null : normalizeTitle(query.q), sort]))
+  const any = query.q !== undefined && query.match === "any" ? ["any"] : []
+  return fingerprint(JSON.stringify([nodeId, canonical(query.filter ?? null), query.q === undefined ? null : normalizeTitle(query.q), sort, ...any]))
 }
 
 /** Où reprendre : la position de la première ligne à servir, et la dernière clé servie (lecture par la base). */

@@ -19,7 +19,7 @@ function LienDeTest({ children, ...props }: { href: string; className?: string; 
 const noeud = (path: string, title: string): TreeNode => ({ path, kind: "page", title, status: "published", children: [] })
 
 describe("EcranDeNoeud, servi en flux pendant la lecture des liens (M64)", () => {
-  // La phrase se sert une fois rendue ; dans l'éditeur, une fois de plus en valeur de son champ.
+  // La phrase se sert une fois rendue ; dans l'éditeur, une fois de plus en texte brut de son champ au repos (1.1.3).
   it.each([
     ["the read document", 1, 1],
     ["the editor at rest", 2, 2],

@@ -22,6 +22,9 @@ describe("parseTableHeader (AC1, AC2)", () => {
     delete open.closed
     delete open.proof
     expect(parseTableHeader(open)).toEqual({ header: { ...open, closed: false, proof: false } })
+    // FB-0014 : une colonne de dates peut porter la clé ; une date et heure, non.
+    expect("header" in parseTableHeader(variant({ key: "dernier_contact" }))).toBe(true)
+    expect(parseTableHeader(variant({ key: "relance_le" }))).toEqual({ problems: ["key: the key column must be text, email, url, number or date; relance_le is datetime."] })
     expect(parseTableHeader([])).toEqual({ problems: ["header: expected an object {columns, key, lifecycle?, closed?, proof?}."] })
   })
 
@@ -34,7 +37,7 @@ describe("parseTableHeader (AC1, AC2)", () => {
       [variant({ lifecycle: { ...LIFECYCLE, stricte: true } }), "lifecycle.stricte: unknown attribute. Allowed: column, states, working, review."],
       [variant({ lifecycle: { ...LIFECYCLE, review: { ...LIFECYCLE.review, auto: true } } }), "lifecycle.review.auto: unknown attribute. Allowed: state, approve, reject, agents_may_decide."],
       [variant({ key: "societe" }), "key: unknown column societe. Columns: entreprise, contact, email, ville, montant_estime, dernier_contact, relance_le, actif, notes, statut."],
-      [variant({ key: "statut" }), "key: the key column must be text, email, url or number; statut is enum."],
+      [variant({ key: "statut" }), "key: the key column must be text, email, url, number or date; statut is enum."],
       [variant({ lifecycle: { ...LIFECYCLE, states: [...STATES].reverse() } }), "lifecycle.states must list exactly the options of statut, in the same order."],
       [variant({ lifecycle: { ...LIFECYCLE, working: "en attente" } }), "lifecycle.working: en attente is not one of the states of statut."],
       [variant({ lifecycle: { ...LIFECYCLE, working: "à traiter" } }), "lifecycle.working: à traiter is the first state, where rows enter; the working state comes after it."],
@@ -74,7 +77,7 @@ describe("parseTableHeader (AC1, AC2)", () => {
         "couleur: unknown attribute. Allowed: columns, key, lifecycle, closed, proof.",
         "columns[1].options: options apply to enum columns only; notes is text.",
         "columns[3].name: duplicate column contact.",
-        "key: the key column must be text, email, url or number; statut is enum.",
+        "key: the key column must be text, email, url, number or date; statut is enum.",
         "lifecycle.working: en attente is not one of the states of statut.",
       ].sort(),
     )

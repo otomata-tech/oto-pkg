@@ -21,7 +21,7 @@ import {
   FORMES_ECRITES,
   type Rangee,
 } from "../../packages/plateforme/ui/noeud/editeur/modele"
-import { controler } from "../../packages/plateforme/ui/noeud/editeur/operations"
+import { controler, estVide } from "../../packages/plateforme/ui/noeud/editeur/operations"
 import { estLaPageVide, modeleDeLaPage } from "../../packages/plateforme/ui/noeud/editeur/page-vide"
 
 // Le modèle d'édition (E05-S02, AC11, AC12) : opérations pures, sans écran. Un bloc servi garde son
@@ -102,12 +102,12 @@ describe("modèle d'édition, structure (AC12)", () => {
     expect(fondu.avec).toBe(rangees[0].cle)
     expect(textes(fondu.modele)[0]).toEqual(["heading", "ObjetRelancer un devis."])
     expect(fondu.focus).toEqual({ cle: rangees[0].cle, curseur: "Objet".length })
-    // Le précédent se modifie par l'assistant (un diagramme) : rien ne fusionne, le focus va à sa rangée.
-    const avecDiagramme = rangeesDepuis([PAGE[1], servi("cccccccc-0011", "mermaid", "graph TD"), PAGE[3]])
-    const refuse = fusionner(avecDiagramme, avecDiagramme[2].cle)
+    // Le précédent se modifie par l'assistant (un contenu cité) : rien ne fusionne, le focus va à sa rangée.
+    const avecReference = rangeesDepuis([PAGE[1], servi("cccccccc-0011", "reference", null, { path: "ventes/suivi" }), PAGE[3]])
+    const refuse = fusionner(avecReference, avecReference[2].cle)
     expect(refuse.avec).toBeUndefined()
-    expect(refuse.modele).toEqual(avecDiagramme)
-    expect(refuse.focus).toEqual({ cle: avecDiagramme[1].cle, curseur: null, cible: "rangee" })
+    expect(refuse.modele).toEqual(avecReference)
+    expect(refuse.focus).toEqual({ cle: avecReference[1].cle, curseur: null, cible: "rangee" })
 
     expect(deplacer(rangees, rangees[1].cle, -1).modele.map((rangee) => rangee.cle)).toEqual([rangees[1].cle, rangees[0].cle, rangees[2].cle, rangees[3].cle])
     expect(deplacer(rangees, rangees[0].cle, -1).modele).toEqual(rangees)
@@ -178,8 +178,8 @@ describe("modèle d'édition, styles d'un bloc (E05-S10, AC-a2, AC-a5)", () => {
     expect(ecrireTexte([ancien], ancien.cle, "Suite revue").modele[0].bloc.data).toEqual({ level: 3 })
     const [paragraphe] = rangeesDepuis([PAGE[1]])
     expect(changerDeForme([paragraphe], paragraphe.cle, "titre").modele[0].bloc.data).toEqual({ level: 1 })
-    // E10-S06 (AC-a3) : « Style » garde un seul « Titre » et ajoute « Repli ».
-    expect(FORMES_ECRITES).toEqual(["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "repli"])
+    // E10-S06 (AC-a3) : « Style » garde un seul « Titre » et ajoute « Repli » ; 1.1.3, « Diagramme ».
+    expect(FORMES_ECRITES).toEqual(["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "diagramme", "repli"])
   })
 
   it("should write a checklist, a quote and code on existing types that blockInputSchema accepts, the text following, the checks kept by line", () => {
@@ -196,6 +196,8 @@ describe("modèle d'édition, styles d'un bloc (E05-S10, AC-a2, AC-a5)", () => {
       ["cases", "checklist"],
       ["citation", "callout"],
       ["code", "code"],
+      // 1.1.3 : le diagramme, sur `mermaid`.
+      ["diagramme", "mermaid"],
     ] as const) {
       const bloc = changerDeForme([paragraphe], paragraphe.cle, forme).modele[0].bloc
       expect(bloc.type).toBe(type)
@@ -206,6 +208,11 @@ describe("modèle d'édition, styles d'un bloc (E05-S10, AC-a2, AC-a5)", () => {
     // Le langage d'un code ne suit pas le bloc devenu Texte.
     const [code] = rangeesDepuis([PAGE[2]])
     expect(changerDeForme([code], code.cle, "texte").modele[0].bloc).toMatchObject({ type: "paragraph", text: "select 1", data: {} })
+    // Du code au diagramme et retour, le texte suit (1.1.3) ; un diagramme blanc est vide : il ne part pas, le service le refuserait.
+    const diagramme = changerDeForme([code], code.cle, "diagramme").modele
+    expect(diagramme[0].bloc).toMatchObject({ id: "cccccccc-0003", type: "mermaid", text: "select 1", data: {} })
+    expect(changerDeForme(diagramme, code.cle, "code").modele[0].bloc).toMatchObject({ type: "code", text: "select 1" })
+    expect(estVide(avecForme({ type: "paragraph", text: " \n ", data: {}, key: null }, "diagramme"))).toBe(true)
   })
 
   it("should duplicate a block right after it, without id, reference, revision nor key, the focus in the copy", () => {

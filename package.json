@@ -83,6 +83,7 @@
     "eslint-plugin-import": "^2.32.0",
     "jose": "6.2.12",
     "jsdom": "^26",
+    "mermaid": "11.17.2",
     "postcss": "^8",
     "postgres": "3.4.9",
     "tailwindcss": "^4",

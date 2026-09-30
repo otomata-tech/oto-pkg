@@ -142,7 +142,8 @@ describe.skipIf(!sqlConfigured)(portable("E11-S02: discard a draft, trash and de
       expect(refused.error).toMatchObject({
         code: "conflict",
         details: { reason: "header_refused" },
-        message: expect.stringContaining(`The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {"path": "${path}"}.`),
+        // E11-S18 (AC-1) : l'écriture refusée n'écrit rien ; le brouillon d'avant (`publish: false`) reste, et son renvoi.
+        message: expect.stringContaining(`Nothing was written; the draft saved before this call stays. To go back to the published header, discard the draft: acme_call node.discard_draft {"path": "${path}"}.`),
       })
 
       const recap = await call("lea", { function: "node.discard_draft", arguments: { path } })

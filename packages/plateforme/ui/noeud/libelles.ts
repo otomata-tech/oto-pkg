@@ -32,6 +32,17 @@ export const ECRAN = {
   rangeAilleurs: "rangé ailleurs",
 } as const
 
+/**
+ * Un bloc `mermaid` : sa légende en texte (le repli, lu sans JavaScript et sous le dessin), le texte que mermaid ne lit
+ * pas, et le nom du dessin (`role="img"`), tiré de son titre ou de sa première ligne.
+ */
+export const DIAGRAMME = {
+  legende: "Diagramme (texte)",
+  invalide: "Diagramme invalide",
+  voirLeCode: "Voir le code",
+  nom: (ligne: string) => (ligne === "" ? "Diagramme" : `Diagramme : ${ligne}`),
+} as const
+
 /** Les formes qu'écrit l'écran (E05-S10, AC-a2 : un seul niveau de titre), leur libellé et le nom du champ ouvert (AC10). */
 export const FORMES = {
   texte: { libelle: "Texte", champ: "ce texte" },
@@ -41,6 +52,7 @@ export const FORMES = {
   cases: { libelle: "Liste à cocher", champ: "cette liste à cocher" },
   citation: { libelle: "Citation", champ: "cette citation" },
   code: { libelle: "Code", champ: "ce code" },
+  diagramme: { libelle: "Diagramme", champ: "ce diagramme" },
   // E10-S06 (AC-a1, AC-a3) : le repli au menu « Style » ; le tableau simple s'insère seulement.
   repli: { libelle: "Repli", champ: "ce repli" },
   tableau: { libelle: "Tableau simple", champ: "ce tableau" },

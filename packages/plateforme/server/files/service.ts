@@ -245,11 +245,31 @@ async function insertPending(db: PlatformDb, identity: Identity, file: { nodeId:
 /** Le délai d'un envoi par le serveur au stockage (dépôt par lien, 1 Mo au plus). */
 const STORE_TIMEOUT_MS = 20_000
 
+/** Ce qui a manqué à un envoi par le serveur, dit tel quel (HN-E10S02-116) : « unreachable » seulement sans réponse. */
+const NOT_REACHED = "the file storage could not be reached"
+
+/**
+ * L'objet envoyé par le serveur puis relu (`HEAD`) : `null` s'il est gardé à sa taille, sinon ce qui a manqué. Une panne
+ * sans réponse du stockage (signature, réseau, délai) lève, et son appelant la dit `NOT_REACHED`.
+ */
+async function sendObject(store: FileStore, key: string, object: { bytes: Uint8Array; mime: string }): Promise<string | null> {
+  const size = object.bytes.byteLength
+  const upload = await store.uploadUrl(key, { size, mime: object.mime })
+  const answer = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: new Blob([object.bytes]), signal: AbortSignal.timeout(STORE_TIMEOUT_MS), redirect: "error" })
+  await answer.body?.cancel()
+  if (!answer.ok) return `the file storage refused it (HTTP ${answer.status})`
+  const head = await store.head(key)
+  // La taille seule, comme la confirmation (`completeFileUpload`) : le type relu n'est pas celui envoyé partout.
+  if (!head) return "the file storage did not keep it"
+  return head.size === size ? null : `the file storage kept ${head.size} bytes instead of ${size}`
+}
+
 /**
  * Un fichier envoyé par le serveur (dépôt par lien, AC-f8 ; ADR-018 § 4), dans un nœud dont l'appelant a déjà relu
  * l'écriture : la ligne `pending` sous le quota, l'objet envoyé par l'URL présignée d'envoi du port, lu (`HEAD`), puis
  * `ready`. Un échec du stockage laisse la ligne `pending`, purgée ensuite (AC-a6), nommé au log serveur, et rend
- * `conflict`. Sans lui, un fichier déposé par lien n'arriverait pas au stockage d'ADR-016.
+ * `conflict` qui dit ce qui a manqué (« … could not be stored: <cause>. Nothing was attached. »), sans consigne : son
+ * appelant la pose. Sans lui, un fichier déposé par lien n'arriverait pas au stockage d'ADR-016.
  */
 export async function storeFile(db: PlatformDb, identity: Identity, file: { nodeId: string; name: string; bytes: Uint8Array }): Promise<FileReady> {
   const store = requireStore()
@@ -259,18 +279,15 @@ export async function storeFile(db: PlatformDb, identity: Identity, file: { node
   const mime = FILE_TYPES[type]
   const id = await insertPending(db, identity, { nodeId: file.nodeId, name: file.name, mime, size })
   const key = objectKey(identity.org.id, id)
-  try {
-    const upload = await store.uploadUrl(key, { size, mime })
-    const answer = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: new Blob([file.bytes]), signal: AbortSignal.timeout(STORE_TIMEOUT_MS), redirect: "error" })
-    if (!answer.ok) throw new Error(`storage answered ${answer.status}`)
-    const head = await store.head(key)
-    // La taille seule, comme la confirmation (`completeFileUpload`) : le type relu n'est pas celui envoyé partout.
-    if (!head || head.size !== size) throw new Error("stored object does not match")
-  } catch (error) {
+  const failure = await sendObject(store, key, { bytes: file.bytes, mime }).catch((error: unknown) => {
     console.error(`[platform] files: upload left pending ${key}`, error instanceof Error ? error.message : error)
-    throw new PlatformError("conflict", `${file.name} could not be stored (file storage unreachable): nothing was attached. Ask for a new upload link and send it again.`)
+    return NOT_REACHED
+  })
+  if (failure !== null) {
+    if (failure !== NOT_REACHED) console.error(`[platform] files: upload left pending ${key}: ${failure}`)
+    throw new PlatformError("conflict", `${file.name} could not be stored: ${failure}. Nothing was attached.`)
   }
-  await markReady(db, identity, { id, name: file.name }, { label: "files: stored", advice: "ask for a new upload link and send it again" })
+  await markReady(db, identity, { id, name: file.name }, { label: "files: stored", advice: "nothing was attached" })
   return { id, name: file.name, size, mime }
 }
 

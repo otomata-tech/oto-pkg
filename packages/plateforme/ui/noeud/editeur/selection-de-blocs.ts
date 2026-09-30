@@ -104,6 +104,8 @@ type Parametres = {
 function entrerDans(zone: HTMLElement | null, cle: string | null) {
   const rangee = cle === null ? null : zone?.querySelector(`[data-cle="${cle}"]`)
   const champ = rangee?.querySelector("[data-champ]")
+  // Un bloc qui se lit : son focus monte son champ, curseur à la fin (`champ-de-bloc.tsx`).
+  if (champ instanceof HTMLElement && champ.dataset.auRepos !== undefined) return champ.focus()
   if (!(champ instanceof HTMLTextAreaElement || champ instanceof HTMLInputElement)) return rangee?.querySelector<HTMLElement>(POIGNEE)?.focus()
   champ.focus()
   champ.setSelectionRange(champ.value.length, champ.value.length)

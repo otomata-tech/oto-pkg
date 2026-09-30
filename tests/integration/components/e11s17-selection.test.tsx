@@ -4,6 +4,7 @@ import { renderBlocks, type BlockView } from "@otomata_tech/oto_platform/schemas
 import { ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 // La sélection de blocs de l'éditeur (E11-S17, lot a), sous sa file d'écriture : `fetch` simulé pour
@@ -33,10 +34,9 @@ function monter(blocs: BlockView[] = PAGE) {
 const bouton = (nom: string) => screen.getByRole("button", { name: nom })
 const poignee = (mots: string) => bouton(`Actions sur ce bloc — ${mots}`)
 
+/** Le champ d'un bloc, ouvert et focalisé : un bloc qu'on ne touche pas se lit, son focus monte le `<textarea>` (1.1.3). */
 function champ(nom: string): HTMLTextAreaElement {
-  const element = screen.getByRole("textbox", { name: nom })
-  if (!(element instanceof HTMLTextAreaElement)) throw new Error(`champ « ${nom} » attendu`)
-  return element
+  return ouvrirLeChamp(nom)
 }
 
 /** La zone des blocs : nommée « Blocs de la page », ou par le nombre de blocs sélectionnés. */
@@ -105,9 +105,10 @@ describe("EditeurDeBlocs, selection from the keyboard (E11-S17, AC-a2, AC-a3, AC
     expect(selectionnes()).toEqual([ID.code])
     expect(screen.queryByRole("menu")).toBeNull()
 
-    // Entrée rend le focus au champ du bloc, curseur à la fin ; le focus dans un champ vide la sélection.
+    // Entrée rend le focus au champ du bloc, qu'il ouvre, curseur à la fin ; le focus dans un champ vide la sélection.
     fireEvent.keyDown(actif(), { key: "Enter" })
-    const code = champ("Modifier ce code — select 1")
+    // Relu sans l'ouvrir : c'est Entrée qui doit l'avoir ouvert.
+    const code = screen.getByRole("textbox", { name: "Modifier ce code — select 1" })
     expect(document.activeElement).toBe(code)
     expect(code).toHaveProperty("selectionStart", "select 1".length)
     expect(selectionnes()).toEqual([])
@@ -272,7 +273,7 @@ describe("EditeurDeBlocs, gestures on a selection (E11-S17, AC-a6 to AC-a8, AC-a
     fireEvent.keyDown(actif(), { key: "Delete" })
     await waitFor(() => expect(statut("Réglez d'abord le bloc en conflit.")).toBeDefined())
     expect(api.envoyes).toHaveLength(1)
-    expect(champ("Modifier ce code — select 1")).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: "Modifier ce code — select 1" })).toBeInTheDocument()
   })
 
   it("should delete 51 selected blocks in one write, beyond the 50 operations of an assistant (fiche D153)", async () => {
@@ -332,7 +333,7 @@ describe("EditeurDeBlocs, gestures on a selection (E11-S17, AC-a6 to AC-a8, AC-a
     fireEvent.keyDown(actif(), { key: "x", ctrlKey: true })
     await waitFor(() => expect(statut("Copie impossible : le navigateur refuse l'accès au presse-papiers.")).toBeDefined())
     expect(api.envoyes).toEqual([])
-    expect(champ("Modifier ce texte — Objet de la relance")).toBeInTheDocument()
+    expect(screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })).toBeInTheDocument()
   })
 
   it("should move the group with Alt+↓ in one write of move_block, in page order, and put each block back on « Annuler »", async () => {

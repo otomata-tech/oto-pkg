@@ -6,6 +6,7 @@ import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/ed
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import { FICHIERS } from "../../../packages/plateforme/ui/noeud/libelles-des-fichiers"
 import { RenduDUnBloc } from "../../../packages/plateforme/ui/noeud/rendu-des-blocs"
+import { ouvrirLeChamp, texteDuBloc } from "../../helpers/champ-du-bloc"
 import { bloc, simulerLAPI } from "../../helpers/noeud"
 
 // Les retours sur l'éditeur et les blocs de la 1.1.1 (E11-S15, lot B) : le tableau simple, la carte d'un fichier, les
@@ -114,9 +115,9 @@ describe("E11-S15, lot B — texte en ligne au repos et correcteur", () => {
   it("should render at rest the marks of a text without a link, bold on a part of it, italic, code and strikethrough, and no HTML (AC-b6)", () => {
     const texte = "Un **gras** ici, *un* et _deux_, du `code` et ~~barré~~"
     monter([bloc(ID.texte, "paragraph", texte), bloc(ID.hostile, "paragraph", "Voir <img src=x onerror=alert(1)> **b**"), bloc(ID.objet, "paragraph", "Objet de la relance")])
-    const champ = zone(screen.getByRole("textbox", { name: /^Modifier ce texte — Un gras ici/ }))
+    const champ = screen.getByRole("textbox", { name: /^Modifier ce texte — Un gras ici/ })
     // Le champ garde la source ; son rendu, posé dessus, la lit comme la lecture.
-    expect(champ).toHaveValue(texte)
+    expect(texteDuBloc(/^Modifier ce texte — Un gras ici/)).toBe(texte)
     expect(champ).toHaveAttribute("data-rendu")
     const rendu = renduDe(champ)
     expect(rendu).toHaveTextContent("Un gras ici, un et deux, du code et barré")
@@ -139,9 +140,10 @@ describe("E11-S15, lot B — texte en ligne au repos et correcteur", () => {
 
   it("should keep the browser's spell checker off a text that carries a link and off the fields of the « Lien » panel, on elsewhere (AC-b7)", () => {
     monter([bloc(ID.texte, "paragraph", "Voir [[prive/moi/taches|Mes tâches]] demain"), bloc(ID.objet, "paragraph", "Objet de la relance")])
-    const lie = zone(screen.getByRole("textbox", { name: "Modifier ce texte — Voir Mes tâches demain" }))
+    // Le correcteur ne relit qu'un champ monté (1.1.3) : chaque bloc s'ouvre avant d'être lu, l'autre se refermant.
+    expect(ouvrirLeChamp("Modifier ce texte — Objet de la relance")).not.toHaveAttribute("spellcheck")
+    const lie = ouvrirLeChamp("Modifier ce texte — Voir Mes tâches demain")
     expect(lie).toHaveAttribute("spellcheck", "false")
-    expect(screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })).not.toHaveAttribute("spellcheck")
     act(() => lie.focus())
     placer(lie, 10)
     expect(screen.getByRole("textbox", { name: "Libellé" })).toHaveAttribute("spellcheck", "false")
@@ -190,7 +192,7 @@ describe("E11-S15, lot B — « @ » avant toute frappe", () => {
       }),
     )
     monter([bloc(ID.texte, "paragraph", "Voir")])
-    const texte = zone(screen.getByRole("textbox", { name: "Modifier ce texte — Voir" }))
+    const texte = ouvrirLeChamp("Modifier ce texte — Voir")
     act(() => texte.focus())
 
     // « @ » seul : les récents, nommés, sans rien taper ; les flèches et Entrée les choisissent comme un trouvé.

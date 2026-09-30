@@ -51,12 +51,14 @@ const AGENT: WriteOrigin = { kind: "agent", ctx: "7K3Q-M2XA" }
 /**
  * `write` de `person` : son résultat ou son refus, et les requêtes parties (`hooks` : course ou panne jouée).
  * `write` publiant par défaut (E11-S02, AC-b1), une entrée qui ne nomme pas `publish` garde le brouillon
- * (`publish: false`), comme avant ; le défaut se teste en passant `publish: undefined`.
+ * (`publish: false`), comme avant ; le défaut se teste en passant `publish: undefined`. `origin` : l'écran
+ * (`human`) garde les deux temps d'une publication, qu'une écriture d'assistant tient en un (E11-S18, AC-1).
  */
-export async function writeAs(ref: ReferenceOrgSql, person: Person, input: Record<string, unknown>, hooks: DbHooks = {}) {
+export async function writeAs(ref: ReferenceOrgSql, person: Person, input: Record<string, unknown>, options: DbHooks & { origin?: WriteOrigin } = {}) {
+  const { origin = AGENT, ...hooks } = options
   const { db, calls } = spyDb(await ref.db(person), hooks)
   const body = "publish" in input ? input : { ...input, publish: false }
-  const outcome = await writeNode(db, acmeIdentity(ref, person), body, AGENT).then(
+  const outcome = await writeNode(db, acmeIdentity(ref, person), body, origin).then(
     (result) => ({ result, error: null }),
     (error: unknown) => ({ result: null, error }),
   )

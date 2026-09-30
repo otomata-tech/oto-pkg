@@ -290,7 +290,8 @@ describe.skipIf(!sqlConfigured)(portable("ERP functions on a real database (E08-
       expect([answer.isError, answer.text]).toEqual([
         true,
         [
-          `Publication of ${PROCEDURE} refused: 2 problem(s). The draft is kept; nothing was published.`,
+          // E11-S18 (AC-1) : l'écriture d'un assistant n'écrit rien ; le brouillon semé avant l'appel reste.
+          `Publication of ${PROCEDURE} refused: 2 problem(s). Nothing was written; the draft saved before this call stays.`,
           `- ${at}: erp.create_invoice has no argument « client »; its arguments: customer, amount`,
           `- ${at}: erp.create_invoice needs argument « customer »; write "<…>" for a value known only when the procedure runs`,
           `Fix them with ${ref.org.prefix}_write (ops on the sections), then publish again. Format and rules: ${ref.org.prefix}_read {"path": "write.procedure"}.`,

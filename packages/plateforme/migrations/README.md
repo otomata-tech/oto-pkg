@@ -127,6 +127,20 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
      definer`, `search_path` vide, accordée à `anon` seul : un `update` conditionnel sur l'empreinte du
      jeton de la porte appelante, qui sert le ticket une fois, par l'un ou l'autre jeton, rend la personne,
      son e-mail dans `members` et la destination, ou rien.
+- `20260930150000_v1_1_3.sql` (version 1.1.3) : les migrations de la version, réunies dans ce fichier, chacune
+  sous une bannière qui nomme sa story ; un seul bloc `-- ROLLBACK:` en fin de fichier, les parties dans l'ordre
+  inverse.
+  1. E11-S19 (ADR-002 § 2 amendé ; HN-E11S19-1) : l'auteur d'un Contexte n'est plus refusé par sa propre
+     écriture ; `write` avance la ligne `ctx` de son code à la révision qu'il vient de publier
+     (`acceptOwnContextWrite`, `server/ctx.ts`). Policy `ctx_update_own` sur `platform.ctx`, `for update` à
+     `authenticated`, en `using` et `with check` : la ligne de l'appelant (`user_id = auth.uid()`) dans une de
+     ses organisations (`member_orgs()`) ; `grant update (contexts)` à `authenticated`, sur cette seule colonne.
+     Le reste (chemin attendu, révision précédente gardée, Contexte publié à la révision dite) est décidé par
+     le service, dans la requête. Aucune table, colonne ni index.
+  2. E11-S18 (HN-E11S18-13) : `functions` rejoint les slugs réservés d'une équipe (`teams_slug_reserved`,
+     supprimée puis recréée avec la liste d'avant plus `functions`), comme `journal` : `read` y liste les
+     fonctions. Une équipe dont le slug est déjà `functions` fait échouer cette partie : lui donner un autre
+     slug dans la base (`update platform.teams set slug = …`) avant d'appliquer. Aucune table, colonne ni index.
 
 ## Installer sur un hôte neuf
 

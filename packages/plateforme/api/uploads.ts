@@ -1,8 +1,8 @@
 // Les routes du dépôt par lien (E10-S02 lot f : AC-f4, AC-f8, AC-f11, AC-f15 ; ADR-018), servies par des branches avant
 // la table de dispatch, qui ne lit qu'un corps JSON (`serve`, `handler.ts`) : le corps est ici le fichier lui-même.
 // `POST uploads/<jeton>` : la seule porte sans session qui écrit (ADR-018 § 1), avant le jeton de session, en texte brut
-// lisible par `curl`, sans CORS ; ses refus 1 à 4 ne lisent ni la base ni plus que la borne du corps, et ne consomment
-// pas le ticket. `POST uploads/<jeton>/form` : le formulaire de dépôt, une route à session distincte (ADR-018 § 8), sous
+// lisible par `curl`, sans CORS ; ses refus avant le service (méthode, `Origin`, forme du jeton, borne du corps) ne
+// lisent ni la base ni plus que la borne du corps, et ne consomment pas le ticket. `POST uploads/<jeton>/form` : le formulaire de dépôt, une route à session distincte (ADR-018 § 8), sous
 // le contrôle d'origine des mutations, en JSON pour l'écran. Chacune n'accepte que son jeton (HN-E10S02-108). Adaptateur
 // mince : `server/uploads.ts` décide ; session, origine et réponse d'erreur en JSON sont celles de la porte (`session.ts`).
 import { UPLOAD_BYTES_MAX, UPLOAD_TOKEN_PATTERN } from "../schemas"
@@ -26,9 +26,12 @@ type UploadRouteOptions = { host: string | null; defer?: (task: () => Promise<vo
 /** Les en-têtes de toute réponse de la porte sans session (AC-f8) : du texte, jamais gardé, jamais indexé. */
 export const UPLOAD_HEADERS = { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" } as const
 
-/** `POST uploads/<jeton>` : la porte sans session (ADR-018 § 1). */
-export function isUploadRoute(segments: readonly string[], method: string): boolean {
-  return method.toUpperCase() === "POST" && segments.length === 2 && segments[0] === "uploads"
+/**
+ * `uploads/<jeton>` : la porte sans session (ADR-018 § 1), toute méthode ; hors `POST`, son refus `forbidden`, sans
+ * session (HN-E10S02-120), jamais le 401 JSON des routes à session.
+ */
+export function isUploadRoute(segments: readonly string[]): boolean {
+  return segments.length === 2 && segments[0] === "uploads"
 }
 
 /** `POST uploads/<jeton>/form` : le formulaire de dépôt, sous session (ADR-018 § 8). */
@@ -52,7 +55,8 @@ async function boundedBody(request: Request): Promise<Uint8Array> {
 }
 
 /**
- * `POST uploads/<jeton>` (AC-f4) : dans cet ordre, et au premier refus, un en-tête `Origin` (`forbidden`, sans lire le
+ * `POST uploads/<jeton>` (AC-f4) : dans cet ordre, et au premier refus, une autre méthode que `POST` (`forbidden`,
+ * HN-E10S02-120 : un `GET` d'un navigateur ne porte pas d'`Origin`), un en-tête `Origin` (`forbidden`, sans lire le
  * corps ni la base : un navigateur, un site tiers, un HTML vu), la forme du jeton (`not_found`), la borne du corps
  * (`too_large`) ; puis le service consomme le ticket par le jeton de `curl`, relit l'identité et le droit, contrôle et
  * écrit. Le `Content-Type` est ignoré (`curl` envoie `application/x-www-form-urlencoded`), comme tout paramètre de
@@ -60,6 +64,7 @@ async function boundedBody(request: Request): Promise<Uint8Array> {
  */
 export async function uploadResponse(request: Request, options: UploadRouteOptions, segments: readonly string[]): Promise<Response> {
   try {
+    if (request.method.toUpperCase() !== "POST") throw new PlatformError("forbidden", "Only POST is accepted here: send the file with curl --data-binary, or use the form link.")
     if (request.headers.has("origin")) throw new PlatformError("forbidden", "Requests from a browser are refused: send the file with curl, or use the form link.")
     const token = segments[1] ?? ""
     if (!UPLOAD_TOKEN_PATTERN.test(token)) throw unknownUploadLink()

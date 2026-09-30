@@ -94,7 +94,7 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
         [salons("ventes/salons", noType), `Invalid table header: columns: « ville » is a new column: give its type (text, number, date, datetime, bool, enum, email, url). ${contract}`],
         [
           salons("ventes/salons", invalid),
-          `Invalid table header: key: the key column must be text, email, url or number; statut is enum; lifecycle.states must list exactly the options of statut, in the same order; lifecycle.working: b is the first state, where rows enter; the working state comes after it. ${contract}`,
+          `Invalid table header: key: the key column must be text, email, url, number or date; statut is enum; lifecycle.states must list exactly the options of statut, in the same order; lifecycle.working: b is the first state, where rows enter; the working state comes after it. ${contract}`,
         ],
         // Un attribut inconnu, refusé par la forme stricte du patch (N1) : à la création, dans le cadre de l'AC2.
         [
@@ -118,7 +118,8 @@ describe.skipIf(!sqlConfigured)(portable("tables written through write"), { time
       const closed = await writeAs(ref, "claire", { path: PROSPECTS.path, base_revision: 3, title: "Suivi des prospects 2026", header: { closed: true }, publish: true })
       // Le titre publié déplace l'adresse (AC-b12 d'E05-S10, HN-E05S10e-17).
       expect(closed.result?.text).toBe(
-        "Draft of ventes/suivi_prospects saved on revision 3: title « Suivi des prospects 2026 ».\nPublished ventes/suivi_prospects revision 4: closed. Next write: base_revision 4.\nRenamed: now at ventes/suivi_des_prospects_2026; the old path ventes/suivi_prospects still leads here.",
+        // Une ligne pour l'écriture publiée (E11-S18, AC-4) ; le chemin se choisit par `node.move` (AC-6).
+        'Published ventes/suivi_prospects revision 4: title « Suivi des prospects 2026 », closed. Next write: base_revision 4.\nRenamed: now at ventes/suivi_des_prospects_2026; the old path ventes/suivi_prospects still leads here. To choose the path, call acme_call node.move {"path": "ventes/suivi_des_prospects_2026", "new_path": "<path>"}.',
       )
       expect((await nodeAt(seed, ref, "ventes/suivi_des_prospects_2026"))?.meta).toEqual({ ...PROSPECTS_HEADER, closed: true })
 

@@ -61,8 +61,10 @@ maison divergera de celui des 34 composants existants.
   bloc (`ui/noeud/editeur/champ-de-bloc.tsx`) n'a ni fond, ni bordure, ni anneau au focus ; il porte
   `focus-visible:outline-hidden`, qui garde un contour en contrastes forcés ; le curseur reste visible, et
   la rangée (`group`) révèle au focus sa gouttière (« + » et poignée, `group-focus-within:opacity-100`,
-  anneau du design system). Contrôle : `rg -n "outline-hidden" packages/plateforme/ui` ne trouve que
-  `champ-de-bloc.tsx`, dont la rangée est un `BlockRow` dont la gouttière est révélée par `:focus-within`
+  anneau du design system). Le bloc lu qui le précède (`ui/noeud/editeur/champ-au-repos.tsx`) porte la même
+  classe : il n'a le focus que le temps de monter le champ qui le prend, et sans elle le `outline: none` du
+  design system lui retirerait aussi le contour en contrastes forcés. Contrôle : `rg -n "outline-hidden" packages/plateforme/ui` ne trouve que
+  `champ-de-bloc.tsx` et `champ-au-repos.tsx`, dont la rangée est un `BlockRow` dont la gouttière est révélée par `:focus-within`
   (`blocks.css`, `.oto-block-row:focus-within > .oto-block-gutter`)
 
 ### Raccourcis clavier

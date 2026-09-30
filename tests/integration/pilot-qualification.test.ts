@@ -232,7 +232,9 @@ describe.skipIf(!sqlConfigured || privatePending)(
 
     it("should publish the procedure an administrator writes with no refusal: no header, three sections, the calls of the module and its links (AC3)", async () => {
       // Le brouillon créé, puis publié : aucun refus du contrôle d'E03-S06, aucun avertissement de lien.
-      expect([published.isError, published.text.split("\n").slice(1)]).toEqual([false, [`Published ${PATH} revision 1 (3 sections, 14 blocks). Next write: base_revision 1.`]])
+      // E11-S18 (AC-4) : une ligne, la publication et ce que l'écriture a fait.
+      const lines = published.text.split("\n")
+      expect([published.isError, lines.length, lines[0].startsWith(`Published ${PATH} revision 1 (3 sections, 14 blocks): added « `)]).toEqual([false, 1, true])
       const node = await admin`select kind, title, summary, meta, revision from platform.nodes where id = ${ids.procedure}`
       expect(node).toEqual([{ kind: "procedure", title: PILOT_PROCEDURE.title, summary: PILOT_PROCEDURE.summary, meta: {}, revision: 1 }])
       const blocks = await admin<{ id: string; type: string; text: string | null; data: unknown }[]>`
@@ -319,7 +321,8 @@ describe.skipIf(!sqlConfigured || privatePending)(
       // AC15, partie M : la source interne se trouve par `find`, au bloc près.
       const found = await session.call("find", { ctx, query: QUERY })
       const placesOf = (path: string) => records(found, "matches").find((match) => match.path === path)?.places
-      expect(placesOf("ventes/notes_salon_2026")).toContainEqual({ match: "block", block: "tilleuls", block_type: "heading", column: null, snippet: expect.stringContaining("Tilleuls") })
+      // E11-S19 (AC-e4) : un titre trouvé est dans sa propre section.
+      expect(placesOf("ventes/notes_salon_2026")).toContainEqual({ match: "block", block: "tilleuls", block_type: "heading", column: null, snippet: expect.stringContaining("Tilleuls"), section: "Boulangerie des Tilleuls (Valbrune)" })
       expect(placesOf(TABLE)).toContainEqual({ match: "block", block: "P-001", block_type: "row", column: "entreprise", snippet: expect.stringContaining("Tilleuls") })
 
       // AC8 : les trois lignes écrites en un appel, chaque valeur avec sa preuve ; « cherché, rien trouvé » avec sa raison.

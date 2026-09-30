@@ -271,7 +271,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
       expect(found.isError, found.text).toBe(false)
       expect(found.text).toContain(path)
-      expect(found.text).toMatch(/block \S+ \(file\): /)
+      // E11-S19 (AC-e4) : le bloc trouvé dit sa section.
+      expect(found.text).toMatch(/block \S+ \(file\) in « Pièces »: /)
     })
   })
 })

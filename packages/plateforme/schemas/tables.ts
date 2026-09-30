@@ -14,6 +14,12 @@ export const COLUMN_TYPES = ["text", "number", "date", "datetime", "bool", "enum
 
 export type ColumnType = (typeof COLUMN_TYPES)[number]
 
+/**
+ * Les types d'une colonne clé (H90 ; dates admises, FB-0014) : relus par l'en-tête (`parseTableHeader`), la clé proposée
+ * d'un import (`inferTable`) et le choix de la clé à l'écran d'import, qui ne tiennent qu'une liste.
+ */
+export const KEY_COLUMN_TYPES: readonly ColumnType[] = ["text", "email", "url", "number", "date"]
+
 const columnTypeSchema = z.enum(COLUMN_TYPES, {
   error: (issue) => (issue.input === undefined ? "required" : `unknown type ${String(issue.input)}. Types: ${COLUMN_TYPES.join(", ")}.`),
 })
@@ -248,7 +254,12 @@ export const tableRowsArgsSchema = z.strictObject({
     .max(200)
     .refine((q) => queryWords(q).length > 0, { error: "write at least one word (letters or digits)" })
     .optional()
-    .describe('Words to find, without case or accents, in any order: each word must appear in a text, email, url or enum column or in the key, e.g. "mairie valbrune" (default: none).'),
+    .describe('Words to find, without case or accents, in any order: each word must appear (unless match is any) in a text, email, url or enum column or in the key, e.g. "mairie valbrune" (default: none).'),
+  // E11-S19 (AC-f1, AC-f2) : le OU classé, ajouté facultatif ; le défaut reste le ET d'E11-S01.
+  match: z
+    .enum(["all", "any"])
+    .optional()
+    .describe("With q: all keeps the rows with every word; any keeps the rows with at least one, those with the most words first, then by sort (default all)."),
   sort: tableSortSchema.optional().describe('Order: {"column": "montant_estime", "direction": "desc"}; cells without value come last (default: the key, ascending).'),
   columns: z
     .array(columnNameSchema)

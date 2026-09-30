@@ -114,8 +114,18 @@ export function readsRows(diff: HeaderDiff): boolean {
  * sortir ; sans elle, chaque écriture d'en-tête suivante repartait du brouillon refusé (FB-0007).
  */
 export function keptDraft(prefix: string, path: string): string {
-  return `The draft is kept; nothing was published. To go back to the published header, discard the draft: ${prefix}_call node.discard_draft {"path": "${path}"}.`
+  return `${DRAFT_KEPT}${DISCARD_LEAD}${prefix}_call node.discard_draft {"path": "${path}"}.`
 }
+
+/**
+ * La phrase d'un refus de publication qui garde le brouillon, et le renvoi à son abandon : une écriture d'assistant
+ * atomique, qui n'en garde aucun, les remplace (`write-atomic.ts`, E11-S18, HN-E11S18-3).
+ */
+export const DRAFT_KEPT = "The draft is kept; nothing was published."
+export const DISCARD_LEAD = " To go back to the published header, discard the draft: "
+
+/** Le début de la consigne d'un retrait à confirmer, que l'écriture atomique réécrit avec l'appel à refaire (HN-E11S18-3). */
+export const CONFIRM_REMOVE_LEAD = "If the user agrees to erase them, call "
 
 /** La raison d'un refus d'en-tête, lue par l'écran pour sa phrase d'aide (E11-S02, AC-d5, AC-g1 ; HN-E11S02-15). */
 export const HEADER_REFUSED = { reason: "header_refused" } as const
@@ -168,7 +178,7 @@ function checkRemovals(check: Check): void {
   )
   throw new PlatformError(
     "needs_confirmation",
-    `Publication of ${path} needs confirmation: ${clauses}. Columns cannot be renamed: to rename one, add the new column, copy the values with ${prefix}_call table.write, then remove the old one. ${keptDraft(prefix, path)} If the user agrees to erase them, call ${prefix}_write {"path": "${path}", "base_revision": ${check.revision}, "header": {"confirm_remove": true}, "publish": true}.`,
+    `Publication of ${path} needs confirmation: ${clauses}. Columns cannot be renamed: to rename one, add the new column, copy the values with ${prefix}_call table.write, then remove the old one. ${keptDraft(prefix, path)} ${CONFIRM_REMOVE_LEAD}${prefix}_write {"path": "${path}", "base_revision": ${check.revision}, "header": {"confirm_remove": true}, "publish": true}.`,
     HEADER_REFUSED,
   )
 }

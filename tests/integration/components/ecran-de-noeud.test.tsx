@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { NodeView, TreeNode } from "@otomata_tech/oto_platform/schemas"
 import { ContexteDeLHote, EcranDeNoeud, EcranDeNoeudChargement } from "@otomata_tech/oto_platform/ui"
 import { cheminsCites } from "../../../packages/plateforme/ui/noeud/corps-du-noeud"
+import { texteDuBloc } from "../../helpers/champ-du-bloc"
 import { avecCle, bloc, ID, PAGE, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 // L'écran d'un nœud (E05-S02 : AC1 à AC9, AC14, AC17, AC19 ; E05-S09, partie c1 : porté d'oto-frontend ;
@@ -455,7 +456,8 @@ describe("EcranDeNoeud, contrôles selon le niveau (AC8, AC20)", () => {
     rendre({ noeud: { data: vueDuNoeud({ level: 2 }) } })
     expect(screen.getByRole("button", { name: "Ajouter un bloc après — Objet de la relance" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Actions sur ce bloc — Objet de la relance" })).toBeInTheDocument()
-    expect(screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })).toHaveValue("Objet de la relance")
+    // Un bloc qu'on ne touche pas se lit (1.1.3) : son texte brut, sans champ monté.
+    expect(texteDuBloc("Modifier ce texte — Objet de la relance")).toBe("Objet de la relance")
     // Le titre s'écrit en place (E05-S10, AC-a1), dans le `<h1>` ; le résumé d'une page, ni lu ni écrit (E11-S05, AC-f1).
     expect(screen.getByRole("textbox", { name: "Titre" })).toHaveValue("Modèle de relance")
     expect(screen.getByRole("textbox", { name: "Titre" }).closest("h1")).not.toBeNull()
@@ -534,7 +536,7 @@ describe("EcranDeNoeud, brouillon (AC9 ; E11-S02, AC-c3)", () => {
       rendre({ noeud: { data: vueDuNoeud({ level, draft: brouillon(blocsDuBrouillon) }) } })
       expect(screen.queryByText(/Brouillon non publié|^Brouillon/)).toBeNull()
       expect(screen.queryByRole("link", { name: "Voir la version publiée" })).toBeNull()
-      expect(screen.getByDisplayValue("Texte du brouillon")).toBeInTheDocument()
+      expect(texteDuBloc("Modifier ce texte — Texte du brouillon")).toBe("Texte du brouillon")
       expect(screen.queryByText("Objet de la relance")).toBeNull()
       cleanup()
     }
@@ -582,7 +584,7 @@ describe("EcranDeNoeud, sections toujours visibles comme titres (AC14 ; E05-S08,
     rendre({ noeud: { data: vueDuNoeud({ blocks: TITRES, level: 2 }) } })
     expect(plan()).toEqual(lecteur)
     const champ = screen.getByRole("textbox", { name: "Modifier ce titre — Détails utiles" })
-    expect(champ).toHaveValue("Détails **utiles**")
+    expect(texteDuBloc("Modifier ce titre — Détails utiles")).toBe("Détails **utiles**")
     expect(champ.closest("h3")).toHaveAttribute("id", "10000000")
   })
 })

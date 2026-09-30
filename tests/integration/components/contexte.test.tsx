@@ -5,6 +5,7 @@ import type { BlockView, NodeKind } from "@otomata_tech/oto_platform/schemas"
 import { AnnexesDuContexte, ContexteDeRafraichissement, EcranDeNoeud } from "@otomata_tech/oto_platform/ui"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 // L'écran d'un Contexte (E05-S04, AC10 à AC12 ; P39 ; E05-S09, partie c1 : porté d'oto-frontend) : l'écran
@@ -165,7 +166,7 @@ describe("publier un Contexte (AC11)", () => {
 
   /** Le texte du bloc envoyé par Échap, puis la page quittée (`pagehide`) : la publication seule part (E05-S10, AC-a6). */
   async function ecrireEtQuitter(texte: string) {
-    const champ = screen.getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })
+    const champ = ouvrirLeChamp("Modifier ce texte — Tutoie les clients.")
     fireEvent.change(champ, { target: { value: texte } })
     fireEvent.keyDown(champ, { key: "Escape" })
     await waitFor(() => expect(api.envoyes).toHaveLength(1))

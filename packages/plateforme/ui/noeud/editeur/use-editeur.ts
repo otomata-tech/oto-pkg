@@ -52,6 +52,9 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
   const ids = useRef(identitesDe(modele))
   const [erreurs, setErreurs] = useState<Readonly<Record<string, string>>>({})
   const [focus, setFocus] = useState<Focus | null>(() => (focusALOuverture && estLaPageVide(modele) ? { cle: modele[0].cle, curseur: 0 } : null))
+  // Le bloc touché en dernier, dont le champ reste monté (1.1.3) ; un focus à poser dans un champ le monte dès son rendu.
+  const [actif, setActif] = useState<string | null>(() => focus?.cle ?? null)
+  const ouvert = focus !== null && focus.cible !== "rangee" ? focus.cle : actif
   const racine = useRef<HTMLDivElement>(null)
   const blocsVus = useRef(blocs)
   const differe = useRef<{ cle: string; minuteur: ReturnType<typeof setTimeout> } | null>(null)
@@ -92,7 +95,9 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
 
   const envois = useEnvois({ blocs, revisionServie, modele: modeleLu, changerModele, fixes, ids, setFocus })
   const fichiers = useFichiersDeLEditeur()
-  const actions = actionsDeLEditeur({ modele: modeleLu, changerModele, fixes, setErreur, setFocus, envois, frapper: file.frapper, differer, annulerLeDiffere, appui, fichiers })
+  // Le focus a quitté la rangée pour de bon : son champ se démonte, le bloc se lit ; un autre bloc touché l'a déjà remplacé.
+  const fermerLeChamp = (cle: string) => setActif((courant) => (courant === cle ? null : courant))
+  const actions = actionsDeLEditeur({ modele: modeleLu, changerModele, fixes, setErreur, setFocus, envois, frapper: file.frapper, differer, annulerLeDiffere, appui, fichiers, fermerLeChamp })
   // Ce qui retient la publication seule, lu à son départ : un conflit, un refus qui attend sa relecture.
   const retenues = useRef({ conflit: false, attente: false })
   useLayoutEffect(() => {
@@ -132,12 +137,13 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
   useLayoutEffect(() => {
     if (!focus) return
     setFocus(null)
+    if (focus.cible !== "rangee") setActif(focus.cle)
     const rangee = racine.current?.querySelector(`[data-cle="${focus.cle}"]`)
     // Le champ de la rangée ; sinon sa poignée (AC4).
-    const champ = focus.cible === "rangee" ? null : rangee?.querySelector<HTMLTextAreaElement | HTMLInputElement>("[data-champ]")
+    const champ = focus.cible === "rangee" ? null : rangee?.querySelector<HTMLElement>("[data-champ]")
     if (!champ) return void rangee?.querySelector<HTMLButtonElement>('[data-geste="poignee"]')?.focus()
     champ.focus()
-    if (focus.curseur === null) return
+    if (focus.curseur === null || !(champ instanceof HTMLTextAreaElement || champ instanceof HTMLInputElement)) return
     const position = Math.min(focus.curseur, champ.value.length)
     champ.setSelectionRange(position, position)
   }, [focus])
@@ -154,5 +160,16 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
   // Les blocs du modèle : les refus d'une publication y trouvent la référence d'un bloc fautif (E05-S04, AC7). Le Texte
   // d'une page vide n'est pas du brouillon (HN-E11S05-19) : sans lui, un Contexte vide demande confirmation (AC11).
   const blocsDuModele = estLaPageVide(modele) ? [] : modele.map((rangee) => rangee.bloc)
-  return { racine, modele, blocs: blocsDuModele, erreurs, envois, actions, fichiers }
+  return {
+    racine,
+    modele,
+    blocs: blocsDuModele,
+    erreurs,
+    envois,
+    actions,
+    fichiers,
+    ouvert,
+    ouvrirLeChamp: (cle: string, curseur: number) => setFocus({ cle, curseur }),
+    activerLeChamp: (cle: string) => setActif(cle),
+  }
 }

@@ -11,6 +11,11 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
           "maxLength": 2000,
           "type": "string",
         },
+        "since_ctx": {
+          "description": "The ctx of an earlier acme_context call in this conversation: then only the routing of the phrase, the contexts changed since and a ctx come back, not the whole context (default: none, the whole context).",
+          "maxLength": 100,
+          "type": "string",
+        },
       },
       "type": "object",
     },
@@ -204,18 +209,24 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
                 "type": "string",
               },
               "block": {
-                "description": "Block operations: reference of the block, from read with refs: true, e.g. "3f9a2c1b" or a key such as "etapes".",
+                "description": "Block operations: reference of the block, from read with refs: true or from find, e.g. "3f9a2c1b" or a key such as "etapes"; with replace_text, only in that block.",
                 "maxLength": 500,
                 "minLength": 1,
                 "type": "string",
               },
+              "count": {
+                "description": "replace_text only: how many times find appears; all are replaced, and another number found is refused (default 1).",
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer",
+              },
               "find": {
-                "description": "replace_text only: exact words to replace, appearing once in the section.",
+                "description": "replace_text only: exact words to replace, appearing once in the section, the block or the whole page (or count times).",
                 "minLength": 1,
                 "type": "string",
               },
               "op": {
-                "description": "replace_section, append, add_section, delete_section or replace_text. By block: replace_block, insert_after, delete_block or move_block.",
+                "description": "replace_section, append, add_section, delete_section or replace_text. By block: replace_block, insert_after, delete_block or move_block. Whole page: set_markdown (the text replaces the whole body; its # and ## headings make the sections).",
                 "enum": [
                   "replace_section",
                   "append",
@@ -226,11 +237,12 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
                   "insert_after",
                   "delete_block",
                   "move_block",
+                  "set_markdown",
                 ],
                 "type": "string",
               },
               "section": {
-                "description": "Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section).",
+                "description": "Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section). Titles are unique in a page: add_section refuses one that exists, and a title held by two headings is refused with the refs of their blocks. replace_text without section: the whole page.",
                 "maxLength": 200,
                 "minLength": 1,
                 "type": "string",

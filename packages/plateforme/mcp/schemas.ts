@@ -32,6 +32,14 @@ export function inputSchemas(prefix: string) {
         .describe(
           `The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit only when there is no request yet (default: none).`,
         ),
+      // E11-S19 (AC-c1 à AC-c3) : `context` léger, ajouté facultatif (ADR-002 § 1).
+      since_ctx: z
+        .string()
+        .max(100)
+        .optional()
+        .describe(
+          `The ctx of an earlier ${prefix}_context call in this conversation: then only the routing of the phrase, the contexts changed since and a ctx come back, not the whole context (default: none, the whole context).`,
+        ),
     }),
     find: z.object({
       ctx,

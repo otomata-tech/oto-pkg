@@ -3,8 +3,9 @@
 Texte complet : `.method/conventions/security-patterns.md`. La fiche suffit pour écrire ; le texte complet se lit sur un doute, et toujours pour une revue. Chaque règle renvoie à sa section.
 
 - Une action valide par `.safeParse()`, jamais `.parse()` ; chaînes bornées (`.max(255)`, `.max(10000)` pour un texte long), formats vérifiés (`.email()`, `.url()`, `.uuid()`), valeurs fermées en `.enum` ; un fichier : type MIME, taille, extension. § Validation des inputs
-- Un texte du client ne passe que par des lectures en temps linéaire : expression ancrée où chaque caractère n'a qu'une lecture, sinon un parcours à la main ; son test passe des textes hostiles à la taille maximale, moins d’une seconde chacun (un temps quadratique y prend plusieurs secondes). § Validation des inputs
+- Un texte du client ne passe que par des lectures en temps linéaire : expression ancrée où chaque caractère n'a qu'une lecture, sinon un parcours à la main ; son test passe des textes hostiles à la taille maximale et prouve le temps linéaire par le rapport des temps du texte entier et de son quart, jamais par une borne en millisecondes. § Validation des inputs
 - Un motif Zod qui compte sur sa borne la pose en `{ abort: true }` ; un email se lit `[^@\s]+@[^@\s]+`, jamais `.+@.+`. § Validation des inputs
+- Un `.md` venu d'un autre outil passe par `splitFrontmatter` avant d'en tirer titre, résumé ou blocs : un frontmatter YAML n'est jamais du contenu. § Validation des inputs
 - Aucun `dangerouslySetInnerHTML` sans DOMPurify ; aucun `href` tiré d'une saisie non validée (URL exigée en `https://`). § XSS Prevention
 - Un lien bâti sur l'origine d'une requête passe par `webUrl` et vise l'hôte qui a résolu l'organisation ; `x-forwarded-proto` ne se lit que `http` ou `https`. § XSS Prevention
 - Aucun jeton CSRF dans une Server Action : derrière un proxy, `serverActions.allowedOrigins` explicite et sans joker ; un Route Handler vérifie l'origine ou une signature. § CSRF Protection

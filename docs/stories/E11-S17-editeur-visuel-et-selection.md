@@ -344,7 +344,7 @@ Tous sous 300 lignes (`coding-standards.md § Complexité`).
   texte, sans `href`.
 - **Fermé — écriture de HTML** : le DOM du champ se construit par le schéma (nœuds texte, `<a>` à `href`
   calculé), jamais par `innerHTML`. Contrôle : `rg -n "innerHTML|dangerouslySetInnerHTML" C:/apps/oto-pkg/packages/plateforme/ui/noeud`
-  ne trouve rien.
+  ne trouve rien hors `diagramme-mermaid.tsx` (1.1.3 : SVG assaini par mermaid, `security-patterns.md § XSS Prevention`).
 - **Fermé — expression adverse** : lecture et écriture linéaires (AC-b5).
 - **Ouvert, assumé** : la copie depuis un champ écrit aussi un `text/html` (sérialiseur du presse-papiers de
   ProseMirror) ; il ne porte que le rendu déjà affiché (texte, liens de la page). Aucun appel réseau nouveau.

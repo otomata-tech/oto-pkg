@@ -99,7 +99,8 @@ describe.skipIf(!sqlConfigured)(portable("E11-S02 through MCP: the functions tha
   it("should publish a write of an assistant by default, and keep a draft with publish: false (AC-b1)", async () => {
     const claire = await session("claire")
     const created = await claire.tool("write", { path: "ventes/faq_mcp_s02", title: "FAQ", summary: "Questions fréquentes.", ops: [{ op: "add_section", section: "Livraison", text: "Sous huit jours." }] })
-    expect(created.text.split("\n")[1]).toBe("Published ventes/faq_mcp_s02 revision 1 (1 section, 2 blocks). Next write: base_revision 1.")
+    // E11-S18 (AC-4) : une ligne, la publication et ce que l'écriture a fait.
+    expect(created.text).toBe("Published ventes/faq_mcp_s02 revision 1 (1 section, 2 blocks): added « Livraison » (30 characters). Next write: base_revision 1.")
     const drafted = await claire.tool("write", { path: "ventes/faq_mcp_s02", base_revision: 1, ops: [{ op: "append", section: "Livraison", text: "Hors week-end." }], publish: false })
     expect(drafted.text.split("\n")[1]).toBe('Publish it with acme_write {"path": "ventes/faq_mcp_s02", "base_revision": 1, "publish": true}.')
     expect(drafted.result.structuredContent).toMatchObject({ status: "published", revision: 1, has_draft: true })

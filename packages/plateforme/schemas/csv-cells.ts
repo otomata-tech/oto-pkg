@@ -8,7 +8,7 @@
 // (`security-patterns.md § Validation des inputs`).
 import { chars } from "./blocks"
 import { IMPORT_CELL_MAX, IMPORT_COLUMNS_MAX, IMPORT_ROWS_MAX, LINK_PATTERN } from "./table-write"
-import { COLUMN_TEXT_MAX, instantOf, isEmail, isValidDate, maxLengthOf, ROW_KEY_MAX, type CellValue, type ColumnType } from "./tables"
+import { COLUMN_TEXT_MAX, instantOf, isEmail, isValidDate, KEY_COLUMN_TYPES, maxLengthOf, ROW_KEY_MAX, type CellValue, type ColumnType } from "./tables"
 
 const count = (value: number) => value.toLocaleString("en-US")
 
@@ -132,23 +132,32 @@ function inferColumn(name: string, cells: readonly string[]): ImportColumn {
   return longest > COLUMN_TEXT_MAX ? { name, type: "text", max_length: longest } : { name, type: "text" }
 }
 
-/** La clé d'une ligne telle que l'import la compare : sans blancs de bord, un nombre en écriture canonique. */
+/**
+ * La clé d'une ligne telle que l'import la compare : sans blancs de bord, un nombre en écriture canonique, une date
+ * rangée `YYYY-MM-DD` (`29/09/2026` et `2026-09-29` désignent la même ligne, FB-0014).
+ */
 function keyText(column: ImportColumn, raw: string): string {
   const read = readCell(column, raw)
-  return "value" in read && typeof read.value === "number" ? String(read.value) : raw.trim()
+  return "value" in read && (typeof read.value === "number" || column.type === "date") ? String(read.value) : raw.trim()
 }
 
 /** Une clé que le service range (`rowKey`) : 200 caractères au plus, sans caractère de contrôle. */
 const keyProblem = (key: string): string | null =>
   chars(key) > ROW_KEY_MAX ? `a key of ${count(ROW_KEY_MAX)} characters at most` : /\p{Cc}/u.test(key) ? "a key without control characters" : null
 
+/** Les types d'une clé proposée : ceux d'une clé (`KEY_COLUMN_TYPES`) sauf `url`, qui ne se propose pas. */
+const PROPOSED_KEY_TYPES: readonly ColumnType[] = KEY_COLUMN_TYPES.filter((type) => type !== "url")
+
+/** Un nombre à virgule ne se propose jamais comme clé (FB-0014) : une colonne `number` n'y prétend qu'en entiers. */
+const decimalsIn = (column: ImportColumn, cells: readonly string[]) => column.type === "number" && cells.some((cell) => (numberOf(cell.trim())?.decimal ?? null) !== null)
+
 /**
- * La colonne clé proposée (AC-b2) : la première, dans l'ordre, de type `text`, `number` ou `email`, dont toutes
- * les valeurs sont présentes, distinctes et rangeables comme clé ; `null` sinon.
+ * La colonne clé proposée (AC-b2) : la première, dans l'ordre, de type `text`, `number` entier, `email` ou `date`
+ * (FB-0014), dont toutes les valeurs sont présentes, distinctes une fois lues et rangeables comme clé ; `null` sinon.
  */
 function proposedKey(columns: readonly ImportColumn[], rows: readonly (readonly string[])[]): string | null {
   const found = columns.findIndex((column, index) => {
-    if (column.type !== "text" && column.type !== "number" && column.type !== "email") return false
+    if (!PROPOSED_KEY_TYPES.includes(column.type) || decimalsIn(column, rows.map((row) => row[index] ?? ""))) return false
     const keys = rows.map((row) => keyText(column, row[index] ?? ""))
     return rows.length > 0 && keys.every((key) => key !== "" && keyProblem(key) === null) && new Set(keys).size === keys.length
   })

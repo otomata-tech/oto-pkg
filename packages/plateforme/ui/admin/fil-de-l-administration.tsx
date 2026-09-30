@@ -6,9 +6,9 @@
 // Changé : les groupes sont ceux du menu de l'entreprise (« Suivi de l'entreprise », « Réglages de
 // l'entreprise », AC-a4) au lieu des quatre écrans de réglages ; les écrans, leurs mots et leurs glyphes
 // sont ceux du rail (`ecransPermis`), aux adresses que l'hôte lui donne, et ceux que la personne ne peut pas
-// ouvrir n'y sont pas ; la navigation est celle de l'hôte (`useHote`). Retiré : TanStack Router.
+// ouvrir n'y sont pas ; la navigation est celle de l'hôte (`useHote`). Retiré : TanStack Router. 1.1.3 : le
+// groupe « Suivi de l'entreprise » disparaît ; Usage et Retours, hors du menu, n'ont plus de fil.
 import { Gear } from "@phosphor-icons/react/dist/csr/Gear"
-import { Pulse } from "@phosphor-icons/react/dist/csr/Pulse"
 import { ecransPermis, type EcranPermis, type Rangement } from "../coque/ecrans"
 import { ENTREPRISE } from "../coque/libelles"
 import { Breadcrumb, type Maillon } from "../ds/react/breadcrumb"
@@ -21,7 +21,6 @@ import type { FilDeLEcran } from "./types"
 export type EcranDAdministration = "usage" | "retours" | "organisation" | "marque" | "drapeaux" | "acces" | "connecteurs"
 
 const GROUPES: Partial<Record<Rangement, { titre: string; glyphe: Glyphe }>> = {
-  suivi: { titre: ENTREPRISE.suivi, glyphe: Pulse },
   reglages: { titre: ENTREPRISE.reglages, glyphe: Gear },
 }
 
@@ -41,7 +40,7 @@ type FilDeLAdministrationProps = FilDeLEcran & { courant: EcranDAdministration }
 /**
  * Le fil de l'écran ouvert ; rien quand l'écran n'est pas de ceux que la personne peut ouvrir (la page dit sa
  * réserve), ni quand il n'est rangé sous aucun groupe du menu de l'entreprise (Connecteurs, au pied du rail
- * depuis E05-S11, AC-32).
+ * depuis E05-S11, AC-32 ; Usage et Retours, hors du menu).
  */
 export function FilDeLAdministration({ courant, adresses, administre }: FilDeLAdministrationProps) {
   const { Lien, naviguer } = useHote()

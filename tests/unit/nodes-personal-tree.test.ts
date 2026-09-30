@@ -87,11 +87,33 @@ describe.skipIf(!sqlConfigured)(portable("personal space, screens and tree on a 
         code: "not_found",
         message: "Cannot create private/lea/x: its parent private/lea does not exist. Closest existing page: private. Create private/lea first, or choose a path under private.",
       })
+      // Le refus nomme le compte et l'organisation de l'appel, et l'espace de la personne (FB-0011).
+      const signedIn = who("lea")
       for (const path of ["private/claire", "private/zoe"]) {
         expect((await write("lea", { path, title: "X", summary: "X" })).error).toMatchObject({
           code: "forbidden",
-          message: `${path} is not your personal space: write in private/lea.`,
+          message: `${path} is not your personal space: this connection is signed in as ${signedIn.user.email} in ${signedIn.org.name}, where your personal space is private/lea.`,
         })
+      }
+      // Sans handle (accès de l'équipe plateforme sans ligne de membre) : aucun espace ici, et la phrase le dit.
+      const staff = who("s")
+      expect((await write("s", { path: "private/lea", title: "X", summary: "X" })).error).toMatchObject({
+        code: "forbidden",
+        message: `private/lea is not your personal space: this connection is signed in as ${staff.user.email} in ${staff.org.name}; you have no personal space here.`,
+      })
+    })
+
+    it("should tell a person who gives a title to her own space without base_revision to write the page under it (FB-0011)", async () => {
+      await content(base())
+      const { error } = await write("lea", { path: "private/lea", title: "Idées", summary: "Mes idées." })
+      expect(error).toMatchObject({
+        code: "stale_revision",
+        message: expect.stringContaining("Nothing was written. private/lea is your personal space itself: to create a page in it, write at private/lea/<page>. Current state:"),
+      })
+      // Sans titre, ou avec une révision (périmée ici), c'est une modification de l'espace : le refus reste le seul.
+      for (const input of [{ summary: "Mes idées." }, { title: "Idées", base_revision: 999 }]) {
+        const stale = (await write("lea", { path: "private/lea", ...input })).error
+        expect(stale).toMatchObject({ code: "stale_revision", message: expect.not.stringContaining("your personal space itself") })
       }
     })
   })

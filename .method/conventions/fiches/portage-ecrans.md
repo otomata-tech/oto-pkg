@@ -29,3 +29,4 @@ Texte complet : `.method/conventions/portage-ecrans.md`. La fiche suffit pour é
 - Chaque écart visible avec la capture d'oto-frontend se liste, avec sa raison, dans « Écarts avec la référence UI » de la story. § 5. Ce qui ne se porte pas
 - Une rangée locale jamais envoyée (le Texte d'une page vide) n'entre pas dans ce que l'éditeur rend pour décrire le brouillon (publication, Contexte vide). § 6. Une règle du service, une seule source
 - Ce que le service et l'écran appliquent tous deux (validation, chaîne servie, borne dite) vit dans `schemas/` ; aucune fonction de `ui/` ne refait une fonction de `server/`, aucun libellé n'écrit en chiffres une borne de `schemas/`. § 6. Une règle du service, une seule source
+- Au montage, aucune mesure de mise en page par élément d'une liste : CSS (`field-sizing`), sinon une passe groupée à l'image suivante ; seul le champ qui reçoit la frappe se mesure tout de suite. § 7. Mesures de mise en page

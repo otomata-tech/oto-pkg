@@ -222,6 +222,7 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
       const ada = ref.identityOf("ada")
 
       const result = await find(db, ada, { query: "zorglub" }, NO_CATALOG)
+      const [{ revision: cRevision }] = await seed.admin<{ revision: number }[]>`select revision from platform.nodes where id = ${ref.nodeId("ventes/c_bloc")}`
       expect(result.text).toBe(
         [
           "Top matches for « zorglub »:",
@@ -231,6 +232,8 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
           "   - block 0000c001 (paragraph): Le **zorglub** est ici dans un bloc.",
           "   - block 0000c002 (checklist): Vérifier le **zorglub**",
           "   - block 0000c003 (callout): Attention au **zorglub**.",
+          // E11-S19 (AC-e5) : Ada, administratrice, écrit la page ; ses blocs simulés n'ont pas de section en base.
+          `   To edit: ${ref.org.prefix}_write {"path": "ventes/c_bloc", "base_revision": ${cRevision}, "ops": [...]}.`,
           "More nodes match (at least 1): add words or set type to narrow the search.",
           readLine(ref.org.prefix),
         ].join("\n"),
@@ -239,6 +242,37 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
       const whole = await find(db, ada, { query: "zorglub seul" }, NO_CATALOG)
       expect(whole.text).not.toContain("More nodes match")
       expect(whole.data).toMatchObject({ more_nodes: 0 })
+    })
+  })
+
+  // E11-S19 (AC-e4, AC-e5) : la section de chaque bloc de page trouvé ; l'appel qui édite la page, pour qui l'écrit seulement.
+  describe("find: sections and the edit line (E11-S19)", () => {
+    it("should give the section of each page block found, and the write call with the revision to a writer only", async () => {
+      const path = "ventes/d_bloc"
+      const [before, , inTarifs] = await ref.addBlocks(path, "published", [
+        { type: "paragraph", text: "Le zorglub avant tout titre." },
+        { type: "heading", text: "Tarifs", data: { level: 1 } },
+        { type: "paragraph", text: "Le zorglub coûte trois euros." },
+      ])
+      const found = [
+        zorglubRow(path, { match: "block", block_id: inTarifs, block_type: "paragraph", snippet: "Le **zorglub** coûte trois euros.", rank: 0.09 }),
+        zorglubRow(path, { match: "block", block_id: before, block_type: "paragraph", snippet: "Le **zorglub** avant tout titre.", rank: 0.08 }),
+      ]
+      const [{ revision }] = await seed.admin<{ revision: number }[]>`select revision from platform.nodes where id = ${ref.nodeId(path)}`
+      const blockLines = [
+        `   - block ${inTarifs.slice(0, 8)} (paragraph) in « Tarifs »: Le **zorglub** coûte trois euros.`,
+        `   - block ${before.slice(0, 8)} (paragraph): Le **zorglub** avant tout titre.`,
+      ]
+      const written = await find((await searchDb({ "zorglub tarifs": found })).db, ref.identityOf("ada"), { query: "zorglub tarifs" }, NO_CATALOG)
+      expect(written.text.split("\n").slice(2, 5)).toEqual([...blockLines, `   To edit: ${ref.org.prefix}_write {"path": "${path}", "base_revision": ${revision}, "ops": [...]}.`])
+      expect(written.data).toMatchObject({
+        matches: [{ path, revision, places: [{ block: inTarifs.slice(0, 8), section: "Tarifs" }, { block: before.slice(0, 8), section: null }] }],
+      })
+      // Marc lit la page sans l'écrire : les sections, sans l'appel qui édite.
+      await ref.addRules([{ node: path, user: "marc", level: "read" }])
+      const marc = await ref.db("marc")
+      const read = await find(watchDb(marc, { rpc: { search_content: () => found.map((row) => ({ ...row, node_id: ref.nodeId(path) })) } }).db, ref.identityOf("marc"), { query: "zorglub tarifs" }, NO_CATALOG)
+      expect(read.text.split("\n").slice(2, 5)).toEqual([...blockLines, readLine(ref.org.prefix)])
     })
   })
 
@@ -302,13 +336,16 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
       expect((await find(db, ada, { query: "probe.payload" }, CATALOG)).text).toContain("1. probe.payload (read, score 1.00): Echoes a payload to test the chain of calls.")
 
       const nodesFirst = (await find(db, ada, { query: "table.schema" }, CATALOG)).text.split("\n")
-      expect(nodesFirst.slice(1, 5)).toEqual([
+      const [{ revision }] = await seed.admin<{ revision: number }[]>`select revision from platform.nodes where id = ${ref.nodeId("ventes/qualifier_prospects")}`
+      expect(nodesFirst.slice(1, 6)).toEqual([
         "1. ventes/qualifier_prospects (procedure, score 0.13): Qualifier les prospects à traiter. " + acmeNode("ventes/qualifier_prospects").summary,
         '   - block 00000009 (call): **table.schema** {"table":"ventes/suivi_prospects"}',
+        // E11-S19 (AC-e5) : Ada écrit la procédure.
+        `   To edit: ${prefix}_write {"path": "ventes/qualifier_prospects", "base_revision": ${revision}, "ops": [...]}.`,
         readLine(prefix),
         "Functions:",
       ])
-      expect(nodesFirst[5]).toBe("1. table.schema (read, score 1.00): Reads the header of a table: its columns, key and states.")
+      expect(nodesFirst[6]).toBe("1. table.schema (read, score 1.00): Reads the header of a table: its columns, key and states.")
       expect(nodesFirst.filter((line) => /^\d\. table\./.test(line))).toHaveLength(3)
       expect(nodesFirst.at(-1)).toBe(`Read a contract with ${prefix}_read {"path": "<function>"}, then run it with ${prefix}_call.`)
 

@@ -94,6 +94,25 @@ describe.skipIf(!sqlConfigured)(portable("table.import and POST tables/import on
     ])
   })
 
+  it("should key a table on a column of dates, first column or named by key, rows matched on the date however written (FB-0014)", async () => {
+    const claire = await session("claire")
+    const create = (table: string, csv: string, key?: string) =>
+      claire.run("table.import", { table, csv, create: { title: "Journées", summary: "Les ventes par jour." }, ...(key ? { key } : {}) })
+    const first = await create("ventes/journees", "Jour;Ventes\n29/09/2026;12\n2026-09-30;15")
+    const named = await create("ventes/journees_vendeur", "Vendeur;Jour\nA;29/09/2026\nA;30/09/2026", "Jour")
+    const merged = await claire.run("table.import", { table: "ventes/journees", csv: "Jour;Ventes\n30/09/2026;16" })
+
+    expect([first.text.split("\n")[0], named.text.split("\n")[0], merged.text.split("\n")[0]]).toEqual([
+      "Created and published ventes/journees: jour (date), ventes (number); key jour.",
+      "Created and published ventes/journees_vendeur: vendeur (text), jour (date); key jour.",
+      "ventes/journees: 0 row(s) created, 1 updated, 0 unchanged.",
+    ])
+    expect((await rowsOf("ventes/journees")).map((row) => [row.key, (row.data as { ventes: number }).ventes])).toEqual([
+      ["2026-09-29", 12],
+      ["2026-09-30", 16],
+    ])
+  })
+
   it("should serve its refusals word for word: cells, no key, a taken path, an unknown table, too large (AC-c1)", async () => {
     const claire = await session("claire")
     const refusal = async (args: Record<string, unknown>) => {
@@ -215,6 +234,6 @@ describe.skipIf(!sqlConfigured)(portable("table.import and POST tables/import on
     expect(contract.text).toContain(sentence)
     const table = await claire.call("read", { ctx: ref.id(CTX.claire), path: "write.table" })
     expect(table.text).toContain(sentence)
-    expect(table.text).toContain("A markdown file the user gives you becomes a page with write: its first # heading is the title, the rest goes in the text.")
+    expect(table.text).toContain("A markdown file the user gives you becomes a page with write: its first # heading is the title, the rest goes in ops [{\"op\": \"set_markdown\", \"text\": \"<the rest>\"}]; a YAML front matter (--- … ---) is not content: take title and summary from it.")
   })
 })

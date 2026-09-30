@@ -18,6 +18,7 @@
 import { blockInputSchema, chars, isBlankLine, trimBlanks, type BlockInput } from "./blocks"
 import { fileBaseName } from "./csv"
 import { filePath, fileSizeText, fileTypeOf } from "./files"
+import { frontmatterHead, splitFrontmatter } from "./frontmatter"
 import { closesFence, LINE_SEPARATORS, openingFence, type Fence } from "./link-syntax"
 import { NODE_HEAD_MAX, normalizeTitle, OP_TEXT_MAX } from "./nodes"
 
@@ -431,14 +432,19 @@ export type MarkdownFile = { title: string; summary: string; chunks: string[] }
  * Un fichier `.md` en page (AC-a3) : titre, le premier titre `#` hors d'une clôture, retiré du corps, sinon le nom
  * du fichier sans extension ; résumé, le texte brut du premier paragraphe, sinon « Importé de <nom> » ; tous deux
  * coupés à 200 caractères ; corps, des morceaux d'`OP_TEXT_MAX` caractères au plus, coupés à une ligne vide hors
- * d'une clôture. Chaque ligne est lue une fois.
+ * d'une clôture. Chaque ligne est lue une fois. Un frontmatter YAML de tête (E11-S18, AC-9) n'est pas du corps : son titre
+ * et son résumé passent avant ceux du texte, et un premier titre `#` qui répète le sien est retiré du corps.
  */
 export function readPageMarkdown(text: string, fileName: string): MarkdownFile {
   const lines = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n")
+  const front = splitFrontmatter(lines)
+  const start = front?.end ?? 0
+  const given = frontmatterHead(front)
+  const [frontTitle, frontSummary] = [given.title, given.summary].map((value) => (value === undefined ? undefined : head(value)))
   let fence: Fence | null = null
   let titleAt = -1
   let paragraphAt = -1
-  for (let at = 0; at < lines.length && (titleAt === -1 || paragraphAt === -1); at++) {
+  for (let at = start; at < lines.length && (titleAt === -1 || paragraphAt === -1); at++) {
     const line = lines[at]
     if (fence) {
       if (closesFence(line, fence)) fence = null
@@ -449,10 +455,13 @@ export function readPageMarkdown(text: string, fileName: string): MarkdownFile {
     if (titleAt === -1 && pageTitleOf(line) !== null) titleAt = at
     else if (paragraphAt === -1 && opensParagraph(line)) paragraphAt = at
   }
-  const title = head(titleAt === -1 ? fileBaseName(fileName) || fileName : (pageTitleOf(lines[titleAt]) ?? ""))
+  const heading = titleAt === -1 ? null : head(pageTitleOf(lines[titleAt]) ?? "")
+  const title = frontTitle ?? heading ?? head(fileBaseName(fileName) || fileName)
   let paragraphEnd = paragraphAt
   while (paragraphAt !== -1 && paragraphEnd < lines.length && !isBlankLine(lines[paragraphEnd])) paragraphEnd++
-  const summary = paragraphAt === -1 ? "" : head(plainText(lines.slice(paragraphAt, paragraphEnd).join(" ")))
-  const body = titleAt === -1 ? lines : [...lines.slice(0, titleAt), ...lines.slice(titleAt + 1)]
+  const summary = frontSummary ?? (paragraphAt === -1 ? "" : head(plainText(lines.slice(paragraphAt, paragraphEnd).join(" "))))
+  // Le titre `#` est celui de la page quand le frontmatter n'en donne pas, ou qu'il répète le sien.
+  const dropHeading = heading !== null && (frontTitle === undefined || normalizeTitle(heading) === normalizeTitle(frontTitle))
+  const body = dropHeading ? [...lines.slice(start, titleAt), ...lines.slice(titleAt + 1)] : lines.slice(start)
   return { title, summary: summary || head(`Importé de ${fileName}`), chunks: chunksOf(body, OP_TEXT_MAX) }
 }

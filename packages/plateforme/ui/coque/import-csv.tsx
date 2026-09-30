@@ -20,7 +20,7 @@ import {
   type ImportProblem,
   type TableHeader,
 } from "../../schemas"
-import { COLUMN_TYPES } from "../../schemas/tables"
+import { COLUMN_TYPES, KEY_COLUMN_TYPES } from "../../schemas/tables"
 import { messageDErreur } from "../api/messages"
 import { Field } from "../ds/react/forms"
 import { Alert, Button } from "../ds/react/primitives"
@@ -102,7 +102,7 @@ function Apercu({ plan }: { plan: PlanDuCsv }) {
 
 /** Les choix d'une clé (AC-b2) : les colonnes qui peuvent la porter, puis la colonne générée. */
 function optionsDeLaCle(plan: PlanDuCsv): { value: string; label: string }[] {
-  const colonnes = plan.columns.filter((colonne) => ["text", "number", "email", "url"].includes(colonne.type) && !(plan.cleGeneree && colonne.name === plan.key))
+  const colonnes = plan.columns.filter((colonne) => KEY_COLUMN_TYPES.includes(colonne.type) && !(plan.cleGeneree && colonne.name === plan.key))
   return [...colonnes.map((colonne) => ({ value: colonne.name, label: colonne.name })), { value: "", label: IMPORT.cleGeneree("ligne") }]
 }
 

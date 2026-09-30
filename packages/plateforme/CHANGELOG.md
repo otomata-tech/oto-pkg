@@ -19,11 +19,49 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## 1.1.3 — 2026-09-30
 
+### Assistants
+- A file sent by `upload.link` that the storage fails to keep says why (not reached, refused with its HTTP status, other size); a page created for it is removed, so a new link can create it.
+- `upload.link` refuses a markdown file that is an HTML page, or served by `source_url` as `text/html`, instead of writing the page source as text.
+- When curl cannot reach the platform (a proxy answers 403), `upload.link` says the fallback: `write` for a markdown file, `table.import` for a CSV, the form link otherwise.
+- A column of dates can be the key of a table, named by `key` or proposed on import; a column of decimal numbers is never proposed as the key.
+- Writing to someone else's personal space is refused with your account, organisation and own space; a title sent to your own space says to write at `private/<handle>/<page>`.
+- A tool answering "context has changed" now gives a new ctx and the changed contexts as `context` serves them: the call is retried with that ctx, without calling `context` again.
+- Publishing a context no longer invalidates the author's own ctx.
+- `context` takes `since_ctx`: the routing of the phrase, the contexts changed since that ctx, and a ctx; it tests a phrase without reloading the context.
+- Without a served procedure, `context` says the score that serves steps (the organisation's threshold and gap) and, for each candidate, the words of the request found in its title or summary.
+- A request to change a text (not to delete) that no procedure matches gets the steps: `find` the exact words, then `write`. « Qu'est-ce que je lui réponds ? » is no longer a data question.
+- `read` with `section`, or of a page served as its outline, no longer repeats the outline in the structured data.
+- `read {"path": "functions"}` lists every function you can run, by connector, with its class.
+- `find` gives the section of each block found and, to a writer, the `write` call with the revision.
+- `table.rows` takes `match: "any"`: the rows with at least one word of `q`, most words first.
+- A `write` that publishes is written whole or not at all: a refused publication leaves no draft and no new page, and a column removal to confirm gives the whole call to make again.
+- A published `write` answers in one line: the revision, then what the write did.
+- `call node.move` moves or renames a page, a procedure, a table or a folder with the pages under it; the old paths still lead to it, and the move shows in the home activity.
+- `call node.write_many` writes up to 50 pages in one call, in order, one result line per page, and says which pages were written when it stops on an error.
+- `write` takes `{op: set_markdown, text}` to replace the whole body from markdown; a YAML front matter is left out.
+- `replace_text` works on the whole page or one `block`; `count` replaces that many occurrences, and a result that would outgrow its section or page is refused first.
+- A new title's path is cut after its last whole word, and the answer says to call `node.move` to choose the path.
+- A markdown file with a YAML front matter imported or sent by `upload.link` takes its title and summary from it, and the front matter is left out of the page.
+- `add_section` after another section no longer fails with an internal error when the database rounds positions.
+
 ### Hosts
-- Install: upgrade to 1.1.3; nothing else to do (no migration, no export added, changed or removed).
+- Install: upgrade to 1.1.3, then copy and apply `20260930150000_v1_1_3.sql` (`oto-platform migrations sync`): policy `ctx_update_own` and `update (contexts)` on `platform.ctx` for `authenticated`; no table, column or index; part 2: `functions` joins the reserved team slugs (`teams_slug_reserved` recreated): a team whose slug is already `functions` makes it fail, give it another slug first.
+- API: `table.rows` refuses a cursor from another query naming `match` among what changed.
+- MCP: two functions join the `call` catalogue (`node.move`, `node.write_many`), and `write` gains the op `set_markdown` and the field `count`; its description changes: refresh the tool list in each host and replay the golden queries of `write`.
+- Server: team slugs, CSV column names and path segments longer than their bound are now cut after their last whole word.
+- MCP: `context` gains the optional `since_ctx`, `table.rows` the optional `match`; the refusal `ctx_stale` changes text; the descriptions of `context`, `read` and `find` change: replay their golden queries.
+- API: `/api/platform/uploads/<token>` answers any other method the host mounts with `forbidden` (403, plain text) instead of the 401 of the session routes; the link is not used up.
+- API: a file stored by the one-time upload link fails with a `conflict` that says what the storage did; a page the link created for it is removed; the server log still names the object left pending.
+- MCP: the description of `upload.link` gains one sentence (the fallback when curl cannot reach the platform), and `table.import` says which columns can be proposed as the key: replay their golden queries.
+- API: a table header accepts a `date` column as its key (`POST /api/platform/tables/import`, `write` of a table header), and the import screen offers it as a key.
 - UI: on the « Contexte » view (`/context`), « À quoi sert cette page » sits in the column of the view's parts, aligned and as wide as they are, instead of against the left edge on a wide window.
 - API: an HTML file uploads on a storage that rewrites its type (Supabase Storage reads it back as `text/plain`): `POST /api/platform/files/<id>/complete` and the one-time upload link check the object's size only, no longer answering `conflict` « does not match its request ».
 - UI: a page with an image (attached or `https`) no longer fails on the server (« Application error », since 1.1.0) when read through its public link (`/p/<token>`), by a reader without write access (`/n/<path>`) or in the viewer of a `.md` file: the block rendering called a function of a `"use client"` module, which the server cannot call.
+- UI: the block editor stays responsive on long pages: only the touched block mounts its text field (the others render as read-only text with the same look, keyboard-reachable), a keystroke re-renders only its own row, block menus are built when opened, and field heights are no longer measured one block at a time (CSS `field-sizing`, else one batched pass); ↑ at the start and ↓ at the end of a block move to the neighbouring block.
+- UI: a mermaid block is drawn in the browser (page `/n/<path>`, public page `/p/<token>`, viewer of a `.md` file) instead of shown as text: its text stays as the server-rendered fallback and under « Voir le code », and a text mermaid cannot read says « Diagramme invalide » without breaking the page. The package gains the `mermaid` dependency (11.17.2), loaded on demand by the browser only: a page without a diagram downloads nothing more.
+- UI: in the editor, « Diagramme » joins the styles and the « + » / « / » choices: a mermaid block is written in a field drawn as code, and drawn below it when the field is not focused; a code block becomes a diagram and back, keeping its text; an empty diagram is not sent.
+- UI: a code block (and a diagram's text) reads as code: a dark background in the rail's tint, light and dark themes alike, with rounded corners, in the page and in the editor (`--code-bg`, `--code-fg`, `--code-mute`, `--code-bd` in `oto.css`).
+- UI: the company menu (top of the rail) no longer shows Usage and Retours, even to the platform team, nor the « Suivi de l'entreprise » and « Réglages de l'entreprise » subtitles; both screens still open from the palette or their address, without a trail.
 - UI: in the editor, a toggle is drawn as it reads (the same pill, chevron and panel): its summary and body read as rendered text until focused (their border shows on hover), and its chevron folds and unfolds the body on screen only (the fold is not saved).
 
 ## 1.1.2 — 2026-09-30

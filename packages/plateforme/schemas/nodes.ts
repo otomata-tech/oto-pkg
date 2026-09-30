@@ -26,7 +26,7 @@ export const nodePathSchema = z
  * E10-S01 : l'adresse d'un fichier importé et le nom d'une colonne d'un CSV se tirent à l'écran comme au service.
  */
 export function slugOf(text: string, max: number): string {
-  return text
+  const slug = text
     .replace(/œ/gi, "oe")
     .replace(/æ/gi, "ae")
     .normalize("NFD")
@@ -34,8 +34,17 @@ export function slugOf(text: string, max: number): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+/, "")
-    .slice(0, max)
-    .replace(/_+$/, "")
+  return cutAtWord(slug, max)
+}
+
+/**
+ * Un slug (`[a-z0-9_]`) coupé à `max` caractères après son dernier mot entier, un premier mot trop long à `max`, sans
+ * `_` en fin (E11-S18, AC-7) : la coupe de `slugOf`, et celle d'un nom de colonne préfixé ou numéroté (`csv.ts`).
+ */
+export function cutAtWord(slug: string, max: number): string {
+  const cut = slug.slice(0, max)
+  const lastWord = slug.length > max && slug[max] !== "_" ? cut.lastIndexOf("_") : -1
+  return (lastWord > 0 ? cut.slice(0, lastWord) : cut).replace(/_+$/, "")
 }
 
 /**
@@ -71,14 +80,20 @@ export const SECTION_OPS = ["replace_section", "append", "add_section", "delete_
 /** Les quatre opérations par bloc (ADR-011 § 5), ajoutées après celles d'E03-S01 (N16). */
 export const BLOCK_OPS = ["replace_block", "insert_after", "delete_block", "move_block"] as const
 
-export const WRITE_OPS = [...SECTION_OPS, ...BLOCK_OPS] as const
+/** L'opération sur tout le corps d'une page (E11-S18, AC-11), ajoutée après celles par bloc (ADR-002 § 1). */
+export const PAGE_OPS = ["set_markdown"] as const
 
-/** Un élément de `write.ops` : une opération par section (titre) ou par bloc (référence). */
+export const WRITE_OPS = [...SECTION_OPS, ...BLOCK_OPS, ...PAGE_OPS] as const
+
+/** Occurrences au plus qu'un `replace_text` remplace d'un coup (E11-S18, AC-10). */
+export const REPLACE_COUNT_MAX = 1_000
+
+/** Un élément de `write.ops` : une opération par section (titre), par bloc (référence) ou sur toute la page. */
 export const writeOpSchema = z.object({
   op: z
     .enum(WRITE_OPS)
     .describe(
-      "replace_section, append, add_section, delete_section or replace_text. By block: replace_block, insert_after, delete_block or move_block.",
+      "replace_section, append, add_section, delete_section or replace_text. By block: replace_block, insert_after, delete_block or move_block. Whole page: set_markdown (the text replaces the whole body; its # and ## headings make the sections).",
     ),
   section: z
     .string()
@@ -86,12 +101,25 @@ export const writeOpSchema = z.object({
     .min(1)
     .max(200)
     .optional()
-    .describe('Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section).'),
+    .describe(
+      'Title of the section it applies to, e.g. "Étapes". Section operations, and move_block (to the end of that section). Titles are unique in a page: add_section refuses one that exists, and a title held by two headings is refused with the refs of their blocks. replace_text without section: the whole page.',
+    ),
   text: z
     .string()
     .optional()
     .describe("New text (markdown); required by every op except delete_section. delete_block and move_block take no text either."),
-  find: z.string().min(1).optional().describe("replace_text only: exact words to replace, appearing once in the section."),
+  find: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("replace_text only: exact words to replace, appearing once in the section, the block or the whole page (or count times)."),
+  count: z
+    .number()
+    .int()
+    .min(1)
+    .max(REPLACE_COUNT_MAX)
+    .optional()
+    .describe("replace_text only: how many times find appears; all are replaced, and another number found is refused (default 1)."),
   after: z
     .string()
     .trim()
@@ -105,7 +133,9 @@ export const writeOpSchema = z.object({
     .min(1)
     .max(500)
     .optional()
-    .describe('Block operations: reference of the block, from read with refs: true, e.g. "3f9a2c1b" or a key such as "etapes".'),
+    .describe(
+      'Block operations: reference of the block, from read with refs: true or from find, e.g. "3f9a2c1b" or a key such as "etapes"; with replace_text, only in that block.',
+    ),
   after_block: z
     .string()
     .trim()
@@ -214,12 +244,35 @@ export const writeNodeSchema = z.object({
 
 export type WriteNodeInput = z.infer<typeof writeNodeSchema>
 
+/** Pages au plus d'une écriture par lot (`node.write_many`, E11-S18, AC-12). */
+export const WRITE_MANY_MAX = 50
+
+/**
+ * Les arguments de `node.write_many` (E11-S18, AC-12) : des écritures de `write`, sans `ctx`, faites dans l'ordre ; une
+ * clé inconnue d'une page est refusée (`markdown` n'en est pas une : `ops` [{op: "set_markdown", text}]).
+ */
+export const writeManyArgsSchema = z.strictObject({
+  pages: z
+    .array(z.strictObject(writeNodeSchema.shape))
+    .min(1)
+    .max(WRITE_MANY_MAX)
+    .describe(
+      'Pages to write in order (parents before their children), 50 at most; each item is a write input without ctx, e.g. {"path": "sav/fiches/garantie", "kind": "page", "title": "Garantie", "summary": "Ce que couvre la garantie.", "ops": [{"op": "set_markdown", "text": "<the markdown of the page>"}]}.',
+    ),
+})
+
 /**
  * Le déplacement d'un nœud (E03-S07, AC14, P12) : un seul schéma pour la route
  * `POST /api/platform/nodes/move`, le formulaire « Déplacer… » d'E05-S02 et `moveNode`. Sans lui,
  * la route et le formulaire valideraient chacun leur chemin.
  */
-export const moveNodeSchema = z.strictObject({ path: nodePathSchema, new_path: nodePathSchema })
+export const moveNodeSchema = z.strictObject({
+  // E11-S18 (AC-5) : aussi les arguments de `node.move`, décrits pour le contrat que `read` sert (`mcp-patterns.md § 3`).
+  path: nodePathSchema.describe("Current path of the page, procedure, table or folder to move, e.g. ventes/relance_devis."),
+  new_path: nodePathSchema.describe(
+    "Path it moves to, e.g. ventes/procedures/relance_devis; its parent must exist. The pages under it follow, and the old paths still lead to it.",
+  ),
+})
 
 export type MoveNodeInput = z.infer<typeof moveNodeSchema>
 

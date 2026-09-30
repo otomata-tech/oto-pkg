@@ -1,7 +1,8 @@
 "use client"
 
-// Le champ d'un bloc (E05-S02 ; E05-S08, AC1, AC7, AC9 ; E05-S09, partie c1) : un `<textarea>` natif
-// toujours monté, dont la hauteur suit le texte, au nom accessible obligatoire, sans fond ni bordure au repos
+// Le champ d'un bloc (E05-S02 ; E05-S08, AC1, AC7, AC9 ; E05-S09, partie c1) : un `<textarea>` natif, monté quand
+// le bloc est touché ou sous la souris (1.1.3, qui remplace le champ toujours monté de la fiche D21 B ; ailleurs, le bloc
+// se lit dans `ChampAuRepos`), dont la hauteur suit le texte, au nom accessible obligatoire, sans fond ni bordure au repos
 // ni au focus : seul le curseur se voit, et la gouttière de sa rangée paraît (HN-E05S08-4). Une liste porte ses
 // repères (puces, numéros à partir de `start`, cases) sur la copie de ses éléments (`elements-de-liste.tsx`).
 // Sa frappe, sa sortie et son clavier vont aux gestes de l'éditeur. Sans lui, un bloc ne s'écrit pas.
@@ -21,7 +22,7 @@
 // E05-S11 : au repos, un texte qui porte des liens se lit comme en lecture, liens dans la phrase (retour 11, fiche
 // D107) : son rendu est posé sur le champ, dans la même case, le champ transparent dessous ; au focus, le rendu
 // s'efface et le texte brut paraît (`editeur.css`). Un clic hors d'un lien traverse le rendu jusqu'au champ ; un
-// clic sur un lien ouvre son panneau (E11-S06). Le champ reste le même élément, monté : aucun focus perdu quand un lien paraît. Tout
+// clic sur un lien ouvre son panneau (E11-S06). Le champ monté reste le même élément : aucun focus perdu quand un lien paraît. Tout
 // le texte sélectionné ouvre le menu de la poignée (AC-28) ; Échap ou la frappe suivante le referme.
 //
 // E10-S01 : un collage de plusieurs lignes (`text/plain` seul, jamais `text/html`) s'insère après le bloc entier,
@@ -46,7 +47,7 @@
 //
 // E11-S17 (lot a) : ⌘A une seconde fois, le texte déjà tout sélectionné ou le bloc vide, prend tous les blocs de la page
 // (AC-a2, `selection-de-blocs.ts`).
-import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type SyntheticEvent } from "react"
+import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type RefObject, type SyntheticEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { Resultat } from "../../api/resultat"
 import { useRechercheDeContenus } from "../../api/use-recherche-de-contenus"
@@ -54,10 +55,11 @@ import { aDesLiens, aDuBalisage, type CiblesDesLiens } from "../en-ligne"
 import { LIEN_DU_BLOC } from "../libelles"
 import { EnLigne } from "../rendu-des-blocs"
 import { tableauColle } from "./blocs-de-page"
+import { ChampAuRepos } from "./champ-au-repos"
 import { ListeDesChoix, useChoixParBarre } from "./choix-de-bloc"
 import { citationAuCurseur, idDOption, lienVers, ListeACiter, useOptionActive, type Citation } from "./citer"
 import { ElementsDeListe } from "./elements-de-liste"
-import { useFileDOperations } from "./file-d-operations"
+import { useCheminDeLaFile } from "./file-d-operations"
 import { useGestes } from "./gestes"
 import { PanneauDuLien, useLienAuCurseur } from "./lien-du-bloc"
 
@@ -78,6 +80,56 @@ function lignesEstimees(texte: string): number {
   return texte.split("\n").reduce((total, ligne) => total + Math.max(1, Math.ceil(ligne.length / CARACTERES_PAR_LIGNE)), 0)
 }
 
+/** `field-sizing: content` (Chrome, Edge) : la hauteur suit le texte par le seul CSS, sans mesure. */
+const hauteurParLeCss = () => typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("field-sizing", "content")
+
+/** `auto` d'abord, sinon `scrollHeight` ne redescend jamais sous la hauteur déjà posée. */
+function mesurer(champ: HTMLTextAreaElement) {
+  champ.style.height = "auto"
+  champ.style.height = `${champ.scrollHeight}px`
+}
+
+/** Les champs montés en attente de leur hauteur : mesurés ensemble à l'image suivante, en une seule mise en page. */
+const aMesurer = new Set<HTMLTextAreaElement>()
+
+function mesurerEnsemble() {
+  const champs = [...aMesurer]
+  aMesurer.clear()
+  // Toutes les écritures, puis toutes les lectures, puis toutes les écritures : jamais une lecture après l'écriture d'un seul.
+  for (const champ of champs) champ.style.height = "auto"
+  const hauteurs = champs.map((champ) => champ.scrollHeight)
+  champs.forEach((champ, rang) => {
+    champ.style.height = `${hauteurs[rang]}px`
+  })
+}
+
+/**
+ * La hauteur d'un champ suit son texte, là où le navigateur n'a pas `field-sizing` (Firefox, Safari) : au montage, avec
+ * les autres champs montés dans le même rendu, à l'image suivante (une mesure par champ forçait une mise en page par
+ * bloc, et figeait une page longue plusieurs secondes) ; ensuite, à chaque texte reçu (frappe, annulation) et à chaque
+ * forme (un titre change de corps), ce seul champ, tout de suite : il grandit pendant qu'on tape. `monte` : le champ
+ * vient d'être monté à la place du bloc lu.
+ */
+function useHauteurDuTexte(champ: RefObject<HTMLTextAreaElement | null>, texte: string, genre: string, monte: boolean) {
+  const mesure = useRef<HTMLTextAreaElement | null>(null)
+  useLayoutEffect(() => {
+    const element = champ.current
+    if (!element || hauteurParLeCss()) return
+    if (mesure.current === element) return mesurer(element)
+    mesure.current = element
+    if (aMesurer.size === 0) requestAnimationFrame(mesurerEnsemble)
+    aMesurer.add(element)
+    return () => void aMesurer.delete(element)
+  }, [champ, texte, genre, monte])
+}
+
+/**
+ * Le bloc survolé en dernier, qui démonte son champ quand un autre l'est : un départ du pointeur que le navigateur ne
+ * signale pas (le champ monté sous lui, un défilement) ne laisse jamais qu'un champ monté par le survol. Son `setState`,
+ * stable d'un rendu à l'autre ; `null` quand le pointeur a quitté le dernier bloc survolé.
+ */
+let survolEnCours: ((survole: boolean) => void) | null = null
+
 type ChampDeBlocProps = {
   cle: string
   texte: string
@@ -97,6 +149,8 @@ type ChampDeBlocProps = {
   liens: LiensDesBlocs | null
   /** Le menu de la poignée est ouvert par la sélection de tout le texte (AC-28). */
   menuOuvert: boolean
+  /** Le bloc touché : le `<textarea>` est monté ; sinon le bloc se lit (`ChampAuRepos`), sauf sous la souris. */
+  ouvert: boolean
   /** L'invite du champ vide : le Texte d'une page vide (E11-S05, AC-g1). */
   invite?: string
 }
@@ -131,7 +185,7 @@ function useCitation(cle: string, texte: string) {
   const gestes = useGestes()
   const [citation, setCitation] = useState<Citation | null>(null)
   const recherche = useRechercheDeContenus()
-  const { chemin } = useFileDOperations()
+  const chemin = useCheminDeLaFile()
   const trouves = "trouves" in recherche.resultat ? recherche.resultat.trouves : []
   const option = useOptionActive(trouves)
   const suivre = (valeur: string, curseur: number) => {
@@ -201,7 +255,7 @@ function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
   }
 }
 
-export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert, invite }: ChampDeBlocProps) {
+export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, lectureSeule, liens, menuOuvert, ouvert, invite }: ChampDeBlocProps) {
   const gestes = useGestes()
   const champ = useRef<HTMLTextAreaElement>(null)
   const unTexte = genre === "paragraph"
@@ -212,6 +266,11 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
   const choix = useChoixParBarre(texte, (un) => gestes.remplacerParChoix(cle, un))
   // Le focus du champ choisit ce que montre la copie d'une liste : son texte brut au focus, son rendu au repos (E11-S06).
   const [auFocus, setAuFocus] = useState(false)
+  // Sous la souris, le `<textarea>` est monté avant l'appui : le clic pose le curseur, le glissé sélectionne, comme partout.
+  const [survole, setSurvole] = useState(false)
+  // Un champ qui a le focus reste monté jusqu'à sa sortie, même quand un geste en ouvre un autre : démonté avec le focus,
+  // il ne recevrait pas de `blur`, et son texte ne partirait pas (ni son bloc vidé ne se retirerait).
+  const monte = ouvert || survole || auFocus
   const enListe = genre === "list" || genre === "checklist"
   const lien = useLienAuCurseur(texte, champ, liens !== null && !lectureSeule, enListe)
   const idDuLien = useId()
@@ -226,14 +285,7 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
       ? { id: idDeLaListe, active: citation.aDesOptions ? idDOption(idDeLaListe, citation.actif) : undefined }
       : null
 
-  // La hauteur suit le texte, à chaque valeur reçue (frappe, annulation) et à chaque forme (un titre change
-  // de corps) : `auto` d'abord, sinon `scrollHeight` ne redescend jamais sous la hauteur déjà posée.
-  useLayoutEffect(() => {
-    const element = champ.current
-    if (!element) return
-    element.style.height = "auto"
-    element.style.height = `${element.scrollHeight}px`
-  }, [texte, genre])
+  useHauteurDuTexte(champ, texte, genre, monte)
 
   const auRepos = liens !== null && aDuBalisage(texte)
   const sansCorrecteur = liens !== null && aDesLiens(texte)
@@ -260,51 +312,74 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
   const toutSelectionner = (evenement: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((evenement.metaKey || evenement.ctrlKey) && evenement.key.toLowerCase() === "a") selectionner(evenement)
   }
+  // Le panneau « Lien » ouvert au repos par le menu contextuel : le champ reste monté, le panneau lui rend le focus.
+  const menuContextuel = (evenement: MouseEvent<HTMLElement>) => {
+    lien.menuContextuel(evenement)
+    if (evenement.defaultPrevented) gestes.activerLeChamp(cle)
+  }
 
   return (
     <>
-      {/* Le champ et son rendu au repos dans la même case (`oto-block-pile`), toujours : le champ n'est jamais remonté. Un `span` : la pile vit aussi dans le `h2` d'un titre. Le menu contextuel d'un lien rendu y est lu par délégation (AC-b9). */}
-      <span className="oto-block-pile" onContextMenuCapture={lien.menuContextuel}>
+      {/* Le champ, ou le bloc lu, et son rendu au repos dans la même case (`oto-block-pile`) : seul le champ change quand le bloc est touché, le rendu et la copie d'une liste restent. Un `span` : la pile vit aussi dans le `h2` d'un titre. Le menu contextuel d'un lien rendu y est lu par délégation (AC-b9). */}
+      <span
+        className="oto-block-pile"
+        onContextMenuCapture={menuContextuel}
+        onPointerEnter={(evenement) => {
+          if (evenement.pointerType !== "mouse" || survole) return
+          if (survolEnCours !== setSurvole) survolEnCours?.(false)
+          survolEnCours = setSurvole
+          setSurvole(true)
+        }}
+        onPointerLeave={() => {
+          setSurvole(false)
+          if (survolEnCours === setSurvole) survolEnCours = null
+        }}
+      >
         {/* La copie d'une liste précède le champ : ses cases, à gauche du texte, viennent avant lui au clavier. */}
         {enListe && <ElementsDeListe cle={cle} texte={texte} genre={genre} debut={debut} cases={cases} lectureSeule={lectureSeule} rendu={auRepos && !auFocus ? liens : null} />}
-        <textarea
-          ref={champ}
-          rows={lignesEstimees(texte)}
-          data-champ=""
-          data-kind={genre}
-          // Son rendu est posé dessus : hors du focus, le texte brut se tait (`editeur.css`).
-          data-rendu={auRepos ? "" : undefined}
-          spellCheck={sansCorrecteur ? false : undefined}
-          aria-label={nom}
-          placeholder={invite}
-          aria-describedby={decrit}
-          aria-autocomplete={liste ? "list" : undefined}
-          aria-controls={liste?.id}
-          aria-activedescendant={liste?.active}
-          readOnly={lectureSeule}
-          value={texte}
-          onChange={(evenement) => {
-            gestes.saisir(cle, evenement.target.value, choix.suivre(texte, evenement.target.value, unTexte))
-            citation.suivre(evenement.target.value, evenement.target.selectionStart)
-            lien.suivre(evenement.target.value, evenement.target.selectionStart, evenement.target.selectionEnd)
-          }}
-          onKeyDown={toucher}
-          onPaste={collage.coller}
-          onSelect={selectionner}
-          onKeyUp={toutSelectionner}
-          onBlur={(evenement) => {
-            setAuFocus(false)
-            choix.fermer()
-            citation.fermer()
-            lien.quitter(evenement)
-            gestes.quitterLeChamp(cle, evenement)
-          }}
-          onFocus={() => {
-            setAuFocus(true)
-            if (lectureSeule) gestes.annoncerLeConflit()
-          }}
-          className="oto-block-field field-sizing-content focus-visible:outline-hidden!"
-        />
+        {!monte ? (
+          <ChampAuRepos texte={texte} nom={nom} genre={genre} decritPar={decritPar} lectureSeule={lectureSeule} rendu={auRepos} invite={invite} ouvrir={(curseur) => gestes.ouvrirLeChamp(cle, curseur)} />
+        ) : (
+          <textarea
+            ref={champ}
+            rows={lignesEstimees(texte)}
+            data-champ=""
+            data-kind={genre}
+            // Son rendu est posé dessus : hors du focus, le texte brut se tait (`editeur.css`).
+            data-rendu={auRepos ? "" : undefined}
+            spellCheck={sansCorrecteur ? false : undefined}
+            aria-label={nom}
+            placeholder={invite}
+            aria-describedby={decrit}
+            aria-autocomplete={liste ? "list" : undefined}
+            aria-controls={liste?.id}
+            aria-activedescendant={liste?.active}
+            readOnly={lectureSeule}
+            value={texte}
+            onChange={(evenement) => {
+              gestes.saisir(cle, evenement.target.value, choix.suivre(texte, evenement.target.value, unTexte))
+              citation.suivre(evenement.target.value, evenement.target.selectionStart)
+              lien.suivre(evenement.target.value, evenement.target.selectionStart, evenement.target.selectionEnd)
+            }}
+            onKeyDown={toucher}
+            onPaste={collage.coller}
+            onSelect={selectionner}
+            onKeyUp={toutSelectionner}
+            onBlur={(evenement) => {
+              setAuFocus(false)
+              choix.fermer()
+              citation.fermer()
+              lien.quitter(evenement)
+              gestes.quitterLeChamp(cle, evenement)
+            }}
+            onFocus={() => {
+              setAuFocus(true)
+              gestes.activerLeChamp(cle)
+              if (lectureSeule) gestes.annoncerLeConflit()
+            }}
+            className="oto-block-field field-sizing-content focus-visible:outline-hidden!"
+          />
+        )}
         {auRepos && !enListe && <TexteAuRepos texte={texte} genre={genre} liens={liens} />}
       </span>
       {panneau && <PanneauDuLien key={`${panneau.ouvert.lu.debut}:${panneau.ouvert.source}`} cle={cle} texte={texte} {...panneau} idDescription={idDuLien} lien={lien} />}

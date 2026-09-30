@@ -1,4 +1,5 @@
-// Les gestes de l'éditeur (E05-S02 ; E05-S08, AC2 à AC6) : des champs toujours montés (fiche D21 B), le
+// Les gestes de l'éditeur (E05-S02 ; E05-S08, AC2 à AC6) : le champ du bloc touché (1.1.3, qui remplace les champs
+// toujours montés de la fiche D21 B ; la sortie de la rangée le démonte), le
 // texte d'un bloc qui part quand le focus quitte son champ, sur ⌘S ou après 1 200 ms sans frappe
 // (HN-E05S08-1), les gestes de structure (ajouter, scinder, fusionner, déplacer, supprimer, changer de
 // forme) qui partent tout de suite, et le clavier. Chaque geste applique une opération pure du modèle
@@ -53,6 +54,8 @@ export type EtatDeLEditeur = {
   appui: RefObject<{ cle: string; instant: number } | null>
   /** Les fichiers joints (E10-S02) : le stockage, les envois en cours, le dialogue ouvert. */
   fichiers: FichiersDeLEditeur
+  /** Le focus a quitté la rangée : son champ se démonte, le bloc se lit (1.1.3). */
+  fermerLeChamp: (cle: string) => void
 }
 
 const FIN = Number.MAX_SAFE_INTEGER
@@ -327,6 +330,7 @@ function sorties(etat: EtatDeLEditeur, envoyerLeTexte: (cle: string) => boolean,
         if (rangee.isConnected && (rangee.contains(document.activeElement) || menuOuvert(rangee))) return
         if (appuiDans(cle)) return
         retirerSiVide(cle)
+        etat.fermerLeChamp(cle)
       }, 0)
     },
   }
@@ -352,7 +356,7 @@ type ActionsDuGroupe = Omit<ReturnType<typeof gestesDuGroupe>, "annulerLeGroupe"
  */
 export function actionsDeLEditeur(
   etat: EtatDeLEditeur,
-): Omit<Gestes, "poignee" | "selectionner" | "fermerLeMenu" | "toutSelectionnerLesBlocs" | "cliquerLaPoignee"> & ActionsPropres & ActionsDuGroupe {
+): Omit<Gestes, "poignee" | "selectionner" | "fermerLeMenu" | "toutSelectionnerLesBlocs" | "cliquerLaPoignee" | "ouvrirLeChamp" | "activerLeChamp"> & ActionsPropres & ActionsDuGroupe {
   const supprimer = suppression(etat)
   const { envoyerLeTexte, retirerSiVide } = textes(etat, supprimer)
   const { retablirSuppression, fondre, ...struct } = structure(etat, envoyerLeTexte)

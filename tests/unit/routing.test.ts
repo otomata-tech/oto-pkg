@@ -11,6 +11,7 @@
 // de la procédure servie y arrivent à rebours (AC7, `reverse` de `watchDb`).
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { connectDeps } from "../helpers/mcp"
+import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
 import { ORG, OTHER_ORG, PEOPLE, TEAMS, type Person } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
 import type { Row } from "../helpers/simulated-db"
@@ -31,6 +32,7 @@ import {
   rankCandidates,
   requestKind,
   routingSettings,
+  wordsInCommon,
   type Components,
 } from "../../packages/plateforme/server/routing"
 
@@ -138,6 +140,63 @@ describe("isDataQuestion (AC4)", () => {
     const kinds = ["Comment je crée un projet ?", "Peux-tu ajouter une tâche ?", "Est-ce que tu peux relancer les devis ?", "Est-ce qu'il reste des prospects", "Relance les devis en attente."]
     expect(kinds.map(requestKind)).toEqual(["how", "request", "request", "data", "action"])
     expect(isDataQuestion("Comment je crée un projet ?")).toBe(false)
+  })
+
+  // E11-S19 (AC-d3, HN-E11S19-6) : un verbe d'édition en tête, ou à l'infinitif après une formule de demande ; « ajoute »
+  // et les suppressions n'en sont pas (`node.trash`, `table.delete_rows`, en-tête d'un tableau : golden PD2, TB3, TDN1).
+  it("should tell a request to change a text, alone or after a request formula, from a creation or a deletion", () => {
+    const edits = ["Corrige le tarif de la grille", "Mets à jour la page des horaires ?", "Peux-tu remplacer ce paragraphe ?", "Est-ce que tu peux reformuler la phrase sur les délais", "Renomme la page des tarifs"]
+    for (const phrase of edits) expect(requestKind(phrase), phrase).toBe("edit")
+    expect(["Ajoute une tâche", "Peux-tu ajouter une tâche ?", "Changement de fournisseur ?"].map(requestKind)).toEqual(["action", "request", "data"])
+    expect(["Supprime la page ventes/essai", "Retire la colonne ville", "Efface le projet Alpha", "Peux-tu supprimer le projet Alpha ?"].map(requestKind)).toEqual([
+      "action",
+      "action",
+      "action",
+      "request",
+    ])
+  })
+
+  // E11-S19 (`security-patterns.md § Validation des inputs`) : une phrase hostile de 2 000 caractères, la borne de
+  // `phrase`, lue en temps linéaire par les motifs du genre et par les mots en commun.
+  it("should read a hostile phrase of 2,000 characters in less than a second", () => {
+    const hostile = [
+      `${"peux-tu ".repeat(250)}`,
+      `qu'est-ce que ${"je ".repeat(662)}`,
+      `mets à jour${" à".repeat(995)}`,
+      "é".repeat(2000),
+      `${"relancer ".repeat(222)}xx`,
+    ].map((phrase) => phrase.slice(0, 2000))
+    const summary = { title: "t".repeat(200), summary: `${"relance ".repeat(24)}` }
+    for (const phrase of hostile) {
+      const started = performance.now()
+      requestKind(phrase)
+      wordsInCommon(phrase, summary)
+      expect(performance.now() - started, phrase.slice(0, 30)).toBeLessThan(TEMPS_LINEAIRE_MS)
+    }
+  })
+
+  // E11-S19 (AC-d4, HN-E11S19-7) : la personne sujet et un tiers objet, avant le verbe ; « j'ai à faire » reste une donnée (TD4).
+  it("should tell a question about what to do to someone from a data question", () => {
+    for (const phrase of ["Qu'est-ce que je lui réponds ?", "Qu’est-ce qu’on leur dit ?", "Que dois-je lui répondre ?"]) {
+      expect(requestKind(phrase), phrase).toBe("action")
+    }
+    for (const phrase of ["Qu'est-ce que j'ai à faire aujourd'hui ?", "Qu'est-ce que je dois faire aujourd'hui ?", "Que lui avons-nous facturé ?"]) {
+      expect(isDataQuestion(phrase), phrase).toBe(true)
+    }
+  })
+})
+
+// E11-S19 (AC-d2, HN-E11S19-5) : les mots de la demande trouvés dans le titre ou le résumé d'une candidate.
+describe("wordsInCommon", () => {
+  const ticket = { title: "Traiter un ticket SAV", summary: "Répond au client qui écrit au support." }
+
+  it("should give the words of the request found in the title or the summary, without case, accents or ending, once each", () => {
+    expect(wordsInCommon("Traite ce TICKET et réponds au client, au client", ticket)).toEqual(["traite", "ticket", "réponds", "client"])
+  })
+
+  it("should leave out short words and words that only share four letters", () => {
+    expect(wordsInCommon("sav au support", ticket)).toEqual(["support"])
+    expect(wordsInCommon("les tickets de caisse", { title: "Tick", summary: "Caisier." })).toEqual([])
   })
 })
 
@@ -293,8 +352,9 @@ describe.skipIf(!sqlConfigured)(portable("routing on the real database, Acme on 
           [
             `Request « relance les devis en attente » matches ventes/relance_devis (score 1.00): its steps follow, if the request is about « ${relance.title} ».`,
             "Other candidates:",
-            other("ventes/relance_prospects", "0.43"),
-            other("ventes/qualifier_prospects", "0.40"),
+            // E11-S19 (AC-d2) : les mots de la demande trouvés dans chacune.
+            other("ventes/relance_prospects", "0.43; words in common: relance"),
+            other("ventes/qualifier_prospects", "0.40; no word in common"),
             `If the request is about one of them instead, read that one with ${ref.org.prefix}_read and follow it rather than these steps.`,
           ].join("\n"),
         )

@@ -15,12 +15,13 @@ import {
 import { fileSizeText } from "../schemas/files"
 import { ACCESS_LEVELS, requireNodeLevel } from "./access"
 import type { PlatformDb } from "./db"
-import { isPlatformError, PlatformError } from "./errors"
-import { admittedType, checkSize, requireStore, storeFile } from "./files/service"
+import { inTransaction, isPlatformError, PlatformError } from "./errors"
+import { admittedType, checkSize, removeObjects, requireStore, storeFile } from "./files/service"
 import type { Identity } from "./identity"
 import { findNode, unknownNode } from "./nodes/lookup"
 import { lastSegment } from "./nodes/segments"
 import { loadBlocks, loadDraft } from "./nodes/store"
+import { writeNodeLazily } from "./nodes/write-lazy"
 import type { WriteOrigin } from "./nodes/write-result"
 import { importRows, inferredHeader, requireCreation } from "./tables/import"
 import type { ToolOutput } from "./tool-output"
@@ -48,6 +49,15 @@ export type UploadResult = { text: string; data: UploadDone }
 type Target = Pick<UploadTicket, "kind" | "mode" | "path" | "baseRevision">
 
 const NOT_UTF8 = "the file is not UTF-8; convert it first (iconv -f WINDOWS-1252 -t UTF-8, or Get-Content -Encoding Default | Set-Content -Encoding UTF8)"
+
+/**
+ * Une page HTML envoyée pour un `.md` (FB-0014, HN-E10S02-118) : `<!doctype html` ou `<html` en tête, blancs de tête
+ * ignorés, sans casse. Rendue, elle serait échappée (du texte) ; refusée, la page n'est pas remplie du source d'un site.
+ */
+const HTML_START = /^<(?:!doctype\s+html|html[\s>])/i
+
+const HTML_NOT_MARKDOWN =
+  "The markdown file is an HTML page (it starts with <!doctype html> or <html>): nothing was written. Send the markdown itself, or attach the HTML page with kind file."
 
 const KIND_LABELS: Record<string, string> = { page: "page", procedure: "procedure", context: "context page", table: "table" }
 
@@ -94,11 +104,8 @@ function utf8(bytes: Uint8Array): string {
   }
 }
 
-/** `writeNode`, lu à l'appel : `write` relit le registre, qui importe ce module. */
-async function write(db: PlatformDb, identity: Identity, body: Record<string, unknown>, origin: WriteOrigin): Promise<ToolOutput> {
-  const { writeNode } = await import("./nodes/write")
-  return writeNode(db, identity, body, origin)
-}
+/** `writeNode`, lu à l'appel (`writeNodeLazily`) : `write` relit le registre, qui importe ce module. */
+const write = writeNodeLazily
 
 /** La publication demandée par le ticket, sinon le défaut de `write` (publier, fiche D135). */
 const publishOf = (ticket: UploadTicket) => (ticket.publish === null ? {} : { publish: ticket.publish })
@@ -120,10 +127,71 @@ async function lastBlock(db: PlatformDb, nodeId: string): Promise<string | null>
   return (await loadBlocks(db, nodeId, draft ? "draft" : "published")).at(-1)?.id ?? null
 }
 
+const SEND_AGAIN = "Ask for a new upload link and send it again."
+
+/** Un fichier en cours d'envoi : son mode, sa page, et la ligne `files` stockée (`ready`), nulle tant que `storeFile` n'a pas abouti. */
+type SentFile = { mode: UploadMode; node: { id: string; path: string }; storedId: string | null }
+
+/**
+ * La page qu'une création vient de faire pour un fichier, retirée quand la suite échoue (HN-E10S02-117) : sous le verrou
+ * de l'arbre (7301, celui d'une création), le nœud créé par cet envoi, jamais publié, créé par la personne du ticket, sans
+ * bloc, sans sous-page ni fichier `ready` autre que celui que cet envoi a stocké (`storedId`), supprimé en une instruction
+ * avec ses lignes `files` (`pending`, et celle de `storedId`), dont les objets partent après le commit ; blocs, brouillon
+ * et alias suivent en cascade. Rend `false` quand la page a reçu autre chose entre-temps : elle reste. La suppression est
+ * bornée à ce que l'envoi a lui-même créé, décidé ici avant la requête.
+ */
+async function undoCreation(db: PlatformDb, identity: Identity, sent: SentFile): Promise<boolean> {
+  const { node, storedId } = sent
+  const [gone] = await inTransaction(db, "uploads: undo creation", async (sql) => {
+    await sql`select pg_catalog.pg_advisory_xact_lock(7301, pg_catalog.hashtext(${identity.org.id}::text))`
+    return sql<{ nodes: number; files: string[] }[]>`
+      with gone as (
+        delete from platform.nodes n
+         where n.org_id = ${identity.org.id} and n.id = ${node.id} and n.path = ${node.path} and n.revision = 0 and n.created_by = ${identity.user.id}
+           and not exists (select 1 from platform.nodes d where d.org_id = n.org_id and d.parent_id = n.id)
+           and not exists (select 1 from platform.blocks b where b.node_id = n.id)
+           and not exists (select 1 from platform.files f where f.node_id = n.id and f.status <> 'pending' and f.id is distinct from ${storedId}::uuid)
+        returning n.id
+      ), gone_files as (
+        delete from platform.files f where f.org_id = ${identity.org.id} and f.node_id in (select gone.id from gone)
+        returning f.id
+      )
+      select (select count(*)::int from gone) as nodes,
+             coalesce((select array_agg(gone_files.id::text) from gone_files), '{}') as files`
+  })
+  await removeObjects(identity.org.id, gone.files)
+  return gone.nodes === 1
+}
+
+/**
+ * La consigne d'un échec après la création de la page d'un fichier (HN-E10S02-117) : la page retirée, le chemin libre pour
+ * un nouveau lien ; sinon (elle a reçu autre chose, ou le retrait a échoué, nommé au log serveur), elle reste en brouillon
+ * et le fichier se renvoie par `attach` sur la révision 0.
+ */
+async function afterFailedCreation(db: PlatformDb, identity: Identity, sent: SentFile): Promise<string> {
+  const { node } = sent
+  const removed = await undoCreation(db, identity, sent).catch((error: unknown) => {
+    console.error(`[platform] uploads: page ${node.id} created for a file not removed`, error instanceof Error ? error.message : error)
+    return false
+  })
+  if (removed) return `The page ${node.path} it created was removed: ask for a new upload link and send it again.`
+  return `The page ${node.path} it created stays, as an unpublished draft: ask for an upload link with mode attach and base_revision 0 to send the file there.`
+}
+
+/**
+ * L'échec d'un fichier, dit à l'assistant : après une création, la page retirée ou gardée (`afterFailedCreation`), pour
+ * toute erreur ; sur une page existante, un échec du stockage (`conflict` de `storeFile`) porte la consigne de renvoyer.
+ */
+async function fileFailure(db: PlatformDb, identity: Identity, sent: SentFile, error: unknown): Promise<unknown> {
+  const advice = sent.mode === "create" ? await afterFailedCreation(db, identity, sent) : sent.storedId === null ? SEND_AGAIN : null
+  if (advice === null || !isPlatformError(error) || (sent.mode !== "create" && error.code !== "conflict")) return error
+  return new PlatformError(error.code, `${error.message} ${advice}`, error.details)
+}
+
 /**
  * Un fichier (AC-f8) : stockage, type et taille d'abord ; `create` crée la page en brouillon, puis la ligne `files` et l'objet
  * (`storeFile`), puis un bloc `file` à la fin de la page, écrit sous la révision du ticket (HN-E10S02-71) et publié selon
- * `publish`. Un échec du stockage laisse la page créée en brouillon, et le dit.
+ * `publish`. Un échec après la création retire la page que l'envoi a créée (`afterFailedCreation`), et le dit.
  */
 async function writeFile(db: PlatformDb, identity: Identity, ticket: UploadTicket, bytes: Uint8Array): Promise<Omit<UploadDone, "url">> {
   const name = ticket.name ?? ""
@@ -138,16 +206,19 @@ async function writeFile(db: PlatformDb, identity: Identity, ticket: UploadTicke
   }
   const found = await findNode(db, identity, path)
   if (!found) throw unknownNode(path, identity.org.prefix)
-  const stored = await storeFile(db, identity, { nodeId: found.node.id, name, bytes }).catch((error: unknown) => {
-    if (ticket.mode !== "create" || !isPlatformError(error)) throw error
-    throw new PlatformError(error.code, `${error.message} The page ${path} was created as an unpublished draft.`, error.details)
-  })
-  const after = await lastBlock(db, found.node.id)
-  const input = { type: "file" as const, data: { file_id: stored.id, name: stored.name, size: stored.size, mime: stored.mime } }
-  const op: WriteOpBody = { op: "insert_after", ...(after ? { block: after } : {}), input }
-  const base = ticket.mode === "create" ? 0 : ticket.baseRevision
-  const output = await write(db, identity, { path, base_revision: base, ops: [op], ...publishOf(ticket) }, origin)
-  return { ...writtenOf(output, path), file: { id: stored.id, name: stored.name, size: stored.size } }
+  const sent: SentFile = { mode: ticket.mode, node: { id: found.node.id, path: found.node.path }, storedId: null }
+  try {
+    const stored = await storeFile(db, identity, { nodeId: sent.node.id, name, bytes })
+    sent.storedId = stored.id
+    const after = await lastBlock(db, sent.node.id)
+    const input = { type: "file" as const, data: { file_id: stored.id, name: stored.name, size: stored.size, mime: stored.mime } }
+    const op: WriteOpBody = { op: "insert_after", ...(after ? { block: after } : {}), input }
+    const base = ticket.mode === "create" ? 0 : ticket.baseRevision
+    const output = await write(db, identity, { path, base_revision: base, ops: [op], ...publishOf(ticket) }, origin)
+    return { ...writtenOf(output, path), file: { id: stored.id, name: stored.name, size: stored.size } }
+  } catch (error) {
+    throw await fileFailure(db, identity, sent, error)
+  }
 }
 
 /**
@@ -156,7 +227,9 @@ async function writeFile(db: PlatformDb, identity: Identity, ticket: UploadTicke
  * sans borne de section, sous la provenance de l'assistant (`origin.file`, `writeNode`).
  */
 async function writeMarkdown(db: PlatformDb, identity: Identity, ticket: UploadTicket, bytes: Uint8Array): Promise<Omit<UploadDone, "url">> {
-  const page = readPageMarkdown(utf8(bytes), ticket.name ?? `${lastSegment(ticket.path)}.md`)
+  const markdown = utf8(bytes)
+  if (HTML_START.test(markdown.slice(0, 200).trimStart())) throw new PlatformError("invalid_arguments", HTML_NOT_MARKDOWN)
+  const page = readPageMarkdown(markdown, ticket.name ?? `${lastSegment(ticket.path)}.md`)
   if (page.chunks.length === 0) throw new PlatformError("invalid_arguments", "The markdown file holds nothing under its title: nothing was written.")
   // Chaque morceau en tête, du dernier au premier : l'ordre du fichier, en une écriture (`importerUnePage` de l'écran).
   const ops = [...page.chunks].reverse().map((text): WriteOpBody => ({ op: "insert_after", text }))

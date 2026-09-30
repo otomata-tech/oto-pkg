@@ -12,8 +12,8 @@ import { displayRefs, headingLevel, resolveBlockRef } from "./document"
 import { newBlock, OpProblem, parseOpText, plural, type OpOutcome, type OpState, type WorkBlock } from "./op-kit"
 import { locate } from "./section-ops"
 
-/** Le bloc d'une référence (N13) ; inconnue, trop courte ou partagée par plusieurs blocs : refus. */
-function target(state: OpState, ref: string, role: "block" | "after_block"): WorkBlock {
+/** Le bloc d'une référence (N13) ; inconnue, trop courte ou partagée par plusieurs blocs : refus. Lu aussi par `replace-text.ts`. */
+export function target(state: OpState, ref: string, role: "block" | "after_block"): WorkBlock {
   const found = resolveBlockRef(state.blocks, ref)
   if ("block" in found) return found.block
   if ("matches" in found) {

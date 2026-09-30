@@ -5,6 +5,7 @@ import type { BlockView, NodeKind, NodeView, ProcedureSummary } from "@otomata_t
 import { ContexteDeRafraichissement, EcranDeNoeud, ListeDesProcedures, ListeDesProceduresChargement, ProcedureDuNoeud } from "@otomata_tech/oto_platform/ui"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
+import { ouvrirLeChamp, texteDuBloc } from "../../helpers/champ-du-bloc"
 import { avecCle, bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 import { libellesDesChoix } from "../../helpers/liste-de-choix"
 
@@ -105,10 +106,10 @@ const styles = (menu: ReturnType<typeof menuDu>) => menu.queryAllByRole("menuite
 /** Le menu ouvert se ferme par Échap, le focus rendu à la poignée. */
 const fermerLeMenu = () => fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
 
+/** Le champ du bloc nommé, une fois rendu, ouvert : un bloc qu'on ne touche pas se lit (1.1.3). */
 async function champ(nom: string): Promise<HTMLTextAreaElement> {
-  const element = await screen.findByRole("textbox", { name: nom })
-  if (!(element instanceof HTMLTextAreaElement)) throw new Error(`champ « ${nom} » attendu`)
-  return element
+  await screen.findByRole("textbox", { name: nom })
+  return ouvrirLeChamp(nom)
 }
 
 /** Un tour de boucle : la sortie d'un champ se décide au tour suivant (E05-S08). */
@@ -174,7 +175,7 @@ describe("écran d'une procédure, celui d'une page (M59)", () => {
 
     // Au niveau écriture, l'éditeur : les étapes gardent leurs numéros à côté de leurs champs (E05-S08, AC8).
     ecran({ noeud: { data: procedure({ level: 2, draft: brouillon() }) } })
-    const etapes4et5 = await champ("Modifier cette liste numérotée — Cherche le contact et")
+    const etapes4et5 = await screen.findByRole("textbox", { name: "Modifier cette liste numérotée — Cherche le contact et" })
     expect(within(etapes4et5.closest<HTMLElement>("[id]") ?? document.body).getAllByText(/^\d+\.$/).map((numero) => numero.textContent)).toEqual(["4.", "5."])
   })
 
@@ -212,7 +213,7 @@ describe("écran d'une procédure, celui d'une page (M59)", () => {
     const surUnePage = await controles("page")
     const surUneProcedure = await controles("procedure")
     expect(surUneProcedure).toEqual(surUnePage)
-    expect(surUneProcedure.formes).toEqual(["Texte", "Titre", "Liste à puces", "Liste numérotée", "Liste à cocher", "Citation", "Code", "Repli"])
+    expect(surUneProcedure.formes).toEqual(["Texte", "Titre", "Liste à puces", "Liste numérotée", "Liste à cocher", "Citation", "Code", "Diagramme", "Repli"])
     expect([...surUneProcedure.duBlocVide, ...surUneProcedure.deLaListe].filter((entree) => /appel/i.test(entree))).toEqual([])
     expect(surUneProcedure.champs).toEqual(["Modifier ce texte — Lis le contrat du", "Modifier ce texte — bloc vide", "Modifier cette liste numérotée — un deux"])
   })
@@ -240,15 +241,17 @@ describe("un appel déjà écrit, sur l'écran d'une page (M59)", () => {
     const lie = appel(23, "mail.create_draft", { body: "[[ventes/contexte]]" })
     const texteLie = bloc(idDe(24), "paragraph", "Voir [[ventes/contexte]].")
     editeur({ blocs: [claim, schema, lie, texteLie], genre: "procedure" })
-    const champClaim = await champ("Modifier ce texte — table.claim")
-    expect(champClaim).toHaveValue(LU.claim)
-    expect(await champ("Modifier ce texte — table.schema")).toHaveValue("Appel de table.schema")
+    await screen.findByRole("textbox", { name: "Modifier ce texte — table.claim" })
+    expect(texteDuBloc("Modifier ce texte — table.claim")).toBe(LU.claim)
+    expect(texteDuBloc("Modifier ce texte — table.schema")).toBe("Appel de table.schema")
     // Ses arguments se lisent en texte brut : un appel ne rend pas ses liens au repos ; un texte, les siens (E05-S11, AC-26).
     expect([...document.querySelectorAll(".oto-block-rendu")].map((rendu) => rendu.closest("[id]")?.id)).toEqual([texteLie.ref])
     // Ouvert, puis quitté ou enregistré sans changement : rien ne part, le bloc reste un appel en base.
-    act(() => champClaim.focus())
+    ouvrirLeChamp("Modifier ce texte — table.claim")
     act(() => bouton("Ailleurs").focus())
     await unTour()
+    // Quitté, le champ s'est démonté (1.1.3) : il se rouvre pour être enregistré, puis réécrit.
+    const champClaim = ouvrirLeChamp("Modifier ce texte — table.claim")
     fireEvent.keyDown(champClaim, { key: "s", ctrlKey: true })
     await unTour()
     expect(api.fetchMock).not.toHaveBeenCalled()

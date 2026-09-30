@@ -13,8 +13,11 @@ import { plural, quotedList } from "./op-kit"
 import { diffLines, outlineLines, outlineOf, renderServed, startOfPageLines, type ReferenceRender, type Version } from "./read-format"
 import type { DraftRow } from "./store"
 
-/** Ce que `read` sert après l'en-tête : le corps (coupé en parties au besoin), les lignes de fin, les blocs lus. */
-export type Served = { body: string; footer: string[]; blocks: DocBlock[]; refs?: Map<DocBlock, string> | null }
+/**
+ * Ce que `read` sert après l'en-tête : le corps (coupé en parties au besoin), les lignes de fin, les blocs lus ;
+ * `outlined` (E11-S19, AC-e2) : le corps porte le plan, que les données ne redisent pas.
+ */
+export type Served = { body: string; footer: string[]; blocks: DocBlock[]; refs?: Map<DocBlock, string> | null; outlined?: true }
 
 export type BodyRequest = {
   input: ReadNodeInput
@@ -100,11 +103,11 @@ export function serveBody(request: BodyRequest): Served {
   if (input.since_revision !== undefined) return served(diffText(request, refs))
   if (!draftMode && node.revision === 0) return served("No published revision yet.")
   if (input.section !== undefined) return served(sectionText(request, refs))
-  if (input.outline) return served(outlineText(request, refs, false), false)
+  if (input.outline) return { ...served(outlineText(request, refs, false), false), outlined: true }
   const sections = splitSections(blocks)
   if (blocksSize(blocks) > PAGE_FULL_MAX && sections.length > 1) {
     const start = renderServed(sections[0].blocks, refs, request.reference, request.fileRoute)
-    return served([start, outlineText(request, refs, true)].filter((part) => part !== "").join("\n\n"), false)
+    return { ...served([start, outlineText(request, refs, true)].filter((part) => part !== "").join("\n\n"), false), outlined: true }
   }
   return served(renderServed(blocks, refs, request.reference, request.fileRoute))
 }

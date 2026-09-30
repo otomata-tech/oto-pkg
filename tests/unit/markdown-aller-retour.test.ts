@@ -65,6 +65,31 @@ describe("readPageMarkdown (AC-a3)", () => {
     expect(chunks).toEqual([`${paragraph}\n\n${paragraph}`, `${fence}\n\n${paragraph}`])
     expect(chunks.every((chunk) => chunk.length <= OP_TEXT_MAX)).toBe(true)
   })
+
+  // E11-S18 (AC-9) : un frontmatter YAML de tête n'est ni le résumé ni le corps.
+  it("should drop a YAML front matter, take title and summary from it, and remove the # heading that repeats its title", () => {
+    const text = ["---", "titre: Guide de l'atelier", 'résumé: "Monter et régler le poste."', "version: 3", "tags:", "  - atelier", "---", "", "# Guide de l'atelier", "", "Ce guide explique le montage.", "", "## Première section", "", "Texte."].join("\n")
+    expect(readPageMarkdown(text, "guide.md")).toEqual({
+      title: "Guide de l'atelier",
+      summary: "Monter et régler le poste.",
+      chunks: ["Ce guide explique le montage.\n\n## Première section\n\nTexte."],
+    })
+  })
+
+  it("should take the summary from the first real paragraph when the front matter has none, and keep a leading divider that opens no front matter", () => {
+    const fronted = readPageMarkdown("---\nversion: 3\n...\n# Guide\n\nCe guide explique le montage.", "guide.md")
+    expect(fronted).toEqual({ title: "Guide", summary: "Ce guide explique le montage.", chunks: ["Ce guide explique le montage."] })
+    expect(readPageMarkdown("---\n\nUn texte.\n\n---", "note.md").chunks).toEqual(["---\n\nUn texte.\n\n---"])
+  })
+
+  // Revue E11-S18 (HN-E11S18-9) : un commentaire après la valeur, un bloc littéral non lu.
+  it("should read a quoted title before a comment, and ignore a literal block title", () => {
+    expect(readPageMarkdown('---\ntitle: "Guide" # à revoir\nsummary: Le montage # brouillon\n---\n\nTexte.', "g.md")).toMatchObject({ title: "Guide", summary: "Le montage" })
+    expect(readPageMarkdown("---\ntitle: |\n  Guide\n  sur deux lignes\n---\n\nCe guide explique le montage.", "guide.md")).toMatchObject({
+      title: "guide",
+      summary: "Ce guide explique le montage.",
+    })
+  })
 })
 
 describe("readPageMarkdown on a hostile text (security-patterns.md § Validation des inputs)", () => {
@@ -74,5 +99,14 @@ describe("readPageMarkdown on a hostile text (security-patterns.md § Validation
     const file = readPageMarkdown(text, "hostile.md")
     expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)
     expect(file.title).toBe("hostile")
+  })
+
+  it("should read a front matter line of spaces ended by a line separator, or a key without colon, in linear time", () => {
+    const separator = String.fromCodePoint(0x2028)
+    for (const line of [`titre:${" ".repeat(PAGE_MAX - 20)}${separator}`, `${"cle ".repeat(PAGE_MAX / 4 - 5)}`]) {
+      const start = performance.now()
+      readPageMarkdown(`---\n${line}\n---\n\nTexte.`, "hostile.md")
+      expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)
+    }
   })
 })

@@ -39,10 +39,11 @@ import { EmbedCard } from "../ds/react/embed-card"
 import { LinkedContent } from "../ds/react/linked-content"
 import { ReaderHeading, ReaderList, ReaderParagraph } from "../ds/react/reader"
 import { texteDUnAppel } from "../procedure/libelles"
+import { DiagrammeMermaid } from "./diagramme-mermaid"
 import { adresseSansIdentifiants, cibleDe, estUnTableau, libelleDUneAdresse, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
 import { CarteDeFichier, ImageAgrandissable } from "./fichier-du-bloc"
 import { GlypheDeNature } from "./glyphes"
-import { ECRAN } from "./libelles"
+import { DIAGRAMME, ECRAN } from "./libelles"
 import { ciblesLues } from "./sous-pages"
 
 /** Le lien d'un bloc : celui de l'hôte (écran serveur) ou `"a"` (éditeur, îlot client). */
@@ -244,7 +245,7 @@ function Repli({ bloc, ...liens }: RenduProps) {
       {fencedParts(bloc.text ?? "").map((partie, rang) =>
         // Une partie n'a pas d'identité : son rang dans un corps dont l'identité est ailleurs.
         partie.code ? (
-          <Preformate key={rang} legende={partie.language ? `Code · ${partie.language}` : "Code"} texte={partie.text} />
+          <Preformate key={rang} genre="code" legende={partie.language ? `Code · ${partie.language}` : "Code"} texte={partie.text} />
         ) : (
           <p key={rang} className="whitespace-pre-line text-sm text-ink">
             <EnLigne texte={partie.text} {...liens} />
@@ -276,10 +277,13 @@ function Cases({ bloc, ...liens }: RenduProps) {
   )
 }
 
-/** Un bloc à légende (code, diagramme) : l'en-tête du bloc de code du design system, puis le texte préformaté. */
-function Preformate({ id, legende, texte }: { id?: string; legende: string; texte: string }) {
+/**
+ * Un bloc à légende (code, diagramme) : l'en-tête du bloc de code du design system, puis le texte préformaté, sur le
+ * fond sombre du code (`data-kind`).
+ */
+function Preformate({ id, legende, texte, genre }: { id?: string; legende: string; texte: string; genre: "code" | "mermaid" }) {
   return (
-    <figure id={id} className={`oto-code ${APRES}`}>
+    <figure id={id} data-kind={genre} className={`oto-code ${APRES}`}>
       <figcaption className="oto-code-head">{legende}</figcaption>
       <pre>
         <code>{texte}</code>
@@ -378,7 +382,7 @@ export function RenduDUnBloc(props: RenduProps & { rendu?: ReactNode; baliseDeTi
       return <Cases {...props} />
     case "code": {
       const langage = chaine(bloc.data.language)
-      return <Preformate id={bloc.ref} legende={langage ? `Code · ${langage}` : "Code"} texte={bloc.text ?? ""} />
+      return <Preformate id={bloc.ref} genre="code" legende={langage ? `Code · ${langage}` : "Code"} texte={bloc.text ?? ""} />
     }
     // Un appel déjà écrit se lit comme un texte (M59, HN-M59-1), jamais exécuté par l'écran ; son texte n'est
     // pas lu en balisage : les arguments se montrent tels qu'ils sont.
@@ -388,8 +392,13 @@ export function RenduDUnBloc(props: RenduProps & { rendu?: ReactNode; baliseDeTi
           {texteDUnAppel(bloc.data)}
         </ReaderParagraph>
       )
+    // Dessiné dans le navigateur (1.1.3) ; le texte, rendu ici, reste le repli (`diagramme-mermaid.tsx`).
     case "mermaid":
-      return <Preformate id={bloc.ref} legende="Diagramme (texte)" texte={bloc.text ?? ""} />
+      return (
+        <DiagrammeMermaid id={bloc.ref} texte={bloc.text ?? ""}>
+          <Preformate genre="mermaid" legende={DIAGRAMME.legende} texte={bloc.text ?? ""} />
+        </DiagrammeMermaid>
+      )
     case "image":
       return <ImageDuBloc {...props} />
     case "callout":

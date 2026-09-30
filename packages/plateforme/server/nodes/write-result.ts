@@ -101,22 +101,34 @@ type ResultInput = {
   teamId: string | null
 }
 
-function publishedLines(input: ResultInput, published: PublishResult): string[] {
+/**
+ * Ce qu'un Contexte publié change pour les conversations qui l'ont reçu (E11-S03, AC-a7) ; `own` : le `ctx` de l'appel
+ * a suivi la publication (E11-S18, AC-14), cette conversation n'a pas à rappeler `context`.
+ */
+export function contextChangedLine(prefix: string, path: string, own: boolean): string {
+  return own
+    ? `Context ${path} changed: every other conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool; this one keeps its ctx.`
+    : `Context ${path} changed: every conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool, this one included if it was.`
+}
+
+/**
+ * La ligne d'une publication (E11-S18, AC-4) : la révision publiée, ses comptes, puis ce que l'écriture a fait (`done`),
+ * et la révision de la prochaine écriture ; un tableau dit ce que sa publication a changé à son en-tête.
+ */
+function publishedLines(input: ResultInput, published: PublishResult, done: readonly string[]): string[] {
   const { node } = input.edit
-  const prefix = input.identity.org.prefix
   const counts = `${published.sections} ${plural(published.sections, "section")}, ${published.blocks} ${plural(published.blocks, "block")}`
   // Un tableau dit ce que sa publication a changé à son en-tête (E07-S04, AC1, AC8). La révision de la
   // prochaine écriture suit : `write` publiant par défaut, l'assistant la reprend (E11-S02, HN-E11S02-27).
-  const table = published.table?.summary ? `: ${published.table.summary}` : ""
+  const parts = [...done, ...(node.kind === "table" && published.table?.summary ? [published.table.summary] : [])]
+  const what = parts.length > 0 ? `: ${parts.join(", ")}` : ""
   const next = `Next write: base_revision ${published.revision}.`
   return [
     node.kind === "table"
-      ? `Published ${node.path} revision ${published.revision}${table}. ${next}`
-      : `Published ${node.path} revision ${published.revision} (${counts}). ${next}`,
-    // Seules les conversations qui ont reçu ce Contexte périment (E11-S03, AC-a7), celle-ci comprise si c'est le cas.
-    ...(published.rulesChanged
-      ? [`Context ${node.path} changed: every conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool, this one included if it was.`]
-      : []),
+      ? `Published ${node.path} revision ${published.revision}${what}. ${next}`
+      : `Published ${node.path} revision ${published.revision} (${counts})${what}. ${next}`,
+    // Seules les conversations qui ont reçu ce Contexte périment (E11-S03, AC-a7), son auteur excepté (E11-S18, AC-14).
+    ...(published.rulesChanged ? [contextChangedLine(input.identity.org.prefix, node.path, false)] : []),
     // Ce que la publication signale (E03-S07 AC2, AC12) : 20 lignes au plus, puis leur nombre restant.
     ...(published.warnings.length > 0 ? ["Warnings:", boundedList(published.warnings.map((warning) => `- ${warning}`), "\n")] : []),
   ]
@@ -138,19 +150,20 @@ export function savedResult(input: ResultInput): ToolOutput {
     return block ? (refs.get(block) ?? "new") : "?"
   }
   const lines: string[] = []
-  // Un tableau publié dans l'appel : la ligne de publication dit ce que l'en-tête change (E07-S04, AC1) ;
-  // la ligne du brouillon ne reste que pour un titre ou un résumé écrits.
+  // Un tableau publié dans l'appel : la ligne de publication dit ce que l'en-tête change (E07-S04, AC1), à la place
+  // de ce que le brouillon en a reçu.
   const tablePublished = published !== null && node.kind === "table"
-  if (saved) {
-    const change = saved.headerChange && !tablePublished ? [saved.headerChange] : []
-    const fragments = [...saved.touched.map((touched) => touched.describe(refOf)), ...headerFragments(saved.header), ...change]
-    const what = fragments.length > 0 ? fragments.join(", ") : "no content yet"
-    if (fragments.length > 0 || !tablePublished) {
+  const change = saved?.headerChange && !tablePublished ? [saved.headerChange] : []
+  const fragments = saved ? [...saved.touched.map((touched) => touched.describe(refOf)), ...headerFragments(saved.header), ...change] : []
+  // Une écriture publiée se dit en une ligne, sans brouillon (E11-S18, AC-4) ; `publish: false` garde les deux.
+  if (published) lines.push(...publishedLines(input, published, fragments))
+  else {
+    if (saved) {
+      const what = fragments.length > 0 ? fragments.join(", ") : "no content yet"
       lines.push(edit.created ? `Draft of ${node.path} created (revision 0): ${what}.` : `Draft of ${node.path} saved on revision ${node.revision}: ${what}.`)
     }
+    lines.push(`Publish it with ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "publish": true}.`)
   }
-  if (published) lines.push(...publishedLines(input, published))
-  else lines.push(`Publish it with ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "publish": true}.`)
   const touched = (saved?.touched ?? []).map((one) => ({
     op: one.op,
     text: one.describe(refOf),

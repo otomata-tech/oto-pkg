@@ -262,7 +262,7 @@ export async function handlePlateforme(request: Request, options: PlatformReques
     if (isFileHtmlRoute(publicSegments, request.method)) return await fileHtmlResponse(request, options, publicSegments)
     // Le dépôt par lien (E10-S02 lot f, ADR-018) : la seule porte sans session qui écrit, le ticket en tient lieu, en texte
     // brut ; puis le formulaire de dépôt, à session, qui vérifie le jeton lui-même. Le corps de l'une et l'autre est le fichier.
-    if (isUploadRoute(publicSegments, request.method)) return await uploadResponse(request, options, publicSegments)
+    if (isUploadRoute(publicSegments)) return await uploadResponse(request, options, publicSegments)
     if (isUploadFormRoute(publicSegments, request.method)) return await uploadFormResponse(request, options, publicSegments)
     const session = await verifiedSession(request, options)
     if (!session) return errorResponse(authenticationRequired(), 401)

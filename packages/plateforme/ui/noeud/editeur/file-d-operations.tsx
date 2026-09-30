@@ -222,11 +222,24 @@ class FileDEnvois {
 
 const ContexteDeLaFile = createContext<File | null>(null)
 
+/**
+ * Le chemin seul, qui ne change pas quand la file s'occupe : un champ de l'éditeur qui le lit (« @ », les contenus
+ * récents hors de la page) n'est pas rendu à nouveau à chaque écriture, comme le serait tout lecteur de la file.
+ */
+const ContexteDuChemin = createContext<string | null>(null)
+
 /** La file de la page ouverte ; un îlot d'écriture n'est monté que sous `FileDOperations`. */
 export function useFileDOperations(): File {
   const file = useContext(ContexteDeLaFile)
   if (!file) throw new Error("useFileDOperations : îlot monté hors de FileDOperations.")
   return file
+}
+
+/** Le chemin de la page que la file écrit, sans s'abonner à son état. */
+export function useCheminDeLaFile(): string {
+  const chemin = useContext(ContexteDuChemin)
+  if (chemin === null) throw new Error("useCheminDeLaFile : îlot monté hors de FileDOperations.")
+  return chemin
 }
 
 type FileDOperationsProps = { chemin: string; revisionPubliee: number; tampon: string | null; children: ReactNode }
@@ -250,5 +263,9 @@ export function FileDOperations({ chemin, revisionPubliee, tampon, children }: F
     }),
     [instantane, file, chemin],
   )
-  return <ContexteDeLaFile.Provider value={valeur}>{children}</ContexteDeLaFile.Provider>
+  return (
+    <ContexteDuChemin.Provider value={chemin}>
+      <ContexteDeLaFile.Provider value={valeur}>{children}</ContexteDeLaFile.Provider>
+    </ContexteDuChemin.Provider>
+  )
 }

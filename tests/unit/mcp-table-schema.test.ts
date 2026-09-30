@@ -13,7 +13,7 @@ import { ORG, PEOPLE } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
 import { seedWithAdmin, type SeededData, sqlConfigured, portable } from "../helpers/sql"
 import { seedTableFixture } from "../factories/table-fixture-sql"
-import { acmeIdentity, nodeAt } from "../factories/table-publish-sql"
+import { acmeIdentity, draftsAt, nodeAt } from "../factories/table-publish-sql"
 
 const NETWORK_TIMEOUT = 60_000
 const SETUP_TIMEOUT = 180_000
@@ -106,10 +106,12 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table through MCP"), {
       await ref.write({ blocks: ["Batimat", "Pollutec"].map((nom) => ({ id: `row:${nom}`, org_id: ORG.id, node_id: salons?.id, state: "published", type: "row", key: nom, data: { nom, ville: "Paris" } })) })
       const asked = await claire.write({ path: "ventes/salons", base_revision: 2, header: { remove_columns: ["ville"] }, publish: true })
       expect(asked.isError).toBe(true)
+      // Rien n'est écrit : le second appel refait le premier, `confirm_remove` en plus dans l'en-tête (E11-S18, AC-1, AC-2).
       expect(asked.text).toBe(
-        'Publication of ventes/salons needs confirmation: removing column « ville » erases its values on 2 rows (sample keys: Batimat, Pollutec). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {"path": "ventes/salons"}. If the user agrees to erase them, call acme_write {"path": "ventes/salons", "base_revision": 2, "header": {"confirm_remove": true}, "publish": true}.',
+        'Publication of ventes/salons needs confirmation: removing column « ville » erases its values on 2 rows (sample keys: Batimat, Pollutec). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. Nothing was written. If the user agrees to erase them, call acme_write {"path":"ventes/salons","base_revision":2,"header":{"remove_columns":["ville"],"confirm_remove":true},"publish":true}.',
       )
-      const confirmed = await claire.write({ path: "ventes/salons", base_revision: 2, header: { confirm_remove: true }, publish: true })
+      expect(await draftsAt(seed, ref, "ventes/salons")).toEqual([])
+      const confirmed = await claire.write({ path: "ventes/salons", base_revision: 2, header: { remove_columns: ["ville"], confirm_remove: true }, publish: true })
       expect([confirmed.isError, confirmed.text]).toEqual([false, "Published ventes/salons revision 3: removed ville (2 values erased). Next write: base_revision 3."])
       expect(confirmed.result.structuredContent).toMatchObject({ text: confirmed.text, revision: 3 })
 

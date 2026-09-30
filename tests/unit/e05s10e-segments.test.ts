@@ -4,6 +4,7 @@
 // du client (un titre de 200 caractères au plus) : un texte hostile de cette taille passe en moins de 250 ms
 // (`security-patterns.md § Validation des inputs`).
 import { describe, expect, it } from "vitest"
+import { columnNames } from "../../packages/plateforme/schemas/csv"
 import { copyTitle } from "../../packages/plateforme/server/nodes/duplicate"
 import { childPath, slugOf, titleSegment } from "../../packages/plateforme/server/nodes/segments"
 import { compareSiblings } from "../../packages/plateforme/server/nodes/view"
@@ -22,6 +23,21 @@ describe("titleSegment", () => {
   it("should cut a long title to 60 characters without a trailing underscore", () => {
     expect(titleSegment(`${"a".repeat(59)} b`)).toBe("a".repeat(59))
     expect(slugOf("ab cd", 3)).toBe("ab")
+  })
+
+  // E11-S18 (AC-7) : coupé au dernier mot entier ; un premier mot plus long que la borne, à la borne.
+  it("should cut a long title after its last whole word, and a single long word at the bound", () => {
+    expect(titleSegment("Traiter un ticket SAV de l'atelier : répondre à un client producteur d'énergie")).toBe("traiter_un_ticket_sav_de_l_atelier_repondre_a_un_client")
+    expect(slugOf("abcdef gh", 6)).toBe("abcdef")
+    expect(slugOf("abcdefgh ij", 6)).toBe("abcdef")
+  })
+
+  // Revue E11-S18 : la même coupe pour un nom de colonne préfixé (`c_`) et numéroté (`_2`).
+  it("should cut a column name after its last whole word, prefixed or numbered", () => {
+    const digits = "2026 montant total hors taxes de la commande client du mois de septembre"
+    expect(columnNames([digits, digits])).toEqual(["c_2026_montant_total_hors_taxes_de_la_commande_client_du", "c_2026_montant_total_hors_taxes_de_la_commande_client_du_2"])
+    const words = "Montant total hors taxes de la commande du client principal en euros"
+    expect(columnNames([words, words])).toEqual(["montant_total_hors_taxes_de_la_commande_du_client_principal", "montant_total_hors_taxes_de_la_commande_du_client_2"])
   })
 
   it("should read a hostile title of the largest size in less than 250 ms", () => {

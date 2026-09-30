@@ -27,7 +27,7 @@ import { memberNames } from "../nodes/view"
 import type { Tx } from "../sql"
 import { serializedLength } from "../tool-output"
 import { checkRowsArgs } from "./check"
-import { matchesQuery, matchesRow, parseFilter, unknownColumns, unknownColumnsMessage, type FilterClause } from "./filters"
+import { matchesRow, parseFilter, queryHits, unknownColumns, unknownColumnsMessage, type FilterClause } from "./filters"
 import { keyValue, loadTable, rowCells, utcText, type LoadedTable, type RowBlock } from "./meta"
 import { tableOutput } from "./output"
 import { openCursor, queryPrint, sortRows, tableCursor, type TableCursor } from "./paging"
@@ -205,6 +205,8 @@ type Query = {
   clauses: FilterClause[]
   /** Les mots de `q` (E11-S01, AC-c1) ; `null` sans `q`. */
   q: string[] | null
+  /** `all` : chaque mot de `q` ; `any` : au moins un, classé (E11-S19, AC-f1). */
+  match: "all" | "any"
   sort: TableRowsArgs["sort"]
   columns: string[] | null
   limit: number
@@ -222,7 +224,7 @@ function parseQuery(header: TableHeader, args: TableRowsArgs): Query {
   const q = args.q === undefined ? null : queryWords(args.q)
   const narrowed = filter.clauses.length > 0 || q !== null || args.sort !== undefined
   const { sort, columns, limit, provenance } = args
-  return { clauses: filter.clauses, q, sort, columns: columns ?? null, limit: limit ?? DEFAULT_LIMIT, provenance: provenance === true, narrowed }
+  return { clauses: filter.clauses, q, match: args.match ?? "all", sort, columns: columns ?? null, limit: limit ?? DEFAULT_LIMIT, provenance: provenance === true, narrowed }
 }
 
 /** Les lignes d'une page avant la coupe : `more` dit s'il en reste après elles. */
@@ -231,10 +233,20 @@ type Selection = { blocks: RowBlock[]; total: number; more: boolean }
 async function scannedSelection(context: FunctionContext, table: LoadedTable, query: Query, cursor: TableCursor): Promise<Selection> {
   const rows = await loadRows(context.db, table.node.id, FILTERED_ROWS_MAX)
   if (rows.length > FILTERED_ROWS_MAX && query.narrowed) throw tooManyRows(table.node.path, rows.length)
+  const words = query.q
+  const hits = new Map<RowBlock, number>()
   const entries = rows
     .map((block) => ({ block, cells: rowCells(block, table.header) }))
-    .filter((entry) => matchesRow(entry.cells, query.clauses) && (query.q === null || matchesQuery(entry.cells, table.header, query.q)))
-  const ordered = sortRows(entries, table.header, query.sort)
+    .filter((entry) => {
+      if (!matchesRow(entry.cells, query.clauses)) return false
+      if (words === null) return true
+      const found = queryHits(entry.cells, table.header, words)
+      hits.set(entry.block, found)
+      return query.match === "any" ? found > 0 : found === words.length
+    })
+  const sorted = sortRows(entries, table.header, query.sort)
+  // E11-S19 (AC-f1, HN-E11S19-11) : en OU, le nombre de mots trouvés d'abord ; le tri, stable, départage par `sort`.
+  const ordered = query.match === "any" ? [...sorted].sort((a, b) => (hits.get(b.block) ?? 0) - (hits.get(a.block) ?? 0)) : sorted
   const page = ordered.slice(cursor.offset, cursor.offset + query.limit)
   return { blocks: page.map((entry) => entry.block), total: ordered.length, more: cursor.offset + page.length < ordered.length }
 }
@@ -320,7 +332,7 @@ export const tableRows = defineFunction({
     "Unknown operator, or an operator the column type does not take (gt on a text column).",
     'A value of the wrong type, e.g. "12000" for a number column or "true" for a bool column.',
     'null in a filter (use {"column": {"empty": true}}), in with no value, more than 30 clauses.',
-    "A cursor from another query (filter, q or sort changed), or unreadable.",
+    "A cursor from another query (filter, q, match or sort changed), or unreadable.",
     "More than 5,000 rows with filter, q or sort; a single row larger than 16,000 characters.",
   ],
   next: ["table.aggregate"],

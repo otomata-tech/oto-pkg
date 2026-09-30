@@ -1,11 +1,11 @@
 import { expect, test, type Page } from "@playwright/test"
-import { avecLaBase, clientAuth, compteDuStaff } from "./fixtures/base"
+import { avecLaBase, clientAuth } from "./fixtures/base"
 import { AUTRE_EQUIPE, CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 import { attendre, capturer, ouvrirAQuoiSert, ouvrirLeRail, seConnecterSurLEspace } from "./fixtures/noeud"
 
 // Les retours du soir de JB (E05-S13, AC-29), en contrôle visuel connecté sur l'organisation de la campagne
 // (`espace.ts`), en clair puis en sombre, à 375 et 1 280 px : le menu de l'entreprise range Journal dans les
-// réglages, sans Usage, deux groupes sous-titrés pour le staff et un seul sans sous-titre sinon (AC-10) ; le titre
+// réglages, sans Usage ni Retours, un seul groupe sans sous-titre (AC-10, puis 1.1.3) ; le titre
 // d'une section du rail la plie et la déplie comme le chevron, un seul contrôle, le pli retenu (AC-12) ; la vue
 // « Contexte » (`/context` depuis E11-S10) montre ses parties en cartes, en français, sans chiffres (AC-13, AC-14) ; l'encart
 // « Voici ce que votre agent va lire » sans chiffres ni légende visible (AC-13) ; « À quoi sert cette page » en une
@@ -32,12 +32,9 @@ async function menuDeLEntreprise(page: Page, largeur: number) {
 test.describe("E05-S13 : les retours du soir", () => {
   test.skip(!ESPACE.semee, SANS_ESPACE)
 
-  let staff = false
-
   test.beforeAll(async () => {
     const { error } = await clientAuth().auth.signInWithPassword({ email, password })
     test.skip(error !== null, "E2E account missing from the Supabase project: run pnpm demo:seed (E01-S05)")
-    staff = await compteDuStaff(email)
     // AC-14 suppose des contenus récents : sur l'organisation neuve de la campagne, le compte n'a encore lu ni écrit
     // aucune page, et le produit n'en sert aucun. Une lecture de la grille tarifaire par son assistant, écrite comme
     // la porte MCP l'écrit (section `journal` du semis), les lui donne ; elle part avec l'organisation.
@@ -62,13 +59,13 @@ test.describe("E05-S13 : les retours du soir", () => {
         const main = page.getByRole("main")
         await seConnecterSurLEspace(page, { email, password })
 
-        // AC-10 : Journal dans les réglages, sans Usage ; les retours au staff seul, dans un second groupe sous-titré.
+        // AC-10 : Journal dans les réglages, sans Usage. 1.1.3 : Retours hors du menu, même pour le staff ; un seul
+        // groupe, sans sous-titre.
         const menu = await menuDeLEntreprise(page, largeur)
-        const reglages = ["Organisation", "Équipes & accès", "Journal"]
-        await expect(menu.getByRole("menuitem")).toHaveText(staff ? [...reglages, "Retours"] : reglages)
+        await expect(menu.getByRole("menuitem")).toHaveText(["Organisation", "Équipes & accès", "Journal"])
         await expect(menu.getByRole("menuitem", { name: "Usage" })).toHaveCount(0)
-        await expect(menu.getByText("Réglages de l’entreprise", { exact: true })).toHaveCount(staff ? 1 : 0)
-        await expect(menu.getByText("Suivi de l’entreprise", { exact: true })).toHaveCount(staff ? 1 : 0)
+        await expect(menu.getByText("Réglages de l’entreprise", { exact: true })).toHaveCount(0)
+        await expect(menu.getByText("Suivi de l’entreprise", { exact: true })).toHaveCount(0)
         await capturer(page, testInfo, `menu-entreprise-${nom}`)
         await page.keyboard.press("Escape")
         if (largeur < 768) await page.keyboard.press("Escape")

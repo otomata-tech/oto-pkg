@@ -85,14 +85,28 @@ export type ResolvedAddress = { address: string; family: number }
 /** La résolution d'un nom d'hôte, toutes ses adresses. */
 export type Resolve = (hostname: string) => Promise<ResolvedAddress[]>
 
-/** Une réponse : son statut, sa redirection, sa taille annoncée, son corps, et de quoi l'abandonner. */
-export type SourceAnswer = { status: number; location: string | null; length: number | null; body: AsyncIterable<Uint8Array>; discard: () => void }
+/** Une réponse : son statut, sa redirection, sa taille et son type annoncés, son corps, et de quoi l'abandonner. */
+export type SourceAnswer = { status: number; location: string | null; length: number | null; type: string | null; body: AsyncIterable<Uint8Array>; discard: () => void }
 
 /** Une requête `GET`, dont la connexion résout son hôte par `lookup` ; `signal` l'arrête. */
 export type SourceGet = (url: URL, lookup: LookupFunction, signal: AbortSignal) => Promise<SourceAnswer>
 
-/** Les octets téléchargés, ou la cause d'un échec. */
-export type Fetched = { bytes: Uint8Array } | { failure: string }
+/** Les octets téléchargés et le type annoncé (`Content-Type`, `null` sans lui), ou la cause d'un échec. */
+export type Fetched = { bytes: Uint8Array; type: string | null } | { failure: string }
+
+/** Un type servi, cité par un échec : 100 caractères au plus. */
+const clipType = (media: string) => (media.length > 100 ? `${media.slice(0, 100)}…` : media)
+
+/**
+ * Ce qu'un `.md` ou un CSV téléchargé peut être (FB-0014, HN-E10S02-118) : un type `text/*` autre que `text/html`,
+ * `application/octet-stream`, ou aucun type annoncé ; paramètres (`; charset=…`) ignorés, sans casse. Sinon la cause
+ * d'échec qui nomme le type servi, jamais l'adresse (AC-f14).
+ */
+export function textSourceFailure(type: string | null): string | null {
+  const media = (type ?? "").split(";")[0].trim().toLowerCase()
+  if (media === "" || media === "application/octet-stream" || (media.startsWith("text/") && media !== "text/html")) return null
+  return `source_url serves ${clipType(media)}, not a text file: a markdown file or a CSV is read from text/markdown, text/plain or text/csv`
+}
 
 const systemResolve: Resolve = (hostname) => dnsLookup(hostname, { all: true, verbatim: true })
 
@@ -104,6 +118,7 @@ const httpsGet: SourceGet = (url, lookup, signal) =>
         status: incoming.statusCode ?? 0,
         location: incoming.headers.location ?? null,
         length: length === undefined ? null : Number(length),
+        type: incoming.headers["content-type"] ?? null,
         body: incoming,
         discard: () => incoming.destroy(),
       })
@@ -147,7 +162,7 @@ async function boundedBody(answer: SourceAnswer): Promise<Fetched> {
     answer.discard()
     return { failure: SOURCE_FAILURES.tooLarge }
   })
-  return read instanceof Uint8Array ? { bytes: read } : read
+  return read instanceof Uint8Array ? { bytes: read, type: answer.type } : read
 }
 
 type Hop = { next: URL } | Fetched

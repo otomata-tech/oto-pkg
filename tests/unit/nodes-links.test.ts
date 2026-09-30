@@ -132,7 +132,8 @@ describe("links passed to publish_node (AC31)", () => {
       const refused = await publish()
       expect(refused.error).toMatchObject({
         code: "too_large",
-        message: "ventes/devis holds 1,001 links; a page holds at most 1,000: split it into several pages. The draft is kept; nothing was published.",
+        // Une écriture d'assistant qui publie n'écrit rien sur un refus ; le brouillon d'avant l'appel reste (E11-S18, AC-1).
+        message: "ventes/devis holds 1,001 links; a page holds at most 1,000: split it into several pages. Nothing was written; the draft saved before this call stays.",
       })
       expect([refused.called, refused.links]).toEqual([false, []])
     })

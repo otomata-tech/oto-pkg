@@ -6,6 +6,7 @@ import { ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import { MESSAGES_DU_BLOC } from "../../../packages/plateforme/ui/noeud/editeur/operations"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { bloc, ID, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur des blocs de page (E10-S06) : le choix du « + » et de « / », le séparateur, les préfixes, les niveaux de
@@ -82,6 +83,7 @@ describe("EditeurDeBlocs, le « + » ouvre un choix (AC-a1)", () => {
       "Liste à cocher",
       "Citation",
       "Code",
+      "Diagramme",
       "Repli",
       "Tableau simple",
       "Séparateur",
@@ -114,7 +116,7 @@ describe("EditeurDeBlocs, le « + » ouvre un choix (AC-a1)", () => {
     expect(api.envoyes[0].ops).toEqual([{ op: "insert_after", block: ID.objet, input: { type: "divider", data: {} } }])
     expect(document.querySelectorAll("hr.oto-separator")).toHaveLength(1)
 
-    const texte = champ("Modifier ce texte — Objet de la relance")
+    const texte = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     act(() => texte.focus())
     taper(texte, "")
     taper(texte, "---")
@@ -145,7 +147,7 @@ describe("EditeurDeBlocs, « / » ouvre le même choix (AC-a2)", () => {
     const texte = await texteNeuf()
     taper(texte, "/")
     const liste = screen.getByRole("listbox", { name: "Blocs à insérer" })
-    expect(within(liste).getAllByRole("option")).toHaveLength(10)
+    expect(within(liste).getAllByRole("option")).toHaveLength(11)
     expect(texte).toHaveAttribute("aria-controls", liste.id)
     taper(texte, "/SEPAR")
     expect(within(liste).getAllByRole("option").map((option) => option.textContent)).toEqual(["Séparateur"])
@@ -172,7 +174,7 @@ describe("EditeurDeBlocs, « / » ouvre le même choix (AC-a2)", () => {
     expect(texte).toHaveValue("/ti")
     expect(document.activeElement).toBe(texte)
     // Un « / » ailleurs qu'au début d'un Texte vide reste du texte.
-    const autre = champ("Modifier ce texte — Objet de la relance")
+    const autre = ouvrirLeChamp("Modifier ce texte — Objet de la relance")
     taper(autre, "Objet de la relance /")
     expect(screen.queryByRole("listbox")).toBeNull()
   })
@@ -227,7 +229,7 @@ describe("EditeurDeBlocs, niveaux de liste (AC-a6)", () => {
 
   it("should indent a line with Tab under the item before it, outdent it with Shift+Tab, and announce what cannot change", async () => {
     monter([LISTE])
-    const liste = zone(champ("Modifier cette liste numérotée — a b"))
+    const liste = ouvrirLeChamp("Modifier cette liste numérotée — a b")
     act(() => liste.focus())
     liste.setSelectionRange(0, 0)
     fireEvent.keyDown(liste, { key: "Tab" })
@@ -249,14 +251,14 @@ describe("EditeurDeBlocs, niveaux de liste (AC-a6)", () => {
     const trois = bloc("f8000000-0000-4000-8000-000000000008", "list", null, { items: [{ text: "a", children: { items: [{ text: "b", children: { items: ["c"] } }] } }] })
     const cases = bloc("f9000000-0000-4000-8000-000000000009", "checklist", null, { items: [{ text: "x", checked: false }, { text: "y", checked: false }] })
     monter([trois, cases])
-    const liste = zone(screen.getByRole("textbox", { name: /^Modifier cette liste — a/ }))
+    const liste = ouvrirLeChamp(/^Modifier cette liste — a/)
     expect(liste).toHaveValue("a\n  - b\n    - c")
     act(() => liste.focus())
     liste.setSelectionRange(liste.value.length, liste.value.length)
     fireEvent.keyDown(liste, { key: "Tab" })
     await waitFor(() => expect(annonce(MESSAGES_DU_BLOC.troisNiveaux)).toBe(true))
     expect(liste).toHaveValue("a\n  - b\n    - c")
-    const aCocher = zone(champ("Modifier cette liste à cocher — x y"))
+    const aCocher = ouvrirLeChamp("Modifier cette liste à cocher — x y")
     aCocher.setSelectionRange(2, 2)
     expect(fireEvent.keyDown(aCocher, { key: "Tab" })).toBe(true)
   })
@@ -264,7 +266,7 @@ describe("EditeurDeBlocs, niveaux de liste (AC-a6)", () => {
   it("should leave a list, then a table, from its handle with Tab after Escape, Shift+Tab left to the browser", async () => {
     const tableau = bloc("fd000000-0000-4000-8000-00000000000d", "simple_table", null, { columns: ["Nom", "Montant"], rows: [["a", "1"]] })
     monter([LISTE, tableau])
-    const liste = champ("Modifier cette liste numérotée — a b")
+    const liste = ouvrirLeChamp("Modifier cette liste numérotée — a b")
     act(() => liste.focus())
     fireEvent.keyDown(liste, { key: "Escape" })
     const poigneeDeLaListe = bouton("Actions sur ce bloc — a b")
@@ -300,15 +302,17 @@ describe("EditeurDeBlocs, niveaux de liste (AC-a6)", () => {
     // Rien ne suit l'éditeur, comme dans l'hôte de référence : le navigateur sort de la page.
     monter([bloc("f1000000-0000-4000-8000-000000000001", "paragraph", "Avant", {}), dernier], null)
     const poignee = bouton(`Actions sur ce bloc — ${mots}`)
-    const champs = Array.from(poignee.closest("[data-cle]")?.querySelectorAll<HTMLElement>("textarea, input") ?? [])
+    // Les champs de la rangée : les cellules d'un tableau, ou le bloc lu d'une liste (1.1.3), qui porte `tabindex="0"`.
+    const champs = Array.from(poignee.closest("[data-cle]")?.querySelectorAll<HTMLElement>("[data-champ]") ?? [])
     expect(champs.length).toBeGreaterThan(0)
+    const attributs = champs.map((un) => un.getAttribute("tabindex"))
     act(() => poignee.focus())
     // Le défaut reste au navigateur ; pendant son geste, aucun champ de la rangée n'est le prochain tabulable.
     expect(fireEvent.keyDown(poignee, { key: "Tab" })).toBe(true)
     expect(tabulablesApres(poignee)).toEqual([])
     // Au tour suivant, même si le focus n'a pas bougé, chaque champ revient dans la tabulation, tel qu'il était.
     await waitFor(() => expect(champs.map((un) => un.tabIndex)).toEqual(champs.map(() => 0)))
-    expect(champs.filter((un) => un.hasAttribute("tabindex"))).toEqual([])
+    expect(champs.map((un) => un.getAttribute("tabindex"))).toEqual(attributs)
     expect(document.activeElement).toBe(poignee)
   })
 

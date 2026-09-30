@@ -3,12 +3,13 @@ import { clientAuth } from "./fixtures/base"
 import { assurerLeNoeud, attendre, attendreLEnregistrement, capturer, ouvrirAQuoiSert, seConnecterSurLEspace, statut } from "./fixtures/noeud"
 import { CHEMINS, EQUIPE, ESPACE, SANS_ESPACE } from "./fixtures/espace"
 
-// Contrôle visuel connecté de la page d'un nœud (E05-S02, AC24 ; E05-S08, AC10 : champs toujours montés ;
+// Contrôle visuel connecté de la page d'un nœud (E05-S02, AC24 ; E05-S08, AC10 : chaque bloc se lit, nommé comme son
+// champ, qui se monte au survol ou au focus depuis la 1.1.3 ;
 // E05-S09, partie c1 : porté d'oto-frontend) : le compte E2E, administrateur de l'organisation de la campagne et
 // responsable de son équipe (`espace.ts`), en clair puis en sombre. Le Contexte de l'équipe, ouvert par le rail,
 // montre son document et ses notes en deux colonnes, l'encart « À quoi sert cette page » en une phrase (E05-S13,
 // AC-17) ; sur la page jetable `private/<handle>/essai_ecran` (créée si elle
-// manque, avec un premier paragraphe), le HTML servi porte déjà les champs, avant l'hydratation, et le
+// manque, avec un premier paragraphe), le HTML servi porte déjà les blocs lus, avant l'hydratation, et le
 // contenu n'a pour navigation que son fil (AC-a2) ; les blocs laissés par un passage interrompu partent ;
 // le paragraphe reçoit un texte horodaté, un titre (le style « Titre » du menu de sa poignée, E05-S10) et un
 // texte sont ajoutés, le texte monte, est supprimé puis rétabli, les deux blocs ajoutés sont retirés (la page
@@ -156,7 +157,7 @@ test.describe("page d'un nœud", () => {
       const dossier = `private/${handle}/essai_dossier`
       await assurerLeNoeud(page, { chemin: dossier, titre: "Dossier d'essai", resume: RESUME })
       await assurerLeNoeud(page, { chemin: essai, titre: "Essai de l'écran", resume: RESUME })
-      // Avant l'hydratation, le HTML servi porte déjà les champs, montés sans clic (E05-S08, AC1).
+      // Avant l'hydratation, le HTML servi porte déjà les blocs, lus sans clic et nommés comme leur champ (E05-S08, AC1).
       const servi = await (await page.goto(`${ESPACE.adresse}/n/${essai}`))?.text()
       expect(servi).toContain('aria-label="Modifier ce texte — ')
       await remettreEnPlace(page, essai)
@@ -167,9 +168,11 @@ test.describe("page d'un nœud", () => {
       await expect(page.getByRole("button", { name: /^Modifier ce bloc/ })).toHaveCount(0)
       await retirerLesRestes(page)
 
-      // Le premier paragraphe, champ toujours monté, reçoit un texte horodaté, qui part (AC2).
+      // Le premier paragraphe, lu, s'ouvre au focus, puis reçoit un texte horodaté, qui part (AC2).
       const horodatage = new Date().toISOString().slice(0, 19)
-      await page.getByRole("textbox", { name: /^Modifier ce texte — / }).first().fill(`Essai ${horodatage}`)
+      const premier = page.getByRole("textbox", { name: /^Modifier ce texte — / }).first()
+      await premier.focus()
+      await premier.fill(`Essai ${horodatage}`)
       await envoyerEtAttendre(page)
       await capturer(page, testInfo, `paragraphe-${mode}`)
 

@@ -319,7 +319,10 @@ describe.skipIf(!ready || privatePending)(privateFolderSuite(ready ? SUITE : `${
       await writeNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea", title: "Sans titre", summary: "À compléter." }, { kind: "human" })
       const renamed = await writeNode(lea.db, lea.identity, { path: "ventes/sans_titre_lea", base_revision: 1, title: "Tarifs Léa 2026" }, { kind: "human" })
       expect(renamed.data).toMatchObject({ path: "ventes/tarifs_lea_2026", renamed_from: "ventes/sans_titre_lea", status: "published", revision: 2 })
-      expect(renamed.text.split("\n").at(-1)).toBe("Renamed: now at ventes/tarifs_lea_2026; the old path ventes/sans_titre_lea still leads here.")
+      // E11-S18 (AC-6) : le chemin se choisit ensuite par `node.move`.
+      expect(renamed.text.split("\n").at(-1)).toBe(
+        `Renamed: now at ventes/tarifs_lea_2026; the old path ventes/sans_titre_lea still leads here. To choose the path, call ${lea.identity.org.prefix}_call node.move {"path": "ventes/tarifs_lea_2026", "new_path": "<path>"}.`,
+      )
       const [alias] = await fx.admin<{ path: string }[]>`select old_path as path from platform.node_aliases where org_id = ${o.org.id} and old_path = 'ventes/sans_titre_lea'`
       expect(alias).toEqual({ path: "ventes/sans_titre_lea" })
       // Lu par l'ancien chemin : la ligne « moved to » en tête ; écrit par lui : le nœud modifié, et publié.

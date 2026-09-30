@@ -7,6 +7,7 @@ import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/ed
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
 import { TitreModifiable } from "../../../packages/plateforme/ui/noeud/en-tete-modifiable"
 import type { CiblesDesLiens } from "../../../packages/plateforme/ui/noeud/en-ligne"
+import { ouvrirLeChamp, texteDuBloc } from "../../helpers/champ-du-bloc"
 import { bloc, PAGE, simulerLAPI } from "../../helpers/noeud"
 
 // L'éditeur d'une page après les retours de JB (E05-S11, lot b) : l'indication d'enregistrement dans la carte du
@@ -41,10 +42,9 @@ function monter({ blocs = PAGE, cibles, liens }: Montage = {}) {
   )
 }
 
+/** Le champ nommé, ouvert : un bloc qu'on ne touche pas se lit (1.1.3) ; le titre de l'en-tête est toujours un champ. */
 function champ(nom: string): HTMLTextAreaElement {
-  const element = screen.getByRole("textbox", { name: nom })
-  if (!(element instanceof HTMLTextAreaElement)) throw new Error(`champ « ${nom} » attendu`)
-  return element
+  return ouvrirLeChamp(nom)
 }
 
 /** L'indication d'enregistrement de la carte : une seule région pour les blocs, le titre et la publication. */
@@ -133,7 +133,7 @@ describe("EditeurDeBlocs, pages citées au repos (E05-S11, AC-26, AC-27)", () =>
     expect(rendu).toHaveTextContent("Voir Grille tarifaire, perdue et ancien.")
     expect(within(rendu).getAllByRole("link").map((lien) => [lien.textContent, lien.getAttribute("href")])).toEqual([["Grille tarifaire", "/n/ventes/grille"]])
     // Le texte brut reste celui du champ : c'est lui qui s'écrit au focus.
-    expect(texte).toHaveValue("Voir [[ventes/grille]], [[ventes/perdue]] et [[ventes/ancien]].")
+    expect(texteDuBloc(/^Modifier ce texte — Voir/)).toBe("Voir [[ventes/grille]], [[ventes/perdue]] et [[ventes/ancien]].")
     await act(async () => {
       servir({ data: { links_out: [{ path: "ventes/ancien", status: "moved", title: "Nouveau", moved_to: "conseil/nouveau" }], links_out_total: 1, links_in: [], links_in_total: 0 } })
     })

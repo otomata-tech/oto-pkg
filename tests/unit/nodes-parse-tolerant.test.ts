@@ -11,7 +11,6 @@ import { parseMarkdown } from "../../packages/plateforme/server/nodes/markdown-p
 import { applyOps } from "../../packages/plateforme/server/nodes/ops"
 import { RenduDUnBloc } from "../../packages/plateforme/ui/noeud/rendu-des-blocs"
 import { bloc } from "../helpers/noeud"
-import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
 
 const fields = ({ type, text, data }: BlockInput) => ({ type, text: text ?? null, data })
 
@@ -149,21 +148,48 @@ describe("the tolerant mode through write (AC-a2)", () => {
   })
 })
 
+/** Le temps d'une lecture tolérante, en millisecondes. */
+function readingTime(text: string): number {
+  const start = performance.now()
+  parseMarkdown(text, { tolerant: true })
+  return performance.now() - start
+}
+
+/**
+ * Le temps de lecture de `whole` et son rapport à celui de `quarter`, quatre fois plus court : chacun le plus court de
+ * trois lectures alternées, après une lecture de chauffe. La charge de la machine ne fait que les allonger, et touche
+ * les deux de la même façon.
+ */
+function readingRatio(quarter: string, whole: string): { whole: number; ratio: number } {
+  readingTime(quarter)
+  let [fastQuarter, fastWhole] = [Infinity, Infinity]
+  for (let round = 0; round < 3; round++) {
+    fastQuarter = Math.min(fastQuarter, readingTime(quarter))
+    fastWhole = Math.min(fastWhole, readingTime(whole))
+  }
+  return { whole: fastWhole, ratio: fastWhole / fastQuarter }
+}
+
+/** Sous ce temps, trop court pour un rapport (le ramasse-miettes y pèse) : une lecture quadratique de 1 000 000 caractères prend des secondes. */
+const QUICK_MS = 50
+
 describe("hostile texts of 1,000,000 characters in tolerant mode (security-patterns.md § Validation des inputs)", () => {
   const size = 1_000_000
-  const hostile: [string, string][] = [
-    ["backticks", "`".repeat(size)],
-    ["a fence never closed", `\`\`\`\n${"a\n".repeat(size / 2)}`],
-    ["nested details", "<details>\n<summary>s</summary>\n".repeat(size / 30)],
-    ["ever deeper items", Array.from({ length: 900 }, (_, depth) => `${" ".repeat(depth * 2)}- x`).join("\n").padEnd(size, "\n")],
-    ["a wide table", `| ${"a | ".repeat(size / 4)}\n| ${"--- | ".repeat(10)}`],
-    ["a long heading", `# ${"t".repeat(size)}`],
-    ["dashes under text", "t\n---\n".repeat(size / 6)],
+  const hostile: [string, (n: number) => string][] = [
+    ["backticks", (n) => "`".repeat(n)],
+    ["a fence never closed", (n) => `\`\`\`\n${"a\n".repeat(n / 2)}`],
+    ["nested details", (n) => "<details>\n<summary>s</summary>\n".repeat(n / 30)],
+    ["ever deeper items", (n) => Array.from({ length: 900 }, (_, depth) => `${" ".repeat(depth * 2)}- x`).join("\n").padEnd(n, "\n")],
+    ["a wide table", (n) => `| ${"a | ".repeat(n / 4)}\n| ${"--- | ".repeat(10)}`],
+    ["a long heading", (n) => `# ${"t".repeat(n)}`],
+    ["dashes under text", (n) => "t\n---\n".repeat(n / 6)],
   ]
   // Un bloc de plus de 100 000 caractères reste refusé, même gardé en code : un texte d'opération en porte 40 000 au plus.
+  // Linéaire : quatre fois le texte, quatre fois le temps (jusqu'à 8 mesuré, ramasse-miettes compris) ; quadratique,
+  // seize. Le rapport ne dépend pas de la charge, qu'une borne en millisecondes subit (2,9 s pour 1 s dans un
+  // `pnpm verify` complet).
   it.each(hostile)("should read %s in linear time", (_what, text) => {
-    const start = performance.now()
-    parseMarkdown(text, { tolerant: true })
-    expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)
+    const { whole, ratio } = readingRatio(text(size / 4), text(size))
+    expect(whole < QUICK_MS || ratio < 10, `${whole.toFixed(0)} ms for ${size} characters, ${ratio.toFixed(1)} times the time of a quarter`).toBe(true)
   })
 })

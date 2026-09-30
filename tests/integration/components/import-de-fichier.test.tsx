@@ -9,6 +9,7 @@ import { nombreLisible } from "../../../packages/plateforme/ui/format/nombres"
 import { MARKDOWN_DANS_L_EDITEUR, MENU_DU_BLOC } from "../../../packages/plateforme/ui/noeud/libelles"
 import { EditeurDeBlocs } from "../../../packages/plateforme/ui/noeud/editeur/editeur-de-blocs"
 import { FileDOperations } from "../../../packages/plateforme/ui/noeud/editeur/file-d-operations"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { simulerLesDialogues } from "../../helpers/dialogue"
 import { choisirDansLaListe } from "../../helpers/liste-de-choix"
 import { bloc, ID, PAGE } from "../../helpers/noeud"
@@ -294,7 +295,8 @@ function Editeur({ blocs = PAGE, children }: { blocs?: BlockView[]; children?: R
   )
 }
 
-const champDuTexte = () => screen.getByRole("textbox", { name: "Modifier ce texte — Objet de la relance" })
+// Le collage va au `<textarea>` : le champ du bloc s'ouvre d'abord (1.1.3), un champ déjà ouvert est rendu tel quel.
+const champDuTexte = () => ouvrirLeChamp("Modifier ce texte — Objet de la relance")
 const coller = (champ: HTMLElement, texte: string) => fireEvent.paste(champ, { clipboardData: { getData: (type: string) => (type === "text/plain" ? texte : "<b>html</b>") } })
 
 describe("EditeurDeBlocs — a paste (AC-a1, AC-a2)", () => {
@@ -303,8 +305,9 @@ describe("EditeurDeBlocs — a paste (AC-a1, AC-a2)", () => {
   it("should insert a paste of several lines after the whole block in tolerant mode, then reread the draft and say what was kept as text", async () => {
     const envoyes = simulerLesEnvois()
     render(<Editeur />)
+    const champ = champDuTexte()
     await act(async () => {
-      coller(champDuTexte(), "# Titre\n\n```call\nx {\n```")
+      coller(champ, "# Titre\n\n```call\nx {\n```")
     })
     await waitFor(() => expect(rafraichir).toHaveBeenCalled())
     expect(envoyes.map(({ corps }) => corps)).toEqual([{ path: "ventes/modele_relance", base_revision: 4, publish: false, ops: [{ op: "insert_after", text: "# Titre\n\n```call\nx {\n```", block: ID.objet }], tolerant: true }])

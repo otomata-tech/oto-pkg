@@ -36,7 +36,7 @@ vi.mock("../../packages/plateforme/server/files/store", async (importOriginal) =
 }))
 
 // Le téléchargement d'une adresse fournie, sans réseau : ce que le test lui fait rendre (AC-f12, AC-f14).
-const source = vi.hoisted(() => ({ fetched: { failure: "source_url could not be reached" } as { bytes: Uint8Array } | { failure: string } }))
+const source = vi.hoisted(() => ({ fetched: { failure: "source_url could not be reached" } as { bytes: Uint8Array; type: string | null } | { failure: string } }))
 
 vi.mock("../../packages/plateforme/server/uploads-fetch", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../packages/plateforme/server/uploads-fetch")>()),
@@ -179,6 +179,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
           type: { isError: true, text: expect.stringMatching(/^setup\.exe: this type of file is not admitted\. Admitted extensions: png, /) },
         })
         expect(await ticketsOf(o.people.claire.id)).toEqual(before)
+        // FB-0014 : le chemin pris est `conflict`, le code du contrat ; la porte MCP n'en sert que le message, le journal le code.
+        expect(claire.journal.find((line) => line.error?.includes(`Path ${page} is not available`))?.error).toBe(`conflict: Path ${page} is not available: choose another path.`)
       } finally {
         await fx.admin`delete from platform.access_rules where id = ${reads}`
       }
@@ -205,7 +207,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         `bash: curl -sS --fail-with-body --data-binary @'rapport d'\\''avril.html' '${url}'`,
         `PowerShell: curl.exe -sS --fail-with-body --data-binary "@rapport d'avril.html" "${url}"`,
         "Limit: 1 MB (1,048,576 bytes); its type comes from the extension of rapport d'avril.html.",
-        `Without a shell, give the person this form link instead: ${form}`,
+        `Without a shell, or if curl cannot reach this address (a proxy answers 403): give the person this form link to drop the file: ${form}`,
       ])
       expect(fields).toEqual({
         path,
@@ -392,6 +394,10 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
       expect(refusals.map((refusal) => [refusal.status, refusal.text])).toEqual(Array.from({ length: 4 }, () => [404, UNKNOWN_LINK]))
       expect({ invalid: invalid.status, again: [again.status, again.text] }).toEqual({ invalid: 400, again: [404, UNKNOWN_LINK] })
+      // FB-0014 : l'envoi refusé après la consommation compte comme une erreur de la conversation du lien ; les refus avant elle ne s'écrivent pas (AC-f9).
+      expect(await fx.admin`select is_error, error, ctx from platform.journal where org_id = ${o.org.id} and tool = 'uploads' and ctx = ${lea.code} and is_error`).toEqual([
+        { is_error: true, error: expect.stringMatching(/^invalid_arguments: /), ctx: lea.code },
+      ])
       // Le ticket envoyé à l'adresse de B reste servi pour A : aucune autre organisation ne le consomme.
       expect((await send(elsewhere, "Nom\nA\n")).status).toBe(200)
     })
@@ -524,7 +530,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
 
       expect(failed.isError).toBe(false)
       expect(failed.text).toBe(
-        `Could not download the file: ${SOURCE_FAILURES.address}. Give the person this form link to drop the file (the link works once, for 15 minutes; the file never goes through this conversation): https://${o.host}/upload/${formToken}`,
+        `Could not download the file: ${SOURCE_FAILURES.address}. Send the markdown with write (one page, within its limits), or give the person this form link (the link works once, for 15 minutes; the file never goes through this conversation): https://${o.host}/upload/${formToken}`,
       )
       expect(JSON.stringify(lea.journal)).not.toContain("secret-token-abc")
       // Le jeton du formulaire n'ouvre pas la porte sans session (HN-E10S02-108) : la même `not_found`, rien de consommé.
@@ -536,7 +542,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
     it("should write the downloaded file like a file sent by curl", async () => {
       const lea = await conversation(as("lea"))
       const path = `ventes/f_telecharge_${hex(3)}`
-      source.fetched = { bytes: bytesOf("## Résumé\n\nLe salon.\n") }
+      source.fetched = { bytes: bytesOf("## Résumé\n\nLe salon.\n"), type: "text/markdown" }
       const written = await lea.link({ path, kind: "md", mode: "create", title: "Salon", summary: "Le salon.", source_url: "https://claude.ai/public/artifacts/abc" })
       expect(written.isError, written.text).toBe(false)
       expect(written.text.split("\n")[0]).toBe(`Uploaded to ${path}: revision 1, published.`)
@@ -587,6 +593,181 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         sent: 200,
         view: "not_found",
         send: "not_found",
+      })
+    })
+  })
+
+  describe("feedback of a real test (FB-0012, FB-0014)", () => {
+    /** Le bucket vu par `fetch`, dont l'envoi (`PUT`) rend ce que décide `put` ; toute autre requête, le bucket. */
+    const puttingWith = (put: (request: Request) => Promise<Response>) => async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init)
+      return request.method === "PUT" ? put(request) : memory.fetch(request)
+    }
+
+    it("should store a .html file by source_url in create then in attach, the bucket reading it back as text/plain as Supabase does (FB-0012)", async () => {
+      const lea = await conversation(as("lea"))
+      const path = `ventes/f_type_html_${hex(3)}`
+      source.fetched = { bytes: bytesOf("<p>Contenu du fichier html.</p>"), type: "application/octet-stream" }
+      const created = await lea.link({ path, kind: "file", mode: "create", name: "a.html", title: "Type", summary: "Un fichier HTML.", source_url: "https://files.example.org/a" })
+      const attached = await lea.link({ path, kind: "file", mode: "attach", name: "b.html", base_revision: 1, source_url: "https://files.example.org/b" })
+      const files = await fx.admin<{ name: string; status: string }[]>`
+        select f.name, f.status from platform.files f join platform.nodes n on n.id = f.node_id
+         where n.org_id = ${o.org.id} and n.path = ${path} order by f.name`
+
+      expect({ created: created.text.split("\n")[0], attached: attached.text.split("\n")[0], files }).toEqual({
+        created: `Uploaded to ${path}: revision 1, published.`,
+        attached: `Uploaded to ${path}: revision 2, published.`,
+        files: [
+          { name: "a.html", status: "ready" },
+          { name: "b.html", status: "ready" },
+        ],
+      })
+    })
+
+    it("should say what the file storage did when it fails, « could not be reached » only without an answer, and leave the page as it was (FB-0012)", async () => {
+      const claire = await conversation(as("claire"))
+      const path = `ventes/f_stockage_${hex(3)}`
+      expect((await claire.write({ path, title: "Stockage", summary: "Une page.", ops: [{ op: "add_section", section: "A", text: "T." }] })).isError).toBe(false)
+      vi.spyOn(console, "error").mockImplementation(() => undefined)
+      source.fetched = { bytes: bytesOf("12345678"), type: null }
+      const attach = async (name: string) => (await claire.link({ path, kind: "file", mode: "attach", name, base_revision: 1, source_url: "https://files.example.org/f" })).text
+
+      memory.failing.add("uploadUrl")
+      const unreachable = await attach("u.pdf")
+      memory.failing.delete("uploadUrl")
+      vi.stubGlobal("fetch", puttingWith(async () => new Response("denied", { status: 403 })))
+      const refused = await attach("r.pdf")
+      vi.stubGlobal("fetch", puttingWith(async () => new Response(null, { status: 200 })))
+      const missing = await attach("m.pdf")
+      vi.stubGlobal(
+        "fetch",
+        puttingWith(async (request) => {
+          memory.objects.set(new URL(request.url).pathname.slice(1), { bytes: new Uint8Array(await request.arrayBuffer()).slice(0, 3), mime: "application/pdf" })
+          return new Response(null, { status: 200 })
+        }),
+      )
+      const shorter = await attach("s.pdf")
+
+      expect([unreachable, refused, missing, shorter]).toEqual([
+        "u.pdf could not be stored: the file storage could not be reached. Nothing was attached. Ask for a new upload link and send it again.",
+        "r.pdf could not be stored: the file storage refused it (HTTP 403). Nothing was attached. Ask for a new upload link and send it again.",
+        "m.pdf could not be stored: the file storage did not keep it. Nothing was attached. Ask for a new upload link and send it again.",
+        "s.pdf could not be stored: the file storage kept 3 bytes instead of 8. Nothing was attached. Ask for a new upload link and send it again.",
+      ])
+      expect((await blocksOf(path, "published")).map((block) => block.type)).toEqual(["heading", "paragraph"])
+    })
+
+    it("should remove the page a failed create made, so a new link creates it, and keep a page that received something meanwhile or is not its own (FB-0012)", async () => {
+      const lea = await conversation(as("lea"))
+      const claire = await conversation(as("claire"))
+      const [path, name] = [`ventes/f_retire_${hex(3)}`, `rapport_${hex(3)}.pdf`]
+      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined)
+      source.fetched = { bytes: bytesOf("%PDF-1.4 rapport"), type: null }
+      const create = (at: string) => lea.link({ path: at, kind: "file", mode: "create", name, title: "Rapport", summary: "Le rapport.", source_url: "https://files.example.org/r.pdf" })
+      const down = () => new Response("down", { status: 500 })
+      const wrote = (outcome: Promise<{ isError: boolean; text: string }>) => outcome.then((written) => (written.isError ? written.text : "done"))
+      const changed = async (rows: Promise<{ count: number }>) => ((await rows).count === 1 ? "done" : "no row changed")
+
+      vi.stubGlobal("fetch", puttingWith(async () => down()))
+      const failed = await create(path)
+      const removed = await nodeOf(path)
+      // Ce que la page reçoit pendant l'envoi : chaque cas n'est écarté que par une condition du retrait, et la page reste.
+      const meanwhile: Record<string, (at: string) => Promise<string>> = {
+        subpage: (at) => wrote(lea.write({ path: `${at}/annexe`, title: "Annexe", summary: "Une annexe.", ops: [{ op: "add_section", section: "A", text: "T." }] })),
+        block: (at) => wrote(claire.write({ path: at, base_revision: 0, publish: false, ops: [{ op: "add_section", section: "A", text: "Le brouillon de Claire." }] })),
+        // La page d'une autre personne : aucun geste d'un service ne change `created_by`, la base le pose.
+        creator: (at) => changed(fx.admin`update platform.nodes set created_by = ${o.people.claire.id} where org_id = ${o.org.id} and path = ${at}`),
+        revision: (at) => changed(fx.admin`update platform.nodes set revision = 1 where org_id = ${o.org.id} and path = ${at}`),
+        file: (at) =>
+          changed(fx.admin`
+            insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+            select org_id, id, 'autre.pdf', 'application/pdf', 3, 'ready', ${o.people.lea.id} from platform.nodes where org_id = ${o.org.id} and path = ${at}`),
+      }
+      const kept: Record<string, unknown> = {}
+      const keptPaths: string[] = []
+      for (const [what, act] of Object.entries(meanwhile)) {
+        const at = `ventes/f_garde_${what}_${hex(3)}`
+        let done = "not run"
+        vi.stubGlobal(
+          "fetch",
+          puttingWith(async () => {
+            done = await act(at)
+            return down()
+          }),
+        )
+        const text = (await create(at)).text
+        kept[what] = { done, stays: text.endsWith(`The page ${at} it created stays, as an unpublished draft: ask for an upload link with mode attach and base_revision 0 to send the file there.`), node: (await nodeOf(at)) !== null }
+        keptPaths.push(at)
+      }
+      vi.stubGlobal("fetch", memory.fetch)
+      const again = await create(path)
+      const pending = await fx.admin<{ path: string }[]>`
+        select n.path from platform.files f join platform.nodes n on n.id = f.node_id where f.org_id = ${o.org.id} and f.name = ${name} and f.status = 'pending' order by n.path`
+
+      expect({ failed: [failed.isError, failed.text], removed, again: again.text.split("\n")[0], pending }).toEqual({
+        failed: [true, `${name} could not be stored: the file storage refused it (HTTP 500). Nothing was attached. The page ${path} it created was removed: ask for a new upload link and send it again.`],
+        removed: null,
+        again: `Uploaded to ${path}: revision 1, published.`,
+        pending: keptPaths.sort().map((at) => ({ path: at })),
+      })
+      expect(kept).toEqual(Object.fromEntries(Object.keys(meanwhile).map((what) => [what, { done: "done", stays: true, node: true }])))
+      // Gardée par ses conditions, jamais par l'échec du retrait (la clé de `parent_id` refuserait la sous-page, au log serveur).
+      expect(loggedText(errors)).not.toContain("created for a file not removed")
+    })
+
+    it("should remove the page and the file a create stored when writing its block fails, so a new link creates it (HN-E10S02-117)", async () => {
+      const lea = as("lea")
+      const [path, name] = [`ventes/f_bloc_${hex(3)}`, `bloc_${hex(3)}.pdf`]
+      const ticket: UploadTicket = { userId: o.people.lea.id, email: o.people.lea.email, ctx: null, kind: "file", mode: "create", path, name, title: "Bloc", summary: "Le bloc.", key: null, baseRevision: null, publish: null }
+      const request = { bytes: bytesOf("%PDF-1.4 bloc"), origin: `https://${o.host}` }
+      vi.spyOn(console, "error").mockImplementation(() => undefined)
+      // Le fichier passé à `ready` (`storeFile`), l'écriture du bloc `file` échoue, à chaque essai : l'écriture atomique
+      // rejoue une fois une panne de la base (`writeAtomically`, HN-E11S18-2), qu'une panne d'un coup n'atteindrait pas.
+      // Le retrait, qui n'écrit pas dans `blocks`, passe.
+      let stage: "storing" | "ready" | "failed" = "storing"
+      const spy = spyDb(lea.db, {
+        fail: (query) => {
+          if (stage === "storing" && query.op === "update" && query.target === "files") stage = "ready"
+          else if (stage !== "storing" && writesOf([query]).length > 0 && query.target === "blocks") {
+            stage = "failed"
+            return { code: "57014" }
+          }
+          return null
+        },
+      })
+      const objects = new Set(memory.objects.keys())
+
+      const failed = await writeUpload(spy.db, lea.identity, ticket, request).then(
+        () => "written",
+        (error: { message?: string }) => error.message ?? "",
+      )
+      const left = { node: await nodeOf(path), files: await fx.admin`select id from platform.files where org_id = ${o.org.id} and name = ${name}`, objects: [...memory.objects.keys()].filter((key) => !objects.has(key)) }
+      const again = await writeUpload(lea.db, lea.identity, ticket, request)
+
+      expect({ stage, removed: failed.endsWith(`The page ${path} it created was removed: ask for a new upload link and send it again.`), left, again: again.text.split("\n")[0] }).toEqual({
+        stage: "failed",
+        removed: true,
+        left: { node: null, files: [], objects: [] },
+        again: `Uploaded to ${path}: revision 1, published.`,
+      })
+    })
+
+    it("should refuse a markdown file served as HTML, or that is an HTML page, writing nothing (FB-0014)", async () => {
+      const lea = await conversation(as("lea"))
+      const [served, page] = [`ventes/f_html_${hex(3)}`, `ventes/f_html_${hex(3)}`]
+      const markdown = (path: string) => lea.link({ path, kind: "md", mode: "create", title: "Notes", summary: "Les notes.", source_url: "https://example.com/" })
+      source.fetched = { bytes: bytesOf("<!doctype html><html><script>alert(1)</script></html>"), type: "text/html; charset=UTF-8" }
+      const byType = await markdown(served)
+      source.fetched = { bytes: bytesOf('\n  <!DOCTYPE html>\n<html lang="fr"><body>Texte</body></html>'), type: "text/plain" }
+      const byContent = await markdown(page)
+
+      expect({ byType: [byType.isError, byType.text], byContent: [byContent.isError, byContent.text], nodes: [await nodeOf(served), await nodeOf(page)] }).toEqual({
+        byType: [
+          false,
+          `Could not download the file: source_url serves text/html, not a text file: a markdown file or a CSV is read from text/markdown, text/plain or text/csv. Send the markdown with write (one page, within its limits), or give the person this form link (the link works once, for 15 minutes; the file never goes through this conversation): https://${o.host}/upload/${formTokenOf(byType.text)}`,
+        ],
+        byContent: [true, "The markdown file is an HTML page (it starts with <!doctype html> or <html>): nothing was written. Send the markdown itself, or attach the HTML page with kind file."],
+        nodes: [null, null],
       })
     })
   })

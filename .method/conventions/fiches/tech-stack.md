@@ -7,6 +7,7 @@ Texte complet : `.method/conventions/tech-stack.md`. La fiche suffit pour écrir
 - Les schémas de `packages/plateforme/schemas/` et tout schéma que le MCP compose s'écrivent en `zod/v4` : un schéma v3 ne s'imbrique pas dans un objet v4. § Stack Technique · § Canal MCP (si le produit expose un serveur MCP)
 - `@hookform/resolvers` 5 (seul à lire `zod/v4`) demande React Hook Form 7.55 au moins. § Stack Technique
 - postgres.js en 3.4.9 exacte, `prepare: false` pour le pooler en mode transaction ; nodemailer 10.0.0 au moins. § Stack Technique
+- mermaid en 11.17.2 exacte, chargé à la demande dans le navigateur seulement (`import()` dans un effet client), `securityLevel: "strict"`. § Stack Technique
 - La borne basse de chaque peer du paquet satisfait les `peerDependencies` des autres peers ; toute plage modifiée passe par `pnpm install`. § Stack Technique
 - Une dépendance du paquet que `tests/` importe est aussi en `devDependencies` de la racine, à la même version exacte. § Canal MCP (si le produit expose un serveur MCP)
 - SDK MCP 1.26.0 et `mcp-handler` 1.1.0 exacts, sans état ; la JWKS se lit au premier jeton, jamais à l'import. § Canal MCP (si le produit expose un serveur MCP)

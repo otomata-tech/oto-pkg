@@ -184,7 +184,7 @@ describe.skipIf(!sqlConfigured)(portable("moves and old paths on a real database
       const under = spyDb(db)
       expect((await settle(writeNode(under.db, lea, { path: "ventes/a/x/neuf", title: "Neuf", summary: "Une page neuve." }, AGENT))).error).toMatchObject({
         code: "invalid_arguments",
-        message: "Cannot create ventes/a/x/neuf: ventes/a/x moved to ventes/b/x. Create ventes/b/x/neuf instead.",
+        message: "Cannot create ventes/a/x/neuf: ventes/a/x moved to ventes/b/x. Create ventes/b/x/neuf instead; to move an existing page there, call acme_call node.move.",
       })
       expect(nodeInserts(under.calls)).toEqual([])
     })

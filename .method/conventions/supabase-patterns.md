@@ -174,6 +174,12 @@ franchit une de ces règles passe par un ADR.
   suite (`25P02`), postgres.js 3.4.9 fait échouer la fin (`uncaughtError`). Une course sur une clé unique se lit
   par `insert … on conflict do nothing returning …` sans ligne, jamais par un `23505` rattrapé. **Vérifiable :**
   aucun `catch` du `fn` d'un `db.tx` ne rattrape une erreur de base (`regles-transaction.test.ts` joue la course).
+  **Exception écrite, l'écriture d'un assistant** (`server/nodes/write-atomic.ts`, E11-S18) : elle tient dans une
+  transaction des services qui, pour l'écran, rattrapent une erreur de base dans la leur (purge d'après publication et
+  `evolution-publish.ts`, `followTitle`, refus relu de `publish_node` dans `publish.ts`) ; sous elle, une telle erreur
+  perd toute l'écriture, rejouée une fois (le refus relu dit alors l'état d'après la course), puis refusée. La tolérance
+  de ces services (N6 : publication faite, avertissement) ne vaut plus que pour l'écran. **Vérifiable :** la course
+  d'AC30 de `tests/unit/nodes-publish.test.ts` (rejouée pour un assistant, tenue en deux temps pour l'écran).
 - **Tout `update` et tout `delete` de la face SQL portent un `where`** : le rôle de
   PostgREST charge `safeupdate` (`session_preload_libraries` d'`authenticator`),
   qui refuse un `update` ou un `delete` sans `where` ; la face SQL ne le charge pas, et la RLS
@@ -196,6 +202,12 @@ franchit une de ces règles passe par un ADR.
   (`insertRows` de `scripts/org-import.mjs`) ; sinon une même fabrique leur donne les mêmes clés
   (`documentBlocks` de `scripts/demo/publication.mjs`). **Vérifiable :** dans un diff, les lignes de
   tout `sql(rows)` qui en insère plusieurs sortent d'une même fabrique ou d'un groupe par colonnes.
+- **Une ligne insérée se retrouve dans le `returning` par son rang, jamais par une valeur flottante relue** : les
+  lignes d'un `insert … values … returning` suivent l'ordre des valeurs, alors qu'un `double precision` relu dépend de
+  `extra_float_digits` de la session, que `server/sql.ts` ne pose pas (sous 1, il revient à 15 chiffres :
+  `1365.3333333333333` revient `1365.33333333333`, et l'égalité avec la valeur envoyée échoue). Le rang se contrôle par le nombre de lignes et une
+  colonne sans arrondi (`type`, `key`). **Vérifiable :** `insertBlocks` de `server/nodes/store.ts` ; son test pose
+  `extra_float_digits = 0` dans la transaction (`tests/unit/e11s18-ecriture-assistants.test.ts`).
 - **Un paramètre `timestamptz` d'une requête postgres.js passe par une `Date`, à la milliseconde** : son sérialiseur (`new Date(x).toISOString()`) coupe les microsecondes d'une date passée
   en texte, et une date lue en `Date` les a déjà perdues. Une date relue puis réécrite, ou comparée à
   l'égalité à une colonne (tampon de garde : `p_draft_stamp` de `publish_node`), reste dans la base,

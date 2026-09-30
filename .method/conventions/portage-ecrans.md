@@ -18,7 +18,8 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
 - **Tout ce que l'arbre porte est une page** : page, tableau, procédure et Contexte s'ouvrent à
   `/n/<chemin>`, avec l'icône de leur genre dans l'arbre. Aucune page de liste par genre (`/procedures`).
 - Les écrans hors de l'arbre s'ouvrent depuis les menus du rail, comme dans oto-frontend : le menu de
-  l'entreprise (« Réglages de l'entreprise » : Organisation, Équipes & accès, puis « Suivi de l'entreprise ») et le menu du compte.
+  l'entreprise (Organisation, Équipes & accès, Journal) et le menu du compte ; un écran réservé à l'équipe
+  d'Oto (Usage, Retours) reste hors des menus, ouvert par la palette.
 - **Vérifiable :** `src/app/(dashboard)/layout.tsx` ne monte que la coque du paquet ; aucune route
   `procedures` sous `src/app/` ; le navigateur d'arbre n'est importé que par le rail.
 - **Le contenu est un bloc conteneur** : `.oto-content` est `position: relative`, la racine `.oto` n'étant
@@ -212,3 +213,18 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
   aucune fonction de `ui/` ne refait le corps d'une fonction de `server/`, et aucun libellé de `ui/`
   n'écrit en chiffres une borne que porte une constante de `schemas/` (en revue, `rg` sur la chaîne ou
   le nombre, pas sur le nom : `checklists/code-review.md § Arbitrage de complexité`).
+
+## 7. Mesures de mise en page
+
+- **Au montage, aucune mesure par élément.** Un composant rendu une fois par élément d'une liste (bloc,
+  rangée, carte, cellule) ne lit, au montage, aucune mesure de mise en page : chaque lecture après une
+  écriture force une mise en page de toute la page, répétée autant de fois qu'il y a d'éléments. Une
+  taille se donne par le CSS (`field-sizing: content`), sinon par une passe groupée à l'image suivante :
+  toutes les écritures, puis toutes les lectures, puis toutes les écritures (`useHauteurDuTexte`,
+  `ui/noeud/editeur/champ-de-bloc.tsx`). Seul le champ qui reçoit la frappe se mesure tout de suite, pour
+  grandir pendant qu'on tape. **Vérifiable :**
+  `rg -n "scrollHeight|offsetHeight|clientHeight|scrollWidth|clientWidth|offsetWidth|offsetLeft|getBoundingClientRect|getComputedStyle" packages/plateforme/ui`
+  — chaque résultat est dans un gestionnaire d'événement, une passe groupée ou le champ qui reçoit la
+  frappe ; le cas « une seule passe » de `tests/integration/components/editeur-leger.test.tsx` échoue sur
+  une mesure faite au montage. Écart connu, à corriger : `TableCell` (`ui/ds/react/table.tsx`, effet de
+  mise en page qui lit `getComputedStyle`, `scrollWidth` et `clientWidth` par cellule), M101.

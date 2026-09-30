@@ -24,8 +24,8 @@ import { slugOf } from "./nodes/segments"
 import { parseId, requireAdmin, type Mutation } from "./members"
 import type { Tx } from "./sql"
 
-/** Chemins de premier niveau pris par l'arbre ou par `read journal` (P39, P22 ; `teams_slug_reserved`). */
-const RESERVED_SLUGS: ReadonlySet<string> = new Set(["guide", "perso", "private", "contexte", "journal"])
+/** Chemins de premier niveau pris par l'arbre, par `read journal` et `read functions` (P39, P22, E11-S19 ; `teams_slug_reserved`). */
+const RESERVED_SLUGS: ReadonlySet<string> = new Set(["guide", "perso", "private", "contexte", "journal", "functions"])
 const MAX_SLUG = 40
 /** Au plus autant d'objets nommés par liste dans un refus `team_owns_objects` (AC14). */
 const MAX_LISTED = 20
@@ -63,13 +63,14 @@ function unreservedSlug(name: string): string {
  */
 async function checkName(sql: Tx, identity: Identity, name: string, exceptId?: string): Promise<void> {
   const slug = teamSlug(name)
-  const teams = await sql<{ id: string; slug: string; name: string }[]>`
-    select id, slug, name from platform.teams where org_id = ${identity.org.id}`
-  const others = teams.filter((team) => team.id !== exceptId)
+  const others = (await sql<TeamRow[]>`select id, slug, name from platform.teams where org_id = ${identity.org.id}`).filter((team) => team.id !== exceptId)
+  // Un nom se compare aux noms courants, par leur slug du jour (`name_taken`, noms voisins compris) ; le chemin, au slug
+  // stocké, qui garde la coupe de sa création (revue E11-S18) : pris par une équipe renommée depuis, `slug_taken`.
+  const holder = others.find((team) => team.slug === slug)
   if (others.some((team) => comparable(team.name) === comparable(name) || teamSlug(team.name) === slug)) {
     throw new PlatformError("conflict", `A team of ${identity.org.name} is already named ${name}.`, { reason: "name_taken" })
   }
-  if (others.some((team) => team.slug === slug)) {
+  if (holder) {
     throw new PlatformError("conflict", `Another team of ${identity.org.name} already uses the path ${slug}: choose another name.`, {
       reason: "slug_taken",
     })

@@ -251,6 +251,9 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       ].join("\n")
       expect(marc.text.endsWith(`children: none\nlinks in: none\nlinks out: none\n\n${expected}`)).toBe(true)
       expect(marc.text.length).toBeLessThan(3500)
+      // E11-S19 (AC-e2, HN-E11S19-9) : le plan est dans le texte, pas une seconde fois en données.
+      expect(marc.data).not.toHaveProperty("outline")
+      expect(marc.data).toMatchObject({ sections_total: 12 })
       const flat = base([{ path: "conseil/texte" }])
       addBlocks(flat, "conseil/texte", "published", Array.from({ length: 13 }, (_, index) => paragraph(String(index).repeat(1000))))
       await content(flat)
@@ -262,6 +265,7 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       const lea = await read("lea", { path: MODELE.path, outline: true })
       expect(lea.text.endsWith('\n\noutline (2 sections, 73 characters):\n- Objet (18 characters)\n- Corps (53 characters)\nRead one with acme_read {"path": "ventes/modele_relance", "section": "<title>"}.')).toBe(true)
       expect(lea.text).not.toContain("Bonjour")
+      expect(lea.data).not.toHaveProperty("outline")
     })
   })
 
@@ -272,6 +276,9 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       addBlocks(tables, "conseil/methode_etude", "published", blocks)
       await content(tables)
       const ada = await read("ada", { path: "conseil/methode_etude", section: "dimensionnement" })
+      // E11-S19 (AC-e1) : le plan de la page n'accompagne pas une section ; son nombre de sections reste.
+      expect(ada.data).not.toHaveProperty("outline")
+      expect(ada.data).toMatchObject({ sections_total: 6 })
       expect(ada.text.endsWith('\n\n## Dimensionnement\n\nd\n\n### Hypothèses\n\nh\n\n### Calcul\n\nc\n\nTo edit: acme_write {"path": "conseil/methode_etude", "base_revision": 1, "ops": [...]}.')).toBe(true)
       expect((await read("ada", { path: "conseil/methode_etude", section: "exemple" })).text).toContain("\n\n## Exemple\n\ne1\n\n## Exemple\n\ne2\n\nTo edit")
       expect(await refusal("ada", { path: "conseil/methode_etude", section: "Budget" })).toMatchObject({
@@ -404,7 +411,8 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       const outlined = await read("lea", { path: "ventes/devis", outline: true, refs: true })
       // Tailles sans les lignes de référence : « ## Objet » (8), une ligne vide, « Relancer. » (9).
       expect(outlined.text).toContain("\noutline (1 section, 19 characters):\n- Objet (19 characters, ref objet)\n")
-      expect(outlined.data?.outline).toEqual([{ title: "Objet", level: 1, chars: 19, ref: "objet" }])
+      // E11-S19 (AC-e2) : la référence est dans le plan du texte, pas redite en données.
+      expect(outlined.data).not.toHaveProperty("outline")
       const version: Tables = { node_versions: [] }
       addVersion(version, "ventes/devis", { revision: 1, title: "ventes/devis", summary: "Summary of ventes/devis.", blocks: [{ id: headingId, type: "heading", text: "Objet", data: { level: 1 }, key: "objet" }, { id: paragraphId, type: "paragraph", text: "Relancer vite.", data: {} }] })
       await ref.write(version)
@@ -510,6 +518,44 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       // O est vide (rien ne l'écrit dans ce fichier).
       await content(base())
       expect((await read("lea", { path: "journal" })).text.split("\n")[0]).toBe("# Journal — last 24 hours")
+    })
+
+    // E11-S19 (AC-e3, HN-E11S19-8) : toutes les fonctions actives, par connecteur, avec leur classe ; un connecteur inactif absent.
+    it("should list every active function by connector with its class and first sentence, then the contracts", async () => {
+      const define = (name: string, fields: { connector: string; class: "read" | "write" | "sensitive"; origin: "paquet" | "service_connecteurs"; description: string }) =>
+        defineFunction({ name, ...fields, schema: z.strictObject({}), examples: [], refusals: [], run: async () => ({ text: "" }) })
+      const rows = define("table.rows", { connector: "table", class: "read", origin: "paquet", description: "Reads the rows of a table. Twenty per page." })
+      const trash = define("node.trash", { connector: "node", class: "write", origin: "paquet", description: "Moves a node to the trash." })
+      const send = define("mail.send", { connector: "mail", class: "sensitive", origin: "service_connecteurs", description: "Sends a draft." })
+      vi.mocked(catalogFunctions).mockReturnValue([rows, send, trash])
+      await content(base())
+      const tail = ["Contracts to read before writing: write.procedure, write.table.", 'Read a contract with acme_read {"path": "<function>"}, then run it with acme_call.']
+      const listed = await read("lea", { path: "functions" })
+      expect(listed.text.split("\n")).toEqual([
+        "2 functions you can run, by connector:",
+        "node:",
+        "- node.trash (write): Moves a node to the trash.",
+        "table:",
+        "- table.rows (read): Reads the rows of a table.",
+        ...tail,
+      ])
+      expect([listed.data, listed.target]).toEqual([
+        {
+          functions: [
+            { name: "node.trash", connector: "node", class: "write" },
+            { name: "table.rows", connector: "table", class: "read" },
+          ],
+          contracts: ["write.procedure", "write.table"],
+        },
+        "functions",
+      ])
+      await content({ ...base(), connector_activations: [{ org_id: ORG.id, connector: "mail", state: "active" }] })
+      expect((await read("lea", { path: "functions" })).text.split("\n").slice(0, 3)).toEqual(["3 functions you can run, by connector:", "mail:", "- mail.send (sensitive): Sends a draft."])
+      // Une description sans point : sa phrase coupée à 200 caractères, points de suspension compris.
+      const wordy = define("erp.long", { connector: "erp", class: "read", origin: "paquet", description: `${"mot ".repeat(80)}sans point` })
+      vi.mocked(catalogFunctions).mockReturnValue([wordy])
+      const line = (await read("lea", { path: "functions" })).text.split("\n")[2]
+      expect([line.length, line.endsWith("…")]).toEqual(["- erp.long (read): ".length + 200, true])
     })
 
     it("should answer an unknown, invisible, personal or foreign node as unknown, and refuse a malformed path (AC17)", async () => {

@@ -81,11 +81,14 @@ function writeVerb(row: ActivityRow): ActivityVerb {
 }
 
 /**
- * Un `call` qui est un geste sur un contenu : `table.write`, et l'exécution confirmée de `node.trash` et de
- * `table.delete_rows` (E11-S02, AC-h3) ; un récapitulatif sans `confirm` et `node.discard_draft` n'y sont pas.
+ * Un `call` qui est un geste sur un contenu : `table.write`, `node.move` (E11-S18, HN-E11S18-14 : son ancien chemin, que
+ * la relecture suit jusqu'au nœud déplacé), et l'exécution confirmée de `node.trash` et de `table.delete_rows` (E11-S02,
+ * AC-h3) ; un récapitulatif sans `confirm`, `node.discard_draft` et `node.write_many` (ses pages, coupées au journal,
+ * ne s'y lisent pas) n'y sont pas.
  */
 function callVerbAndPath(row: ActivityRow): { verb: ActivityVerb; path: string | null } | null {
   if (row.target === "table.write") return { verb: "wrote_rows", path: row.table }
+  if (row.target === "node.move") return { verb: "moved", path: row.path ?? null }
   if (row.confirmed !== true) return null
   if (row.target === "node.trash") return { verb: "trashed", path: row.path ?? null }
   if (row.target === "table.delete_rows") return { verb: "deleted_rows", path: row.table }

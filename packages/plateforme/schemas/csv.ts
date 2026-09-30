@@ -7,7 +7,7 @@
 //
 // Toute lecture est linéaire (`security-patterns.md § Validation des inputs`) : un parcours à la main pour le
 // CSV, des expressions ancrées dont chaque caractère n'a qu'une lecture pour les cellules.
-import { slugOf } from "./nodes"
+import { cutAtWord, slugOf } from "./nodes"
 import { isRecord, type CellValue } from "./tables"
 
 /** Les séparateurs lus, dans l'ordre qui départage une égalité (AC-b1). */
@@ -116,13 +116,13 @@ export function parseCsv(text: string, separator: CsvSeparator): CsvTable | { un
 export function columnNameOf(header: string, rank: number): string {
   const slug = slugOf(header, IMPORT_NAME_MAX)
   if (slug === "") return `colonne_${rank}`
-  return /^[0-9]/.test(slug) ? `c_${slug}`.slice(0, IMPORT_NAME_MAX).replace(/_+$/, "") : slug
+  return /^[0-9]/.test(slug) ? cutAtWord(`c_${slug}`, IMPORT_NAME_MAX) : slug
 }
 
-/** Un nom pris : `_2`, `_3`… jusqu'à un nom libre, sous 60 caractères. */
+/** Un nom pris : `_2`, `_3`… jusqu'à un nom libre, sous 60 caractères, la base coupée au mot (E11-S18). */
 function freeName(base: string, used: ReadonlySet<string>): string {
   let name = base
-  for (let rank = 2; used.has(name); rank++) name = `${base.slice(0, IMPORT_NAME_MAX - String(rank).length - 1).replace(/_+$/, "")}_${rank}`
+  for (let rank = 2; used.has(name); rank++) name = `${cutAtWord(base, IMPORT_NAME_MAX - String(rank).length - 1)}_${rank}`
   return name
 }
 

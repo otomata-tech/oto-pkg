@@ -2,6 +2,7 @@
 // plages de blocs de `splitSections` (M05) : une section est un titre et les blocs qui le suivent
 // jusqu'au prochain titre de niveau inférieur ou égal, sous-sections comprises (N9). Fonctions pures,
 // sur le document en mémoire : rien n'est écrit tant que toutes les opérations ne sont pas passées.
+// E11-S18 : `replace_text`, qui vise aussi un bloc ou toute la page, part dans `replace-text.ts`.
 //
 // Repris de la maquette (`mcp-test/src/proto/services/sections.ts` l. 1-84) : les cinq opérations, le
 // premier échec qui refuse tout, les titres cités par un refus. Retiré : les sections en objets
@@ -13,14 +14,14 @@ import { findSections, normalizeTitle, type BlockInput, type WriteOpBody } from 
 import { listItemTexts } from "../../schemas/blocks"
 import { isUnknownBlock } from "../../schemas/blocks-render"
 import { boundedList } from "../errors"
-import { cut } from "../journal"
 import { blockMarkdown, blocksSize, charCount, displayRefs, formatCount, headingLevel } from "./document"
 import { HEADING_TEXT_MAX, LIST_ITEMS_MAX } from "./limits"
 import { newBlock, OpProblem, parseOpText, plural, quotedList, type OpOutcome, type OpState, type WorkBlock } from "./op-kit"
 
 type Parsed = { blocks: BlockInput[]; lines: number[] }
 
-type Located = { start: number; end: number; heading: WorkBlock; level: 1 | 2 | 3 | 4 | 5; title: string }
+/** Une section trouvée par son titre : ses bornes dans le document, son titre et son niveau ; lue aussi par `replace-text.ts`. */
+export type Located = { start: number; end: number; heading: WorkBlock; level: 1 | 2 | 3 | 4 | 5; title: string }
 
 /** Le niveau de titre le plus bas (E10-S04, AC-b3) : sous lui, aucun sous-niveau à proposer. */
 const DEEPEST_LEVEL = 5
@@ -58,9 +59,9 @@ export function locate(state: OpState, title: string, role: "section" | "after")
 /**
  * Refus `conflict` quand `blocks`, que l'opération réécrirait ou supprimerait, portent un bloc d'une
  * version plus récente (M67, D122) : `read` ne le sert que par une ligne de commentaire, que
- * `parseMarkdown` ignore ; la section réécrite le perdrait.
+ * `parseMarkdown` ignore ; la section réécrite le perdrait. Lu aussi par `replace_text` (`replace-text.ts`).
  */
-function keepNewerBlocks(blocks: readonly WorkBlock[], title: string): void {
+export function keepNewerBlocks(blocks: readonly WorkBlock[], title: string): void {
   const newer = blocks.find(isUnknownBlock)
   if (!newer) return
   throw new OpProblem(
@@ -76,8 +77,11 @@ function absorbOwnHeading(parsed: Parsed, title: string, level: number): Parsed 
   return { blocks: parsed.blocks.slice(1), lines: parsed.lines.slice(1) }
 }
 
-/** Aucun titre du niveau de la section ou plus haut dans son texte (N9) : on ajoute une section par add_section. */
-function checkHeadings(parsed: Parsed, text: string, level: number, title: string): void {
+/**
+ * Aucun titre du niveau de la section ou plus haut dans son texte (N9) : on ajoute une section par add_section. Lu aussi
+ * par `replace_text` (`replace-text.ts`).
+ */
+export function checkHeadings(parsed: Parsed, text: string, level: number, title: string): void {
   const source = text.replace(/\r\n?/g, "\n").split("\n")
   parsed.blocks.forEach((block, index) => {
     if (block.type !== "heading" || block.data.level > level) return
@@ -93,9 +97,9 @@ function checkHeadings(parsed: Parsed, text: string, level: number, title: strin
 /**
  * Les blocs neufs d'un texte, chacun apparié dans l'ordre à un ancien bloc de même forme canonique
  * (même markdown), chaque ancien une fois au plus : un bloc apparié garde son id, sa clé, sa révision
- * et sa provenance ; tout autre bloc est neuf (N12).
+ * et sa provenance ; tout autre bloc est neuf (N12). Lu aussi par `set_markdown` (E11-S18, `ops.ts`).
  */
-function matchByForm(state: OpState, old: readonly WorkBlock[], fresh: readonly BlockInput[]): WorkBlock[] {
+export function matchByForm(state: OpState, old: readonly WorkBlock[], fresh: readonly BlockInput[]): WorkBlock[] {
   const consumed = new Set<WorkBlock>()
   return fresh.map((input) => {
     const candidate = newBlock(state, input)
@@ -198,76 +202,10 @@ function deleteSection(state: OpState, op: WriteOpBody): OpOutcome {
   return outcome(op, blocks, [], `deleted « ${at.title} »${also}`)
 }
 
-/** Le markdown de la section, et l'étendue (indices de chaîne) du rendu de chacun de ses blocs. */
-function spansOf(section: readonly WorkBlock[]): { markdown: string; spans: { block: WorkBlock; start: number; end: number }[] } {
-  const spans: { block: WorkBlock; start: number; end: number }[] = []
-  let markdown = ""
-  for (const block of section) {
-    const rendered = blockMarkdown(block)
-    if (rendered === "") continue
-    if (markdown !== "") markdown += "\n\n"
-    spans.push({ block, start: markdown.length, end: markdown.length + rendered.length })
-    markdown += rendered
-  }
-  return { markdown, spans }
-}
-
-/** Le bloc dont le rendu contient l'occurrence : ses blocs après remplacement (un seul garde l'id, N12). */
-function editInBlock(state: OpState, at: Located, span: { block: WorkBlock; start: number }, edit: { index: number; find: string; text: string }): WorkBlock[] {
-  const rendered = blockMarkdown(span.block)
-  const offset = edit.index - span.start
-  const markdown = rendered.slice(0, offset) + edit.text + rendered.slice(offset + edit.find.length)
-  const parsed = parseOpText(markdown, state)
-  if (span.block === at.heading) {
-    const [first] = parsed.blocks
-    if (parsed.blocks.length !== 1 || first.type !== "heading" || first.data.level !== at.level) {
-      throw new OpProblem("invalid_arguments", `the title of « ${at.title} » must stay a heading of its level; use replace_block to change it.`)
-    }
-  } else {
-    checkHeadings(parsed, markdown, at.level, at.title)
-  }
-  if (parsed.blocks.length !== 1) return parsed.blocks.map((input) => newBlock(state, input))
-  const [only] = parsed.blocks
-  return [{ ...span.block, type: only.type, text: only.text ?? null, data: { ...(only.data ?? {}) } }]
-}
-
-function replaceText(state: OpState, op: WriteOpBody, text: string): OpOutcome {
-  const at = locate(state, op.section ?? "", "section")
-  const find = op.find ?? ""
-  const section = state.blocks.slice(at.start, at.end)
-  const { markdown, spans } = spansOf(section)
-  const count = markdown.split(find).length - 1
-  if (count !== 1) {
-    throw new OpProblem("invalid_arguments", `« ${cut(find, 100)} » appears ${count} times in « ${at.title} »; quote words that appear exactly once.`)
-  }
-  const index = markdown.indexOf(find)
-  const span = spans.find((candidate) => candidate.start <= index && index + find.length <= candidate.end)
-  let replaced: WorkBlock[]
-  let edited: WorkBlock[]
-  // Un remplacement dans un bloc ne réécrit que lui ; à cheval sur plusieurs blocs, tout le corps (M67).
-  keepNewerBlocks(span ? [span.block] : section.slice(1), at.title)
-  if (span) {
-    edited = editInBlock(state, at, span, { index, find, text })
-    replaced = section.flatMap((block) => (block === span.block ? edited : [block]))
-  } else {
-    const bodyStart = (spans[1]?.start ?? markdown.length) - 2
-    if (index < bodyStart + 2) throw new OpProblem("invalid_arguments", `« find » spans the title of « ${at.title} »; use replace_section.`)
-    const body = markdown.slice(bodyStart + 2)
-    const offset = index - bodyStart - 2
-    const newBody = body.slice(0, offset) + text + body.slice(offset + find.length)
-    const parsed = parseOpText(newBody, state)
-    checkHeadings(parsed, newBody, at.level, at.title)
-    const oldBody = section.slice(1)
-    const matched = matchByForm(state, oldBody, parsed.blocks)
-    edited = matched.filter((block) => !oldBody.includes(block))
-    replaced = [at.heading, ...matched]
-  }
-  const blocks = [...state.blocks.slice(0, at.start), ...replaced, ...state.blocks.slice(at.end)]
-  const title = replaced[0]?.text ?? at.title
-  return outcome(op, blocks, edited, `edited « ${title} » (${formatCount(blocksSize(replaced))} characters)`)
-}
-
-/** Une opération par section, sur le document en mémoire (champs déjà contrôlés par `applyOps`). */
+/**
+ * Une opération par section, sur le document en mémoire (champs déjà contrôlés par `applyOps`) ; `replace_text`, qui
+ * vise aussi un bloc ou toute la page, est dans `replace-text.ts` (E11-S18).
+ */
 export function applySectionOp(state: OpState, op: WriteOpBody): OpOutcome {
   const text = op.text ?? ""
   switch (op.op) {
@@ -277,9 +215,7 @@ export function applySectionOp(state: OpState, op: WriteOpBody): OpOutcome {
       return append(state, op, text)
     case "add_section":
       return addSection(state, op, text)
-    case "delete_section":
-      return deleteSection(state, op)
     default:
-      return replaceText(state, op, text)
+      return deleteSection(state, op)
   }
 }

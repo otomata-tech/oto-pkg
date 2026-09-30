@@ -25,6 +25,9 @@
 // séparateur. Ce qui est propre au tableau, au repli et aux niveaux de liste vit dans `blocs-de-page.ts`.
 //
 // E11-S05 (AC-g1) : retirer le dernier bloc laisse un Texte vide ; le Texte d'une page vide vit dans `page-vide.ts`.
+//
+// 1.1.3 : le diagramme s'écrit (forme `diagramme`, bloc `mermaid`), en lignes comme le code, et passe de l'un à l'autre
+// avec son texte. Vide, il ne part pas, comme tout bloc vide (`estVide`) : le service refuse un `mermaid` blanc.
 import type { BlockView } from "../../../schemas"
 import { simpleTableOf } from "../../../schemas/blocks"
 import { isRecord } from "../../../schemas/tables"
@@ -34,7 +37,7 @@ import { CHOIX_DE_BLOC } from "../libelles"
 import { avecTableau, repliDuTexte, TABLEAU_NEUF, tableauDuTexte, texteDuRepli, texteDuTableau, type Tableau } from "./blocs-de-page"
 
 /** Les formes du menu « Style » (E05-S10, AC-a2 ; E10-S06, AC-a3), dans son ordre ; tout autre bloc se lit, se déplace, se duplique et se supprime. */
-export const FORMES_ECRITES = ["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "repli"] as const
+export const FORMES_ECRITES = ["texte", "titre", "puces", "numerotee", "cases", "citation", "code", "diagramme", "repli"] as const
 
 /** Une forme qu'écrit l'écran : celles du menu, et le tableau simple, qui s'insère sans se convertir (E10-S06, AC-a3). */
 export type Forme = (typeof FORMES_ECRITES)[number] | "tableau"
@@ -78,7 +81,7 @@ function nouvelleCle(): string {
 const PROPRES_A_LA_FORME = new Set(["level", "items", "ordered", "start", "language", "tone", "summary", "columns", "rows", "align"])
 
 /** Les formes qui s'écrivent en lignes (un élément par ligne, ou du code) : Entrée y passe à la ligne. */
-export const FORMES_EN_LIGNES: ReadonlySet<Forme> = new Set(["puces", "numerotee", "cases", "code"])
+export const FORMES_EN_LIGNES: ReadonlySet<Forme> = new Set(["puces", "numerotee", "cases", "code", "diagramme"])
 
 /**
  * Le préfixe tapé au début d'un Texte, la forme qu'il donne (AC11) et le niveau d'un titre : `# ` et `## ` le niveau 1,
@@ -112,7 +115,7 @@ export function formeDe(bloc: Pick<BlocEdite, "type" | "data">): Forme | null {
   if (bloc.type === "list") return bloc.data.ordered === true ? "numerotee" : "puces"
   if (bloc.type === "checklist") return "cases"
   if (bloc.type === "callout") return "citation"
-  if (bloc.type === "code") return "code"
+  if (bloc.type === "code" || bloc.type === "mermaid") return bloc.type === "code" ? "code" : "diagramme"
   if (bloc.type === "toggle") return "repli"
   if (bloc.type === "simple_table") return "tableau"
   return null
@@ -260,7 +263,8 @@ export function avecForme(servi: BlocEdite, forme: Forme): BlocEdite {
   if (forme === "numerotee") return { ...bloc, type: "list", text: null, data: { ...data, items, ordered: true } }
   if (forme === "cases") return { ...bloc, type: "checklist", text: null, data: { ...data, items: texte.split("\n").map((ligne) => ({ text: ligne, checked: false })) } }
   if (forme === "citation") return { ...bloc, type: "callout", text: texte, data }
-  if (forme === "code") return { ...bloc, type: "code", text: texte, data }
+  // Le code et le diagramme, sur le même texte ; le langage du code ne suit pas.
+  if (forme === "code" || forme === "diagramme") return { ...bloc, type: forme === "code" ? "code" : "mermaid", text: texte, data }
   // Un Texte devenu repli : sa première ligne en résumé, coupée à 200 caractères ; les autres, le corps (E10-S06, AC-a3).
   if (forme === "repli") return avecTexte({ ...bloc, type: "toggle", text: "", data }, texte)
   if (forme === "tableau") return avecTexte({ ...bloc, type: "simple_table", text: null, data }, texte)

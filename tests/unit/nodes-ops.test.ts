@@ -8,6 +8,7 @@ import { blockMarkdown, blocksSize, charCount, placeBlocks, type DocBlock } from
 import type { WorkBlock } from "../../packages/plateforme/server/nodes/op-kit"
 import { applyOps } from "../../packages/plateforme/server/nodes/ops"
 import { blockUuid } from "../helpers/reference-org"
+import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
 
 const PATH = "ventes/devis"
 
@@ -120,7 +121,7 @@ describe("section operations on blocks (AC22)", () => {
       [[{ op: "replace_text", section: "Règles", text: "x" }], "Op 1 (replace_text « Règles »): find is required (the exact words to replace)."],
       [
         [{ op: "replace_text", section: "Règles", find: "Jamais d'envoi", text: "x" }],
-        "Op 1 (replace_text « Règles »): « Jamais d'envoi » appears 2 times in « Règles »; quote words that appear exactly once.",
+        "Op 1 (replace_text « Règles »): « Jamais d'envoi » appears 2 times in « Règles »; quote words that appear exactly once. To replace all 2, give count: 2.",
       ],
       [
         [{ op: "append", section: "Étapes", text: "a\n\n## Budget" }],
@@ -132,6 +133,82 @@ describe("section operations on blocks (AC22)", () => {
     for (const [ops, message, blocks] of cases) {
       expect(refused(ops, blocks), message).toMatchObject({ code: "invalid_arguments", message: `${message} Nothing was written.` })
     }
+  })
+})
+
+describe("replace_text on the page or a block, counted, and set_markdown (E11-S18, AC-10, AC-11)", () => {
+  it("should replace in the whole page or in one block, all the occurrences counted, and refuse another number found", () => {
+    const page = apply([{ op: "replace_text", find: "Jamais d'envoi", text: "Aucun envoi", count: 2 }])
+    expect(page.blocks.slice(7).map((block) => [block.id, block.text])).toEqual([
+      [P3, "Aucun envoi sans accord."],
+      [P4, "Aucun envoi le week-end."],
+    ])
+    expect(page.describe[0]).toBe("replaced 2 occurrences of « Jamais d'envoi »")
+    const block = apply([{ op: "replace_text", block: ref(P4), find: "Jamais d'envoi", text: "Pas d'envoi" }])
+    expect(ids(block.blocks)).toEqual(ids(devis()))
+    expect([block.blocks[8].text, block.describe[0]]).toEqual(["Pas d'envoi le week-end.", `edited block ${ref(P4)}`])
+
+    const cases: [Op[], string][] = [
+      [
+        [{ op: "replace_text", find: "Jamais d'envoi", text: "x" }],
+        "Op 1 (replace_text): « Jamais d'envoi » appears 2 times in ventes/devis; quote words that appear exactly once. To replace all 2, give count: 2.",
+      ],
+      [[{ op: "replace_text", find: "Jamais d'envoi", text: "x", count: 3 }], "Op 1 (replace_text): « Jamais d'envoi » appears 2 times in ventes/devis, not 3 (count)."],
+      [
+        [{ op: "replace_text", find: "accord.\n\nJamais", text: "x" }],
+        "Op 1 (replace_text): « accord.\n\nJamais » spans several blocks of ventes/devis; replace it within one block or one section (give section), or rewrite the page with set_markdown.",
+      ],
+      [[{ op: "replace_text", section: "Règles", block: ref(P4), find: "Jamais", text: "x" }], "Op 1 (replace_text « Règles »): give section or block, not both."],
+    ]
+    for (const [ops, message] of cases) expect(refused(ops), message).toMatchObject({ code: "invalid_arguments", message: `${message} Nothing was written.` })
+  })
+
+  // Revue E11-S18 : chaque branche de la garde des titres, et un bloc avant le premier titre.
+  it("should keep a heading at its level and refuse a heading at the level of the section or above, but not before the first heading", () => {
+    const cases: [Op[], string][] = [
+      [
+        [{ op: "replace_text", section: "Règles", find: "## Règles", text: "### Règles" }],
+        "Op 1 (replace_text « Règles »): the title of « Règles » must stay a heading of its level; use replace_block to change it.",
+      ],
+      [[{ op: "replace_text", find: "## Objet", text: "### Objet" }], "Op 1 (replace_text): the title of « Objet » must stay a heading of its level; use replace_block to change it."],
+      [
+        [{ op: "replace_text", section: "Règles", find: "Jamais d'envoi sans", text: "## Budget\n\nJamais d'envoi sans" }],
+        "Op 1 (replace_text « Règles »): line 1 « ## Budget » is a heading at the level of « Règles » or above; add a new section with add_section, or use ### for a sub-section.",
+      ],
+      [
+        [{ op: "replace_text", find: "Relancer un devis", text: "## Budget\n\nRelancer un devis" }],
+        "Op 1 (replace_text): line 1 « ## Budget » is a heading at the level of « Objet » or above; add a new section with add_section, or use ### for a sub-section.",
+      ],
+    ]
+    for (const [ops, message] of cases) expect(refused(ops), message).toMatchObject({ code: "invalid_arguments", message: `${message} Nothing was written.` })
+    const before = apply([{ op: "replace_text", find: "Intro.", text: "## Avant\n\nIntro." }], doc([paragraph("Intro."), heading("Objet", 1)]))
+    expect(texts(before.blocks)).toEqual(["## Avant", "Intro.", "## Objet"])
+  })
+
+  it("should refuse a replacement that would outgrow its bound before building it, and replace 1,000 occurrences in linear time", () => {
+    const many = doc([paragraph("ab ".repeat(1_000).trim())])
+    const grown = refused([{ op: "replace_text", block: ref(blockUuid(1)), find: "ab", text: "x".repeat(200), count: 1_000 }], many)
+    expect(grown).toMatchObject({
+      code: "too_large",
+      message: `Op 1 (replace_text ${ref(blockUuid(1))}): replacing 1,000 occurrences would bring block ${ref(blockUuid(1))} to about 200,999 characters; 100,000 at most: replace fewer at a time, or with a shorter text. Nothing was written.`,
+    })
+    const start = performance.now()
+    const replaced = apply([{ op: "replace_text", block: ref(blockUuid(1)), find: "ab", text: "cd", count: 1_000 }], many)
+    expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)
+    expect(replaced.blocks[0].text).toBe("cd ".repeat(1_000).trim())
+  })
+
+  it("should replace the whole body, keep the ids of the same blocks, drop a front matter, and refuse an empty text", () => {
+    const set = apply([{ op: "set_markdown", text: "---\ntitle: Devis\n---\n\n## Objet\n\nRelancer un devis resté sans réponse.\n\n## Suite\n\nAppeler." }])
+    expect(ids(set.blocks)).toEqual([OBJET, P1, null, null])
+    expect(texts(set.blocks)).toEqual(["## Objet", "Relancer un devis resté sans réponse.", "## Suite", "Appeler."])
+    expect(set.describe[0]).toMatch(/^replaced the whole body \(2 sections, [0-9]+ characters\)$/)
+    // À la création : sur un document vide.
+    expect(texts(apply([{ op: "set_markdown", text: "## Budget\n\nMontant HT." }], []).blocks)).toEqual(["## Budget", "Montant HT."])
+    expect(refused([{ op: "set_markdown", text: "---\ntitle: Devis\n---\n" }])).toMatchObject({
+      code: "invalid_arguments",
+      message: "Op 1 (set_markdown): text is empty; set_markdown writes the whole body of the page. Nothing was written.",
+    })
   })
 })
 

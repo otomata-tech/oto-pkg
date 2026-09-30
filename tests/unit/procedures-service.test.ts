@@ -11,7 +11,7 @@
 // prouvée par ses tests.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { BlockInput } from "../../packages/plateforme/schemas"
-import { writeNode } from "../../packages/plateforme/server/nodes/write"
+import { writeNode, type WriteOrigin } from "../../packages/plateforme/server/nodes/write"
 import { checkProcedure, listProcedures } from "../../packages/plateforme/server/procedures"
 import { BUSY_REFUSAL } from "../factories/test-functions"
 import { CONTENT_AT, nodeId, ORG, OTHER_ORG, TEAMS, type ContentNode, type Person, type RuleSpec } from "../helpers/reference-org"
@@ -211,9 +211,9 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
     await ref.addBlocks(PATH, "draft", blocks)
   }
 
-  async function write(person: Person, input: Record<string, unknown>, meanwhile?: WatchOptions["meanwhile"]) {
+  async function write(person: Person, input: Record<string, unknown>, meanwhile?: WatchOptions["meanwhile"], origin: WriteOrigin = { kind: "agent", ctx: null }) {
     const { db, calls } = watchDb(await ref.db(person), { meanwhile })
-    const outcome = await writeNode(db, ref.identityOf(person), input, { kind: "agent", ctx: null }).then(
+    const outcome = await writeNode(db, ref.identityOf(person), input, origin).then(
       (result) => ({ result, error: null }),
       (error: unknown) => ({ result: null, error }),
     )
@@ -255,7 +255,8 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
       const { prefix } = ref.org
       expect(claire.error).toMatchObject({
         code: "invalid_arguments",
-        message: [`Publication of ${PATH} refused: 1 problem(s). The draft is kept; nothing was published.`, `- ${problem(prefix)}`, footer(prefix)].join("\n"),
+        // Une écriture d'assistant qui publie n'écrit rien sur un refus ; le brouillon d'avant reste (E11-S18, AC-1).
+        message: [`Publication of ${PATH} refused: 1 problem(s). Nothing was written; the draft saved before this call stays.`, `- ${problem(prefix)}`, footer(prefix)].join("\n"),
         details: { refusals: [{ kind, message: problem(prefix) }] },
       })
       const after = await content()
@@ -309,7 +310,8 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
         ),
       })
       expect(publishCalls(edited.calls)).toEqual([])
-      expect(await draftTexts(PATH)).toContain("Nouveau texte.")
+      // Refusée à la publication, l'écriture d'un assistant ne laisse aucun brouillon (E11-S18, AC-1).
+      expect(await draftTexts(PATH)).toEqual([])
       // La procédure revient plus bas, publiée sans brouillon.
       await reset()
 
@@ -340,7 +342,8 @@ describe.skipIf(!sqlConfigured)(portable("procedures on the real database, O"), 
         await ref.addBlocks(PATH, "draft", [callBlock("mail.send")])
         await seed.admin`update platform.node_drafts set updated_at = now() where node_id = ${ref.nodeId(PATH)}`
       }
-      const claire = await write("claire", { path: PATH, base_revision: 1, publish: true }, concurrent)
+      // Par l'écran : l'écriture d'un assistant, atomique, se rejoue après une course (E11-S18, HN-E11S18-2).
+      const claire = await write("claire", { path: PATH, base_revision: 1, publish: true }, concurrent, { kind: "human" })
       expect(claire.error).toMatchObject({
         code: "stale_revision",
         message: `stale revision: ${PATH} changed while publishing (its draft was saved meanwhile). Nothing was published. Read it again with draft: true, then retry.`,

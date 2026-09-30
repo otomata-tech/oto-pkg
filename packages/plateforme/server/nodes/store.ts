@@ -151,6 +151,8 @@ export type DraftSave<B extends DocBlock> = {
   /** Le tampon lu au début de l'appel, ou le `draft_stamp` de l'écran ; garde de l'en-tête. */
   stamp: string | null
   provenance: Record<string, unknown>
+  /** Le préfixe des outils de l'organisation, que cite un refus (revue E11-S18). */
+  prefix: string
   /**
    * L'ouverture du brouillon (`openDraft`) quand l'appel n'en a lu aucun, jouée en tête de la transaction de
    * l'écriture (M32, HN-E01S10-b2-3) : un refus qui suit n'en laisse aucun ouvert. Rend le tampon qui garde
@@ -273,7 +275,23 @@ async function writeUpdate(sql: Tx, save: DraftSave<DocBlock>, update: DraftUpda
   if (rows.length === 0) throw new DraftStopped({ what: "block", block: old }, null)
 }
 
-/** Les blocs neufs, en une requête ; rend chacun avec son id et sa révision, retrouvés par leur position (unique). */
+/**
+ * Des blocs insérés que les lignes rendues ne redonnent pas (nombre ou genre) : un refus qui dit quoi faire, journalisé
+ * d'abord ; jamais `internal`, que la porte MCP masque (E11-S18, AC-8).
+ */
+function unmatchedInsert(save: DraftSave<DocBlock>, sent: number, returned: number): PlatformError {
+  console.error(`[platform] nodes: draft of ${save.node.id}: ${sent} blocks inserted, ${returned} rows returned in another shape`)
+  return new PlatformError(
+    "conflict",
+    `${save.node.path}: the new blocks could not be matched once written. Nothing was written. Retry the write; if it fails again, report it with ${save.prefix}_feedback (type error).`,
+  )
+}
+
+/**
+ * Les blocs neufs, en une requête ; rend chacun avec son id et sa révision, retrouvés par leur rang : les lignes d'un
+ * `insert … values … returning` suivent l'ordre des valeurs. Jamais par leur position relue (FB-0015) : une session où
+ * `extra_float_digits` est sous 1 relit un `double precision` arrondi à 15 chiffres (E11-S18, AC-8).
+ */
 async function insertBlocks<B extends DocBlock>(sql: Tx, save: DraftSave<B>, inserts: B[]): Promise<Map<B, B>> {
   if (inserts.length === 0) return new Map()
   // Une seule fabrique, les mêmes colonnes pour chaque ligne : `sql(rows)` prend celles de la première.
@@ -291,17 +309,11 @@ async function insertBlocks<B extends DocBlock>(sql: Tx, save: DraftSave<B>, ins
     updated_by: save.userId,
   }))
   const created = await written(
-    sql<{ id: string; position: number | null; revision: number }[]>`insert into platform.blocks ${sql(rows)} returning id, position, revision`,
+    sql<{ id: string; type: string; revision: number }[]>`insert into platform.blocks ${sql(rows)} returning id, type, revision`,
     { what: "block", block: inserts[0] },
   )
-  const byPosition = new Map(created.map((row) => [row.position, row]))
-  return new Map(
-    inserts.map((block) => {
-      const row = byPosition.get(block.position)
-      if (!row) throw new PlatformError("internal", "Internal error.")
-      return [block, { ...block, id: row.id, revision: row.revision }]
-    }),
-  )
+  if (created.length !== inserts.length || created.some((row, rank) => row.type !== inserts[rank].type)) throw unmatchedInsert(save, inserts.length, created.length)
+  return new Map(inserts.map((block, rank) => [block, { ...block, id: created[rank].id, revision: created[rank].revision }]))
 }
 
 /**

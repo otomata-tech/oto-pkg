@@ -243,18 +243,18 @@ describe("RailApplication zones (AC-a3)", () => {
 describe("RailApplication menus (AC-a4)", () => {
   // E05-S11 (AC-31, AC-32, AC-33) : « Réglages de l'entreprise » d'abord, « Équipes & accès » dedans ; ni Marque,
   // ni Drapeaux, ni Accès plateforme, ni Connecteurs (au pied du rail), même quand l'hôte en sert l'adresse.
-  // E05-S13 (AC-10) : « Journal » dans les réglages ; un seul groupe montré n'a pas de sous-titre.
+  // E05-S13 (AC-10) : « Journal » dans les réglages ; un seul groupe montré n'a pas de sous-titre. 1.1.3 : ni Usage
+  // ni Retours, même quand l'hôte en sert l'adresse ; « Suivi de l'entreprise » disparaît.
   it.each([
-    [true, ["Organisation", "Équipes & accès", "Journal", "Usage", "Retours"]],
+    [true, ["Organisation", "Équipes & accès", "Journal"]],
     [false, ["Équipes & accès", "Journal"]],
-  ])("should offer the company menu by administration right (%s), settings before follow-up, each entry navigating", (administre, attendues) => {
+  ])("should offer the company menu by administration right (%s), without follow-up screens, each entry navigating", (administre, attendues) => {
     const rail = monter({ administre, adresses: { ...ADRESSES, marque: "/admin/brand", drapeaux: "/admin/flags", acces: "/admin/access" } })
     fireEvent.click(within(rail).getByRole("button", { name: /^Entreprise : Démo/ }))
 
     expect(itemsDuMenu()).toEqual(attendues)
     const texte = screen.getByRole("menu").textContent ?? ""
-    if (administre) expect(texte.indexOf("Réglages de l’entreprise")).toBeLessThan(texte.indexOf("Suivi de l’entreprise"))
-    else expect(texte).not.toMatch(/Réglages de l’entreprise|Suivi de l’entreprise/)
+    expect(texte).not.toMatch(/Réglages de l’entreprise|Suivi de l’entreprise/)
     expect(texte).not.toContain("Membres & équipes")
     fireEvent.click(menu().getByRole("menuitem", { name: "Équipes & accès" }))
     expect(hote.naviguer).toHaveBeenCalledWith("/teams")

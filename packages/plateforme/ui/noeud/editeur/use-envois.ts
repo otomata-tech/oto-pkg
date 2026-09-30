@@ -213,7 +213,7 @@ export function useEnvois(parametres: Parametres) {
     numero.current += 1
     const version = verdict.genre === "conflit-du-bloc" ? verdict.version : null
     const suivant = numero.current
-    // Le texte de la personne à la relecture : son champ, toujours monté, a pu recevoir des frappes depuis l'envoi refusé (E05-S08).
+    // Le texte de la personne à la relecture : son champ a pu recevoir des frappes depuis l'envoi refusé (E05-S08).
     const tape = trouver(modele.current, attente.cle)?.bloc
     setConflit((courant) => ({
       cle: attente.cle,

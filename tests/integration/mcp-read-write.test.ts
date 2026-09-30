@@ -131,7 +131,8 @@ describe.skipIf(!sqlConfigured || privatePending)(
       const path = `ventes/faq_${hex(3)}`
       const created = await lea.call("write", { path, title: "FAQ", summary: "Questions fréquentes.", ops: [{ op: "add_section", section: "Livraison", text: "Sous huit jours." }] })
       expect(created.isError, created.text).toBe(false)
-      expect(created.text.split("\n")[1]).toBe(`Published ${path} revision 1 (1 section, 2 blocks). Next write: base_revision 1.`)
+      // E11-S18 (AC-4) : une ligne, la publication et ce que l'écriture a fait.
+      expect(created.text).toBe(`Published ${path} revision 1 (1 section, 2 blocks): added « Livraison » (30 characters). Next write: base_revision 1.`)
       expect(created.result.structuredContent).toMatchObject({ status: "published", revision: 1 })
       const drafted = await lea.call("write", { path, base_revision: 1, ops: [{ op: "append", section: "Livraison", text: "Hors week-end." }], publish: false })
       expect(drafted.text.split("\n")[1]).toBe(`Publish it with ${ref.org.prefix}_write {"path": "${path}", "base_revision": 1, "publish": true}.`)

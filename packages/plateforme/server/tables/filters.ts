@@ -219,11 +219,19 @@ const CELL_SEPARATOR = "\n"
  * cellules différentes. Chaque cellule est normalisée une fois par ligne (coût borné, § Sécurité de la story).
  */
 export function matchesQuery(cells: ReadonlyMap<string, CellValue>, header: TableHeader, words: readonly string[]): boolean {
+  return queryHits(cells, header, words) === words.length
+}
+
+/**
+ * Le nombre de mots de `q` qu'une ligne porte, cherchés comme pour `matchesQuery` (E11-S19, AC-f1) : `match: "any"`
+ * de `table.rows` garde les lignes qui en portent au moins un et les classe par ce nombre.
+ */
+export function queryHits(cells: ReadonlyMap<string, CellValue>, header: TableHeader, words: readonly string[]): number {
   const searched = header.columns.flatMap((column) => {
     if (!TEXT_TYPES.includes(column.type) && column.name !== header.key) return []
     const cell = cells.get(column.name)
     return cell !== undefined && typeof cell !== "boolean" ? [normalizeTitle(String(cell))] : []
   })
   const text = searched.join(CELL_SEPARATOR)
-  return words.every((word) => text.includes(word))
+  return words.filter((word) => text.includes(word)).length
 }

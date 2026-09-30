@@ -93,14 +93,14 @@ describe("/admin/feedback, reserved to the platform team (E08-S09, AC1 ; E05-S13
     expect(listFeedback).not.toHaveBeenCalled()
   })
 
-  it("should read the feedback with the session's client for the platform team, under its trail", async () => {
+  it("should read the feedback with the session's client for the platform team, without a trail (out of the menu)", async () => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte("staff-member"))
 
     render(await retours())
     expect(listFeedback).toHaveBeenCalledWith(SESSION.db, identite("staff-member"), { state: undefined, type: undefined, days: 7, cursor: undefined })
     expect(screen.queryByRole("alert")).toBeNull()
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Retours des assistants")
-    expect(within(screen.getByRole("navigation", { name: "Chemin" })).getByRole("link", { name: "Suivi de l’entreprise" })).toHaveAttribute("href", "/admin/feedback")
+    expect(screen.queryByRole("navigation", { name: "Chemin" })).toBeNull()
   })
 
   it("should send a visitor without a session to /login, and say a failed identity", async () => {
@@ -121,7 +121,7 @@ describe("/admin/feedback, reserved to the platform team (E08-S09, AC1 ; E05-S13
 // Depuis E05-S09 (AC-a4), les entrées sont celles du menu de l'entreprise, au haut du rail ; depuis E05-S11
 // (AC-31, AC-33), « Réglages » puis « Suivi » ; Connecteurs est au pied du rail (AC-32), « Brancher un
 // assistant » au menu du compte. E05-S13 : Usage caché (AC-8), Retours au staff (AC-9), Journal dans les
-// réglages, un seul groupe sans sous-titre hors du staff (AC-10).
+// réglages, un seul groupe sans sous-titre hors du staff (AC-10). 1.1.3 : Retours hors du menu, même pour le staff.
 describe("(dashboard) layout administration entries (E08-S03 N9 ; E05-S09, AC-a4 ; E05-S13, AC-8 to AC-10)", () => {
   const ouvrir = () => {
     fireEvent.click(screen.getByRole("button", { name: /^Entreprise : Démo/ }))
@@ -131,7 +131,7 @@ describe("(dashboard) layout administration entries (E08-S03 N9 ; E05-S09, AC-a4
   it.each([
     ["admin", ["Organisation", "Équipes & accès", "Journal"]],
     ["member", ["Équipes & accès", "Journal"]],
-    ["staff-member", ["Organisation", "Équipes & accès", "Journal", "Retours"]],
+    ["staff-member", ["Organisation", "Équipes & accès", "Journal"]],
   ] as const)("should show the entries by right: %s", async (profil, attendues) => {
     vi.mocked(getPlatformIdentitySafely).mockResolvedValue(connecte(profil))
 

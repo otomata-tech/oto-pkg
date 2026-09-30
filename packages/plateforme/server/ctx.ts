@@ -9,9 +9,14 @@
 //
 // Face SQL (E01-S10, partie e1a) : chaque opération tient en une transaction (`db.tx`), sous
 // l'appelant de la session.
+//
+// E11-S19 : `acceptOwnContextWrite(db, identity, { ctx, path, revision })` avance la ligne du code de l'auteur d'un
+// Contexte à la révision qu'il vient de publier (appelée par `write`) ; le refus `ctx_stale` porte un nouveau code et
+// les Contextes changés ; `ctxChanges` sert le mode léger de `context` (`since_ctx`).
 import { randomInt } from "node:crypto"
 import { CTX_PATTERN } from "../schemas"
-import { expectedContextPaths } from "./context/blocks/contexts"
+import { changedContextParts, contextBodies, expectedContextPaths } from "./context/blocks/contexts"
+import { CONTEXT_BUDGET, renderContext } from "./context/engine"
 import type { Json } from "./database"
 import type { PlatformDb } from "./db"
 import { boundedList, fromDatabaseError, inTransaction, PlatformError } from "./errors"
@@ -39,6 +44,14 @@ export function missingCtxMessage(prefix: string): string {
 export function staleCtxMessage(prefix: string, paths: readonly string[] = []): string {
   const changed = paths.length > 0 ? ` (${boundedList(paths)})` : ""
   return `context has changed${changed}: call ${prefix}_context again with the same request, then retry this call.`
+}
+
+/**
+ * Le refus d'un code périmé qui porte le changement (E11-S19, AC-b1) : les chemins changés, bornés, le nouveau code et
+ * la consigne de rejouer l'appel avec lui, puis `served`, les parties des Contextes changés telles que `context` les sert.
+ */
+export function changedCtxMessage(prefix: string, paths: readonly string[], code: string, served: string): string {
+  return `context has changed (${boundedList(paths)}). New ctx: ${code}: retry this call with it, and pass it to every ${prefix}_ tool from now on. The changed contexts, as served now:\n\n${served}`
 }
 
 /** Un Contexte publié à l'un des chemins attendus : son nœud et sa révision (≥ 1). */
@@ -108,26 +121,30 @@ export async function lastCtxAt(db: PlatformDb, identity: Identity): Promise<str
  * Crée le code de la conversation, sous RLS, en une transaction : la version des règles (comptée, plus lue
  * par la garde, HN-E11S03-3) et la révision publiée de chaque Contexte attendu (E11-S03, AC-a1), lues
  * ensemble maintenant. Un code déjà pris n'est pas écrit (`on conflict do nothing`) : l'essai suivant en
- * tire un autre, sans erreur qui arrêterait la transaction.
+ * tire un autre, sans erreur qui arrêterait la transaction. `request.contexts` (E11-S19, HN-E11S19-2) : les
+ * révisions déjà lues par la garde, gardées telles quelles au lieu d'être relues.
  */
 export async function issueCtx(
   db: PlatformDb,
   identity: Identity,
-  request: { host: string | null; userAgent: string | null },
+  request: { host: string | null; userAgent: string | null; contexts?: Record<string, number> },
 ): Promise<string> {
   const paths = expectedContextPaths(identity)
+  const seen = request.contexts
   return inTransaction(db, "issueCtx", async (sql) => {
     const [[org], published] = await Promise.all([
       sql<{ rules_version: number }[]>`select rules_version from platform.orgs where id = ${identity.org.id}`.catch((error) => {
         throw fromDatabaseError(error, "issueCtx: orgs")
       }),
-      publishedContexts(sql, identity, paths).catch((error) => {
-        throw fromDatabaseError(error, "issueCtx: nodes")
-      }),
+      seen
+        ? Promise.resolve([])
+        : publishedContexts(sql, identity, paths).catch((error) => {
+            throw fromDatabaseError(error, "issueCtx: nodes")
+          }),
     ])
     // L'organisation de l'identité, que la RLS ne montrerait plus : ce que rendait `.single()` sans ligne.
     if (!org) throw new PlatformError("not_found", "Not found.")
-    const contexts = keptRevisions(paths, published)
+    const contexts = seen ?? keptRevisions(paths, published)
     // 32^8 codes : une collision est improbable, deux de suite impossibles en pratique.
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const code = newCtxCode()
@@ -144,10 +161,102 @@ export async function issueCtx(
 }
 
 /**
+ * L'auteur d'un Contexte n'est pas refusé par sa propre écriture (E11-S19, AC-a1, HN-E11S19-1) : la ligne du code
+ * `ctx` de l'appel passe à `revision` pour `path`, quand ce code est à la personne dans l'organisation, garde ce
+ * chemin à la révision précédente (le code avait vu tout ce qui précède l'écriture) et que le Contexte y est publié
+ * maintenant. Sinon rien ne change : un autre changement survenu entre-temps reste à lire, par le refus `ctx_stale`
+ * qui le porte. Rend `true` quand la ligne a avancé. Appelée par `write` après la publication d'un Contexte ; la
+ * policy `ctx_update_own` et le privilège sur la seule colonne `contexts` bornent l'écriture en base.
+ */
+export async function acceptOwnContextWrite(
+  db: PlatformDb,
+  identity: Identity,
+  written: { ctx: string; path: string; revision: number },
+): Promise<boolean> {
+  const { path, revision } = written
+  const code = written.ctx.trim().toUpperCase()
+  if (!CTX_PATTERN.test(code) || revision < 1 || !expectedContextPaths(identity).includes(path)) return false
+  const updated = await inTransaction(db, "acceptOwnContextWrite: ctx", (sql) => sql`
+    update platform.ctx set contexts = jsonb_set(contexts, array[${path}::text], to_jsonb(${revision}::int))
+     where code = ${code} and org_id = ${identity.org.id} and user_id = ${identity.user.id}
+       and (contexts -> ${path}::text) = to_jsonb(${revision - 1}::int)
+       and exists (select 1 from platform.nodes n
+                    where n.org_id = ${identity.org.id} and n.path = ${path} and n.kind = 'context' and n.status = 'published' and n.revision = ${revision})`)
+  return updated.count > 0
+}
+
+/** Une ligne `ctx` lue par la garde : la personne, l'organisation, les Contextes gardés, le host et l'agent. */
+type CtxRow = { user_id: string; org_id: string; contexts: Record<string, unknown> | null; host: string | null; user_agent: string | null }
+
+/**
+ * Ce que la garde a lu d'un code : sa ligne, les Contextes gardés dont le contenu servi a changé depuis son émission
+ * (`null` : code émis avant la 1.1.0, qui ne les garde pas), et `seen`, la révision publiée de chaque Contexte attendu
+ * lue par cette même garde (vide sans lecture des Contextes) : un code émis ensuite garde celles-là (HN-E11S19-2).
+ */
+type CtxState = { row: CtxRow; changed: string[] | null; seen: Record<string, number> }
+
+/**
+ * Le code `code` s'il est à la personne dans l'organisation, avec ce que la garde a lu (`CtxState`) ; `null` pour un
+ * code inconnu, d'une autre personne ou d'une autre organisation. `staleAllowed` : les Contextes ne sont pas lus. Une
+ * transaction.
+ */
+async function ctxState(db: PlatformDb, identity: Identity, code: string, staleAllowed: boolean): Promise<CtxState | null> {
+  const paths = expectedContextPaths(identity)
+  return inTransaction(db, "requireCtx", async (sql) => {
+    // Les deux lectures partent ensemble (AC-a8) ; leurs refus se décident dans l'ordre : le code, puis ses Contextes.
+    const [ctx, current] = await Promise.allSettled([
+      sql<CtxRow[]>`select user_id, org_id, contexts, host, user_agent from platform.ctx where code = ${code}`,
+      staleAllowed ? Promise.resolve([]) : publishedContexts(sql, identity, paths),
+    ])
+    if (ctx.status === "rejected") throw fromDatabaseError(ctx.reason, "requireCtx: ctx")
+    const [row] = ctx.value
+    if (!row || row.user_id !== identity.user.id || row.org_id !== identity.org.id) return null
+    if (staleAllowed) return { row, changed: [], seen: {} }
+    if (current.status === "rejected") throw fromDatabaseError(current.reason, "requireCtx: nodes")
+    const seen = keptRevisions(paths, current.value)
+    // Émis avant la 1.1.0 : la ligne ne dit pas quels Contextes elle a servis (AC-a5, HN-E11S03-4).
+    if (row.contexts === null) return { row, changed: null, seen }
+    return { row, changed: await changedContexts(sql, row.contexts, paths, current.value), seen }
+  })
+}
+
+/**
+ * Les parties des Contextes changés, lues maintenant et rendues sous le plafond de `context` (E11-S19, AC-b1, AC-c2) :
+ * le même rendu que `context`, en-tête et corps, sans lignes de faits.
+ */
+async function changedContextsText(db: PlatformDb, identity: Identity, changed: readonly string[]): Promise<string> {
+  const bodies = await contextBodies(db, identity, changed)
+  return renderContext(changedContextParts(identity, bodies, changed), CONTEXT_BUDGET, identity.org.prefix).text
+}
+
+/**
+ * Le refus d'un code périmé qui porte le changement (E11-S19, AC-b1, HN-E11S19-2, ADR-002 § 2 amendé) : un nouveau
+ * code, émis pour la personne au host et à l'agent de l'ancien, qui garde les révisions lues par la garde, et les
+ * parties des Contextes changés, lues ensuite, hors de la transaction de la garde. Un Contexte republié entre les
+ * deux lectures est servi plus récent que la révision gardée : le code est refusé une fois de plus, jamais gardé
+ * au-delà de ce qui a été servi. En panne de l'une ou de l'autre, le refus d'E11-S03 (AC-b3) : rappeler `context`.
+ */
+async function staleRefusal(db: PlatformDb, identity: Identity, state: CtxState & { changed: string[] }): Promise<PlatformError> {
+  const prefix = identity.org.prefix
+  const { row, changed, seen } = state
+  try {
+    const [code, served] = await Promise.all([
+      issueCtx(db, identity, { host: row.host, userAgent: row.user_agent, contexts: seen }),
+      changedContextsText(db, identity, changed),
+    ])
+    return new PlatformError("ctx_stale", changedCtxMessage(prefix, changed, code, served))
+  } catch (error) {
+    console.error("[platform] requireCtx: changed contexts not served", error)
+    return new PlatformError("ctx_stale", staleCtxMessage(prefix, changed))
+  }
+}
+
+/**
  * Garde des cinq outils autres que `context`. Refuse un code absent, mal formé, inconnu, d'une
  * autre personne ou émis sur une autre organisation (`ctx_missing`, N13), ou dont un Contexte gardé a
  * changé de contenu servi depuis l'émission (`ctx_stale`, E11-S03, ADR-002 § 2), sauf `staleAllowed`
- * (`feedback`, HN-E11S03-1 : un retour sur la panne n'exige pas de relire le contexte). Rend le code
+ * (`feedback`, HN-E11S03-1 : un retour sur la panne n'exige pas de relire le contexte). Le refus d'un code
+ * périmé porte un nouveau code et les Contextes changés (E11-S19, `staleRefusal`). Rend le code
  * normalisé et la signature du host qu'il porte (AC19).
  */
 export async function requireCtx(
@@ -161,26 +270,28 @@ export async function requireCtx(
   // requête et reçoit la consigne d'appeler context.
   const code = typeof raw === "string" ? raw.trim().toUpperCase() : ""
   if (!CTX_PATTERN.test(code)) throw new PlatformError("ctx_missing", missingCtxMessage(prefix))
-  const paths = expectedContextPaths(identity)
+  const state = await ctxState(db, identity, code, options.staleAllowed === true)
+  if (!state) throw new PlatformError("ctx_missing", missingCtxMessage(prefix))
+  const { changed } = state
+  if (changed === null) throw new PlatformError("ctx_stale", staleCtxMessage(prefix))
+  if (changed.length > 0) throw await staleRefusal(db, identity, { ...state, changed })
+  return { code, host: state.row.host }
+}
 
-  return inTransaction(db, "requireCtx", async (sql) => {
-    // Les deux lectures partent ensemble (AC-a8) ; leurs refus se décident dans l'ordre : le code, puis ses Contextes.
-    const [ctx, current] = await Promise.allSettled([
-      sql<{ user_id: string; org_id: string; contexts: Record<string, unknown> | null; host: string | null }[]>`
-        select user_id, org_id, contexts, host from platform.ctx where code = ${code}`,
-      options.staleAllowed ? Promise.resolve([]) : publishedContexts(sql, identity, paths),
-    ])
-    if (ctx.status === "rejected") throw fromDatabaseError(ctx.reason, "requireCtx: ctx")
-    const [row] = ctx.value
-    if (!row || row.user_id !== identity.user.id || row.org_id !== identity.org.id) {
-      throw new PlatformError("ctx_missing", missingCtxMessage(prefix))
-    }
-    if (options.staleAllowed) return { code, host: row.host }
-    if (current.status === "rejected") throw fromDatabaseError(current.reason, "requireCtx: nodes")
-    // Émis avant la 1.1.0 : la ligne ne dit pas quels Contextes elle a servis (AC-a5, HN-E11S03-4).
-    if (row.contexts === null) throw new PlatformError("ctx_stale", staleCtxMessage(prefix))
-    const changed = await changedContexts(sql, row.contexts, paths, current.value)
-    if (changed.length > 0) throw new PlatformError("ctx_stale", staleCtxMessage(prefix, changed))
-    return { code, host: row.host }
-  })
+/**
+ * Ce qu'a changé depuis un code précédent de la personne (E11-S19, `context` léger, AC-c1 à AC-c3) : le code
+ * normalisé, son host et son agent, les Contextes gardés changés (vide : aucun) et les révisions lues par la garde,
+ * que garde un code émis ensuite (`seen`, HN-E11S19-2). `null` pour un code mal formé, inconnu, d'une autre personne
+ * ou d'une autre organisation, ou émis avant la 1.1.0 : `context` sert alors tout.
+ */
+export async function ctxChanges(
+  db: PlatformDb,
+  identity: Identity,
+  raw: string,
+): Promise<{ code: string; host: string | null; userAgent: string | null; changed: string[]; seen: Record<string, number> } | null> {
+  const code = raw.trim().toUpperCase()
+  if (!CTX_PATTERN.test(code)) return null
+  const state = await ctxState(db, identity, code, false)
+  if (!state || state.changed === null) return null
+  return { code, host: state.row.host, userAgent: state.row.user_agent, changed: state.changed, seen: state.seen }
 }

@@ -10,6 +10,10 @@
 //
 // E10-S06 : `Tab` et `Maj+Tab` descendent et remontent la ligne d'une liste à puces ou numérotée (AC-a6) ; les
 // champs d'un tableau et d'un repli gardent leurs propres touches, seuls Échap, ⌘S et ⌥↑ / ⌥↓ passent ici.
+// `Tab` sur la poignée d'un bloc qui garde `Tab` sort du bloc (AC-a6, `sortirDuBlocAuClavier`, venu de `rangee-de-bloc.tsx`).
+//
+// 1.1.3 : ↑ au début d'un champ va à la fin du bloc d'avant, ↓ à la fin d'un champ au début du bloc d'après ; seul le
+// bloc touché monte son champ, les autres se lisent (`champ-de-bloc.tsx`).
 import type { KeyboardEvent } from "react"
 import { NIVEAUX_DE_LISTE } from "../libelles"
 import type { EtatDeLEditeur } from "./actions"
@@ -101,5 +105,65 @@ export function clavier(etat: EtatDeLEditeur, actions: Clavier) {
     if (evenement.key === "Backspace" && debut === 0 && fin === 0 && rang > 0) return intercepter(() => actions.fondre(cle))
     const suivante = etat.modele.current[rang + 1]
     if (evenement.key === "Delete" && debut === fin && fin === champ.value.length && suivante) return intercepter(() => actions.fondre(suivante.cle))
+    // ↑ au début du texte, ↓ à sa fin : le bloc voisin, dont le champ se monte, curseur à sa fin ou à son début (1.1.3).
+    const seule = !evenement.shiftKey && !evenement.altKey && !evenement.ctrlKey && !evenement.metaKey
+    const precedente = etat.modele.current[rang - 1]
+    if (evenement.key === "ArrowUp" && seule && debut === 0 && fin === 0 && precedente) return intercepter(() => etat.setFocus({ cle: precedente.cle, curseur: texteDe(precedente.bloc).length }))
+    if (evenement.key === "ArrowDown" && seule && debut === fin && fin === champ.value.length && suivante) return intercepter(() => etat.setFocus({ cle: suivante.cle, curseur: 0 }))
   }
+}
+
+/** Les formes dont le champ garde `Tab` (E10-S06, AC-a6, AC-b1) : de leur poignée, `Tab` sort du bloc. */
+const GARDENT_TAB: ReadonlySet<Forme> = new Set(["puces", "numerotee", "tableau"])
+
+/**
+ * Un élément de la tabulation, rendu : `tabIndex` positif ou nul, ni désactivé, ni sous `[hidden]`, `[inert]` ou dans un
+ * `<details>` fermé, ni caché par le style (`checkVisibility`, là où le navigateur l'a ; jsdom ne calcule pas le rendu).
+ */
+function tabulable(element: HTMLElement): boolean {
+  return (
+    element.tabIndex >= 0 &&
+    !element.matches(":disabled") &&
+    element.closest("[hidden], [inert], details:not([open]) > :not(summary)") === null &&
+    (typeof element.checkVisibility !== "function" || element.checkVisibility())
+  )
+}
+
+/** `element` suit `repere` dans le document, hors de lui. */
+const apres = (repere: Element, element: Element) => !repere.contains(element) && (repere.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
+/**
+ * Retire des éléments de la tabulation le temps de l'action par défaut de `Tab`, qui suit le `keydown`, et les y rend au
+ * tour suivant, que le focus ait bougé ou non ; chacun retrouve son attribut `tabindex` tel qu'il était.
+ */
+function horsDeLaTabulationUnInstant(elements: HTMLElement[]) {
+  const avant = elements.map((element) => ({ element, attribut: element.getAttribute("tabindex") }))
+  for (const element of elements) element.tabIndex = -1
+  setTimeout(() => {
+    for (const { element, attribut } of avant) {
+      if (attribut === null) element.removeAttribute("tabindex")
+      else element.setAttribute("tabindex", attribut)
+    }
+  }, 0)
+}
+
+/**
+ * `Tab` sur la poignée d'une liste à puces ou numérotée, ou d'un tableau (AC-a6) : le champ qui suit la poignée garde
+ * `Tab`, le focus va donc au premier élément après la rangée. Rien après elle (la fin de la page) : la touche reste au
+ * navigateur, qui sort de la page, les champs de la rangée hors de la tabulation le temps de son geste. `Maj+Tab` et
+ * les autres touches restent au menu.
+ */
+export function sortirDuBlocAuClavier(evenement: KeyboardEvent<HTMLButtonElement>, forme: Forme | null) {
+  if (evenement.key !== "Tab" || evenement.shiftKey || evenement.altKey || evenement.ctrlKey || evenement.metaKey) return
+  if (forme === null || !GARDENT_TAB.has(forme)) return
+  const poignee = evenement.currentTarget
+  const rangee = poignee.closest("[data-cle]")
+  if (!rangee) return
+  const suivant = Array.from(rangee.ownerDocument.body.querySelectorAll<HTMLElement>("*")).find((element) => apres(rangee, element) && tabulable(element))
+  if (!suivant) {
+    horsDeLaTabulationUnInstant(Array.from(rangee.querySelectorAll<HTMLElement>("*")).filter((element) => apres(poignee, element) && tabulable(element)))
+    return
+  }
+  evenement.preventDefault()
+  suivant.focus()
 }

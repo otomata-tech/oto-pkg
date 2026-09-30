@@ -148,6 +148,9 @@ function routingLineOf(text: string): string {
 
 describe("codeBlock", () => {
   const unmatched = { candidates: [], served: null, kind: "action" as const }
+  /** E11-S19 (AC-d5) : le refus « context has changed » porte le nouveau code et les Contextes changés. */
+  const PASS_LINE =
+    'Pass this ctx to every acme_ tool. If a tool answers "context has changed", its answer gives a new ctx and the changed contexts: take them into account, then retry that call with the new ctx.'
 
   // E05-S12 (AC-9) : les règles de l'espace entre la consigne du code et la ligne du routage.
   it("should give the code, the instruction to pass it, the rules of the workspace, then the request", () => {
@@ -155,7 +158,7 @@ describe("codeBlock", () => {
       name: "code",
       text: [
         "ctx: 7K3Q-M2XA",
-        'Pass this ctx to every acme_ tool. If a tool answers "context has changed", call acme_context again with the same request, then retry that call.',
+        PASS_LINE,
         workspaceRules("acme"),
         "## This request",
         "Request « Relance les devis »: no procedure matches. Say so instead of guessing; acme_find can search pages, tables and functions.",
@@ -176,21 +179,35 @@ describe("codeBlock", () => {
       { ...candidate("ventes/relance_prospects", 0.62), title: "Relancer les prospects", summary: "Relance les prospects à traiter." },
       { ...candidate("ventes/qualifier_prospects", 0.6), title: "Qualifier les prospects", summary: "Complète les fiches des prospects." },
     ]
+    const settings = { threshold: 0.65, gap: 0.1 }
     const routing = (phrase: string, fields: { candidates: Candidate[]; kind: RequestKind }) =>
-      routingLineOf(codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase, served: null, ...fields }).text)
-    const closest = [
-      "- ventes/relance_prospects — Relancer les prospects: Relance les prospects à traiter. (0.62)",
-      "- ventes/qualifier_prospects — Qualifier les prospects: Complète les fiches des prospects. (0.60)",
+      routingLineOf(codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase, served: null, settings, ...fields }).text)
+    // E11-S19 (AC-d2) : chaque candidate dit les mots de la demande trouvés dans son titre ou son résumé.
+    const closest = (first: string, second: string) => [
+      `- ventes/relance_prospects — Relancer les prospects: Relance les prospects à traiter. (0.62; ${first})`,
+      `- ventes/qualifier_prospects — Qualifier les prospects: Complète les fiches des prospects. (0.60; ${second})`,
       "Read the one that fits the request with acme_read, if any; otherwise search with acme_find or ask the user.",
     ]
+    const prospects = "words in common: prospects"
     // AC-a4 : la règle du routage renvoie aux candidates, au lieu de faire demander.
     expect(workspaceRules("acme")).toContain(
       "\n- When a request matches a procedure, its steps come right after this part: follow them in order. Otherwise the closest procedures are listed there: use the one that fits, or search; ask the user when nothing fits.\n",
     )
     const question = "Combien de prospects avons-nous à Valbrune, et lesquels ?"
-    for (const [phrase, kind] of [["prospects", "action"], [question, "data"], ["Comment je relance ?", "how"], ["Peux-tu relancer ?", "request"]] as const) {
-      expect(routing(phrase, { candidates, kind })).toBe([`Request « ${phrase} »: no clear match. Closest procedures:`, ...closest].join("\n"))
+    const cases = [
+      ["prospects", "action", prospects, prospects],
+      [question, "data", prospects, prospects],
+      ["Comment je relance ?", "how", "words in common: relance", "no word in common"],
+      ["Peux-tu relancer ?", "request", "words in common: relancer", "no word in common"],
+    ] as const
+    // E11-S19 (AC-d1) : le seuil et l'écart du réglage de l'organisation.
+    const unclear = (phrase: string, threshold = "0.65", gap = "0.10") =>
+      `Request « ${phrase} »: no clear match (steps are served from a score of ${threshold}, ${gap} ahead of the next). Closest procedures:`
+    for (const [phrase, kind, first, second] of cases) {
+      expect(routing(phrase, { candidates, kind })).toBe([unclear(phrase), ...closest(first, second)].join("\n"))
     }
+    const strict = codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase: "prospects", served: null, candidates, kind: "action", settings: { threshold: 0.8, gap: 0.2 } })
+    expect(routingLineOf(strict.text).split("\n")[0]).toBe(unclear("prospects", "0.80", "0.20"))
     expect(routing(question, { candidates: [], kind: "data" })).toBe(
       `Request « ${question} »: no procedure matches. It is a question: search with acme_find, acme_read or acme_call table.rows and answer it.`,
     )
@@ -198,6 +215,25 @@ describe("codeBlock", () => {
       "Request « donne-moi une recette de crêpes »: no procedure matches. Say so instead of guessing; acme_find can search pages, tables and functions.",
     )
     expect(routing("x".repeat(250), { candidates: [], kind: "action" }).startsWith(`Request « ${"x".repeat(200)} »: no procedure`)).toBe(true)
+    // E11-S19 (AC-d3) : une demande d'édition sans candidate dit la marche : les mots exacts par find, puis write.
+    expect(routing("Corrige le tarif de la grille", { candidates: [], kind: "edit" })).toBe(
+      "Request « Corrige le tarif de la grille »: no procedure matches. It asks to change a content: search with acme_find for the exact words to change, not the document's title; each block found comes with its section and how to edit it with acme_write.",
+    )
+  })
+
+  // E11-S19 (AC-c1, AC-c2) : `context` léger, sans les règles ; la ligne dit ce qui vaut encore du code d'où l'on repart.
+  it("should replace the rules by what still holds since the earlier ctx in a light context", () => {
+    const light = (changed: string[]) =>
+      codeBlock({ prefix: "acme", code: "7K3Q-M2XA", phrase: "Relance les devis", ...unmatched, since: { code: "AAAA-BBBB", changed } }).text.split("\n")
+    expect(light([]).slice(0, 4)).toEqual([
+      "ctx: 7K3Q-M2XA",
+      PASS_LINE,
+      "Since ctx AAAA-BBBB: nothing changed; the rules and contexts served with it still hold.",
+      "## This request",
+    ])
+    expect(light(["contexte", "ventes/contexte"])[2]).toBe(
+      "Since ctx AAAA-BBBB: the rules and the other contexts served with it still hold; the changed contexts follow (contexte, ventes/contexte).",
+    )
   })
 
   // E11-S16 (AC-a2) : la procédure servie l'est si la demande porte sur son titre ; les autres candidates, par titre et
@@ -212,7 +248,7 @@ describe("codeBlock", () => {
     const matched = (phrase: string) => `Request « ${phrase} » matches todo/creer_un_projet (score 0.78): its steps follow, if the request is about « Créer un nouveau projet ».`
     const others = [
       "Other candidates:",
-      "- todo/ajouter_une_tache — Ajouter une tâche: Ajoute une tâche à ma todo. (0.58)",
+      "- todo/ajouter_une_tache — Ajouter une tâche: Ajoute une tâche à ma todo. (0.58; no word in common)",
       "If the request is about one of them instead, read that one with demo_read and follow it rather than these steps.",
     ]
 

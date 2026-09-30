@@ -9,8 +9,10 @@
 import { randomUUID } from "node:crypto"
 import type postgres from "postgres"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { CTX_PATTERN } from "../../packages/plateforme/schemas"
-import { CTX_ALPHABET, issueCtx, lastCtxAt, missingCtxMessage, newCtxCode, requireCtx, staleCtxMessage } from "../../packages/plateforme/server/ctx"
+import { CTX_PATTERN, SERVED_RULES } from "../../packages/plateforme/schemas"
+import { CONTEXT_GONE } from "../../packages/plateforme/server/context/blocks/contexts"
+import { acceptOwnContextWrite, CTX_ALPHABET, issueCtx, lastCtxAt, missingCtxMessage, newCtxCode, requireCtx, staleCtxMessage } from "../../packages/plateforme/server/ctx"
+import type { PlatformDb } from "../../packages/plateforme/server/db"
 import { PlatformError } from "../../packages/plateforme/server/errors"
 import { connectDeps } from "../helpers/mcp"
 import { ORG, OTHER_ORG, PEOPLE, TEAMS, type Person } from "../helpers/reference-org"
@@ -51,6 +53,11 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
   })
 
   const dbOf = (person: Person) => asCaller(ref.people[person].id, ref.people[person].email)
+  /**
+   * La connexion d'administration en `PlatformDb`, sans RLS : une base qui rend toutes les lignes, pour prouver le filtre
+   * du service. `begin` enveloppe le type rendu par `fn` (postgres.js) ; la valeur est bien celle de `fn`.
+   */
+  const adminDb = (): PlatformDb => ({ tx: <T,>(fn: (sql: postgres.TransactionSql) => Promise<T>) => seed.admin.begin(fn) as Promise<T> })
   const setRulesVersion = (version: number) => seed.admin`update platform.orgs set rules_version = ${version} where id = ${ref.org.id}`
   const ctxRow = async (code: string) =>
     (await seed.admin`select code, org_id, user_id, rules_version, contexts, host, user_agent from platform.ctx where code = ${code}`)[0]
@@ -154,7 +161,8 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
 
   // E11-S03, lot a (FB-0005) : le code périme par les Contextes qu'il a servis, et eux seuls.
   describe("requireCtx, the kept Contextes (E11-S03, AC-a2 to AC-a6)", () => {
-    const stale = (paths: string[]) => ({ code: "ctx_stale", message: staleCtxMessage(ref.org.prefix, paths) })
+    // E11-S19 (AC-b1) : le refus nomme les chemins, puis porte un nouveau code et les Contextes changés.
+    const stale = (paths: string[]) => ({ code: "ctx_stale", message: expect.stringContaining(`context has changed (${paths.join(", ")}). New ctx: `) })
     /** Un code de Léa (Ventes) émis maintenant : ce qu'il garde est ce que lit `issueCtx`. */
     const leaCode = () => issueCtx(dbOf("lea"), ref.identityOf("lea"), { host: null, userAgent: null })
     const guard = (code: string) => requireCtx(dbOf("lea"), ref.identityOf("lea"), code)
@@ -187,6 +195,8 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
       await seed.admin`update platform.nodes set status = 'draft' where id = ${ref.nodeId("private/lea/contexte")}`
       try {
         await expect(guard(code)).rejects.toMatchObject(stale(["private/lea/contexte"]))
+        // E11-S19 (AC-b1) : un Contexte retiré a son en-tête et la ligne qui le dit.
+        await expect(guard(code)).rejects.toMatchObject({ message: expect.stringContaining(`## Context: you only (private/lea/contexte)\n${CONTEXT_GONE}`) })
       } finally {
         await seed.admin`update platform.nodes set status = 'published' where id = ${ref.nodeId("private/lea/contexte")}`
       }
@@ -237,19 +247,142 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
     it("should refuse read once a served Contexte is published changed, record feedback on that code, and pass after another person's Privé is published", async () => {
       const mcp = await session()
       const { code } = await mcp.openContext("Relance les devis")
-      await publishContext("ventes/contexte", snapshot(`Par MCP ${randomUUID()}`))
+      const marker = `Par MCP ${randomUUID()}`
+      await ref.addBlocks("ventes/contexte", "published", [{ type: "paragraph", text: marker }])
+      await publishContext("ventes/contexte", snapshot(marker))
       const refused = await mcp.call("read", { ctx: code, path: "ventes/devis" })
-      expect([refused.isError, refused.text]).toEqual([
-        true,
-        `context has changed (ventes/contexte): call ${ref.org.prefix}_context again with the same request, then retry this call.`,
-      ])
+      // E11-S19 (AC-b1, AC-b2) : le nouveau code, la consigne, la partie changée seule ; l'appel rejoué avec lui passe.
+      const fresh = /^context has changed \(ventes\/contexte\)\. New ctx: (\S+): retry this call with it/.exec(refused.text)?.[1] ?? ""
+      expect([refused.isError, fresh]).toEqual([true, expect.stringMatching(CTX_PATTERN)])
+      expect(refused.text).toContain(`, as served now:\n\n## Context: team Ventes (ventes/contexte)\n`)
+      expect(refused.text).toContain(marker)
+      expect(refused.text).not.toContain("## Context: everyone")
+      expect(await ctxRow(fresh)).toMatchObject({ user_id: ref.people.lea.id, host: null, user_agent: "vitest" })
+      expect((await mcp.call("read", { ctx: fresh, path: "ventes/devis" })).isError).toBe(false)
       const feedback = await mcp.call("feedback", { ctx: code, type: "gap", text: "Le contexte a changé en cours de route." })
       expect(feedback.isError).toBe(false)
       expect(await seed.admin`select ctx from platform.feedback where org_id = ${ref.org.id} and ctx = ${code}`).toHaveLength(1)
 
-      const fresh = await mcp.openContext("Relance les devis")
+      const reopened = await mcp.openContext("Relance les devis")
       await publishContext("private/claire/contexte", snapshot(`Privé de Claire ${randomUUID()}`))
-      expect((await mcp.call("read", { ctx: fresh.code, path: "ventes/devis" })).isError).toBe(false)
+      expect((await mcp.call("read", { ctx: reopened.code, path: "ventes/devis" })).isError).toBe(false)
+    })
+
+    // E11-S19 (HN-E11S19-2) : un Contexte republié entre la garde et la lecture des corps ; le nouveau code garde la
+    // révision vue par la garde, et se fait refuser une fois de plus, jamais l'inverse.
+    it("should issue the new ctx with the revisions the guard read, so a republication meanwhile refuses it once more", async () => {
+      const code = await issueCtx(dbOf("lea"), ref.identityOf("lea"), { host: null, userAgent: null })
+      const seen = await publishContext("ventes/contexte", snapshot(`Vu par la garde ${randomUUID()}`))
+      // La garde finit par la lecture des instantanés ; toute requête qui la suit (émission, corps) attend la même
+      // republication : relire les révisions à l'émission verrait la suivante.
+      let guarded = false
+      let meanwhile: Promise<number> | null = null
+      const { db } = spyDb(dbOf("lea"), {
+        before: (query) => {
+          if (query.target === "node_versions") guarded = true
+          else if (guarded) return (meanwhile ??= publishContext("ventes/contexte", snapshot(`Entre-temps ${randomUUID()}`)))
+        },
+      })
+      const refused = await requireCtx(db, ref.identityOf("lea"), code).catch((error: unknown) => error)
+      const fresh = /New ctx: (\S+):/.exec(refused instanceof PlatformError ? refused.message : "")?.[1] ?? ""
+      expect([await meanwhile, (await ctxRow(fresh)).contexts]).toEqual([seen + 1, expect.objectContaining({ "ventes/contexte": seen })])
+      await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), fresh)).rejects.toMatchObject({ code: "ctx_stale" })
+    })
+
+    // E11-S19 (AC-b3) : l'émission du nouveau code en panne, le refus d'E11-S03, sans code.
+    it("should fall back to the instruction to call context again when the new ctx cannot be issued", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {})
+      const code = await issueCtx(dbOf("lea"), ref.identityOf("lea"), { host: null, userAgent: null })
+      await publishContext("ventes/contexte", snapshot(`Panne ${randomUUID()}`))
+      const { db } = spyDb(dbOf("lea"), { fail: (query) => (query.op === "insert" && query.target === "ctx" ? { code: "57014" } : null) })
+      await expect(requireCtx(db, ref.identityOf("lea"), code)).rejects.toMatchObject({ code: "ctx_stale", message: staleCtxMessage(ref.org.prefix, ["ventes/contexte"]) })
+    })
+
+    // E11-S19 (AC-c1 à AC-c3) : `context` léger, par `since_ctx`.
+    it("should answer since_ctx with the same ctx and the routing only when nothing changed, without writing a ctx", async () => {
+      const mcp = await session()
+      const { code } = await mcp.openContext()
+      const count = async () => (await seed.admin<{ n: number }[]>`select count(*)::int as n from platform.ctx where user_id = ${ref.people.lea.id}`)[0].n
+      const before = await count()
+      const light = await mcp.call("context", { phrase: "Relance les devis", since_ctx: code.toLowerCase() })
+      expect(light.text.split("\n").slice(0, 4)).toEqual([
+        `ctx: ${code}`,
+        expect.stringContaining("Pass this ctx"),
+        `Since ctx ${code}: nothing changed; the rules and contexts served with it still hold.`,
+        "## This request",
+      ])
+      expect(light.result.structuredContent).toMatchObject({ ctx: code })
+      for (const absent of ["## Context:", "## What's new", "## Procedures you can run", SERVED_RULES.title]) expect(light.text).not.toContain(absent)
+      expect(await count()).toBe(before)
+    })
+
+    it("should answer since_ctx with a new ctx and the changed contexts only when one changed", async () => {
+      const mcp = await session()
+      const { code } = await mcp.openContext()
+      const marker = `Léger ${randomUUID()}`
+      await ref.addBlocks("ventes/contexte", "published", [{ type: "paragraph", text: marker }])
+      await publishContext("ventes/contexte", snapshot(marker))
+      const light = await mcp.call("context", { since_ctx: code })
+      const fresh = /^ctx: (\S+)/.exec(light.text)?.[1]
+      expect(fresh).not.toBe(code)
+      expect(light.text).toContain(`Since ctx ${code}: the rules and the other contexts served with it still hold; the changed contexts follow (ventes/contexte).`)
+      expect(light.text).toContain(`\n\n## Context: team Ventes (ventes/contexte)\n`)
+      expect(light.text).toContain(marker)
+      expect(light.text).not.toContain("## Context: everyone")
+      expect((await mcp.call("read", { ctx: fresh, path: "ventes/devis" })).isError).toBe(false)
+    })
+
+    it("should serve the whole context for a since_ctx unknown, of another person, malformed or issued before 1.1.0", async () => {
+      const mcp = await session()
+      await ref.write({ ctx: [{ code: "GGGG-0001", org_id: ORG.id, user_id: PEOPLE.lea.id, contexts: null }] })
+      const claire = await issueCtx(dbOf("claire"), ref.identityOf("claire"), { host: null, userAgent: null })
+      for (const since of ["ZZZZ-ZZZZ", claire, "pas un code", ref.id("GGGG-0001")]) {
+        const full = await mcp.call("context", { since_ctx: since })
+        expect([full.isError, full.text.includes(SERVED_RULES.title), full.text.includes("## Context: everyone"), full.text.includes("Since ctx")], since).toEqual([false, true, true, false])
+      }
+    })
+  })
+
+  // E11-S19, lot a : l'auteur d'un Contexte n'est pas refusé par sa propre écriture.
+  describe("acceptOwnContextWrite (E11-S19, AC-a1, AC-a2)", () => {
+    const lea = () => ref.identityOf("lea")
+    const leaCode = () => issueCtx(dbOf("lea"), lea(), { host: null, userAgent: null })
+    const kept = async (code: string) => (await ctxRow(code)).contexts
+
+    it("should move the caller's code to the revision just published, which the guard then accepts (AC-a1)", async () => {
+      const code = await leaCode()
+      const revision = await publishContext("ventes/contexte", snapshot(`Écrit par Léa ${randomUUID()}`))
+      expect(await acceptOwnContextWrite(dbOf("lea"), lea(), { ctx: code, path: "ventes/contexte", revision })).toBe(true)
+      expect(await kept(code)).toMatchObject({ "ventes/contexte": revision })
+      await expect(requireCtx(dbOf("lea"), lea(), code)).resolves.toMatchObject({ code })
+    })
+
+    it("should change nothing after another change, for a path not expected, a revision not published, or another person's code (AC-a2)", async () => {
+      const code = await leaCode()
+      const before = await kept(code)
+      // Un autre changement entre-temps : le code ne gardait pas la révision précédente.
+      await publishContext("ventes/contexte", snapshot(`Autre auteur ${randomUUID()}`))
+      const twice = await publishContext("ventes/contexte", snapshot(`Léa ensuite ${randomUUID()}`))
+      expect(await acceptOwnContextWrite(dbOf("lea"), lea(), { ctx: code, path: "ventes/contexte", revision: twice })).toBe(false)
+      // Le Contexte d'une équipe dont Léa n'est pas : jamais attendu pour elle, même quand la ligne le garde à r − 1.
+      const support = await publishContext("support/contexte", snapshot(`Support ${randomUUID()}`))
+      await ref.write({ ctx: [{ code: "HHHH-0001", org_id: ORG.id, user_id: PEOPLE.lea.id, contexts: { "support/contexte": support - 1 } }] })
+      const supportCode = ref.id("HHHH-0001")
+      expect(await acceptOwnContextWrite(dbOf("lea"), lea(), { ctx: supportCode, path: "support/contexte", revision: support })).toBe(false)
+      expect(await kept(supportCode)).toEqual({ "support/contexte": support - 1 })
+      // Une révision que le Contexte n'a pas publiée : le code garde bien la précédente.
+      const current = await revisionOf("contexte")
+      expect(await acceptOwnContextWrite(dbOf("lea"), lea(), { ctx: code, path: "contexte", revision: current + 1 })).toBe(false)
+      expect(await kept(code)).toEqual(before)
+      // Le code d'une autre personne, gardant la révision précédente, sur la connexion d'administration, qui rend et
+      // modifierait la ligne : seul le filtre `user_id` du service la refuse (`security-patterns.md § Droits dans le service`).
+      const other = await issueCtx(dbOf("claire"), ref.identityOf("claire"), { host: null, userAgent: null })
+      const claireBefore = await kept(other)
+      const next = await publishContext("ventes/contexte", snapshot(`Pour Claire ${randomUUID()}`))
+      expect(await acceptOwnContextWrite(adminDb(), lea(), { ctx: other, path: "ventes/contexte", revision: next })).toBe(false)
+      expect(await kept(other)).toEqual(claireBefore)
+      // Témoin : la même connexion avance la ligne de Claire pour Claire.
+      expect(await acceptOwnContextWrite(adminDb(), ref.identityOf("claire"), { ctx: other, path: "ventes/contexte", revision: next })).toBe(true)
     })
   })
 

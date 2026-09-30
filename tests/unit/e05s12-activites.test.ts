@@ -56,6 +56,9 @@ describe("classifyRow: the verb of a journal line (AC-12, HN-E05S12-15)", () => 
     ["a confirmed table.delete_rows", { method: "tools/call", tool: "acme_call", target: "table.delete_rows", confirmed: true, table: "ventes/salons" }, "deleted_rows"],
     ["the summary of table.delete_rows", { method: "tools/call", tool: "acme_call", target: "table.delete_rows", table: "ventes/salons" }, null],
     ["a confirmed node.discard_draft", { method: "tools/call", tool: "acme_call", target: "node.discard_draft", confirmed: true, path: "ventes/salons" }, null],
+    // E11-S18 (HN-E11S18-14) : un déplacement par `node.move`, sans confirmation ; son ancien chemin mène au nœud.
+    ["a node.move", { method: "tools/call", tool: "acme_call", target: "node.move", path: "ventes/relance_devis" }, "moved"],
+    ["a node.write_many, whose pages the journal cuts", { method: "tools/call", tool: "acme_call", target: "node.write_many", truncated: true }, null],
     ["a context routed to a path", { method: "tools/call", tool: "acme_context", target: "ventes/relance_devis", ctx: "K7M2-9QXR" }, "ran"],
     ["a context phrase", { method: "tools/call", tool: "acme_context", target: "relance les devis" }, null],
     ["a find", { method: "tools/call", tool: "acme_find", target: "ventes" }, null],

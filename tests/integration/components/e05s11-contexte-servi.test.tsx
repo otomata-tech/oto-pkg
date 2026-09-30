@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { NodeView } from "@otomata_tech/oto_platform/schemas"
 import { ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { ContexteServi, type DonneesDuContexteServi } from "../../../packages/plateforme/ui/contexte/contexte-servi"
+import { ouvrirLeChamp } from "../../helpers/champ-du-bloc"
 import { bloc, simulerLAPI, vueDuNoeud } from "../../helpers/noeud"
 
 const rafraichir = vi.fn()
@@ -112,7 +113,7 @@ describe("la vue « Contexte » (AC-13)", () => {
 describe("écrire un Contexte dans la vue (AC-14)", () => {
   it("should write in place the Contextes the person can write, and read the others as served, without a link to Profil", () => {
     monter()
-    // Gestion (Ventes) et écriture (Privé) : l'éditeur d'une page, ses champs toujours montés.
+    // Gestion (Ventes) et écriture (Privé) : l'éditeur d'une page, chaque bloc modifiable (lu au repos, champ monté au focus).
     expect(partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })).toBeInTheDocument()
     expect(partie("Contexte : Privé").getByRole("textbox", { name: "Modifier ce texte — Signature : Léa." })).toBeInTheDocument()
     // Écrire publie (E11-S02, AC-c2) : au niveau écriture aussi, la publication seule, sans phrase.
@@ -128,7 +129,7 @@ describe("écrire un Contexte dans la vue (AC-14)", () => {
   it("should publish a written Contexte on its own path, then read the view again", async () => {
     const api = simulerLAPI()
     monter()
-    const champ = partie("Contexte : équipe Ventes").getByRole("textbox", { name: "Modifier ce texte — Tutoie les clients." })
+    const champ = ouvrirLeChamp("Modifier ce texte — Tutoie les clients.", screen.getByRole("region", { name: "Contexte : équipe Ventes" }))
     fireEvent.change(champ, { target: { value: "Tutoie les clients, toujours." } })
     fireEvent.keyDown(champ, { key: "Escape" })
     await waitFor(() => expect(api.envoyes).toHaveLength(1))

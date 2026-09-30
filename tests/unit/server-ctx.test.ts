@@ -4,7 +4,7 @@
 // sur une vraie base : `tests/integration/server-ctx.test.ts` (E01-S10, partie e1a).
 import { describe, expect, it } from "vitest"
 import { CTX_PATTERN } from "../../packages/plateforme/schemas"
-import { CTX_ALPHABET, missingCtxMessage, newCtxCode, requireCtx, staleCtxMessage } from "../../packages/plateforme/server/ctx"
+import { changedCtxMessage, CTX_ALPHABET, missingCtxMessage, newCtxCode, requireCtx, staleCtxMessage } from "../../packages/plateforme/server/ctx"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
 import type { Identity } from "../../packages/plateforme/server/identity"
 
@@ -56,6 +56,13 @@ describe("messages (H27)", () => {
     )
     const many = Array.from({ length: 22 }, (_, index) => `equipe${index}/contexte`)
     expect(staleCtxMessage("acme", many)).toContain(", equipe19/contexte, … and 2 more): call acme_context again")
+  })
+
+  // E11-S19 (AC-b1) : le refus porte le nouveau code, la consigne de rejouer avec lui, puis les Contextes changés.
+  it("should give the new ctx, the instruction to retry with it, then the changed contexts", () => {
+    expect(changedCtxMessage("acme", ["ventes/contexte"], "7K3Q-M2XA", "## Context: team Ventes (ventes/contexte)\nTutoie.")).toBe(
+      "context has changed (ventes/contexte). New ctx: 7K3Q-M2XA: retry this call with it, and pass it to every acme_ tool from now on. The changed contexts, as served now:\n\n## Context: team Ventes (ventes/contexte)\nTutoie.",
+    )
   })
 })
 

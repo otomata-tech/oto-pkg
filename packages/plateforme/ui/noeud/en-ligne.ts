@@ -322,10 +322,31 @@ function avecLesAdresses(texte: string, atomes: Atome[]): Atome[] {
 }
 
 /**
- * Le texte d'un bloc en segments, dans l'ordre : les liens et le code d'abord, puis le gras et l'italique
- * autour d'eux ; un segment vide n'est jamais produit.
+ * Les lectures déjà faites, par texte : l'éditeur lit le même texte plusieurs fois par rendu (nom des gestes, rendu au
+ * repos, balisage, liens), et chaque rangée le relisait à chaque frappe d'une autre. Bornée en entrées, la plus ancienne
+ * sort la première ; un texte long n'y entre pas, pour que la borne tienne aussi en mémoire. Au navigateur seulement :
+ * sur le serveur, le processus sert les pages de toutes les organisations, et leurs textes n'y restent pas.
  */
-export function segmentsEnLigne(texte: string): Segment[] {
+const LUS = new Map<string, readonly Segment[]>()
+const LUS_MAX = 1_000
+const LU_CARACTERES_MAX = 5_000
+
+/**
+ * Le texte d'un bloc en segments, dans l'ordre : les liens et le code d'abord, puis le gras et l'italique
+ * autour d'eux ; un segment vide n'est jamais produit. Le tableau rendu est partagé entre les appels (`LUS`).
+ */
+export function segmentsEnLigne(texte: string): readonly Segment[] {
+  if (typeof window === "undefined") return lireLesSegments(texte)
+  const lu = LUS.get(texte)
+  if (lu) return lu
+  const segments = lireLesSegments(texte)
+  if (texte.length > LU_CARACTERES_MAX) return segments
+  if (LUS.size >= LUS_MAX) LUS.delete(LUS.keys().next().value ?? "")
+  LUS.set(texte, segments)
+  return segments
+}
+
+function lireLesSegments(texte: string): Segment[] {
   const atomes = atomesDe(texte)
   // Le texte que lisent les marques : chaque atome y tient en un caractère, dont `places` garde le rang.
   const morceaux: string[] = []

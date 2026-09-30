@@ -7,6 +7,7 @@
 // tableau remis à son état semé avant chaque publication (`freshTable`) ; requêtes vues, courses et
 // pannes jouées par `spyDb` ; textes servis au modèle comparés mot pour mot (H04).
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import type { WriteOrigin } from "../../packages/plateforme/server/nodes/write"
 import type { RowBlock } from "../../packages/plateforme/server/tables/meta"
 import { nodeId } from "../helpers/reference-org"
 import type { ReferenceOrgSql } from "../helpers/reference-org-sql"
@@ -58,6 +59,8 @@ function withRows(count: number, notes = true): RowBlock[] {
 /** L'en-tête en attente qui retire `notes`, publié par `confirm_remove`. */
 const WITHOUT_NOTES = { ...PROSPECTS_HEADER, columns: PROSPECTS_HEADER.columns.filter((column) => column.name !== "notes") }
 const CONFIRM = { path: PROSPECTS.path, base_revision: 3, header: { confirm_remove: true }, publish: true }
+/** L'écran : une publication en deux temps, sa purge dans sa propre transaction (E11-S18, AC-3). */
+const SCREEN: WriteOrigin = { kind: "human" }
 
 describe.skipIf(!sqlConfigured)(portable("the header of a table published over its rows"), { timeout: NETWORK_TIMEOUT }, () => {
   let seed: SeededData
@@ -121,18 +124,18 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
   })
 
   describe("type of a column that holds values (AC7)", () => {
-    it("should refuse the type change of a column that holds values, the draft kept, and change it on a column without value", async () => {
+    it("should refuse the type change of a column that holds values, nothing written, and change it on a column without value", async () => {
       const ville = await publish({ columns: [{ name: "ville", type: "enum", options: ["Valbrune", "Coudray"] }] })
       expect(ville.error).toMatchObject({
         code: "conflict",
         // E11-S02 (AC-d5) : la raison que l'écran lit pour sa phrase d'aide (AC-g1).
         details: { reason: "header_refused" },
+        // Une écriture d'assistant qui publie n'écrit rien sur un refus (E11-S18, AC-1).
         message:
-          "Publication of ventes/suivi_prospects refused: column « ville » holds values on 11 rows (sample keys: Atelier 2, Atelier 10, Boulangerie Fournier, Brasserie de la Lise, Camping Les Pins); its type cannot change from text to enum. Add a new column of type enum, copy the values with acme_call table.write, then remove « ville ». The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {\"path\": \"ventes/suivi_prospects\"}.",
+          "Publication of ventes/suivi_prospects refused: column « ville » holds values on 11 rows (sample keys: Atelier 2, Atelier 10, Boulangerie Fournier, Brasserie de la Lise, Camping Les Pins); its type cannot change from text to enum. Add a new column of type enum, copy the values with acme_call table.write, then remove « ville ». Nothing was written.",
       })
       expect(publishCalls(ville.calls)).toEqual([])
-      const [draft] = await draftsAt(seed, ref, PROSPECTS.path)
-      expect(draft?.meta).toMatchObject({ columns: expect.arrayContaining([{ name: "ville", type: "enum", options: ["Valbrune", "Coudray"] }]) })
+      expect(await draftsAt(seed, ref, PROSPECTS.path)).toEqual([])
       // La colonne clé « a des valeurs » dès que le tableau a des lignes.
       const key = await publish({ columns: [{ name: "entreprise", type: "email" }] })
       expect(key.error).toMatchObject({ code: "conflict", message: expect.stringContaining("column « entreprise » holds values on 12 rows (") })
@@ -149,15 +152,15 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
         code: "needs_confirmation",
         // E11-S02 (AC-d5) : la raison que l'écran lit pour sa phrase d'aide (AC-g1).
         details: { reason: "header_refused" },
+        // Rien n'est écrit : l'appel à refaire porte tout l'en-tête et `confirm_remove` (E11-S18, AC-1, AC-2).
         message:
-          'Publication of ventes/suivi_prospects needs confirmation: removing column « notes » erases its values on 2 rows (sample keys: Clinique des Saules, École de Valbrune). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {"path": "ventes/suivi_prospects"}. If the user agrees to erase them, call acme_write {"path": "ventes/suivi_prospects", "base_revision": 3, "header": {"confirm_remove": true}, "publish": true}.',
+          'Publication of ventes/suivi_prospects needs confirmation: removing column « notes » erases its values on 2 rows (sample keys: Clinique des Saules, École de Valbrune). Columns cannot be renamed: to rename one, add the new column, copy the values with acme_call table.write, then remove the old one. Nothing was written. If the user agrees to erase them, call acme_write {"path":"ventes/suivi_prospects","base_revision":3,"header":{"remove_columns":["notes"],"confirm_remove":true},"publish":true}.',
       })
       expect(publishCalls(asked.calls)).toEqual([])
-      const [draft] = await draftsAt(seed, ref, PROSPECTS.path)
-      expect(draft?.meta).toMatchObject({ columns: expect.not.arrayContaining([expect.objectContaining({ name: "notes" })]) })
+      expect(await draftsAt(seed, ref, PROSPECTS.path)).toEqual([])
 
       const before = await tableRows(seed, ref)
-      const confirmed = await writeAs(ref, "claire", CONFIRM)
+      const confirmed = await writeAs(ref, "claire", { ...CONFIRM, header: { remove_columns: ["notes"], confirm_remove: true } })
       expect(confirmed.result?.text).toBe("Published ventes/suivi_prospects revision 4: removed notes (2 values erased). Next write: base_revision 4.")
       const after = await tableRows(seed, ref)
       const purged = ["Clinique des Saules", "École de Valbrune"]
@@ -185,8 +188,9 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
         await seed.admin`update platform.blocks set revision = revision + 1
                           where node_id = ${ref.nodeId(PROSPECTS.path)} and state = 'published' and key = 'Clinique des Saules'`
       }
+      // Par l'écran : la purge d'après la publication tient sa transaction ; celle d'un assistant est dans son écriture (E11-S18).
       await freshTable(seed, ref, { draft: { meta: WITHOUT_NOTES } })
-      const once = await writeAs(ref, "claire", CONFIRM, { meanwhile: race(1) })
+      const once = await writeAs(ref, "claire", CONFIRM, { meanwhile: race(1), origin: SCREEN })
       expect(once.result?.text).toBe("Published ventes/suivi_prospects revision 4: removed notes (2 values erased). Next write: base_revision 4.")
       const clinique = await liveRow("Clinique des Saules")
       expect(clinique).toMatchObject({ revision: 3 })
@@ -195,7 +199,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
       raced = 0
       const logged = vi.spyOn(console, "error").mockImplementation(() => undefined)
       await freshTable(seed, ref, { draft: { meta: WITHOUT_NOTES } })
-      const always = await writeAs(ref, "claire", CONFIRM, { meanwhile: race(9) })
+      const always = await writeAs(ref, "claire", CONFIRM, { meanwhile: race(9), origin: SCREEN })
       expect(always.result?.text).toBe(
         "Published ventes/suivi_prospects revision 4: removed notes (1 value erased). Next write: base_revision 4.\nWarnings:\n- 1 row still holds a value under removed column notes (changed while purging; sample key: Clinique des Saules); it is purged if a column notes is added again.",
       )
@@ -203,7 +207,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
 
       // Une panne de la base pendant la purge, la publication faite : une ligne non écrite, puis la relecture des lignes en panne.
       await freshTable(seed, ref, { draft: { meta: WITHOUT_NOTES } })
-      const unwritten = await writeAs(ref, "claire", CONFIRM, { fail: (call) => (purgeOf("Clinique des Saules")(call) ? { code: "57014" } : null) })
+      const unwritten = await writeAs(ref, "claire", CONFIRM, { fail: (call) => (purgeOf("Clinique des Saules")(call) ? { code: "57014" } : null), origin: SCREEN })
       expect(unwritten.result?.text).toBe(
         "Published ventes/suivi_prospects revision 4: removed notes (1 value erased). Next write: base_revision 4.\nWarnings:\n- 1 row still holds a value under removed column notes (could not be written; sample key: Clinique des Saules); it is purged if a column notes is added again.",
       )
@@ -214,7 +218,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
         return published && call.kind === "table" && call.table === "blocks" && call.op === "select" ? { code: "57014" } : null
       }
       await freshTable(seed, ref, { draft: { meta: WITHOUT_NOTES } })
-      const unread = await writeAs(ref, "claire", CONFIRM, { fail: afterPublication })
+      const unread = await writeAs(ref, "claire", CONFIRM, { fail: afterPublication, origin: SCREEN })
       expect(unread.result?.text).toBe(
         "Published ventes/suivi_prospects revision 4: removed notes. Next write: base_revision 4.\nWarnings:\n- 2 rows still hold values under removed column notes (could not be written; sample keys: Clinique des Saules, École de Valbrune); they are purged if a column notes is added again.",
       )
@@ -230,7 +234,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
           // E11-S02 (AC-d5) : la raison que l'écran lit pour sa phrase d'aide (AC-g1).
           details: { reason: "header_refused" },
           message:
-            "Publication of ventes/suivi_prospects refused: removing « notes » would erase values on 2,431 rows; 2,000 at most per publication: clear them in batches with acme_call table.write, then remove the column. The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {\"path\": \"ventes/suivi_prospects\"}.",
+            "Publication of ventes/suivi_prospects refused: removing « notes » would erase values on 2,431 rows; 2,000 at most per publication: clear them in batches with acme_call table.write, then remove the column. Nothing was written.",
         })
         expect(publishCalls(many.calls)).toEqual([])
 
@@ -240,7 +244,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
           // E11-S02 (AC-d5) : la raison que l'écran lit pour sa phrase d'aide (AC-g1).
           details: { reason: "header_refused" },
           message:
-            "Publication of ventes/suivi_prospects refused: the table has 5,001 rows; header changes that check its rows work on tables of 5,000 rows at most in this version. The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {\"path\": \"ventes/suivi_prospects\"}.",
+            "Publication of ventes/suivi_prospects refused: the table has 5,001 rows; header changes that check its rows work on tables of 5,000 rows at most in this version. Nothing was written.",
         })
         expect(blockCalls(huge.calls).map((call) => "count" in call)).toEqual([true])
 
@@ -286,7 +290,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
       expect(refused.error).toMatchObject({
         code: "conflict",
         message:
-          "Publication of ventes/suivi_prospects refused: the old values left under « fax » could not be erased on 1 row (sample key: Mairie de Coudray); an added column never shows old values. The draft is kept; nothing was published. Retry the publication.",
+          "Publication of ventes/suivi_prospects refused: the old values left under « fax » could not be erased on 1 row (sample key: Mairie de Coudray); an added column never shows old values. Nothing was written. Retry the publication.",
       })
       expect(publishCalls(refused.calls)).toEqual([])
       expect(record((await liveRow("Mairie de Coudray"))?.data)).toHaveProperty("fax")
@@ -316,7 +320,7 @@ describe.skipIf(!sqlConfigured)(portable("the header of a table published over i
         // E11-S02 (AC-d5) : la raison que l'écran lit pour sa phrase d'aide (AC-g1).
         details: { reason: "header_refused" },
         message:
-          "Publication of ventes/suivi_prospects refused: its key cannot change from « entreprise » to « email » while it has rows (12). Create a new table keyed by email and copy the rows (acme_call table.rows, then table.write). The draft is kept; nothing was published. To go back to the published header, discard the draft: acme_call node.discard_draft {\"path\": \"ventes/suivi_prospects\"}.",
+          "Publication of ventes/suivi_prospects refused: its key cannot change from « entreprise » to « email » while it has rows (12). Create a new table keyed by email and copy the rows (acme_call table.rows, then table.write). Nothing was written.",
       })
       expect(publishCalls(full.calls)).toEqual([])
     })

@@ -149,8 +149,8 @@ function contextBody(input: { markdown: string; children: readonly IndexNode[]; 
  * (E11-S03, AC-b1, AC-b4). Ses listes arrêtées à 20 lignes (N20), il finit par le pointeur qui le dit (AC-b2)
  * et la partie compte `cut`. `path` au rapport seulement quand le corps est servi (AC-4).
  */
-function partBlock(entry: ContextPath, facts: PartFacts, prefix: string, content: { body?: ContextBody; notLoaded?: boolean }): ContextBlock {
-  const head = [headerOf(entry), ...entry.facts(facts)].join("\n")
+function partBlock(entry: ContextPath, factLines: readonly string[], prefix: string, content: { body?: ContextBody; notLoaded?: boolean }): ContextBlock {
+  const head = [headerOf(entry), ...factLines].join("\n")
   const part = { name: entry.name, head: head.length }
   const { body } = content
   if (content.notLoaded && entry.path) return { ...part, text: `${head}\n${CONTEXT_INDEX.notLoaded}${prefix}_read {"path": "${entry.path}"}.` }
@@ -167,8 +167,25 @@ function partBlock(entry: ContextPath, facts: PartFacts, prefix: string, content
  */
 export function contextParts(identity: Identity, facts: PartFacts, bodies: ReadonlyMap<string, ContextBody> | null): ContextBlock[] {
   return contextPaths(identity).map((entry) =>
-    partBlock(entry, facts, identity.org.prefix, bodies === null ? { notLoaded: true } : { body: entry.path ? bodies.get(entry.path) : undefined }),
+    partBlock(entry, entry.facts(facts), identity.org.prefix, bodies === null ? { notLoaded: true } : { body: entry.path ? bodies.get(entry.path) : undefined }),
   )
+}
+
+/** La ligne d'un Contexte changé qui n'a plus de corps servi : retiré, dépublié, vidé ou devenu illisible (E11-S19). */
+export const CONTEXT_GONE = "Nothing is served here any more: this context was removed, emptied or unpublished."
+
+/**
+ * Les parties des Contextes changés depuis un code `ctx` (E11-S19, AC-b1, AC-c2, HN-E11S19-3), dans l'ordre des
+ * parties : l'en-tête et le corps servis maintenant, comme `contextParts`, sans les lignes de faits, qui ne périment
+ * pas le code ; un Contexte sans corps a son en-tête et `CONTEXT_GONE`. `changed` : des chemins attendus.
+ */
+export function changedContextParts(identity: Identity, bodies: ReadonlyMap<string, ContextBody>, changed: readonly string[]): ContextBlock[] {
+  return contextPaths(identity).flatMap((entry) => {
+    if (!entry.path || !changed.includes(entry.path)) return []
+    const body = bodies.get(entry.path)
+    if (!body || body.text === "") return [{ name: entry.name, text: `${headerOf(entry)}\n${CONTEXT_GONE}` }]
+    return [partBlock(entry, [], identity.org.prefix, { body })]
+  })
 }
 
 /**
@@ -259,10 +276,10 @@ function renderContextNode(node: ContextNode, reads: ContextReads): ContextBody 
  * transaction leurs blocs publiés, leurs enfants et leurs liens sortants, puis les niveaux des enfants, puis
  * les cibles des liens et des blocs `reference` ; une lecture par étape pour tous les Contextes. Un Contexte
  * absent, jamais publié ou illisible n'a pas de corps. Une panne lève : `contextParts` reçoit alors `null`
- * (AC13).
+ * (AC13). `paths` (E11-S19) : les seuls Contextes changés, lus pour un refus `ctx_stale` ou un `context` léger.
  */
-export async function contextBodies(db: PlatformDb, identity: Identity): Promise<Map<string, ContextBody>> {
-  const nodes = await readableContexts(db, identity, expectedContextPaths(identity))
+export async function contextBodies(db: PlatformDb, identity: Identity, paths: readonly string[] = expectedContextPaths(identity)): Promise<Map<string, ContextBody>> {
+  const nodes = await readableContexts(db, identity, paths)
   if (nodes.length === 0) return new Map()
   const ids = nodes.map((node) => node.id)
   const [blockRows, childRows, links] = await contextRows(db, identity, ids)

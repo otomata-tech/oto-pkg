@@ -37,6 +37,7 @@ import { charCount, formatCount } from "../nodes/document"
 import { findNode, lookupAlias, lookupNode, notAvailable, parentPath, ROOT_PATH } from "../nodes/lookup"
 import { ownerOf } from "../nodes/view"
 import type { WriteOrigin } from "../nodes/write"
+import { writeNodeLazily } from "../nodes/write-lazy"
 import { columnOf } from "./header"
 import { loadTable, type LoadedTable } from "./meta"
 import { requireWrite, tableResult, tableTeamId, utcClock } from "./output"
@@ -228,14 +229,13 @@ async function writeLot(lot: Lot, rows: readonly ImportRow[]): Promise<Counts> {
 
 /**
  * Le tableau créé et publié par le service de `write` (E07-S04) : son chemin, que la publication rend. Le registre
- * importe ce module, et la publication relit le registre (contrôle des procédures) : lu à l'appel, par un import
- * dynamique, `write` ne forme pas de cycle d'import (précédent : `functionNames` de `tables/schema.ts`).
+ * importe ce module, et la publication relit le registre (contrôle des procédures) : lu à l'appel
+ * (`writeNodeLazily`), `write` ne forme pas de cycle d'import.
  */
 async function createTable(context: ImportContext, request: ImportRequest, create: NonNullable<ImportRequest["create"]>): Promise<string> {
   const { title, summary, header } = create
   const body = { path: request.path, kind: "table", title, summary, header, publish: true }
-  const { writeNode } = await import("../nodes/write")
-  const output = await writeNode(context.db, context.identity, body, request.by)
+  const output = await writeNodeLazily(context.db, context.identity, body, request.by)
   return typeof output.data?.path === "string" ? output.data.path : request.path
 }
 
@@ -355,7 +355,7 @@ export const tableImport = defineFunction({
   class: "write",
   origin: "paquet",
   description:
-    "Imports the rows of a CSV into a table, matched on its key; with create, creates and publishes the table first. A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line. Each piece is checked whole, then written whole or not at all: a row whose key exists is updated, a value equal to the stored one is ignored, and every new value carries the provenance import with the file name, which stands as its proof. With create, the types are read from the values (bool, number, date, datetime, email, url, else text) and the key is the first column whose values are all present and distinct, unless you pass key; it needs the write level on the parent. Columns the table does not have are ignored and listed.",
+    "Imports the rows of a CSV into a table, matched on its key; with create, creates and publishes the table first. A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line. Each piece is checked whole, then written whole or not at all: a row whose key exists is updated, a value equal to the stored one is ignored, and every new value carries the provenance import with the file name, which stands as its proof. With create, the types are read from the values (bool, number, date, datetime, email, url, else text) and the key is the first text, whole-number, email or date column whose values are all present and distinct, unless you pass key; it needs the write level on the parent. Columns the table does not have are ignored and listed.",
   schema: tableImportArgsSchema,
   examples: [
     {

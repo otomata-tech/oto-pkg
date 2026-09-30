@@ -5,12 +5,13 @@
 // Sans lui, rien ne se lit.
 import { FILES_ROUTE, type BlockView, type NodeView, type ReadNodeInput } from "../../schemas"
 import { ACCESS_LEVELS, describeOwner, type AccessLevel } from "../access"
-import { getContract, renderContract } from "../catalog/contracts"
+import { contractNames, getContract, renderContract } from "../catalog/contracts"
 import { catalogFunctions, catalogNames, describeFunction, findFunction, isActive, looksLikeFunction } from "../catalog/registry"
 import { loadActiveConnectors } from "../connectors/activations"
 import type { Json } from "../database"
 import type { PlatformDb } from "../db"
 import { inTransaction, PlatformError } from "../errors"
+import { functionCatalog, FUNCTIONS_PATH } from "../find"
 import type { Identity } from "../identity"
 import { readJournal } from "../journal-model"
 import { JOURNAL_PATH } from "../../schemas/journal"
@@ -141,7 +142,7 @@ function pendingOf(draft: Context["draft"]): PendingDraft | null {
 
 /**
  * `read` (AC4 à AC18) : un nom de fonction sert son contrat ; `journal` sert le journal des appels
- * (E05-S05) ; un chemin sert l'en-tête du nœud et ses blocs rendus selon le mode demandé, coupés en
+ * (E05-S05) ; `functions`, toutes les fonctions actives (E11-S19) ; un chemin sert l'en-tête du nœud et ses blocs rendus selon le mode demandé, coupés en
  * parties au-delà de 45 000 caractères. Un nœud invisible répond comme un chemin inconnu (H68).
  * `origin` (E10-S02, AC-d1) : l'origine de la requête MCP, qui rend absolue l'adresse d'un fichier joint ;
  * `file` (AC-d2) : le texte d'un fichier joint au nœud.
@@ -151,6 +152,10 @@ export async function readNode(db: PlatformDb, identity: Identity, input: ReadNo
   const path = input.path.trim()
   if (looksLikeFunction(path)) return readFunction(db, identity, path)
   if (path === JOURNAL_PATH) return readJournal(db, identity, input)
+  if (path === FUNCTIONS_PATH) {
+    const active = await loadActiveConnectors(db, identity.org.id)
+    return functionCatalog(catalogFunctions().filter((fn) => isActive(fn, active)), contractNames(), prefix)
+  }
   checkRequest(input, path)
   const found = await findNode(db, identity, path)
   if (!found) throw unknownNode(path, prefix)
@@ -183,7 +188,7 @@ export async function readNode(db: PlatformDb, identity: Identity, input: ReadNo
     links: context.links.lines,
   })
   const served = await servedOf(db, identity, { input, context, prefix, draftMode, fileRoute: fileRouteOf(options.origin) })
-  const data = dataOf(context, served)
+  const data = dataOf(context, served, input)
   const nextActions = context.level >= ACCESS_LEVELS.write ? [`${prefix}_write`] : []
   return paginate({ input, node: context.node, prefix, header: header.join("\n"), served, data, nextActions, teamId: context.owner.teamId })
 }
@@ -218,10 +223,17 @@ async function servedOf(db: PlatformDb, identity: Identity, request: { input: Re
   return { ...serveBody({ ...request, blocks, since, draft: context.draft, reference }), references }
 }
 
-function dataOf(context: Context, served: Body): Record<string, unknown> {
+/**
+ * Les données en champs de `read`. Le plan (`outline`) n'y est pas quand une section est demandée ou que le texte le
+ * porte déjà (E11-S19, AC-e1, AC-e2, HN-E11S19-9 ; `mcp-patterns.md § 4`) : `sections_total` reste.
+ */
+function dataOf(context: Context, served: Body, input: ReadNodeInput): Record<string, unknown> {
   const { node } = context
   const refs = served.refs ?? null
   const outline = outlineOf(served.blocks, refs)
+  const outlineData = input.section !== undefined || served.outlined
+    ? {}
+    : { outline: outline.slice(0, OUTLINE_DATA_MAX).map((entry) => ({ title: entry.title, level: entry.level, chars: entry.chars, ...(refs ? { ref: entry.ref } : {}) })) }
   const references = served.references.slice(0, REFERENCES_DATA_MAX).map((one) => ({
     kind: one.kind,
     path: one.path,
@@ -243,7 +255,7 @@ function dataOf(context: Context, served: Body): Record<string, unknown> {
     parent: context.parent,
     children: context.children.children.map((child) => ({ path: child.path, title: child.title, kind: child.kind })),
     children_total: context.children.total,
-    outline: outline.slice(0, OUTLINE_DATA_MAX).map((entry) => ({ title: entry.title, level: entry.level, chars: entry.chars, ...(refs ? { ref: entry.ref } : {}) })),
+    ...outlineData,
     sections_total: outline.length,
     blocks_total: served.blocks.length,
     has_draft: context.draft !== null,

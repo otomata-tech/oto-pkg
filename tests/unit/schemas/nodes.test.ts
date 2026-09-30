@@ -118,17 +118,32 @@ describe("read and write input schemas, extended by additions only (AC1)", () =>
     const items = at(ops, "items")
     const fields = at(items, "properties")
     strip(ops, " Block operations address a block by its reference instead.")
+    // E11-S18 (1.1.3) : set_markdown, l'unicité des titres et replace_text sur la page ou un bloc, avec count.
+    strip(at(fields, "op"), " Whole page: set_markdown (the text replaces the whole body; its # and ## headings make the sections).")
     strip(at(fields, "op"), " By block: replace_block, insert_after, delete_block or move_block.")
+    strip(
+      at(fields, "section"),
+      " Titles are unique in a page: add_section refuses one that exists, and a title held by two headings is refused with the refs of their blocks. replace_text without section: the whole page.",
+    )
     strip(at(fields, "section"), " Section operations, and move_block (to the end of that section).")
     strip(at(fields, "text"), " delete_block and move_block take no text either.")
-    expect(at(fields, "op").enum).toEqual(["replace_section", "append", "add_section", "delete_section", "replace_text", "replace_block", "insert_after", "delete_block", "move_block"])
+    expect(at(fields, "find").description).toBe("replace_text only: exact words to replace, appearing once in the section, the block or the whole page (or count times).")
+    at(fields, "find").description = "replace_text only: exact words to replace, appearing once in the section."
+    expect(at(fields, "op").enum).toEqual(["replace_section", "append", "add_section", "delete_section", "replace_text", "replace_block", "insert_after", "delete_block", "move_block", "set_markdown"])
     at(fields, "op").enum = ["replace_section", "append", "add_section", "delete_section", "replace_text"]
-    expect([fields.block, fields.after_block]).toEqual([
-      { description: 'Block operations: reference of the block, from read with refs: true, e.g. "3f9a2c1b" or a key such as "etapes".', type: "string", minLength: 1, maxLength: 500 },
+    expect([fields.block, fields.after_block, fields.count]).toEqual([
+      {
+        description: 'Block operations: reference of the block, from read with refs: true or from find, e.g. "3f9a2c1b" or a key such as "etapes"; with replace_text, only in that block.',
+        type: "string",
+        minLength: 1,
+        maxLength: 500,
+      },
       { description: "move_block only: reference of the block to put it after (default: the start of the page, outside any section).", type: "string", minLength: 1, maxLength: 500 },
+      { description: "replace_text only: how many times find appears; all are replaced, and another number found is refused (default 1).", type: "integer", minimum: 1, maximum: 1000 },
     ])
     delete fields.block
     delete fields.after_block
+    delete fields.count
     expect(items.required).toEqual(["op"])
     items.required = ["op", "section"]
     expect(write).toEqual(E03_S01.write)

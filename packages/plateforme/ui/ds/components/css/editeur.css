@@ -21,7 +21,10 @@
   block-size: 14px;
   margin: 0;
   accent-color: var(--primary);
+  /* Une case se coche d'un clic : le pointeur le dit ; en lecture seule, elle ne réagit pas. */
+  cursor: pointer;
 }
+.oto-block-check:disabled { cursor: default; }
 
 /* ── la citation (AC-a2) : un filet à gauche, pendant de l'encart lu, sans fond ; le texte garde la colonne. */
 .oto-block-field[data-kind="callout"] {

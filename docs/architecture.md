@@ -95,7 +95,8 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   ├── app/auth/oidc/{login,callback,logout}   # Mode OIDC : connexion chez l'émetteur, session en cookie chiffré
 │   ├── app/oauth/consent/page.tsx              # Mode Supabase : consentement OAuth des assistants
 │   ├── app/no-organization/page.tsx            # Personne connectée sans appartenance à l'organisation de l'adresse
-│   ├── app/p/…                                 # Page publique d'un lien de partage (ADR-013)
+│   ├── app/p/…                                 # Page publique d'un lien de partage (ADR-013) ; `p/[jeton]/share-image/[[...chemin]]` : son image de partage (E11-S21)
+│   ├── app/opengraph-image.tsx                 # Image de partage de toute autre adresse : l'organisation seule, jamais une page (E11-S21)
 │   ├── app/api/mcp/route.ts                    # MCP des organisations
 │   ├── app/api/mcp-admin/route.ts              # MCP admin, rôle plateforme
 │   ├── app/api/platform/[...route]/route.ts    # API du paquet
@@ -103,7 +104,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   ├── lib/fonctions-metier.ts                 # Fonctions de l'ERP inscrites au catalogue, importé en tête des routes MCP et API
 │   ├── lib/plateforme/                         # Session de l'hôte dans les deux modes, client et session OIDC, marque de l'adresse
 │   ├── lib/cellule/sous-domaines.ts            # Propre au SaaS : sous-domaines par l'API Vercel, désactivé sans ses variables
-│   └── middleware.ts                           # Session ; `/api`, `/.well-known`, `/p` publics (le MCP gère son auth)
+│   └── middleware.ts                           # Session ; `/api`, `/.well-known`, `/p`, `/opengraph-image` publics (le MCP gère son auth)
 ├── packages/plateforme/                        # @otomata_tech/oto_platform
 │   ├── ui/                                     # Écrans copiés d'oto-frontend et leur design system ; JAMAIS server/, migrations/ ni client de base
 │   ├── schemas/                                # Zod partagé par toutes les faces, ui/ compris ; rendu des blocs, syntaxe des liens
@@ -307,6 +308,7 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `journal-read.ts`, `journal-rows.ts`, `journal-model.ts`, `usage.ts`, `activities.ts` | Lecture du journal par conversation, dans la portée décidée par le service (ses lignes, celles des équipes qu'on mène, toutes pour l'admin) ; arguments masqués et coupés ; un appel sur l'espace personnel d'autrui ne livre à un autre lecteur que son outil, son heure, son issue, son code et sa cible coupée à `private/<handle>` (`perso/<handle>` sur une ligne d'avant ce nom, le journal n'étant pas réécrit) ; usage agrégé ; activités de l'accueil (le journal classé en gestes sur un contenu, dans la même portée, titre et lien seulement pour un contenu que la personne lit) | écrans, MCP, MCP admin |
 | `admin/` | Opérations des huit outils admin, partagées avec le tableau de bord ; journal admin ; point d'extension de la création d'une organisation, que l'hôte branche | MCP admin, API |
 | `flags.ts`, `cell.ts`, `brand.ts` | Drapeaux par organisation ; état de la cellule (version, migrations, variables exigées selon le mode) ; marque | MCP admin, écrans |
+| `share-image.ts` | Données de l'image de partage d'une adresse, sans session (E11-S21) : l'organisation de l'adresse (`org_by_host`, logo lu par `fetchSource`, en `data:`), et, pour un lien public, le titre et le résumé que `readPublicNode` sert ; jamais un nœud sans lien ; ne lève jamais (repli générique). Dessinée par `ImageDePartage` (`ui/`), rendue par `ImageResponse` chez l'hôte | Routes d'image de l'hôte |
 
 **Hors de `server/`, dans `schemas/`**, des fonctions pures qu'importent `server/` et `ui/` :
 le rendu des blocs (`blocks-render.ts`, dont le `.md` d'une page et son inverse, `pageMarkdown` et
@@ -326,7 +328,9 @@ rejoue sur chaque lot, et les règles d'une valeur de tableau (`tables.ts` : `is
   vers le service. Réponses `{ data }` ou `{ error: { code, message } }` avec le statut HTTP. Une
   ressource sans organisation (`cell`, équipe plateforme) se reconnaît avant l'identité par
   l'adresse. Routes du tableau de bord sous `admin/*`. `GET nodes/export` et `GET tables/export`
-  rendent `{filename, content}`, des lectures sans ligne de journal (D138) ; `POST tables/import`
+  rendent `{filename, content}`, des lectures sans ligne de journal (D138) ; `GET nodes/tree` rend l'arbre
+  visible de la personne (`visibleTree`, `{tree, truncated}`), celui que le layout de l'hôte passe au rail,
+  lecture sans journal (E11-S20) ; `POST tables/import`
   écrit un lot de 500 lignes d'un CSV. Vérification de la session en deux temps, réponses d'erreur
   JSON et contrôle d'origine d'une mutation dans `api/session.ts`, partagés par la table de dispatch
   et les branches qui passent avant elle. Fichiers : `api/files.ts` (`GET files`, `POST files`,
@@ -338,7 +342,12 @@ rejoue sur chaque lot, et les règles d'une valeur de tableau (`tables.ts` : `is
   (`forbidden`, sans lire la base ni consommer le ticket) ; à côté, la route à session du
   formulaire, `POST uploads/<jeton>/form`, que monte la page `/upload/<token>` de l'hôte.
 - `ui/` : écrans en Server Components, qui reçoivent leurs données et leurs rappels par props
-  (`.method/conventions/portage-ecrans.md`) ; mutations par `api/`. Une procédure s'y édite et s'y
+  (`.method/conventions/portage-ecrans.md`) ; mutations par `api/`. Le rail (`RailApplication`) part de
+  l'arbre servi par le layout, que Next ne rejoue pas à la navigation client, puis relit son arbre seul par
+  `GET nodes/tree` : à chaque changement d'adresse, au retour sur l'onglet ou la fenêtre (5 s au moins après
+  la relecture précédente), et à chaque relecture de la page (`useRafraichir`, qui suit chaque geste) ; une
+  relecture à la fois, l'arbre montré gardé sur un échec, un nouvel arbre servi par le layout adopté
+  (E11-S20). Équipes et nom de l'organisation restent ceux du layout. Une procédure s'y édite et s'y
   lit comme une page (texte seul, un bloc `call` déjà écrit rendu en texte) ; ses blocs `call`, la
   vérification à la publication et les prompts servent les assistants.
 
@@ -413,7 +422,10 @@ Pas à pas, variables et vérifications : `packages/plateforme/README.md` et oto
 
 - **Installer** : `@otomata_tech/oto_platform` en version exacte et ses dépendances pairs ;
   `transpilePackages` ; `@source` et `ui/styles.css` dans le CSS de l'hôte ; les routes de § 3,
-  chacune important d'abord `lib/fonctions-metier.ts` ; `CoquilleOto` dans le layout.
+  chacune important d'abord `lib/fonctions-metier.ts` ; `CoquilleOto` dans le layout. Aperçu d'un lien (E11-S21) :
+  le layout racine pose `metadonneesDePartage` (origine de la requête en `metadataBase`, organisation de l'adresse),
+  la page publique la sienne (contenu du lien) ; deux routes d'image, `opengraph-image.tsx` à la racine (laissée
+  passer par le middleware) et `p/[jeton]/share-image/[[...chemin]]`.
 - **Base** : une fois par base, par un administrateur, `oto-platform db prepare` (rôles,
   schéma `auth` réduit, extensions, `platform_app`) ; puis `oto-platform migrations sync` et
   `migrations check`, et l'application des migrations par l'outil de l'hôte (`supabase db push

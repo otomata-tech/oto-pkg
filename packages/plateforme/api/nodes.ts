@@ -10,6 +10,8 @@
 // AC-b6), `GET nodes/impact` (aperçu d'un déplacement, AC-b7), `POST nodes/position` (ordre des frères,
 // AC-b9), `POST nodes/duplicate` (AC-b10), `POST nodes/access` (accès général, AC-b13) ; aucun outil MCP
 // ne les porte (liste figée, ADR-002). `GET nodes/export?path=` (E10-S01, AC-a5) : le `.md` d'un nœud publié.
+// `GET nodes/tree` (E11-S20, AC-1) : l'arbre visible, celui que le layout de l'hôte passe au rail, que le rail relit
+// seul à la navigation client, où Next ne rejoue pas le layout.
 import { generalAccessSchema, moveNodeSchema, nodePathBodySchema, placeNodeSchema, writeNodeBodySchema } from "../schemas"
 import { nodeHeadQuerySchema, type NodeHead } from "../schemas/search"
 import { invalidInput } from "../server/errors"
@@ -21,6 +23,7 @@ import { moveNode } from "../server/nodes/move"
 import { nodeLinks } from "../server/nodes/node-links"
 import { placeNode } from "../server/nodes/order"
 import { loadNode } from "../server/nodes/read"
+import { visibleTree } from "../server/nodes/tree"
 import { writeNode } from "../server/nodes/write"
 import type { ResourceRoutes } from "./handler"
 
@@ -74,6 +77,15 @@ export const nodesRoutes: ResourceRoutes = {
       fixed: { 0: "export" },
       async handle({ db, identity, request }) {
         return { status: 200, data: await exportNode(db, identity, queryOf(request)) }
+      },
+    },
+    {
+      // E11-S20 (AC-1) : le service du layout (`visibleTree`), qui filtre par niveau et borne à 5 000 nœuds (`truncated`).
+      // Une lecture : aucune ligne de journal.
+      params: 1,
+      fixed: { 0: "tree" },
+      async handle({ db, identity }) {
+        return { status: 200, data: await visibleTree(db, identity) }
       },
     },
   ],

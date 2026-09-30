@@ -6,6 +6,8 @@ export { inviteSchema, invitationIdSchema, listInvitationsQuerySchema } from "./
 export type { Invite, InviteInput, InvitationRole, InvitationState } from "./invitations"
 export { brandInputSchema, OTO_THEMES, THEME_LABELS, themeSchema } from "./brand"
 export type { BrandInput, Theme } from "./brand"
+// E11-S21 : l'image de partage d'une adresse, lue par `server/`, dessinée par `ui/`.
+export type { ShareImageData } from "./share-image"
 export { NODE_PATH_PATTERN, nodePathSchema, WRITE_OPS } from "./nodes"
 export { CTX_PATTERN, ctxCodeSchema } from "./ctx"
 export { BLOCK_TYPES, blockTypeSchema, blockKeySchema, blockInputSchema, blockRef } from "./blocks"

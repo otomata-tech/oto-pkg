@@ -2,6 +2,8 @@ import type { ReactNode } from "react"
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import type { BlockView } from "@otomata_tech/oto_platform/schemas"
+import { Reader } from "../../../packages/plateforme/ui/ds/react/reader"
+import { CADRE_DU_TABLEAU } from "../../../packages/plateforme/ui/noeud/libelles"
 import { RenduDUnBloc } from "../../../packages/plateforme/ui/noeud/rendu-des-blocs"
 import { bloc } from "../../helpers/noeud"
 
@@ -52,6 +54,29 @@ describe("RenduDUnBloc — page markdown forms (E10-S04)", () => {
     expect(cellules[1].querySelector("s")?.textContent).toBe("Relancer")
     expect(cellules[1].querySelector("br")).not.toBeNull()
     expect(container.querySelector("script")).toBeNull()
+  })
+
+  // 1.1.5 : la colonne de lecture est centrée (`content.css`) ; un tableau, enfant direct du corps de lecture, s'en élargit
+  // et défile dans son propre cadre, que le clavier atteint. Les largeurs se mesurent au navigateur, pas sous jsdom.
+  it("should render each table, simple or written as text, in its own named keyboard-focusable scroll frame, a direct child of the reading body", () => {
+    const { container } = render(
+      <Reader>
+        <RenduDUnBloc bloc={bloc(id(9), "simple_table", null, { columns: ["A", "B"], rows: [["1", "2"]] })} Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} />
+        <RenduDUnBloc bloc={bloc(id(10), "paragraph", "| A | B |\n|---|---|\n| 1 | 2 |", {})} Lien={LienDeTest} hrefDuChemin={(chemin) => `/n/${chemin}`} />
+      </Reader>,
+    )
+    const corps = container.querySelector(".oto-island-body[data-reading]")
+    const simple = screen.getByRole("region", { name: CADRE_DU_TABLEAU.simple })
+    const texte = screen.getByRole("region", { name: CADRE_DU_TABLEAU.texte })
+    expect(corps).toHaveAttribute("data-reading", "")
+    expect(simple).toHaveClass("oto-table-wrap")
+    expect(within(simple).getByRole("table")).toBeInTheDocument()
+    expect(texte.tagName).toBe("PRE")
+    expect(texte).toHaveClass("oto-code")
+    for (const cadre of [simple, texte]) {
+      expect(cadre.parentElement).toBe(corps)
+      expect(cadre).toHaveAttribute("tabindex", "0")
+    }
   })
 
   it("should render a divider as a horizontal rule without an added role (AC-a2)", () => {

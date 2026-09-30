@@ -7,7 +7,9 @@
 // services sont les vrais. En suite portable (`sqlConfigured`) : le projet, ou le Postgres nu du job `bare-postgres`.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
+import type { TreeNode } from "../../packages/plateforme/schemas"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
+import { visibleTree } from "../../packages/plateforme/server/nodes/tree"
 import { ORG, PEOPLE, type Person } from "../helpers/reference-org"
 import { seedReferenceOrg, type ReferenceOrgSql } from "../helpers/reference-org-sql"
 import { seedWithAdmin, sqlConfigured, type SeededData, portable } from "../helpers/sql"
@@ -96,6 +98,29 @@ describe.skipIf(!sqlConfigured)(portable("GET /api/platform/search?q= (AC-a7)"),
       body: { data: { matches: [{ path: "annonces", kind: "page", title: "Annonces", snippet: "**grille** des tarifs 2026" }], more: 0 } },
     })
     expect(await lireSous("search?q=%20%20", "claire")).toMatchObject({ status: 400, body: { error: { code: "invalid_arguments" } } })
+  })
+})
+
+// E11-S20 (AC-1, AC-2) : l'arbre que le rail relit seul, celui que le layout de l'hôte lui passe.
+describe.skipIf(!sqlConfigured)(portable("GET /api/platform/nodes/tree (E11-S20)"), { timeout: NETWORK_TIMEOUT }, () => {
+  const chemins = (noeuds: TreeNode[]): string[] => noeuds.flatMap((noeud) => [noeud.path, ...chemins(noeud.children)])
+
+  it("should serve the visible tree of the caller, as the layout reads it, without a node she does not read", async () => {
+    const lu = await lireSous("nodes/tree", "paul")
+
+    expect(lu).toEqual({ status: 200, body: { data: await visibleTree(await ref.db("paul"), ref.identityOf("paul")) } })
+    // Paul (Support) lit sa FAQ, pas les devis de Ventes.
+    expect(chemins(lu.body.data.tree)).toContain("support/faq")
+    expect(chemins(lu.body.data.tree)).not.toContain("ventes/devis")
+    expect(lu.body.data.truncated).toBe(false)
+  })
+
+  it("should answer 401 without a session", async () => {
+    const request = new Request(`https://${ref.org.host}/api/platform/nodes/tree`, { method: "GET", headers: { "x-forwarded-proto": "https" } })
+    const response = await handlePlateforme(request, { accessToken: null, host: ref.org.host })
+
+    expect(response.status).toBe(401)
+    expect(await response.json()).toEqual({ error: { code: "forbidden", message: "Authentication required." } })
   })
 })
 

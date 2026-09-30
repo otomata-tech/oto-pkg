@@ -43,6 +43,9 @@ export const DIAGRAMME = {
   nom: (ligne: string) => (ligne === "" ? "Diagramme" : `Diagramme : ${ligne}`),
 } as const
 
+/** Le nom du cadre d'un tableau lu, qui défile en largeur et se prend donc au clavier : un tableau simple, un tableau écrit en texte. */
+export const CADRE_DU_TABLEAU = { simple: "Tableau", texte: "Tableau en texte" } as const
+
 /** Les formes qu'écrit l'écran (E05-S10, AC-a2 : un seul niveau de titre), leur libellé et le nom du champ ouvert (AC10). */
 export const FORMES = {
   texte: { libelle: "Texte", champ: "ce texte" },

@@ -121,12 +121,22 @@ exclut. Source en lecture seule : `src/components/` et `src/design-system/` du d
   couleurs numérotées sont refusées par `check:framework`.
 - Besoin d'un autre token du contrat (`--title`, `--hair`, `--oto-bg`…) : l'ajouter à
   `@theme inline`, jamais recalculer une valeur (elles sont vérifiées dans oto-frontend).
+- **Hors navigateur, une couleur du jeu se lit dans une table confrontée à `oto.css`.** Un rendu qui ne lit pas le
+  CSS (l'image de partage, dessinée par Satori) recopie les valeurs d'un bloc de teinte à l'identique et tire un
+  jeton dérivé (`--ink`, `--mute`, `--title`) de sa formule `color-mix` du contrat, jamais d'une valeur choisie :
+  une copie diverge sans bruit au premier thème retouché. **Vérifiable :** son test relit `oto.css` et compare la
+  table entière (`COULEURS_DE_L_IMAGE`, `tests/integration/components/image-de-partage.test.tsx`).
 - **Contour d'un champ : `ring-1 ring-mute`, jamais `border-<couleur>`.** La règle
   `* { border-color: var(--border) }` de `src/app/globals.css` est hors layer : elle bat tout
   utilitaire `border-*` (rangé en `@layer utilities`) et pose le `--border` du template sous `.oto`
   (contour invisible la nuit). `mute` mesure plus de 3:1 sur l'îlot, jour et
   nuit. **Vérifiable :** aucune classe `border-<token>` dans un écran porté (`ui-tokens.test.ts`
   n'exempte aucun écran).
+- **Une propriété que pose une classe `oto-*` ne se change pas par un utilitaire sur le même élément** : les feuilles
+  du design system sont hors couche et battent `@layer utilities` (`overflow-x-auto` sur un `pre.oto-code`, que
+  `overflow: hidden` rognait sans défilement) ; elle se change dans la feuille, sous un sélecteur de contexte.
+  **Vérifiable :** en revue, sur chaque élément de `ui/` qui porte une classe `oto-*` et un utilitaire, l'utilitaire
+  ne redéfinit aucune propriété que la classe déclare.
 - L'écran ne pose pas `.oto` lui-même. Dans le groupe `(dashboard)`, la page non plus : le layout
   pose `CoquilleOto` **une fois**, à la couleur de la personne, sinon à celle de l'organisation (`preferredTheme`). Une `.oto` imbriquée
   redéclare le thème par défaut et écrase celui du client ; seule exception voulue, la pastille

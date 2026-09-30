@@ -18,6 +18,8 @@ const PUBLIC_ROUTES = [
   "/design-system",
   "/api",
   "/.well-known",
+  // L'image de partage de l'organisation (E11-S21) : un robot d'aperçu n'a pas de session ; elle ne porte aucune page.
+  "/opengraph-image",
 ]
 
 // Correspondance par segment : un simple `startsWith("/api")` rendrait aussi publique une page

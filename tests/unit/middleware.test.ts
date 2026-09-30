@@ -94,6 +94,8 @@ describe("middleware without a session (AC7)", () => {
     "/api/mcp",
     "/.well-known/oauth-protected-resource/api/mcp",
     "/.well-known/oauth-protected-resource",
+    // E11-S21 (AC-9) : l'image de partage de l'organisation, demandée par un robot d'aperçu sans session.
+    "/opengraph-image?4b1a1d3c2e5f6a7b",
   ])("should let the public route %s through", async (path) => {
     const response = await middleware(requete(path))
 

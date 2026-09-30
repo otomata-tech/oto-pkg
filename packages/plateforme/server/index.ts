@@ -127,6 +127,8 @@ export { moveImpact } from "./nodes/move-impact"
 export { setGeneralAccess } from "./general-access"
 export { nodeLinks } from "./nodes/node-links"
 export { listShares, nodeShare, readPublicNode, revokeShare, shareNode } from "./shares"
+// E11-S21 : les données de l'image de partage d'une adresse, lues sans session (organisation, lien public).
+export { shareImageData } from "./share-image"
 // E10-S02 (lot c) : « Voir » un fichier joint, dans l'organisation et par un lien public (visionneuse de la page de l'hôte).
 export { fileView, publicFileView } from "./files/view"
 // E10-S02 (lot f, ADR-018) : le formulaire de dépôt d'un ticket (page de l'hôte, AC-f15).

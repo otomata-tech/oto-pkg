@@ -113,6 +113,13 @@ Pour une application Next 15 (App Router) sur Supabase.
      passe au paquet sans jeton), toujours `X-Robots-Tag: noindex, nofollow` ; la page `/p/<jeton>` de
      l'hôte peut aussi appeler `readPublicNode` directement.
 
+   Aperçu d'un lien collé dans une messagerie (E11-S21) : `app/opengraph-image.tsx` rend
+   `new ImageResponse(<ImageDePartage donnees={await shareImageData(requestHost(await headers()))} />, TAILLE_DE_PARTAGE)`
+   (l'organisation de l'adresse seule), `app/p/[jeton]/share-image/[[...chemin]]/route.tsx` la même chose avec
+   `{ token, path }` (le contenu du lien) ; le middleware laisse passer `/opengraph-image` ; le `generateMetadata` du
+   layout racine étend `metadonneesDePartage({ organisation, origine })`, celui de la page publique
+   `metadonneesDePartage({ organisation, page })`. Les fichiers de l'hôte de référence (`src/`) servent de modèle.
+
 7. Réglages d'Auth du projet Supabase, une fois les migrations appliquées : depuis un clone du dépôt
    `otomata-tech/oto-pkg`, `pnpm auth:settings --to <ref> --site-url <url> --redirect <motif>`
    montre l'écart avec les réglages de la plateforme (hook d'inscription, serveur OAuth, adresses,

@@ -10,6 +10,7 @@
 // l'écran reste ouvert. Retiré : Agents, compteurs, premier jour, squelette (les données
 // arrivent avec la page). Ajouté (fiche D90 B) : sous 768 px, le bouton « Menu » ouvre le rail en tiroir,
 // qu'oto-frontend laissait sans déclencheur ; son bouton est le `.oto-rail-toggle` du design system.
+// E11-S20 : l'arbre servi est l'état de départ, remplacé par les relectures du rail (`useArbreDuRail`).
 import { useCallback, useId, useRef, useState } from "react"
 import { List } from "@phosphor-icons/react/dist/csr/List"
 import { SquaresFour } from "@phosphor-icons/react/dist/csr/SquaresFour"
@@ -25,18 +26,29 @@ import { PiedDuRail } from "./pied-du-rail"
 import { RechercheDuRail } from "./recherche-du-rail"
 import { SectionsDuRail } from "./sections-du-rail"
 import type { AdressesDuRail, DonneesDuRail } from "./types"
+import { useArbreDuRail } from "./use-arbre-du-rail"
 
-type ArbreProps = Pick<DonneesDuRail, "arbre" | "equipes" | "handle"> & { prefixe: string }
+type ArbreProps = Pick<DonneesDuRail, "arbre" | "equipes" | "handle"> & { prefixe: string; enPanne: boolean }
 
 /**
  * L'arbre en sections, ou l'échec de sa lecture (sans équipes, les sections ne se rangent pas) : le
- * message fourni, puis « Réessayer », qui relit la page (`ErreurDeLecture` sans lien) — le layout de
- * l'hôte n'est pas rejoué à la navigation, et sans lui seul un rechargement du navigateur relirait l'arbre.
+ * message fourni, puis « Réessayer », qui relit la page (`ErreurDeLecture` sans lien), et avec elle l'arbre du
+ * rail (E11-S20) ; une relecture réussie à la navigation remplace aussi l'échec.
+ * `enPanne` : les relectures échouent depuis trois essais ; l'arbre montré reste, une ligne le dit sans alerte (AC-6),
+ * dans une région de statut montée vide (`accessibility-patterns.md § Régions dynamiques`), hors de la mise en page
+ * tant qu'elle l'est (le titre de groupe du rail réduit est un filet).
  */
-function ArbreDuRail({ arbre, equipes, handle, prefixe }: ArbreProps) {
+function ArbreDuRail({ arbre, equipes, handle, prefixe, enPanne }: ArbreProps) {
   if (arbre.error !== undefined) return <ErreurDeLecture titre={RAIL.arbreEnPanne} message={arbre.error} />
   if (equipes.error !== undefined) return <ErreurDeLecture titre={RAIL.arbreEnPanne} message={equipes.error} />
-  return <SectionsDuRail arbre={arbre.data.tree} equipes={equipes.data} handle={handle} prefixe={prefixe} tronque={arbre.data.truncated} />
+  return (
+    <>
+      <SectionsDuRail arbre={arbre.data.tree} equipes={equipes.data} handle={handle} prefixe={prefixe} tronque={arbre.data.truncated} />
+      <p role="status" className={enPanne ? "oto-rail-group" : "oto-sr-only"}>
+        {enPanne ? RAIL.arbreNonActualise : ""}
+      </p>
+    </>
+  )
 }
 
 /** Une couche posée sur le tiroir (menu, palette, dialogue) : Échap et le clic hors d'elle la ferment d'abord. */
@@ -65,9 +77,10 @@ function useTiroirDuRail(chemin: string) {
 
 export type RailApplicationProps = DonneesDuRail & { adresses: AdressesDuRail }
 
-export function RailApplication({ entreprise, arbre, equipes, handle, compte, administre, adresses }: RailApplicationProps) {
+export function RailApplication({ entreprise, arbre: servi, equipes, handle, compte, administre, adresses }: RailApplicationProps) {
   const { chemin } = useHote()
   const tiroir = useTiroirDuRail(chemin)
+  const { arbre, enPanne } = useArbreDuRail(servi, chemin)
   const idDuRail = useId()
   const lu = arbre.error === undefined && equipes.error === undefined ? { tree: arbre.data.tree, equipes: equipes.data } : null
   return (
@@ -83,7 +96,7 @@ export function RailApplication({ entreprise, arbre, equipes, handle, compte, ad
             <RailItem as={LigneDuRail} href={adresses.accueil} label={RAIL.accueil} icon={<AnimatedIcon as={SquaresFour} size="xs" />} active={chemin === adresses.accueil} />
           )}
           <RechercheDuRail arbre={lu} handle={handle} adresses={adresses} administre={administre} />
-          <ArbreDuRail arbre={arbre} equipes={equipes} handle={handle} prefixe={adresses.pages} />
+          <ArbreDuRail arbre={arbre} equipes={equipes} handle={handle} prefixe={adresses.pages} enPanne={enPanne} />
         </RailScroll>
         <PiedDuRail compte={compte} adresses={adresses} administre={administre} />
       </Rail>

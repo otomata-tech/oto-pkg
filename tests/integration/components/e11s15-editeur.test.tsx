@@ -84,6 +84,12 @@ describe("E11-S15, lot B — tableau simple, fichier, image, menu de la poignée
     expect(within(grille).getAllByRole("textbox")).toHaveLength(4)
   })
 
+  // 1.1.5 : la colonne centrée du lecteur (`content.css`) exclut `data-reading="blocs"` ; le corps d'écriture garde sa pleine largeur.
+  it("should mark the writing body apart from the centered reading column", () => {
+    monter([TABLEAU])
+    expect(screen.getByRole("table").closest(".oto-island-body")).toHaveAttribute("data-reading", "blocs")
+  })
+
   it("should draw a joined file as the file row of the design system, name, size and actions kept (AC-b2)", () => {
     lire(bloc(ID.fichier, "file", null, { file_id: ID_FICHIER, name: "devis.pdf", size: 2048 }))
     const ligne = screen.getByText("devis.pdf").closest(".oto-file")

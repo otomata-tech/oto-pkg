@@ -124,7 +124,25 @@ describe("/p/<jeton> refusals (AC-d5)", () => {
 
 describe("/p/<jeton> indexing (AC-d6)", () => {
   it("should title and describe the page by its content and keep it out of any index", async () => {
-    expect(await generateMetadata(params())).toEqual({ title: "Tarifs 2026", description: "Les prix publics de l'année.", robots: { index: false, follow: false } })
+    expect(await generateMetadata(params())).toMatchObject({ title: "Tarifs 2026", description: "Les prix publics de l'année.", robots: { index: false, follow: false } })
+  })
+
+  // E11-S21 (AC-6) : l'aperçu d'un lien collé dans une messagerie, sous le même jeton et le même chemin.
+  it("should give the link's preview its content, its organisation and its image keyed by revision", async () => {
+    expect(await generateMetadata(params(["ventes", "tarifs"]))).toEqual({
+      title: "Tarifs 2026",
+      description: "Les prix publics de l'année.",
+      robots: { index: false, follow: false },
+      openGraph: {
+        type: "article",
+        siteName: "Démo",
+        title: "Tarifs 2026",
+        description: "Les prix publics de l'année.",
+        url: `/p/${JETON}/ventes/tarifs`,
+        images: [{ url: `/p/${JETON}/share-image/ventes/tarifs?v=3`, width: 1200, height: 630, alt: "Tarifs 2026 — Démo" }],
+      },
+      twitter: { card: "summary_large_image" },
+    })
   })
 })
 

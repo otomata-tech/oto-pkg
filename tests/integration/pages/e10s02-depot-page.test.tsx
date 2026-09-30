@@ -2,13 +2,16 @@
 // destination du ticket de la personne (`uploadForm`, qui ne consomme rien) et la montre ; le refus du service (une autre
 // personne, un lien servi ou expiré) se dit par la phrase de l'écran, sans zone de dépôt ; un fichier choisi part tel quel
 // à la route à session du ticket, « Déposé » s'annonce en `role="status"`, qui reçoit le focus ; un refus en
-// `role="alert"`, la zone restant offerte s'il laisse le lien valable, retirée sinon, le focus sur l'alerte. Session de
-// l'hôte et service simulés ; l'écran est le vrai.
+// `role="alert"`, la zone restant offerte s'il laisse le lien valable, retirée sinon, le focus sur l'alerte. Après un
+// dépôt, « Ouvrir la page » mène à la page du fichier (sa visionneuse pour un `html` ou un `md` joint), que la
+// navigation de l'hôte ouvre après le délai de lecture ; un refus n'ouvre rien. Session de l'hôte, sa navigation et
+// service simulés ; l'écran est le vrai.
 import type { ReactElement } from "react"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { PlatformError, uploadForm, type Identity, type PlatformDb } from "@otomata_tech/oto_platform/server"
 import { UPLOAD_BYTES_MAX } from "@otomata_tech/oto_platform/schemas"
+import { ContexteDeLHote } from "@otomata_tech/oto_platform/ui"
 import DepotPage from "@/app/(dashboard)/upload/[token]/page"
 import { getPlatformIdentitySafely, type PlatformSession } from "@/lib/plateforme/session"
 
@@ -44,12 +47,18 @@ const IDENTITE: Identity = {
 
 const page = () => DepotPage({ params: Promise.resolve({ token: JETON }) })
 
+/** La navigation de l'hôte (`router.push` dans Next), que l'écran appelle pour ouvrir la page du fichier. */
+const naviguer = vi.fn()
+
 async function monter(element: Promise<ReactElement>) {
   const rendu = await element
   await act(async () => {
-    render(rendu)
+    render(<ContexteDeLHote.Provider value={{ Lien: "a", chemin: "", naviguer }}>{rendu}</ContexteDeLHote.Provider>)
   })
 }
+
+const PAGE = "https://demo.oto.test/n/ventes/rapports/mars"
+const DEPOSE = { path: "ventes/rapports/mars", revision: 1, status: "published", url: PAGE }
 
 /** Le champ de fichier de la zone de dépôt (un `<input type="file">` nommé par sa zone). */
 const champ = () => {
@@ -66,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -87,7 +97,7 @@ describe("/upload/<token> (AC-f15)", () => {
   })
 
   it("should show the destination, send the file as is to the form route, announce it dropped and move the focus there", async () => {
-    const envoi = vi.fn(async () => Response.json({ data: { path: "ventes/rapports/mars", revision: 1, status: "published", url: "https://demo.oto.test/n/ventes/rapports/mars" } }))
+    const envoi = vi.fn(async () => Response.json({ data: DEPOSE }))
     vi.stubGlobal("fetch", envoi)
     await monter(page())
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Déposer un fichier")
@@ -98,7 +108,7 @@ describe("/upload/<token> (AC-f15)", () => {
 
     fireEvent.change(champ(), { target: { files: [fichier] } })
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Déposé dans ventes/rapports/mars."))
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Fichier déposé dans « ventes/rapports/mars »."))
     expect(envoi).toHaveBeenCalledWith(`/api/platform/uploads/${JETON}/form`, { method: "POST", credentials: "same-origin", body: fichier })
     expect(document.querySelector('input[type="file"]')).toBeNull()
     // La zone qui tenait le focus est partie : il va à l'annonce, jamais à <body> (M4).
@@ -130,5 +140,54 @@ describe("/upload/<token> (AC-f15)", () => {
     expect(document.querySelector('input[type="file"]')).toBeNull()
     expect(screen.getByText("Ce lien ne peut plus servir : demandez-en un nouveau à l'assistant.")).toBeInTheDocument()
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("alert")))
+  })
+})
+
+describe("/upload/<token>, after the drop", () => {
+  // Minuteurs simulés : le `waitFor` de Testing Library draine par un `setTimeout(0)` et resterait suspendu ; celui de
+  // Vitest avance l'horloge de son intervalle à chaque essai, ici 1 ms, loin du délai de lecture.
+  beforeEach(() => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] }))
+  // Le rendu qui montre l'issue précède ses effets passifs : `act` les vide, minuteur d'ouverture compris.
+  async function guetter(attente: () => void) {
+    await vi.waitFor(attente, { interval: 1, timeout: 5_000 })
+    await act(async () => undefined)
+  }
+
+  it("should offer a link to the page and open it through the host once the reading delay is over", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ data: DEPOSE })))
+    await monter(page())
+
+    fireEvent.change(champ(), { target: { files: [new File(["## Mars"], "mars.md")] } })
+
+    await guetter(() => expect(screen.getByRole("link", { name: "Ouvrir la page" })).toHaveAttribute("href", PAGE))
+    act(() => vi.advanceTimersByTime(1_000))
+    expect(naviguer).not.toHaveBeenCalled()
+    act(() => vi.advanceTimersByTime(500))
+    expect(naviguer).toHaveBeenCalledExactlyOnceWith(PAGE)
+  })
+
+  it("should lead to the viewer of an attached html file, as the page's « Voir » does", async () => {
+    vi.mocked(uploadForm).mockResolvedValue({ path: "ventes/rapports/mars", kind: "file", mode: "attach", name: "rapport.html", expiresAt: "2026-09-30T08:15:00.000Z" })
+    const fichier = { id: "f0000000-0000-4000-8000-000000000001", name: "rapport.html", size: 12 }
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ data: { ...DEPOSE, file: fichier } })))
+    await monter(page())
+
+    fireEvent.change(champ(), { target: { files: [new File(["<p>Mars</p>"], "rapport.html")] } })
+
+    await guetter(() => expect(screen.getByRole("link", { name: "Ouvrir la page" })).toHaveAttribute("href", `${PAGE}?view=${fichier.id}`))
+    act(() => vi.advanceTimersByTime(1_500))
+    expect(naviguer).toHaveBeenCalledExactlyOnceWith(`${PAGE}?view=${fichier.id}`)
+  })
+
+  it("should open nothing after a refusal", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: { code: "invalid_arguments", message: "Refused." } }, { status: 400 })))
+    await monter(page())
+
+    fireEvent.change(champ(), { target: { files: [new File(["x"], "petit.md")] } })
+
+    await guetter(() => expect(screen.getByRole("alert")).toHaveTextContent("Ce fichier ne convient pas à cette destination"))
+    act(() => vi.advanceTimersByTime(10_000))
+    expect(naviguer).not.toHaveBeenCalled()
+    expect(screen.queryByRole("link", { name: "Ouvrir la page" })).toBeNull()
   })
 })

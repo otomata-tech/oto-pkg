@@ -1,8 +1,9 @@
+import { randomBytes } from "node:crypto"
 import { expect, test } from "@playwright/test"
 import { auRepos } from "./fixtures/au-repos"
 import { clientAuth } from "./fixtures/base"
 import { seConnecterSurLEspace } from "./fixtures/noeud"
-import { CHEMINS, ESPACE, PROCEDURE, SANS_ESPACE } from "./fixtures/espace"
+import { CHEMINS, EQUIPE, ESPACE, PROCEDURE, SANS_ESPACE } from "./fixtures/espace"
 
 // Le rail, la seule coque (E05-S09, partie a), en contrôle visuel connecté : le compte E2E,
 // administrateur de l'organisation de la campagne (`espace.ts`), en clair puis en sombre. Une seule navigation
@@ -10,7 +11,8 @@ import { CHEMINS, ESPACE, PROCEDURE, SANS_ESPACE } from "./fixtures/espace"
 // courante (AC-a6) ; la procédure de l'équipe est dans l'arbre (AC-a5) ; ⌘K ouvre la palette, qui trouve et
 // ouvre un nœud (AC-a7) ; le menu de l'entreprise porte les réglages, Journal compris, sans Usage (AC-a4 ;
 // E05-S13, AC-8, AC-10). Captures du rail dans les huit thèmes, posés sur la racine `.oto` de la page, sans
-// écrire la marque (AC-x1, AC-x3).
+// écrire la marque (AC-x1, AC-x3). E11-S20 (AC-3) : une page écrite dans un autre onglet, comme par un assistant,
+// paraît dans le rail à la navigation suivante, sans recharger le document ; page jetable, mise à la corbeille à la fin.
 
 const email = process.env.E2E_USER_EMAIL ?? ""
 const password = process.env.E2E_USER_PASSWORD ?? ""
@@ -76,6 +78,46 @@ test.describe("le rail", () => {
         }
       } finally {
         await page.close()
+      }
+    })
+
+    // E11-S20 (AC-3) : l'arbre relu seul à la navigation client, le layout de l'hôte n'étant pas rejoué.
+    test(`should show in the rail a page written in another tab at the next navigation, without reloading (${mode})`, async ({ browser }) => {
+      const context = await browser.newContext({ colorScheme: mode, viewport: { width: 1440, height: 900 } })
+      const page = await context.newPage()
+      const chemin = `${EQUIPE.slug}/essai_e11s20_${randomBytes(3).toString("hex")}`
+      const titre = `Essai E11-S20 ${chemin.slice(-6)}`
+      try {
+        await seConnecterSurLEspace(page, { email, password })
+        const rail = page.getByRole("navigation", { name: "Navigation principale" })
+        await page.evaluate(() => {
+          document.body.dataset.sansRechargement = "oui"
+        })
+
+        // L'autre onglet, sous la même session : la page s'écrit par l'API du paquet, comme la création du rail.
+        const autre = await context.newPage()
+        await autre.goto(`${ESPACE.adresse}/`)
+        const issue = await autre.evaluate(
+          async (corps) => {
+            const reponse = await fetch("/api/platform/nodes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(corps) })
+            return reponse.ok ? "écrite" : await reponse.text()
+          },
+          { path: chemin, title: titre, summary: "Page jetable du contrôle d'E11-S20.", kind: "page" },
+        )
+        expect(issue).toBe("écrite")
+        await autre.close()
+
+        await rail.getByRole("link", { name: "Contexte · Tout le monde" }).click()
+        await expect(page).toHaveURL(`${ESPACE.adresse}/n/contexte`)
+        await expect(rail.getByRole("link", { name: titre })).toBeVisible()
+        expect(await page.evaluate(() => document.body.dataset.sansRechargement)).toBe("oui")
+      } finally {
+        await page
+          .evaluate(async (path) => {
+            await fetch("/api/platform/trash", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path }) })
+          }, chemin)
+          .catch(() => {})
+        await context.close()
       }
     })
 

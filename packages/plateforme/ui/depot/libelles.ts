@@ -26,7 +26,9 @@ export const DEPOT = {
   /** Ce que la zone dit avant la sélection (`uploads-patterns.md § Côté composant`). */
   limites: (genre: UploadKind) => `${tailleLisible(UPLOAD_BYTES_MAX)} au plus${genre === "file" ? "" : ", encodé en UTF-8"}.`,
   envoi: "Dépôt en cours…",
-  depose: (chemin: string) => `Déposé dans ${chemin}. Revenez à la conversation : l'assistant relira la destination.`,
+  depose: (chemin: string) => `Fichier déposé dans « ${chemin} ». La page s'ouvre…`,
+  /** Le lien vers la page du fichier, offert si la page ne s'ouvre pas d'elle-même. */
+  ouvrir: "Ouvrir la page",
   /** Ce qui remplace la zone après un refus qui a servi le lien : un nouvel essai serait refusé. */
   clos: "Ce lien ne peut plus servir : demandez-en un nouveau à l'assistant.",
 } as const

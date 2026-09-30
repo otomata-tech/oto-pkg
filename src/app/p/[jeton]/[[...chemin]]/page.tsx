@@ -4,7 +4,7 @@ import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { fileViewParamSchema, publicFilesRoute } from "@otomata_tech/oto_platform/schemas"
 import { isPlatformError, publicFileView, readPublicNode, requestHost } from "@otomata_tech/oto_platform/server"
-import { CoquilleOto, MESSAGES_DE_LA_VISIONNEUSE, PAGE_PUBLIQUE, PagePublique, resultatDe, type PagePubliqueProps } from "@otomata_tech/oto_platform/ui"
+import { CoquilleOto, MESSAGES_DE_LA_VISIONNEUSE, metadonneesDePartage, PAGE_PUBLIQUE, PagePublique, resultatDe, type PagePubliqueProps } from "@otomata_tech/oto_platform/ui"
 import { marqueDeLAdresse } from "@/lib/plateforme/marque-de-l-adresse"
 
 // La page publique d'un lien de partage (E05-S10, AC-d2 à AC-d6 ; ADR-013 § 4, § 5) : `/p/<jeton>` pour le
@@ -58,11 +58,16 @@ const cheminDe = (segments: string[] | undefined): string | null => (segments &&
 
 export async function generateMetadata({ params }: PagePubliqueParams): Promise<Metadata> {
   const { jeton, chemin } = await params
-  const lecture = await lire(jeton, cheminDe(chemin))
+  const [marque, lecture] = await Promise.all([marqueDeLAdresse(), lire(jeton, cheminDe(chemin))])
+  // Introuvable ou en panne : l'aperçu générique de l'organisation, que pose le layout racine (E11-S21, AC-6).
   if (lecture === null) return { title: PAGE_PUBLIQUE.introuvable, robots: ROBOTS }
   // Une panne se titre par la phrase de la page, jamais par le titre d'un 404.
   if (lecture.error !== undefined) return { title: PAGE_PUBLIQUE.echec, robots: ROBOTS }
-  return { title: lecture.data.node.title, description: lecture.data.node.summary || undefined, robots: ROBOTS }
+  const { node } = lecture.data
+  // L'aperçu du lien (E11-S21) : son image sous le même jeton et le même chemin, clé de cache par révision (HN-E11S21-3).
+  const dessous = chemin && chemin.length > 0 ? `/${chemin.join("/")}` : ""
+  const page = { titre: node.title, resume: node.summary, adresse: `/p/${jeton}${dessous}`, image: `/p/${jeton}/share-image${dessous}?v=${node.revision}` }
+  return { title: node.title, description: node.summary || undefined, robots: ROBOTS, ...metadonneesDePartage({ organisation: marque?.nomAffiche ?? null, page }) }
 }
 
 export default async function PagePubliqueDuLien({ params, searchParams }: PagePubliqueParams) {

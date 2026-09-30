@@ -13,7 +13,7 @@ import LoginPage, { metadata as metadataConnexion } from "@/app/(auth)/login/pag
 import ResetPasswordPage, { metadata as metadataNouveauMotDePasse } from "@/app/(auth)/reset-password/page"
 import AucuneOrganisationPage, { metadata as metadataAucuneOrganisation } from "@/app/no-organization/page"
 import ConfirmerPage, { metadata as metadataConfirmer } from "@/app/auth/confirm/page"
-import { metadata as metadataRacine } from "@/app/layout"
+import { generateMetadata as metadataRacine } from "@/app/layout"
 import { forgotPasswordAction, loginAction, magicLinkAction, resetPasswordAction } from "@/lib/actions/auth"
 import { marqueDeLAdresse } from "@/lib/plateforme/marque-de-l-adresse"
 import { getPlatformIdentitySafely, getPlatformSession, type PlatformSession } from "@/lib/plateforme/session"
@@ -39,7 +39,7 @@ vi.mock("@/lib/actions/auth", () => ({
   logoutAction: vi.fn(),
 }))
 
-vi.mock("@/lib/plateforme/session", () => ({ getPlatformSession: vi.fn(), getPlatformIdentitySafely: vi.fn() }))
+vi.mock("@/lib/plateforme/session", () => ({ getPlatformSession: vi.fn(), getPlatformIdentitySafely: vi.fn(), getRequestOrigin: vi.fn(async () => "https://demo.oto.test") }))
 
 // redirect() lève NEXT_REDIRECT dans Next : le mock lève aussi, le rendu s'arrête comme en production.
 vi.mock("next/navigation", async (importOriginal) => ({
@@ -167,8 +167,8 @@ describe("/login on the authentication template without an organisation (E05-S07
 })
 
 describe("tab titles (E05-S07, AC1)", () => {
-  it("should title each screen under the product template of the root layout, and keep the five screens out of search engines", () => {
-    expect(metadataRacine.title).toEqual({ default: "Oto", template: "%s | Oto" })
+  it("should title each screen under the product template of the root layout, and keep the five screens out of search engines", async () => {
+    expect((await metadataRacine()).title).toEqual({ default: "Oto", template: "%s | Oto" })
     expect(ECRANS.map((ecran) => ecran.onglet)).toEqual([
       "Connexion",
       "Mot de passe oublié",

@@ -152,7 +152,8 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
   })
   return (
     <ContexteDesGestes.Provider value={gestes}>
-      <Reader ref={editeur.racine}>
+      {/* `blocs` : le corps d'écriture garde sa pleine largeur (`blocks.css`), hors de la colonne centrée du lecteur (`content.css`). */}
+      <Reader ref={editeur.racine} data-reading="blocs">
         <IndicationDEnregistrement />
         <div className="mb-3.5 flex flex-col gap-2">
           <Publication genre={genre} blocs={editeur.blocs} />

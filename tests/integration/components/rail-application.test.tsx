@@ -8,7 +8,8 @@
 // le nœud créé montré avant la relecture de l'arbre, à l'adresse que le service rend (AC-c2). E05-S11 (lot e) :
 // Connecteurs au pied (AC-32), le menu de l'entreprise (AC-31, AC-33), le menu du compte (AC-6, AC-e22), le
 // « + » de Privé (AC-34), le résumé par genre (AC-e21), « Contexte · <section> » (AC-18). E05-S12 (lot D) : créer,
-// déposer et ranger sous un Contexte (AC-25 à AC-27).
+// déposer et ranger sous un Contexte (AC-25 à AC-27). E11-S20 : l'arbre relu seul, à la navigation, au retour sur
+// l'onglet, après un geste (AC-3 à AC-8).
 // L'hôte est simulé par ce qu'il prête (`ContexteDeLHote`, la relecture) ; l'API, par `fetch`.
 import type { AnchorHTMLAttributes } from "react"
 import { cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -95,23 +96,43 @@ function monter(props: Partial<RailApplicationProps> = {}, chemin = "/n/conseil/
   return screen.getByRole("navigation", { hidden: true })
 }
 
-type Reponse = { data: unknown } | { error: { code: "forbidden" | "conflict" | "stale_revision" | "not_found"; message: string } }
+type Reponse = { data: unknown } | { error: { code: "forbidden" | "conflict" | "stale_revision" | "not_found" | "internal"; message: string } }
 
-const STATUTS = { forbidden: 403, conflict: 409, stale_revision: 409, not_found: 404 } as const
+const STATUTS = { forbidden: 403, conflict: 409, stale_revision: 409, not_found: 404, internal: 500 } as const
+
+/** Une réponse de l'API, au statut de son code. */
+function repondre(reponse: Reponse): Response {
+  const statut = "error" in reponse ? STATUTS[reponse.error.code] : 200
+  return new Response(JSON.stringify(reponse), { status: statut, headers: { "content-type": "application/json" } })
+}
+
+/** Une relecture de l'arbre en panne : l'arbre montré reste (E11-S20, AC-6). */
+const PANNE: Reponse = { error: { code: "internal", message: "Internal error." } }
+
+/** L'arbre que rend une relecture (`GET nodes/tree`, E11-S20). */
+const arbreRelu = (tree: TreeNode[]): Reponse => ({ data: { tree, truncated: false } })
+
+/**
+ * Les relectures de l'arbre par le rail (E11-S20, `GET nodes/tree`) : servies hors de la file des réponses et des
+ * appels relus, chacune par la première de `reponses`, sinon en panne (l'arbre montré reste) ; comptées.
+ */
+const relectures: { nombre: number; reponses: Reponse[] } = { nombre: 0, reponses: [] }
 
 /**
  * L'API simulée, qui répond sans attendre : chaque appel est rendu par `reponses`, dans l'ordre, un refus
- * au statut de son code ; les appels se relisent.
+ * au statut de son code ; les appels se relisent. Les relectures de l'arbre passent par `relectures`.
  */
 function simulerLAPI(...reponses: Reponse[]) {
   const appels: { url: string; methode: string; corps: unknown }[] = []
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/platform/nodes/tree") {
+        relectures.nombre++
+        return repondre(relectures.reponses.shift() ?? PANNE)
+      }
       appels.push({ url, methode: init?.method ?? "GET", corps: init?.body ? JSON.parse(String(init.body)) : undefined })
-      const reponse = reponses.shift() ?? { data: {} }
-      const statut = "error" in reponse ? STATUTS[reponse.error.code] : 200
-      return new Response(JSON.stringify(reponse), { status: statut, headers: { "content-type": "application/json" } })
+      return repondre(reponses.shift() ?? { data: {} })
     }),
   )
   return appels
@@ -159,6 +180,8 @@ beforeAll(simulerLesDialogues)
 beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
+  relectures.nombre = 0
+  relectures.reponses = []
 })
 
 afterEach(() => {
@@ -969,6 +992,144 @@ describe("RailApplication search (AC-a7)", () => {
   })
 })
 
+describe("RailApplication, the tree kept up to date (E11-S20)", () => {
+  const rail = () => screen.getByRole("navigation", { hidden: true })
+  const lien = (nom: string) => within(rail()).queryByRole("link", { name: nom })
+  const titre = (tree: TreeNode[], chemin: string, nouveau: string): TreeNode[] =>
+    tree.map((lu) => ({ ...lu, title: lu.path === chemin ? nouveau : lu.title, children: titre(lu.children, chemin, nouveau) }))
+  // « Conseil » renommé par un assistant, dans un autre onglet.
+  const RELU = titre(ARBRE, "conseil", "Conseil et devis")
+  const NON_ACTUALISE = "L'arbre n'a pas pu être actualisé."
+  let horloge: { maintenant: number; restaurer: () => void } | null = null
+
+  /** L'heure du rail, avancée à la main (le délai de 5 s d'AC-4), et l'onglet visible ou caché. */
+  function arreterLHorloge(visible: { etat: DocumentVisibilityState }) {
+    const now = vi.spyOn(Date, "now").mockImplementation(() => horloge?.maintenant ?? 0)
+    const visibilite = vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visible.etat)
+    horloge = {
+      maintenant: 1_000_000,
+      restaurer: () => {
+        now.mockRestore()
+        visibilite.mockRestore()
+      },
+    }
+    return horloge
+  }
+
+  afterEach(() => {
+    horloge?.restaurer()
+    horloge = null
+  })
+
+  it("should re-read its tree when the address changes and show it in place, the tree shown meanwhile, a folded section staying folded (AC-3)", async () => {
+    simulerLAPI()
+    relectures.reponses.push(arbreRelu(RELU))
+    const { rerender } = render(railA("/n/conseil/grille"))
+    fireEvent.click(within(rail()).getByRole("button", { name: "Replier Ventes" }))
+    expect(relectures.nombre).toBe(0)
+
+    rerender(railA("/n/conseil"))
+    expect(lien("Conseil")).toBeInTheDocument()
+    await waitFor(() => expect(lien("Conseil et devis")).toHaveAttribute("aria-current", "page"))
+    expect(relectures.nombre).toBe(1)
+    expect(within(rail()).getByRole("button", { name: "Déplier Ventes" })).toHaveAttribute("aria-expanded", "false")
+  })
+
+  it("should re-read its tree when the tab is visible again or the window takes the focus, 5 s at least after the last read (AC-4)", async () => {
+    simulerLAPI()
+    relectures.reponses.push(arbreRelu(RELU))
+    const onglet: { etat: DocumentVisibilityState } = { etat: "hidden" }
+    const temps = arreterLHorloge(onglet)
+    render(railA("/n/conseil/grille"))
+
+    // Moins de 5 s après le montage, ou l'onglet caché : rien ne part.
+    temps.maintenant += 4_999
+    onglet.etat = "visible"
+    fireEvent(document, new Event("visibilitychange"))
+    fireEvent.focus(window)
+    temps.maintenant += 1
+    onglet.etat = "hidden"
+    fireEvent(document, new Event("visibilitychange"))
+    expect(relectures.nombre).toBe(0)
+
+    onglet.etat = "visible"
+    fireEvent(document, new Event("visibilitychange"))
+    await waitFor(() => expect(lien("Conseil et devis")).toBeInTheDocument())
+    // La fenêtre reprend le focus avec l'onglet : moins de 5 s après la relecture, rien ne part.
+    fireEvent.focus(window)
+    expect(relectures.nombre).toBe(1)
+    temps.maintenant += 5_000
+    fireEvent.focus(window)
+    await waitFor(() => expect(relectures.nombre).toBe(2))
+  })
+
+  it("should re-read its tree after a gesture, with the page (AC-5)", async () => {
+    const appels = simulerLAPI({ data: { path: "conseil_copie", from: "conseil", count: 2 } })
+    relectures.reponses.push(arbreRelu([{ ...ARBRE[0], children: [...ARBRE[0].children, noeud("conseil_copie", "page", "Conseil (copie)")] }]))
+    render(railA("/n/conseil/grille"))
+    fireEvent.click(screen.getByRole("button", { name: "Autres actions sur Conseil" }))
+    fireEvent.click(menu().getByRole("menuitem", { name: "Dupliquer" }))
+
+    await waitFor(() => expect(lien("Conseil (copie)")).toBeInTheDocument())
+    expect(hote.rafraichir).toHaveBeenCalledTimes(1)
+    expect(relectures.nombre).toBe(1)
+    expect(appels).toEqual([{ url: "/api/platform/nodes/duplicate", methode: "POST", corps: { path: "conseil" } }])
+  })
+
+  it("should keep the tree shown when a re-read fails, without an alert, say it quietly after three failures in a row, and drop it on success (AC-6)", async () => {
+    simulerLAPI()
+    // Une réponse sans arbre compte comme un échec, comme une panne.
+    relectures.reponses.push(PANNE, { data: {} })
+    const { rerender } = render(railA("/n/conseil/grille"))
+    rerender(railA("/n/conseil"))
+    await waitFor(() => expect(relectures.nombre).toBe(1))
+    rerender(railA("/n/conseil/grille"))
+    await waitFor(() => expect(relectures.nombre).toBe(2))
+    expect(lien("Conseil")).toBeInTheDocument()
+    expect(within(rail()).queryByText(NON_ACTUALISE)).toBeNull()
+
+    rerender(railA("/n/conseil"))
+    // Dit par une région de statut montée vide : annoncé sans alerte (`accessibility-patterns.md § Régions dynamiques`).
+    expect(await within(rail()).findByText(NON_ACTUALISE)).toHaveAttribute("role", "status")
+    expect(lien("Conseil")).toBeInTheDocument()
+    expect(within(rail()).queryByRole("alert")).toBeNull()
+
+    relectures.reponses.push(arbreRelu(RELU))
+    rerender(railA("/n/conseil/grille"))
+    await waitFor(() => expect(lien("Conseil et devis")).toBeInTheDocument())
+    expect(within(rail()).queryByText(NON_ACTUALISE)).toBeNull()
+  })
+
+  it("should send one re-read at a time, and a single one after it whatever was asked meanwhile (AC-7)", async () => {
+    const enAttente: ((reponse: Response) => void)[] = []
+    const lire = vi.fn(() => new Promise<Response>((resolve) => enAttente.push(resolve)))
+    vi.stubGlobal("fetch", lire)
+    const { rerender } = render(railA("/n/conseil/grille"))
+    rerender(railA("/n/conseil"))
+    rerender(railA("/n/guide"))
+    rerender(railA("/n/contexte"))
+    expect(lire).toHaveBeenCalledTimes(1)
+
+    enAttente[0](repondre(PANNE))
+    await waitFor(() => expect(lire).toHaveBeenCalledTimes(2))
+    enAttente[1](repondre(arbreRelu(RELU)))
+    await waitFor(() => expect(lien("Conseil et devis")).toBeInTheDocument())
+    expect(lire).toHaveBeenCalledTimes(2)
+  })
+
+  it("should take a tree served again by the layout in place of the one re-read (AC-8)", async () => {
+    simulerLAPI()
+    relectures.reponses.push(arbreRelu(RELU))
+    const { rerender } = render(railA("/n/conseil/grille"))
+    rerender(railA("/n/conseil"))
+    await waitFor(() => expect(lien("Conseil et devis")).toBeInTheDocument())
+
+    rerender(railA("/n/conseil", { arbre: { data: { tree: titre(ARBRE, "conseil", "Conseil 2027"), truncated: false } } }))
+    expect(lien("Conseil 2027")).toBeInTheDocument()
+    expect(lien("Conseil et devis")).toBeNull()
+  })
+})
+
 describe("SectionsDuRail in the sidebar of an ERP (AC-a8)", () => {
   it("should show a single coque, the ERP's, navigate by the ERP's link and create through the package API", async () => {
     const appels = simulerLAPI({ data: { path: "conseil/sans_titre" } })
@@ -999,5 +1160,7 @@ describe("SectionsDuRail in the sidebar of an ERP (AC-a8)", () => {
 
     await waitFor(() => expect(hote.naviguer).toHaveBeenCalledWith("/erp/plateforme/n/conseil/sans_titre"))
     expect(appels[0]).toMatchObject({ url: "/api/platform/nodes", methode: "POST", corps: { path: "conseil/sans_titre", kind: "page" } })
+    // E11-S20 : l'arbre de l'ERP est le sien ; seul `RailApplication` relit le sien.
+    expect(relectures.nombre).toBe(0)
   })
 })

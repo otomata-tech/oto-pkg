@@ -130,6 +130,7 @@ const SEGMENTS_ADMIS = [
   'platform',
   'profile',
   'reset-password',
+  'share-image',
   'teams',
   'trash',
   'upload',

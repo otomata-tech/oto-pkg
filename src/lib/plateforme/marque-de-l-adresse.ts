@@ -1,4 +1,5 @@
 import { headers } from "next/headers"
+import { cache } from "react"
 import {
   createAnonPlatformDb,
   isPlatformError,
@@ -28,8 +29,9 @@ export function marqueDOrganisation(org: { name: string; brand: unknown }): Marq
 /**
  * Marque de l'organisation de l'adresse, lue sans session (`org_by_host`, seule lecture ouverte à
  * `anon`) ; `null` sans organisation, sur une panne, ou sans réponse en `ATTENTE_DE_LA_MARQUE_MS`.
+ * Une fois par requête (`cache`) : le layout racine (métadonnées de partage, E11-S21) et la page la partagent.
  */
-export async function marqueDeLAdresse(): Promise<MarqueDOrganisation | null> {
+export const marqueDeLAdresse = cache(async function marqueDeLAdresse(): Promise<MarqueDOrganisation | null> {
   // Hors de tout `try` : au prérendu, `headers()` lève pour marquer la route dynamique, et ce signal
   // doit atteindre Next (`api-patterns.md § Type de retour standard`).
   const host = requestHost(await headers())
@@ -52,4 +54,4 @@ export async function marqueDeLAdresse(): Promise<MarqueDOrganisation | null> {
   } finally {
     clearTimeout(minuteur)
   }
-}
+})

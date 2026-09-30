@@ -43,7 +43,7 @@ import { DiagrammeMermaid } from "./diagramme-mermaid"
 import { adresseSansIdentifiants, cibleDe, estUnTableau, libelleDUneAdresse, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
 import { CarteDeFichier, ImageAgrandissable } from "./fichier-du-bloc"
 import { GlypheDeNature } from "./glyphes"
-import { DIAGRAMME, ECRAN } from "./libelles"
+import { CADRE_DU_TABLEAU, DIAGRAMME, ECRAN } from "./libelles"
 import { ciblesLues } from "./sous-pages"
 
 /** Le lien d'un bloc : celui de l'hôte (écran serveur) ou `"a"` (éditeur, îlot client). */
@@ -194,6 +194,12 @@ function alignementDe(valeur: unknown): "center" | "end" | undefined {
 }
 
 /**
+ * Le cadre d'un tableau lu : il défile en largeur (`oto-table-wrap`, `content.css`), jamais la page ; focusable et nommé,
+ * pour que le clavier le fasse défiler. Toujours, faute de savoir sans mesure s'il défile (`portage-ecrans.md § 7`).
+ */
+const CADRE_DEFILANT = { tabIndex: 0, role: "region" } as const
+
+/**
  * Un tableau simple (E10-S04, AC-a1) : le balisage et les classes de `TableauFixe` (`ui/equipes/tableau-fixe.tsx`),
  * en-têtes `scope="col"`, alignement par colonne ; il défile dans son bloc (`oto-table-wrap`), jamais la page.
  * Rendu aussi par le serveur : ni le `Table` client du design system, ni `TableauFixe`, dont les clés sont les
@@ -204,7 +210,7 @@ function TableauSimple({ bloc, ...liens }: RenduProps) {
   const alignements = (align ?? []).map(alignementDe)
   // Une cellule n'a pas d'identité : son rang dans une rangée, et la rangée le sien, dans un bloc qui a la sienne.
   return (
-    <div id={bloc.ref} className={`oto-table-wrap ${APRES}`}>
+    <div id={bloc.ref} className={`oto-table-wrap ${APRES}`} {...CADRE_DEFILANT} aria-label={CADRE_DU_TABLEAU.simple}>
       <table className="oto-table" data-responsive="scroll" data-simple="">
         <thead>
           <tr>
@@ -340,7 +346,7 @@ function Paragraphe({ bloc, ...liens }: RenduProps) {
   const texte = bloc.text ?? ""
   if (estUnTableau(texte)) {
     return (
-      <pre id={bloc.ref} className={`oto-code ${APRES} overflow-x-auto p-3`}>
+      <pre id={bloc.ref} className={`oto-code ${APRES} overflow-x-auto p-3`} {...CADRE_DEFILANT} aria-label={CADRE_DU_TABLEAU.texte}>
         {texte}
       </pre>
     )

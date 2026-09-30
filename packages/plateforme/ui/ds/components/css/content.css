@@ -43,7 +43,7 @@
   font-size: var(--fs-2xs);
 }
 
-/* Le lecteur, le corps d'un document en lecture (`.oto-island-body[data-reading]` est dans `islands.css`, ses enfants ici) : de l'air entre les blocs plutôt que dans l'interligne ; la mesure est sur le paragraphe, pas sur le conteneur, l'îlot reste pleine largeur pour un encart ou un tableau. */
+/* Le lecteur, le corps d'un document en lecture (`.oto-island-body[data-reading]` est dans `islands.css`, ses enfants ici) : de l'air entre les blocs plutôt que dans l'interligne ; les blocs lus tiennent dans une colonne centrée à la mesure du texte, qu'un tableau seul déborde des deux côtés (plus bas). */
 
 /* Tout est scopé par `.oto-island-body[data-reading]`, et c'est obligatoire : le reset (`.oto h2`, `.oto p`, `.oto ul`, (0,1,1)) bat une simple classe, et sans le préfixe les intertitres se collent et les puces disparaissent, sans erreur. */
 
@@ -96,6 +96,31 @@
 .oto-island-body[data-reading] .oto-reader-list .oto-reader-list { margin: var(--space-1-5) 0 0; }
 .oto-island-body[data-reading] ul.oto-reader-list ul.oto-reader-list { list-style: circle; }
 .oto-island-body[data-reading] ul.oto-reader-list ul.oto-reader-list ul.oto-reader-list { list-style: square; }
+
+/* Changé (1.1.5) : la colonne de lecture est centrée dans l'îlot ; collée à gauche, un îlot plus large que la mesure (la visionneuse d'un `.md`, en pleine largeur) ou un tableau qui le remplit laissaient le texte au bord gauche. Chaque enfant direct prend la colonne par ses marges, qui gardent leur fusion verticale (une grille les additionnerait). `--colonne-du-lecteur`, longueur déclarée, se calcule une fois sur le corps, au corps du texte, d'où `--fs-sm` : les mêmes pixels chez un intertitre, dont le `ch` est plus large. L'éditeur (`data-reading="blocs"`) garde sa pleine largeur (`blocks.css`). */
+@property --colonne-du-lecteur {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+.oto-island-body[data-reading]:not([data-reading="blocs"]) {
+  font-size: var(--fs-sm);
+  --colonne-du-lecteur: var(--reader-measure);
+}
+/* La largeur bornée aussi : un enfant à `inline-size: 100%` (le filet d'un séparateur) sortirait sinon de la colonne à droite. */
+.oto-island-body[data-reading]:not([data-reading="blocs"]) > * {
+  margin-inline: max(0px, calc((100% - var(--colonne-du-lecteur)) / 2));
+  max-inline-size: min(100%, var(--colonne-du-lecteur));
+}
+/* Un tableau, simple ou écrit en texte (`pre`, `rendu-des-blocs.tsx`) : centré sur la colonne, aussi large qu'elle au moins, il s'élargit des deux côtés jusqu'au bord du corps, puis défile dans son cadre ; sans le confinement du cadre (`table.css`, pour les cartes), sa largeur se mesure sur son contenu ; `overflow-x` ici, le `overflow: hidden` de `.oto-code` (hors couche) battant l'utilitaire du `pre`. */
+.oto-island-body[data-reading]:not([data-reading="blocs"]) > :is(.oto-table-wrap, pre.oto-code) {
+  container-type: normal;
+  overflow-x: auto;
+  inline-size: fit-content;
+  min-inline-size: min(100%, var(--colonne-du-lecteur));
+  max-inline-size: 100%;
+  margin-inline: auto;
+}
 
 /* L'encart de contenu, un objet posé au fil du texte et pas une ligne : sa vignette (la trame du thème, le glyphe de son type) dit ce que c'est avant qu'on lise le nom. */
 

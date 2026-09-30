@@ -6,17 +6,26 @@
 // fois). La zone, qui tenait le focus, part après « Déposé » ou après un refus qui a servi le lien : le focus va à la
 // région qui le dit (`accessibility-patterns.md § Après une action`). Sans lui, un assistant sans shell ni adresse
 // publique n'aurait aucun moyen de déposer un fichier.
+//
+// Après « Déposé », l'onglet mène à la page qui contient le fichier, après un court délai qui laisse lire l'annonce,
+// par la navigation de l'hôte (`useHote().naviguer`) ; « Ouvrir la page » reste offert si elle n'aboutit pas. Pas de
+// `window.close()` : il n'agit que sur un onglet ouvert par un script, pas sur `form_url` ouvert depuis la conversation.
 import { useEffect, useRef, useState } from "react"
-import { UPLOAD_BYTES_MAX, type UploadDone, type UploadKind } from "../../schemas"
+import { fileTypeOf, UPLOAD_BYTES_MAX, type UploadDone, type UploadKind } from "../../schemas"
 import { deposerParLeLien, type ErreurPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
 import { ZoneDeDepot } from "../coque/import-de-fichier"
+import { useHote } from "../hote/navigation"
+import { adresseDeVue } from "../noeud/fichier-du-bloc"
 import { DEPOT, REFUS_DU_DEPOT } from "./libelles"
+
+/** Le temps de lire « Déposé » avant que la page s'ouvre. */
+const DELAI_D_OUVERTURE_MS = 1_500
 
 type Etat =
   | { phase: "repos" }
   | { phase: "envoi" }
-  | { phase: "depose"; chemin: string }
+  | { phase: "depose"; chemin: string; adresse: string }
   /** `clos` : le refus a servi le lien, ou le lien ne sert plus ; un nouvel essai rendrait `not_found`. */
   | { phase: "refus"; message: string; clos: boolean }
 
@@ -37,7 +46,18 @@ function lienEncoreValable(erreur: ErreurPlateforme, fichier: File): boolean {
   return erreur.code === "too_large" && fichier.size > UPLOAD_BYTES_MAX
 }
 
+/**
+ * Où mène un dépôt réussi : l'adresse de la page que rend le service (`url`, `/n/<chemin>`, à l'origine même du
+ * formulaire, que la route exige), suivie de `?view=<id>` pour un fichier joint que la page montre dans sa visionneuse
+ * (`adresseDeVue` : `html`, `md`) ; tout autre fichier, un `.md` importé ou un CSV : la page.
+ */
+function adresseDuDepot(depose: UploadDone): string {
+  const vue = depose.file ? adresseDeVue(depose.file.id, fileTypeOf(depose.file.name)) : null
+  return vue?.startsWith("?") ? `${depose.url}${vue}` : depose.url
+}
+
 export function FormulaireDeDepot({ jeton, genre, accepte }: FormulaireDeDepotProps) {
+  const { Lien, naviguer } = useHote()
   const [etat, setEtat] = useState<Etat>({ phase: "repos" })
   // Un second dépôt arrive avant que l'état soit rendu : ce verrou tient l'envoi unique.
   const enCours = useRef(false)
@@ -51,6 +71,13 @@ export function FormulaireDeDepot({ jeton, genre, accepte }: FormulaireDeDepotPr
     focusSur.current.focus()
     focusSur.current = null
   })
+
+  const ouvrir = etat.phase === "depose" ? etat.adresse : null
+  useEffect(() => {
+    if (ouvrir === null) return
+    const minuteur = setTimeout(() => naviguer(ouvrir), DELAI_D_OUVERTURE_MS)
+    return () => clearTimeout(minuteur)
+  }, [ouvrir, naviguer])
 
   async function deposer(fichier: File) {
     if (enCours.current) return
@@ -66,7 +93,7 @@ export function FormulaireDeDepot({ jeton, genre, accepte }: FormulaireDeDepotPr
       return
     }
     focusSur.current = statut.current
-    setEtat({ phase: "depose", chemin: reponse.data.path })
+    setEtat({ phase: "depose", chemin: reponse.data.path, adresse: adresseDuDepot(reponse.data) })
   }
 
   const annonce = etat.phase === "envoi" ? DEPOT.envoi : etat.phase === "depose" ? DEPOT.depose(etat.chemin) : ""
@@ -78,6 +105,11 @@ export function FormulaireDeDepot({ jeton, genre, accepte }: FormulaireDeDepotPr
       <p ref={statut} tabIndex={-1} role="status" className="text-sm text-ink">
         {annonce}
       </p>
+      {etat.phase === "depose" && (
+        <Lien href={etat.adresse} className="self-start text-sm text-ink underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ink">
+          {DEPOT.ouvrir}
+        </Lien>
+      )}
       <p ref={alerte} tabIndex={-1} role="alert" className="text-sm text-ink">
         {etat.phase === "refus" ? etat.message : ""}
       </p>

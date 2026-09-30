@@ -17,6 +17,21 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.1.5 — 2026-09-30
+
+### Hosts
+- Install: upgrade to 1.1.5; no migration, no new variable. For link previews (Slack, WhatsApp, LinkedIn, mail), add `app/opengraph-image.tsx` (`new ImageResponse(<ImageDePartage donnees={await shareImageData(requestHost(await headers()))} />, { ...TAILLE_DE_PARTAGE })`, `size = TAILLE_DE_PARTAGE`, `contentType = "image/png"`) and `app/p/[jeton]/share-image/[[...chemin]]/route.tsx` (`GET`, the same with `{ token: jeton, path: chemin?.join("/") ?? null }`); let `/opengraph-image` through the auth middleware; the root layout's `generateMetadata` spreads `metadonneesDePartage({ organisation, origine })` (request origin, organisation of the address), the public page's spreads `metadonneesDePartage({ organisation, page })`. The reference host (`src/`) shows each file. The rail's `GET nodes/tree` needs no route: the catch-all `/api/platform/[...route]` already serves `GET`.
+- Server: `shareImageData(host, link?)` reads a share image's data without a session: the organisation of the address (name, theme, logo fetched by `fetchSource` as a PNG or JPEG `data:` URL, else `null`) and, with a public link, the title and summary `readPublicNode` serves; no node is read without a link; never throws (unknown organisation: `org: null`; unknown, revoked or out-of-scope link: `page: null`; a failure is logged `[platform] share image:`).
+- Schemas: `ShareImageData`, the type `shareImageData` returns and `ImageDePartage` draws.
+- UI: `ImageDePartage` draws a 1200 × 630 light share image as inline-styled JSX for `ImageResponse` (`next/og`, called by the host; the package does not import it): the theme's colour, the logo or the initial, the organisation's name; for a public link, its title and summary cut at a word; « Oto » and its mark without an organisation. `TAILLE_DE_PARTAGE` is its size. Default font of `ImageResponse` (Noto Sans).
+- UI: `metadonneesDePartage({ organisation, origine?, page? })` gives `openGraph` (`site_name` = organisation, `og:url`, `og:description`) and `twitter.card = summary_large_image`, plus `metadataBase` from a `http(s)` origin; with `page` (`titre`, `resume`, `adresse`, `image`), the public link's title, cut summary and image (1200 × 630, `alt`). A private page (`/n/<path>`) sets none: its title never reaches a preview.
+- API: `GET /api/platform/nodes/tree` answers `{ tree, truncated }`, the visible tree of the session's person (`visibleTree`, as the dashboard layout passes to the rail); a read, no journal line; 401 without a session.
+- UI: `RailApplication` keeps its tree up to date without reloading the page: it re-reads it alone (`GET nodes/tree`) when the current path changes, when the tab is visible again or the window takes the focus (5 s at least after the last read), and after each page re-read; one read at a time; a failed read keeps the tree shown, and three in a row say it under the sections; a new tree served by the layout replaces it. Teams and the company name still come from the layout.
+- UI: `useRafraichir()` still calls the host's re-read (`ContexteDeRafraichissement`) once, then asks the mounted rail to re-read its tree; `SectionsDuRail` mounted alone in an ERP sidebar does not re-read.
+- UI: a checklist box in the editor shows the pointer cursor (the default one when read-only).
+- UI: after a file is dropped on the upload form (`/upload/<token>`), the form says where it went, offers « Ouvrir la page », and opens the page that holds it 1.5 s later through the host navigation (`ContexteDeLHote`): `/n/<path>`, or the viewer `?view=<id>` of an attached `html` or `md` file. A refused drop opens nothing.
+- UI: reading screens (node reader, public page, attached `.md` viewer) keep their text in a centered reading column whatever the width of a table; a simple table or a markdown table kept as text widens symmetrically up to the reading body, then scrolls in its own frame, a named region reachable with the keyboard; a markdown table kept as text now scrolls instead of being cut; the editor keeps its full width.
+
 ## 1.1.4 — 2026-09-30
 
 ### Assistants

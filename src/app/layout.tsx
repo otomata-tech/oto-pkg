@@ -1,18 +1,27 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { FaviconDuTheme } from "@otomata_tech/oto_platform/ui"
+import { FaviconDuTheme, metadonneesDePartage } from "@otomata_tech/oto_platform/ui"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { marqueDeLAdresse } from "@/lib/plateforme/marque-de-l-adresse"
+import { getRequestOrigin } from "@/lib/plateforme/session"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
-  title: {
-    default: "Oto",
-    template: "%s | Oto",
-  },
-  description: "Description du projet",
+// Les métadonnées de partage de toute adresse (E11-S21) : l'organisation de l'adresse, jamais une page privée
+// (HN-E11S21-2) ; l'image vient de la convention `opengraph-image.tsx`. L'origine de la requête devient `metadataBase` :
+// chaque organisation sert ses images sous sa propre adresse.
+export async function generateMetadata(): Promise<Metadata> {
+  const [origine, marque] = await Promise.all([getRequestOrigin(), marqueDeLAdresse()])
+  return {
+    title: {
+      default: "Oto",
+      template: "%s | Oto",
+    },
+    description: "Description du projet",
+    ...metadonneesDePartage({ organisation: marque?.nomAffiche ?? null, origine }),
+  }
 }
 
 export default function RootLayout({

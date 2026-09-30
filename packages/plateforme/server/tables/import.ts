@@ -119,9 +119,9 @@ function meanwhile(lot: Lot, row: { line: number; rowKey: string }, what: "was c
 /**
  * Une création (AC-b3, AC-c1, D120) : le chemin libre (un nœud, visible ou non, ou l'ancien chemin d'un autre :
  * `conflict`, N31), le parent visible, son écriture (E11-S02, comme `writeNode`) ; sinon le refus dit à qui demander. Rien n'est lu ni écrit
- * des lignes avant.
+ * des lignes avant. Relue par `upload.link` (E10-S02, AC-f1) pour toute création.
  */
-async function requireCreation(context: ImportContext, path: string): Promise<void> {
+export async function requireCreation(context: ImportContext, path: string): Promise<void> {
   const { db, identity } = context
   if ((await lookupNode(db, identity, path)) ?? (await lookupAlias(db, identity, path))) throw notAvailable(path)
   const parentAt = parentPath(path) ?? ROOT_PATH
@@ -294,8 +294,9 @@ export async function importLot(context: ImportContext, body: unknown): Promise<
 /**
  * L'en-tête d'un tableau créé par `table.import` (AC-b2, AC-c1) : les noms de la ligne d'en-tête, les types
  * déduits, la clé nommée par l'appel, sinon déduite ; sans elle, le refus d'AC-c1 (aucune clé générée par `call`).
+ * Relu par le dépôt d'un CSV par lien (E10-S02, AC-f7).
  */
-function inferredHeader(headers: readonly string[], rows: readonly (readonly string[])[], key: string | undefined): ImportedHeader {
+export function inferredHeader(headers: readonly string[], rows: readonly (readonly string[])[], key: string | undefined): ImportedHeader {
   const names = columnNames(headers)
   const inferred = inferTable(rows, names)
   if (key === undefined) {

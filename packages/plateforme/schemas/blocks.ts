@@ -9,6 +9,7 @@
 // traversent sans perte. Retiré : `type` libre (liste fermée ici), `refs` servies et `content` d'un
 // encart (→ bloc `reference`).
 import * as z from "zod/v4"
+import { FILE_MAX_BYTES } from "./files"
 import { NODE_PATH_PATTERN } from "./nodes"
 
 /** Les onze types de la V1, dans l'ordre du contrat d'E01-S06, puis ceux qu'une migration additive ajoute (E10-S04). */
@@ -27,6 +28,8 @@ export const BLOCK_TYPES = [
   "simple_table",
   "divider",
   "toggle",
+  // E10-S02 : un fichier joint à la page (ADR-016).
+  "file",
 ] as const
 
 export const blockTypeSchema = z.enum(BLOCK_TYPES)
@@ -168,10 +171,39 @@ const mermaid = z.object({
   key: optionalKey,
 })
 
+/** L'identifiant d'un fichier joint, en minuscules comme la base le relit (`blocks_shape_check`, E10-S02). */
+const fileId = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "File: a lowercase uuid.")
+
+/** Les largeurs d'une image (E10-S02, AC-b3) ; sans largeur, `full`. */
+export const IMAGE_WIDTHS = ["small", "medium", "full"] as const
+
+export type ImageWidth = (typeof IMAGE_WIDTHS)[number]
+
+/** Une image : une adresse `https` externe, ou un fichier joint (E10-S02, AC-b1), jamais les deux ; sa largeur, facultative. */
 const image = z.object({
   type: z.literal("image"),
   text: blockText.nullable().optional(),
-  data: z.looseObject({ src: z.string().refine(within(1, 2000), "Source: 1 to 2 000 characters."), alt: z.string().optional() }),
+  data: z
+    .looseObject({
+      src: z.string().refine(within(1, 2000), "Source: 1 to 2 000 characters.").optional(),
+      file_id: fileId.optional(),
+      alt: z.string().optional(),
+      width: z.enum(IMAGE_WIDTHS).optional(),
+    })
+    .refine((data) => (data.src === undefined) !== (data.file_id === undefined), "Image: a source or a file, not both."),
+  key: optionalKey,
+})
+
+/** Un fichier joint à la page (E10-S02, AC-b2) : son identifiant, son nom, sa taille (1 octet à 50 Mo) et son type. */
+const file = z.object({
+  type: z.literal("file"),
+  text: noText,
+  data: z.looseObject({
+    file_id: fileId,
+    name: z.string().refine(within(1, 255), "Name: 1 to 255 characters."),
+    size: z.number().int().min(1).max(FILE_MAX_BYTES),
+    mime: z.string().refine(within(1, 255), "Type: 1 to 255 characters."),
+  }),
   key: optionalKey,
 })
 
@@ -317,6 +349,7 @@ export const blockInputSchema = z.discriminatedUnion("type", [
   simpleTable,
   divider,
   toggle,
+  file,
 ])
 
 export type BlockInput = z.infer<typeof blockInputSchema>

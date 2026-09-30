@@ -29,6 +29,8 @@ const PERSON_COLUMNS = {
     "access_rules.subject_user_id",
     "platform_staff.user_id",
     "platform_grants.user_id",
+    // Les tickets de dépôt par lien de la personne (E10-S02 lot f), sans clé depuis leur création.
+    "upload_tickets.user_id",
   ],
   // Sans action : l'espace personnel empêchait la suppression du compte (fiche D19).
   noAction: ["nodes.owner_user_id"],
@@ -56,6 +58,8 @@ const PERSON_COLUMNS = {
     "connector_activations.activated_by",
     "sim_outbox.created_by",
     "sim_outbox.sent_by",
+    // L'auteur d'un fichier joint (E10-S02), sans clé depuis sa création.
+    "files.created_by",
   ],
 }
 const ALL_PERSON_COLUMNS = [...PERSON_COLUMNS.cascade, ...PERSON_COLUMNS.noAction, ...PERSON_COLUMNS.setNull]
@@ -124,14 +128,14 @@ describe.skipIf(!sqlConfigured)(
       await sql?.end({ timeout: 5 })
     }, SETUP_TIMEOUT)
 
-    it.skipIf(!supabaseConfigured)(onProject("should keep no foreign key to auth.users, the 31 person columns still uuid (AC1)"), async () => {
+    it.skipIf(!supabaseConfigured)(onProject("should keep no foreign key to auth.users, the 32 person columns still uuid (AC1)"), async () => {
       const keys = await sql`select conrelid::regclass::text as tbl, conname from pg_catalog.pg_constraint
                               where confrelid = 'auth.users'::regclass and connamespace = 'platform'::regnamespace`
       expect(plain(keys)).toEqual([])
       const columns = await sql`select table_name || '.' || column_name as col, data_type from information_schema.columns
                                  where table_schema = 'platform' and table_name || '.' || column_name = any(${ALL_PERSON_COLUMNS})
                                  order by 1`
-      expect(ALL_PERSON_COLUMNS).toHaveLength(31)
+      expect(ALL_PERSON_COLUMNS).toHaveLength(32)
       expect(plain(columns)).toEqual([...ALL_PERSON_COLUMNS].sort().map((col) => ({ col, data_type: "uuid" })))
     })
 

@@ -164,6 +164,13 @@ un script dont la première écriture précède sa propre lecture des comptes (`
 l'étape qui précède la première écriture lui passe une clé refusée et prouve qu'aucune écriture n'est
 partie (`tests/unit/demo-seed.test.ts`).
 
+En mode OIDC (`PLATFORM_OIDC_ISSUER` posée), le script Démo ne tient ni clé ni compte : seules la
+connexion d'administration et `E2E_USER_EMAIL` sont exigées, `--user` nomme la personne E2E par son
+identifiant interne, contrôlé en `uuid` avant toute connexion, et `prepareOrg` n'a pas de sonde ;
+hors de ce mode, `--user` est refusé (code 1), comme dans `platform:staff`. **Vérifiable :**
+`tests/integration/demo-seed-oidc.test.ts` joue le semis sans clé et les deux refus de la ligne de
+commande.
+
 Une personne de `platform` peut n'avoir aucun compte Auth : fixtures portables des tests,
 compte supprimé du tableau de bord. Un script la lit dans les copies de `platform` (`members`,
 `platform_staff`) et ne s'arrête pas sur un compte absent ; un ménage la date par un repère
@@ -238,3 +245,5 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ]
 ```
+
+Exception : les deux routes HTML d'ADR-017 (`/api/plateforme/files/<id>/html`, `/api/plateforme/public/<jeton>/files/<id>/html`) sont exclues de `X-Frame-Options` et de la `Referrer-Policy` globale : l'iframe de la visionneuse les charge, et elles posent leurs propres en-têtes (`server/files/html.ts`).

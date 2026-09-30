@@ -39,6 +39,11 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - `call node.discard_draft` drops a node's pending draft, such as a refused table header, back to its published revision; a refused header says to do so.
 - `call node.trash` moves a node to the trash (manage level, restorable 30 days on screen); `call table.delete_rows` deletes rows by key for good, naming those in review.
 - `call table.import` with `create` needs the write level on the parent, no longer manage.
+- `read` of a page shows an attached image as `![alt](<link>)` and a file as `[name (size, type)](<link>)`; `write` keeps both forms, only for files already attached to that page.
+- `read` with `file` = the id from a file link serves the text of an attached html, md, txt or csv file alone, in its own fence; long files come in parts.
+- `call upload.link` gives a one-time link (15 minutes, 1 MB) to put a file on your disk in a page, or a `.md` or a CSV in a page or a table: send it with the curl command it returns.
+- Without a shell, `upload.link` takes `source_url`, a public https address the server downloads; otherwise give the person `form_url`, a one-time upload form.
+- `find` finds an attached file by its name.
 
 ### Hosts
 - Migrations: `20260929140000_route_candidates_formulations.sql` adds `platform.lexicon_fix` (no client role executes it), recreates `route_candidates` with two more columns (`s_phrase`, `lexical_title`) and `search_content`; run `oto-platform migrations sync`.
@@ -74,6 +79,17 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 - UI: `TableauDuNoeud` takes `assistant?`, the most recent family of `lastConnections`, read by the host for a table without rows (example: `src/app/(dashboard)/n/[...chemin]/page.tsx`); an empty table names that assistant.
 - UI: `EcranDeNoeud` always lays a page, a procedure or a Contexte out in two columns, « Cité dans », « Cite » and « Sous-pages » folded on the right; a node's header and the public page offer « Télécharger en .csv/.md ».
 - Schemas: `./schemas` exports `rowCells`, `keyValue` (moved from the server) and `PUBLIC_TABLE_ROWS_MAX`.
+- Migrations: `20260929200000_platform_files.sql` adds the tables `platform.files` and `platform.upload_tickets`, the block type `file` (and `image` with `file_id`, `width`), `public_file_by_token` and `consume_upload_ticket` (granted to `anon` only), and recreates `duplicate_subtree`, `block_search_text` and `forget_user`; run `oto-platform migrations sync`, then apply it.
+- Install: attached files are optional: set all five of `PLATFORM_STORAGE_ENDPOINT`, `PLATFORM_STORAGE_BUCKET`, `PLATFORM_STORAGE_REGION`, `PLATFORM_STORAGE_ACCESS_KEY_ID`, `PLATFORM_STORAGE_SECRET_ACCESS_KEY` (S3 access keys, never `service_role`), or none: without them, files are disabled and everything else works.
+- Install: the bucket is private, its CORS allows `PUT` and `GET` from each address of the application with the `content-type` header; a host CSP allows the bucket's origin in `img-src` and `connect-src`, and `frame-src 'self'` (package README).
+- Install: pinned dependency `aws4fetch` 1.0.20 (S3 signing, no AWS SDK).
+- API: `GET files`, `POST files`, `POST files/<id>/complete`, `GET files/<id>` (302 to a 60 s presigned URL; `?check`, `?disposition=inline`), `GET files/<id>/markdown`, `GET files/<id>/html`; outside any session `GET public/<token>/files/<id>` (with `/markdown`, `/html`) and `POST uploads/<token>`, never behind CORS.
+- API: `POST nodes/duplicate` copies the attached files, counted in the 10 GB quota; the trash purge deletes the files of purged nodes and their objects.
+- Install: exclude `/api/plateforme/files/<id>/html` and `/api/plateforme/public/<token>/files/<id>/html` from a global `X-Frame-Options`, `Referrer-Policy` or CSP (ADR-017; example: `next.config.ts` of the reference host).
+- UI: pass `fileView` (`/n/…`) or `publicFileView` (`/p/<token>/…`, with `routeDesFichiers={publicFilesRoute(<token>)}`) for `?view=<id>` to show the viewer of an attached `html` or `md` file.
+- UI: add the page `/upload/<token>` under the session: it passes `uploadForm(db, identity, token)` to `EcranDeDepot` (example: `src/app/(dashboard)/upload/[token]/page.tsx`); its form posts to `POST uploads/<token>/form`.
+- MCP: `read` gains the optional field `file` and `upload.link` joins the `call` catalogue; the descriptions of `read` and `call` grow by one sentence: refresh the tool list in each host after upgrading (six tools, unchanged).
+- CLI: `pnpm org:export` and `pnpm org:import` need the five storage variables when the organisation has attached files, and carry their bytes in `<file>.files/`.
 
 ## 1.0.0 — 2026-09-28
 

@@ -53,7 +53,7 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
   // E10-S04 : `block_search_text` re-versionnée rend, pour chaque forme d'avant elle, le texte de la ligne de base
   // V1 (recopiée ici) : `search_tsv`, colonne STORED, n'est pas recalculée.
   it("should give the searchable text of the V1 baseline for every earlier valid case, and read the new forms", async () => {
-    const earlier = [...DOCUMENT_CASES, ...ROW_CASES].filter((c) => c.valid && !["simple_table", "divider", "toggle"].includes(String(c.block.type)) && !JSON.stringify(c.block).includes("children"))
+    const earlier = [...DOCUMENT_CASES, ...ROW_CASES].filter((c) => c.valid && !["simple_table", "divider", "toggle", "file"].includes(String(c.block.type)) && !JSON.stringify(c.block).includes("children"))
     for (const c of earlier) {
       const data = fx.admin.json(JSON.parse(JSON.stringify(c.block.data ?? {})))
       const [row] = await fx.admin`

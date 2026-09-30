@@ -9,12 +9,17 @@
 // Écrit dans le style d'oto-frontend, qui n'a ni `/` ni choix au « + » : le menu est celui du design system
 // (`overlays.tsx`, ses groupes) ; la liste reprend celle de « @ » (`citer.tsx` : `oto-pop`, `oto-menu-item`, option
 // désignée par le champ, région montée vide) ; le filtre, `fuzzyScore` de la palette ⌘K, sans casse ni accent.
+//
+// E10-S02 (lot b) : le groupe « Insérer » du « + » propose aussi « Image » et « Fichier » quand le stockage est activé
+// (AC-b1, AC-b2, AC-b7) ; « / » ne les propose pas : il change un Texte en bloc, un fichier se joint après un bloc.
 import { useEffect, useState, type KeyboardEvent } from "react"
 import { normalizeTitle } from "../../../schemas/blocks-render"
 import { fuzzyScore } from "../../ds/react/command-palette"
 import type { MenuItem } from "../../ds/react/overlays"
 import { CHOIX_DE_BLOC, FORMES } from "../libelles"
+import { FICHIERS } from "../libelles-des-fichiers"
 import { idDOption } from "./citer"
+import type { Genre } from "./envoi-de-fichier"
 import { FORMES_ECRITES, type Choix } from "./modele"
 
 /** Les deux groupes du choix, dans l'ordre du menu. */
@@ -25,9 +30,22 @@ const GROUPES: readonly { titre: string; choix: readonly Choix[] }[] = [
 
 const libelleDe = (choix: Choix) => (choix === "separateur" ? CHOIX_DE_BLOC.separateur : FORMES[choix].libelle)
 
-/** Le menu du « + » (AC-a1) : les deux groupes ; choisir insère le bloc après la rangée. */
-export function itemsDuChoix(choisir: (choix: Choix) => void): MenuItem[] {
-  return GROUPES.flatMap(({ titre, choix }) => [{ group: titre }, ...choix.map((un) => ({ label: libelleDe(un), onSelect: () => choisir(un) }))])
+/**
+ * Le menu du « + » (AC-a1) : les deux groupes ; choisir insère le bloc après la rangée. `joindre` : le stockage est
+ * activé, « Image » et « Fichier » terminent « Insérer » (E10-S02, AC-b7).
+ */
+export function itemsDuChoix(choisir: (choix: Choix) => void, joindre?: (quoi: Genre) => void): MenuItem[] {
+  const fichiers: MenuItem[] = joindre
+    ? [
+        { label: FICHIERS.image, onSelect: () => joindre("image") },
+        { label: FICHIERS.fichier, onSelect: () => joindre("fichier") },
+      ]
+    : []
+  return GROUPES.flatMap(({ titre, choix }, rang) => [
+    { group: titre },
+    ...choix.map((un) => ({ label: libelleDe(un), onSelect: () => choisir(un) })),
+    ...(rang === GROUPES.length - 1 ? fichiers : []),
+  ])
 }
 
 /** Les entrées que retient ce qui est tapé après « / » (AC-a2) : toutes sans rien, sinon les meilleures d'abord, sans casse ni accent. */

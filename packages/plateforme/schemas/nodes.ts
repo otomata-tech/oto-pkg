@@ -143,6 +143,16 @@ export const readNodeSchema = z.object({
     .boolean()
     .optional()
     .describe("true: each block comes with its reference, e.g. <!-- ref: 3f9a2c1b -->, for the block operations of write (default false)."),
+  // E10-S02 (AC-d2, fiche D119) : le texte d'un fichier joint, champ facultatif ajouté (ADR-002).
+  file: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe(
+      "Id of one text file attached to the page (html, md, txt, csv), from a file link /api/plateforme/files/<id>, to read its text alone (default: the whole page).",
+    ),
 })
 
 export type ReadNodeInput = z.infer<typeof readNodeSchema>

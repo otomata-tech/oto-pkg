@@ -16,6 +16,8 @@
 
 **Pas de state côté client pour ce qui vient du serveur.** Les Server Components fetchent directement. Pas de `useEffect` + `fetch` + `useState` pour charger des données.
 
+**Exception écrite :** la carte d'un fichier joint (`ui/noeud/fichier-du-bloc.tsx`) demande par un `useEffect`, une fois montée, si le stockage sert encore son objet (`GET files/<id>?check`, par `ui/api/client.ts`) : la page ne le sait qu'au prix d'une requête au bucket par fichier affiché, que son rendu n'attend pas.
+
 ## URL State (recommandé pour les filtres)
 
 ```tsx

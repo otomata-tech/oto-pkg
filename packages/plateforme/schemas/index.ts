@@ -228,3 +228,12 @@ export type { TableImportArgs, TableImportBody } from "./table-write"
 export { CONTEXT_INDEX } from "./context-index"
 // E05-S13 (AC-16) : les formats des blocs servis que la vue « Contexte » relit pour les dire en français.
 export { SERVED_BUDGET, SERVED_NEWS, SERVED_PROCEDURES, SERVED_RECENT, SERVED_RULES } from "./context-index"
+// E10-S02 (lot a) : les fichiers joints à un nœud. Types admis, limites et corps des routes `files`.
+export { FILE_MAX_BYTES, FILE_TYPES, fileIdSchema, fileReadQuerySchema, fileRequestSchema, fileTypeOf, IMAGE_TYPES, ORG_QUOTA_BYTES, TEXT_FILE_MAX_BYTES, TEXT_TYPES } from "./files"
+export type { FileAvailability, FileReady, FileStorageState, FileType, FileUpload } from "./files"
+// E10-S02 (lot c) : « Voir ». Les routes des fichiers d'un lien public, le paramètre `view` et le fichier vu.
+export { FILES_ROUTE, filePath, fileViewParamSchema, publicFilesRoute } from "./files"
+export type { FileMarkdown, FileView, ViewedBlock } from "./files"
+// E10-S02 (lot f, ADR-018) : le dépôt par lien à usage unique. Entrée d'`upload.link`, jeton, bornes, adresses.
+export { MODES_OF, UPLOAD_BYTES_MAX, UPLOAD_FORM_ROUTE, UPLOAD_KINDS, UPLOAD_MODES, UPLOAD_RULE, UPLOAD_TOKEN_PATTERN, UPLOAD_TTL_MINUTES, UPLOADS_ROUTE, uploadLinkSchema } from "./uploads"
+export type { UploadDone, UploadFormView, UploadKind, UploadLinkArgs, UploadMode } from "./uploads"

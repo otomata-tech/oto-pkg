@@ -5,6 +5,8 @@
 // champ et son clavier. Sans lui, chaque rangée recevrait une douzaine de rappels en props.
 import { createContext, useContext, type FocusEvent, type KeyboardEvent } from "react"
 import type { Tableau } from "./blocs-de-page"
+import type { Genre } from "./envoi-de-fichier"
+import type { OptionDuDepot } from "./gestes-des-fichiers"
 import type { PoigneeGlissee } from "./glisser"
 import type { BlocEdite, Choix, Forme, Retiree } from "./modele"
 
@@ -59,6 +61,26 @@ export type Gestes = {
   retablir: (retiree: Retiree) => void
   /** Les dix secondes d'« Annuler » sont passées. */
   oublierLAnnonce: () => void
+  /** Le « + » approché ou un geste de fichier : l'état du stockage se lit, une fois (E10-S02, HN-E10S02-6). */
+  connaitreLesFichiers: () => void
+  /** « Image » ou « Fichier » du « + » (E10-S02, AC-b1, AC-b2) : le dialogue du choix, types et limites dits (AC-b4). */
+  choisirUnFichier: (cle: string, quoi: Genre) => void
+  /** Le fichier choisi dans ce dialogue : joint après le bloc, sans choix au dépôt (AC-b5). */
+  fichierChoisi: (fichier: File) => void
+  /** Un fichier lâché sur un bloc (AC-b1, AC-b2, AC-b5) ; stockage désactivé, le dépôt d'E10-S01. */
+  deposerUnFichierDansLaPage: (cle: string, fichier: File) => void
+  /** Une image collée dans un champ (AC-b1, AC-b7). */
+  collerUneImage: (cle: string, fichier: File) => void
+  /** « Annuler » un envoi, « Retirer » un envoi refusé (AC-b4). */
+  annulerLEnvoi: (cle: string) => void
+  /** Le choix au dépôt d'un `.md` ou d'un `.csv` (AC-b5). */
+  choisirAuDepot: (option: OptionDuDepot) => void
+  /** Le tableau d'un CSV importé : sa référence après le bloc (AC-b5, AC-b6). */
+  tableauImporte: (chemin: string) => void
+  /** « Convertir en tableau » d'un CSV joint (AC-b6). */
+  convertirLeCsv: (cle: string) => void
+  /** Échap, « Annuler » ou « Fermer » d'un dialogue de fichier : rien ne s'écrit. */
+  fermerLeDialogue: () => void
   /** La sélection d'un champ a changé : `totale`, elle couvre tout son texte non vide, le menu de sa poignée s'ouvre (E05-S11, AC-28). */
   selectionner: (cle: string, totale: boolean) => void
   /** Le menu ouvert par une sélection se ferme : Échap, la frappe suivante, un clic ailleurs (AC-28). */

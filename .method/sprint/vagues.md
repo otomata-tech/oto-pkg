@@ -19,6 +19,11 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
   « Hypothèses » de la story ; le pilote la reporte dans `docs/decisions/hypotheses.md`. Ce qui
   changerait l'expérience d'un client ou coûterait cher à défaire va aussi dans
   `docs/decisions/fiche-decisions.md`, et la story avance sous l'option recommandée.
+- **Une consigne du pilote ne contredit pas un AC en silence** : une consigne qui s'en écarte cite
+  l'AC et dit pourquoi ; sans cette citation, l'AC prévaut sur la consigne, et l'agent qui voit le
+  conflit suit l'AC et le signale en tête de rapport. Le pilote relit chaque consigne contre les AC
+  du lot avant de la donner, l'agent ne connaissant l'intention que par le texte (vérifiable : toute
+  hypothèse « contraire à la lettre d'un AC » cite une consigne qui cite cet AC).
 - **Le pilote n'attend pas JB** : avant une question (`AskUserQuestion`), il lance tout le travail qui
   n'en dépend pas ; celui qui en dépend part sous l'option recommandée, hypothèse notée. Vérifiable
   sur la trace : aucune question n'est suivie d'une attente alors qu'un lot indépendant restait à lancer.

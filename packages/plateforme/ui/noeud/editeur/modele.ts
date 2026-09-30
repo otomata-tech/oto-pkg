@@ -271,7 +271,8 @@ export function avecForme(servi: BlocEdite, forme: Forme): BlocEdite {
 export function premiersMots(bloc: Pick<BlocEdite, "type" | "text" | "data">): string {
   const donnee = (champ: string) => (typeof bloc.data[champ] === "string" ? String(bloc.data[champ]) : "")
   // Un tableau simple se nomme par ses colonnes, un repli par son résumé (E10-S04), un séparateur par son nom (E10-S06) : ils n'ont pas de texte.
-  const propre = bloc.type === "divider" ? CHOIX_DE_BLOC.separateur : bloc.type === "call" ? donnee("function") : bloc.type === "reference" ? donnee("path") : bloc.type === "toggle" ? donnee("summary") : bloc.type === "simple_table" ? simpleTableOf(bloc.data).columns.join(" ") : null
+  // Un fichier joint se nomme par son nom (E10-S02).
+  const propre = bloc.type === "divider" ? CHOIX_DE_BLOC.separateur : bloc.type === "file" ? donnee("name") : bloc.type === "call" ? donnee("function") : bloc.type === "reference" ? donnee("path") : bloc.type === "toggle" ? donnee("summary") : bloc.type === "simple_table" ? simpleTableOf(bloc.data).columns.join(" ") : null
   const texte = propre ?? (bloc.type === "image" ? donnee("alt") || (bloc.text ?? "") : texteDe(bloc))
   const mots = texteLu(texte).trim().split(/\s+/).filter(Boolean).slice(0, 4)
   return mots.length > 0 ? mots.join(" ") : "bloc vide"

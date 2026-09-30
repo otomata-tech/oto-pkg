@@ -14,6 +14,7 @@ import { ACCESS_LEVELS, ancestorPaths, describeOwner, nodeDecisions, nodeLevel, 
 import { defineFunction, type FunctionContext, type FunctionSummary } from "../catalog/define"
 import type { PlatformDb } from "../db"
 import { boundedList, changedMeanwhile, inTransaction, invalidInput, PlatformError } from "../errors"
+import { purgePendingFiles, removeObjects } from "../files/service"
 import type { Identity } from "../identity"
 import type { Mutation } from "../members"
 import { findNode, NODE_SQL_COLUMNS, unknownNode, type NodeRow } from "./lookup"
@@ -35,16 +36,29 @@ const TRASH_ROWS = 1_000
  * est contrôlée à la fin de l'instruction ; blocs, versions, liens, alias, règles et liens publics partent
  * en cascade). Une rétention de l'organisation, pas un geste de la personne : sous son jeton, la RLS
  * d'isolation seule la borne. Rend le nombre de nœuds purgés.
+ * E10-S02 (AC-e2, ADR-016 § 6) : dans la même instruction, les lignes `files` des nœuds purgés, et eux seuls,
+ * sont supprimées et leurs identifiants rendus (la cascade de `files.node_id` les perdrait) ; leurs objets
+ * partent après le commit, un échec du bucket nommé au log serveur (`removeObjects`).
  */
 export async function purgeTrash(db: PlatformDb, identity: Identity): Promise<number> {
-  const purged = await inTransaction(db, "trash: purge", (sql) => sql<{ id: string }[]>`
-    delete from platform.nodes n
-     where n.org_id = ${identity.org.id} and n.deleted_at < now() - make_interval(days => ${TRASH_DAYS})
-       and not exists (select 1 from platform.nodes d
-                        where d.org_id = n.org_id and starts_with(d.path, n.path || '/')
-                          and (d.deleted_at is null or d.deleted_at >= now() - make_interval(days => ${TRASH_DAYS})))
-    returning n.id`)
-  return purged.length
+  // E10-S02 (AC-a6) : les envois de fichiers abandonnés partent au passage de la corbeille, objets compris.
+  await purgePendingFiles(db, identity)
+  const [purged] = await inTransaction(db, "trash: purge", (sql) => sql<{ nodes: number; files: string[] }[]>`
+    with gone as (
+      delete from platform.nodes n
+       where n.org_id = ${identity.org.id} and n.deleted_at < now() - make_interval(days => ${TRASH_DAYS})
+         and not exists (select 1 from platform.nodes d
+                          where d.org_id = n.org_id and starts_with(d.path, n.path || '/')
+                            and (d.deleted_at is null or d.deleted_at >= now() - make_interval(days => ${TRASH_DAYS})))
+      returning n.id
+    ), gone_files as (
+      delete from platform.files f where f.org_id = ${identity.org.id} and f.node_id in (select gone.id from gone)
+      returning f.id
+    )
+    select (select count(*)::int from gone) as nodes,
+           coalesce((select array_agg(gone_files.id::text) from gone_files), '{}') as files`)
+  await removeObjects(identity.org.id, purged.files)
+  return purged.nodes
 }
 
 /** Ce que l'arbre garde en place ne part pas à la corbeille (AC9 d'E03-S07, P39), dit à la façon du refus. */

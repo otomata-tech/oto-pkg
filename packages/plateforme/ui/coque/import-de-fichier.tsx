@@ -57,8 +57,11 @@ async function lire(fichier: File, cible: CibleDImport): Promise<Lu | { erreur: 
   return { genre: "md", nom: fichier.name, texte }
 }
 
-/** La zone de dépôt, qui est aussi le champ de fichier : un clic ou Entrée ouvre le choix du système. */
-function ZoneDeDepot({ limites, choisir }: { limites: string; choisir: (fichier: File) => void }) {
+/**
+ * La zone de dépôt, qui est aussi le champ de fichier : un clic ou Entrée ouvre le choix du système. `accepte` : ce que
+ * propose ce choix, un `.md` ou un `.csv` sans lui ; E10-S02 la reprend pour joindre une image ou un fichier (AC-b4).
+ */
+export function ZoneDeDepot({ limites, choisir, accepte = ".md,.markdown,.csv,text/markdown,text/csv" }: { limites: string; choisir: (fichier: File) => void; accepte?: string }) {
   const id = useId()
   const [survol, setSurvol] = useState(false)
   const lacher = (evenement: DragEvent<HTMLLabelElement>) => {
@@ -87,7 +90,7 @@ function ZoneDeDepot({ limites, choisir }: { limites: string; choisir: (fichier:
       <input
         id={id}
         type="file"
-        accept=".md,.markdown,.csv,text/markdown,text/csv"
+        accept={accepte}
         className="oto-sr-only"
         onChange={(evenement) => {
           const fichier = evenement.target.files?.[0]

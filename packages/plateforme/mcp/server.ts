@@ -89,7 +89,8 @@ class JsonRpcError extends Error {
 const SERVICES: { [K in ToolKey]: Service<K> } = {
   context: ({ db, identity, userAgent }, input) => buildContext(db, identity, input, { userAgent }),
   find: async ({ db, identity, activeConnectors }, input) => find(db, identity, input, { functions: catalogFunctions(), activeConnectors: await activeConnectors() }),
-  read: ({ db, identity }, input) => readNode(db, identity, input),
+  // L'origine de la requête rend absolue l'adresse d'un fichier joint (E10-S02, AC-d1).
+  read: ({ db, identity, origin }, input) => readNode(db, identity, input, { origin }),
   call: ({ db, identity, origin, activeConnectors, trace, accessToken }, input, ctx) =>
     runCall({ db, identity, ctxCode: ctx?.code ?? null, ctxHost: ctx?.host ?? null, origin, activeConnectors, trace, accessToken }, input),
   // La provenance d'un bloc écrit par un assistant porte le code `ctx` de la conversation (AC28).

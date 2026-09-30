@@ -86,6 +86,33 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   un tampon changé, puis supprime les blocs `draft` et la ligne `node_drafts` ; `nodes` et les blocs publiés
   ne bougent pas. Le droit (niveau écriture, nœud déjà publié) est décidé par le service. Aucune table,
   colonne, policy ni index.
+- `20260929200000_platform_files.sql` (E10-S02 ; ADR-016, fiches D111, D113, D118) : les fichiers joints à
+  un nœud, migration unique de la story, complétée lot par lot. Lot a : table `files` (`org_id`, `node_id` en
+  cascade, `name` de 1 à 255 caractères, `mime`, `size` de 1 octet à 50 Mo, `status` `pending` ou `ready`,
+  `created_by`, `created_at` ; aucun octet, la clé d'objet vaut `<org_id>/<id>`), index `(org_id, status)` et
+  `(node_id)`, RLS d'isolation par organisation (quatre policies, l'insertion attribuée à l'appelant sur un nœud
+  de l'organisation), privilèges d'`authenticated` (mise à jour de `status` seule). `blocks_type_check` et
+  `blocks_shape_check` élargies : bloc `file` (`{file_id, name, size, mime}`, `text` nul) ; `image.data` porte
+  `src` ou `file_id`, jamais les deux, et `width` facultatif (`small`, `medium`, `full`). Toute ligne existante
+  reste valide. `block_search_text` re-versionnée : le nom d'un fichier est cherchable, même texte qu'avant pour
+  toute forme existante. `forget_user` re-versionnée : `files.created_by` mis à nul. Mêmes signatures,
+  privilèges redits. Lot c : `public_file_by_token(org, token, file)`, `security definer`, `search_path` vide,
+  accordée à `anon` seul (ADR-016 § 7, ADR-017 § 5) : lien actif, nœud du fichier publié, hors corbeille, dans le
+  périmètre du lien et lisible par son auteur, fichier `ready` cité par un bloc publié (`file` ou `image`) de ce
+  nœud ; rend `id`, `name`, `mime`, `size` et le chemin du nœud, ou rien, la même réponse pour tout refus. Lot d :
+  aucun objet SQL. Lot e : `duplicate_subtree` remplacée (retirée puis recréée aussitôt, mêmes arguments, mêmes
+  contrôles, accordée à `authenticated`) : le type rendu gagne `copied_files`, les paires (ancien, nouveau) des
+  fichiers de chaque nœud copié ; chaque fichier qu'un bloc publié d'un nœud copié cite reçoit une ligne neuve
+  `pending` sous la copie, et le `file_id` des blocs copiés, donc de l'instantané de la copie, est réécrit (ADR-016
+  § 6, fiche D118). Le service copie les objets après le commit et passe les lignes à `ready`. Lot f (ADR-018) :
+  table `upload_tickets` (empreintes SHA-256 des deux jetons, celui de `curl` et celui du formulaire, uniques, jamais
+  un jeton ; personne, `ctx`, type, mode, destination et ses paramètres ; `expires_at`, `used_at`), index
+  `(org_id, expires_at)`, RLS d'isolation par organisation (lecture de ses tickets et des tickets expirés, insertion
+  attribuée à l'appelant, suppression d'un ticket expiré seulement ; aucune mise à jour) ;
+  `consume_upload_ticket(org, empreinte, formulaire)`, `security definer`, `search_path` vide, accordée à `anon`
+  seul : un `update` conditionnel sur l'empreinte du jeton de la porte appelante, qui sert le ticket une fois, par
+  l'un ou l'autre jeton, rend la personne, son e-mail dans `members` et la destination, ou rien ; `forget_user`
+  supprime aussi les tickets de la personne.
 
 ## Installer sur un hôte neuf
 

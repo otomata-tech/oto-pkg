@@ -13,8 +13,12 @@ import { NODE_COLUMNS, notAvailable, type NodeRow } from "./lookup"
 import { plural, type Touched, type WorkBlock } from "./op-kit"
 import type { PublishResult } from "./publish"
 
-/** La porte d'une écriture (AC28) : le MCP, avec le code `ctx` de la conversation, ou l'écran (API). */
-export type WriteOrigin = { kind: "agent"; ctx: string | null } | { kind: "human" }
+/**
+ * La porte d'une écriture (AC28) : le MCP, avec le code `ctx` de la conversation, ou l'écran (API). `file` : un `.md`
+ * déposé par lien (E10-S02 lot f, AC-f7, AC-f8), écrit sous la provenance de l'assistant et le `ctx` de son ticket ; posé
+ * par le seul service du dépôt (`server/uploads-write.ts`), jamais par une porte.
+ */
+export type WriteOrigin = { kind: "agent"; ctx: string | null; file?: { replace: boolean } } | { kind: "human" }
 
 /**
  * Un brouillon écrit : ses blocs (ids posés), son tampon, ce que chaque opération a touché, l'en-tête

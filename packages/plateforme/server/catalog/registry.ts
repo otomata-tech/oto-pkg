@@ -20,6 +20,7 @@ import { tableSchema } from "../tables/schema"
 import { tableWrite } from "../tables/write"
 import type { CatalogFunction } from "./define"
 import { erpFunctions } from "./erp-source"
+import { uploadLink } from "./upload-link"
 
 /** Le connecteur natif du paquet (H80) : toujours actif et sans compte, même avant ses fonctions (E07-S01). */
 export const NATIVE_CONNECTOR = "table"
@@ -27,7 +28,8 @@ export const NATIVE_CONNECTOR = "table"
 /**
  * Catalogue de la V1 (H80) : `mail` simulé (E04-S01), lecture des tableaux (E07-S01), écriture et file
  * de travail (E07-S02), import d'un CSV (E10-S01), suppression de lignes, abandon d'un brouillon et
- * corbeille (E11-S02, connecteur natif `node`) ; ERP (E08-S05) s'y ajoute.
+ * corbeille (E11-S02, connecteur natif `node`) ; ERP (E08-S05) s'y ajoute ; le dépôt par lien (E10-S02 lot f, connecteur
+ * `upload`, ADR-018).
  */
 export function catalogFunctions(): CatalogFunction[] {
   return [
@@ -43,6 +45,7 @@ export function catalogFunctions(): CatalogFunction[] {
     tableDeleteRows,
     nodeDiscardDraft,
     nodeTrash,
+    uploadLink,
     ...erpFunctions(),
   ]
 }

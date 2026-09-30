@@ -31,6 +31,7 @@ import { loadBlocks, loadDraft, openDraft, publishedMeanwhile, saveDraft, type D
 import { staleState } from "./read-format"
 import { ownerOf, teamOf } from "./view"
 import { insertNode, provenanceOf, savedResult, type Saved, type WriteOrigin } from "./write-result"
+import { attachFiles, refuseFilesOnCreate } from "./write-files"
 
 export type { WriteOrigin } from "./write-result"
 
@@ -44,9 +45,17 @@ function parseBody(input: unknown): WriteNodeBody {
   return wellFormed(parsed.data)
 }
 
-/** Le mode tolérant de l'analyse (E10-S01, AC-a2) : demandé par le corps de l'API seulement ; le MCP ne le porte jamais. */
+/**
+ * Le mode tolérant de l'analyse (E10-S01, AC-a2) : demandé par le corps de l'API seulement ; le MCP ne le porte jamais.
+ * Un `.md` déposé par lien (E10-S02, AC-f7) se lit toujours ainsi, sous la provenance de l'assistant (`origin.file`).
+ */
 function tolerantFor(body: WriteNodeBody, origin: WriteOrigin): boolean {
-  return origin.kind === "human" && body.tolerant === true
+  return origin.kind === "human" ? body.tolerant === true : origin.file !== undefined
+}
+
+/** Un `.md` déposé par lien (E10-S02, AC-f7, AC-f8) : écrit entier, sans borne de section, et qui remplace tout le corps. */
+function uploadedFile(origin: WriteOrigin): { replace: boolean } | undefined {
+  return origin.kind === "agent" ? origin.file : undefined
 }
 
 /** À qui demander (H68) : la partie « à qui » d'`access.ts` pour le propriétaire effectif, lu une fois par l'appelant. */
@@ -54,8 +63,8 @@ async function whoToAsk(db: PlatformDb, identity: Identity, owner: Owner | null)
   return owner ? describeOwner(db, identity, owner) : "its managers"
 }
 
-/** Racine (H50), chemin du journal (E05-S05) et espaces personnels (H61, N29), avant toute lecture. */
-function checkPath(identity: Identity, path: string): void {
+/** Racine (H50), chemin du journal (E05-S05) et espaces personnels (H61, N29), avant toute lecture ; relu par `upload.link` (E10-S02, AC-f1). */
+export function checkPath(identity: Identity, path: string): void {
   // Un nœud à ce chemin masquerait le journal que `read` y sert (AC12 d'E05-S05, HN-E05S05-8).
   if (path === JOURNAL_PATH) throw new PlatformError("invalid_arguments", "journal is reserved: it serves the call journal. Choose another path.")
   refuseUnderRoot(path)
@@ -156,7 +165,12 @@ async function saveEdits(db: PlatformDb, identity: Identity, edit: Edit): Promis
   // Un tableau n'a pas de blocs de document : ses lignes (`row`) ne passent jamais par le brouillon (N27).
   const state = draft || edit.created ? "draft" : "published"
   const current = node.kind === "table" ? [] : await loadBlocks(db, node.id, state)
-  const applied = applyOps(current, body.ops ?? [], { path: node.path, revision: node.revision, tolerant: tolerantFor(body, edit.origin) })
+  const tolerant = tolerantFor(body, edit.origin)
+  // Un `.md` déposé par lien qui remplace le corps s'applique à une page vide (E10-S02, AC-f8).
+  const file = uploadedFile(edit.origin)
+  const base = file?.replace ? [] : current
+  // Les fichiers cités, relus avant l'écriture (E10-S02, AC-d3).
+  const applied = await attachFiles(db, identity, { node, current, created: edit.created, tolerant }, applyOps(base, body.ops ?? [], { path: node.path, revision: node.revision, tolerant, wholeFile: file !== undefined }))
   const next: WorkBlock[] = placeBlocks(applied.blocks)
   const header = edit.created ? null : pendingHeader(body, node)
   const table = node.kind === "table" ? tableHeaderEdit(edit, draft, identity.org.prefix) : null
@@ -274,7 +288,8 @@ async function create(db: PlatformDb, identity: Identity, body: WriteNodeBody, o
     throw new PlatformError("forbidden", reservedTo("write", `under ${parentAt}`, await whoToAsk(db, identity, await ownerOf(db, parent.node.id))))
   }
   // Rien n'est écrit tant que les opérations ne sont pas passées (AC22) : elles s'appliquent d'abord à vide.
-  applyOps([], body.ops ?? [], { path, tolerant: tolerantFor(body, origin) })
+  const planned = applyOps([], body.ops ?? [], { path, tolerant: tolerantFor(body, origin), wholeFile: uploadedFile(origin) !== undefined })
+  refuseFilesOnCreate(planned.blocks, { path, tolerant: tolerantFor(body, origin) })
   const spec = { path, parent: parent.node, kind, title: body.title, summary: body.summary }
   // Le nœud, son brouillon et son contenu dans une seule transaction (E01-S10, AC-x4) : une création arrêtée
   // au milieu ne laisse ni nœud ni brouillon. Un nœud neuf hérite du propriétaire et des règles de son

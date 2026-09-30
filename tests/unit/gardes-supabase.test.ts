@@ -32,13 +32,6 @@ const SUPABASE_GUARDED: Record<string, string> = {
   "tests/integration/platform-staff-script.test.ts": "one describe runs the script in its Supabase mode",
   "tests/unit/server-oauth.test.ts": "one describe drives the OAuth server of Supabase",
   "tests/integration/org-transfer.test.ts": "export and import read and match the emails of Auth accounts (the AC14 describe is portable)",
-  // Lot c d'E11-S14 : le semis de l'isolation par le mode OIDC du script Démo.
-  "tests/integration/isolation/donnees.ts": "lot c of E11-S14, pending: seeds through the Demo script and Auth accounts",
-  "tests/integration/isolation/api.test.ts": "lot c of E11-S14, pending",
-  "tests/integration/isolation/contenu.test.ts": "lot c of E11-S14, pending",
-  "tests/integration/isolation/mcp.test.ts": "lot c of E11-S14, pending",
-  "tests/integration/isolation/tables.test.ts": "lot c of E11-S14, pending",
-  "tests/integration/mcp-read-write.test.ts": "lot c of E11-S14, pending",
   // Playwright : la campagne passe par l'écran de connexion de l'hôte de référence, Supabase Auth.
   "tests/e2e/aucune-organisation.spec.ts": "Playwright signs in through Supabase Auth",
   "tests/e2e/connect.spec.ts": "Playwright signs in through Supabase Auth",

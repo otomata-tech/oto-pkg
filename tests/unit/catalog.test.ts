@@ -102,6 +102,8 @@ describe("catalog (AC23)", () => {
       "table.delete_rows",
       "node.discard_draft",
       "node.trash",
+      // E10-S02 (lot f) : le dépôt par lien à usage unique.
+      "upload.link",
     ])
     expect(callExamples(catalogFunctions(), NONE)).toEqual(["table.rows"])
   })

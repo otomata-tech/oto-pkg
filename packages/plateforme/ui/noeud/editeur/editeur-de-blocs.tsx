@@ -24,6 +24,7 @@
 //
 // E11-S05 (AC-g1, AC-g2) : plus d'état vide ni de « Commencer à écrire » ; une page sans bloc a un Texte vide, créé
 // sur le poste, dont le champ porte l'invite, et qui prend le focus à l'ouverture quand le titre est écrit.
+// E10-S02 (lot b) : il tient les envois de fichiers et leurs dialogues (`envoi-de-fichier.ts`, `choix-au-depot.tsx`).
 import { useState, type ReactNode } from "react"
 import type { BlockView, NodeKind } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
@@ -37,6 +38,8 @@ import { AlerteDEdition, IndicationDEnregistrement, LigneDAnnonce } from "./lign
 import type { Rangee } from "./modele"
 import { estLaPageVide } from "./page-vide"
 import type { LiensDesBlocs } from "./champ-de-bloc"
+import { DialogueDesFichiers } from "./choix-au-depot"
+import type { Depot } from "./envoi-de-fichier"
 import { RangeeDeBloc } from "./rangee-de-bloc"
 import type { Conflit } from "./use-envois"
 import { useEditeur } from "./use-editeur"
@@ -69,10 +72,14 @@ type RangeesProps = {
   conflit: Conflit | null
   liens: LiensDesBlocs
   referencesRendues?: Readonly<Record<string, ReactNode>>
+  /** Le stockage est activé (E10-S02, AC-b7). */
+  fichiers: boolean
+  /** Les envois en cours, par rangée locale (E10-S02, AC-b1). */
+  depots: Readonly<Record<string, Depot>>
 }
 
 /** Les rangées, une par bloc, rendues par leur clé de rendu, jamais par leur rang ; le Texte d'une page vide porte l'invite. */
-function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues }: RangeesProps) {
+function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, referencesRendues, fichiers, depots }: RangeesProps) {
   const invite = estLaPageVide(modele) ? EDITEUR.invite : undefined
   return modele.map((rangee, rang) => (
     <RangeeDeBloc
@@ -89,6 +96,8 @@ function Rangees({ modele, tenue, menuOuvert, erreurs, conflit, liens, reference
       liens={liens}
       rendu={rangee.bloc.id === undefined ? undefined : referencesRendues?.[rangee.bloc.id]}
       invite={invite}
+      fichiers={fichiers}
+      depot={depots[rangee.cle]}
     />
   ))
 }
@@ -118,8 +127,11 @@ export function EditeurDeBlocs(props: EditeurDeBlocsProps) {
           conflit={envois.conflit}
           liens={liens}
           referencesRendues={referencesRendues}
+          fichiers={editeur.fichiers.stockage.actif}
+          depots={editeur.fichiers.depots}
         />
         <LigneDAnnonce annonce={envois.annonce} />
+        <DialogueDesFichiers dialogue={editeur.fichiers.dialogue} chemin={envois.chemin} />
       </Reader>
     </ContexteDesGestes.Provider>
   )

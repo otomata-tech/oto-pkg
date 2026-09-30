@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { BlockView } from "../../../schemas"
 import { actionsDeLEditeur, aEnvoyer } from "./actions"
+import { useFichiersDeLEditeur } from "./envoi-de-fichier"
 import { useFileDOperations } from "./file-d-operations"
 import type { BlocEdite, Focus, Rangee } from "./modele"
 import { estLaPageVide, modeleDeLaPage } from "./page-vide"
@@ -90,7 +91,8 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
   useEffect(() => partirAvecLeTexte, [partirAvecLeTexte])
 
   const envois = useEnvois({ blocs, revisionServie, modele: modeleLu, changerModele, fixes, ids, setFocus })
-  const actions = actionsDeLEditeur({ modele: modeleLu, changerModele, fixes, setErreur, setFocus, envois, frapper: file.frapper, differer, annulerLeDiffere, appui })
+  const fichiers = useFichiersDeLEditeur()
+  const actions = actionsDeLEditeur({ modele: modeleLu, changerModele, fixes, setErreur, setFocus, envois, frapper: file.frapper, differer, annulerLeDiffere, appui, fichiers })
   // Ce qui retient la publication seule, lu à son départ : un conflit, un refus qui attend sa relecture.
   const retenues = useRef({ conflit: false, attente: false })
   useLayoutEffect(() => {
@@ -152,5 +154,5 @@ export function useEditeur({ blocs, revisionServie, focusALOuverture = false }: 
   // Les blocs du modèle : les refus d'une publication y trouvent la référence d'un bloc fautif (E05-S04, AC7). Le Texte
   // d'une page vide n'est pas du brouillon (HN-E11S05-19) : sans lui, un Contexte vide demande confirmation (AC11).
   const blocsDuModele = estLaPageVide(modele) ? [] : modele.map((rangee) => rangee.bloc)
-  return { racine, modele, blocs: blocsDuModele, erreurs, envois, actions }
+  return { racine, modele, blocs: blocsDuModele, erreurs, envois, actions, fichiers }
 }

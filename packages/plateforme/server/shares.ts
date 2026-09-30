@@ -8,6 +8,7 @@
 // hors de l'organisation.
 import { randomBytes } from "node:crypto"
 import {
+  fileIdSchema,
   nodePathSchema,
   SHARE_TOKEN_PATTERN,
   shareNodeSchema,
@@ -192,6 +193,13 @@ type PublicRow = {
   links: PublicNodeView["links"]
 }
 
+/** L'organisation de l'adresse d'une lecture publique ; une adresse qui n'en sert aucune : `not_found`, la même réponse. */
+function publicOrg(db: PlatformDb, host: string | null) {
+  return resolveOrg(db, host).catch((error: unknown) => {
+    throw isPlatformError(error) && error.code === "unknown_org" ? publicNotFound() : error
+  })
+}
+
 /**
  * Le contenu d'un lien public (ADR-013 § 3, § 4 ; AC-d2 à AC-d5), hors session : l'organisation de
  * l'adresse (`org_by_host`), puis `public_node_by_token` sous `anon`, bornée au jeton ; `path` : un
@@ -206,9 +214,7 @@ export async function readPublicNode(host: string | null, token: string, path?: 
   const target = path === undefined || path === null ? null : nodePathSchema.safeParse(path)
   if (target && !target.success) throw publicNotFound()
   const db = createAnonPlatformDb()
-  const org = await resolveOrg(db, host).catch((error: unknown) => {
-    throw isPlatformError(error) && error.code === "unknown_org" ? publicNotFound() : error
-  })
+  const org = await publicOrg(db, host)
   const [row] = await inTransaction(db, "public: read", (sql) => sql<{ view: PublicRow | null }[]>`
     select platform.public_node_by_token(${org.id}, ${token}, ${target?.data ?? null}) as view`)
   const view = row?.view
@@ -225,4 +231,27 @@ export async function readPublicNode(host: string | null, token: string, path?: 
     // La langue de l'organisation de l'adresse, lue dans sa marque, sans requête (E11-S05, AC-d3).
     language: organisationLanguage(org),
   }
+}
+
+/** Un fichier joint servi par un lien public (E10-S02, AC-c5) : de quoi composer sa clé (`objectKey`) et le montrer. */
+export type PublicFile = { orgId: string; id: string; name: string; mime: string; size: number; nodePath: string }
+
+type PublicFileRow = { id: string; name: string; mime: string; size: number | string; node_path: string }
+
+/**
+ * Un fichier joint servi par un lien public (ADR-016 § 7, ADR-017 § 5 ; E10-S02, AC-c5), hors session :
+ * l'organisation de l'adresse, puis `public_file_by_token` sous `anon`, bornée au jeton. Seul un fichier `ready`
+ * cité par un bloc publié d'un nœud que le lien couvre et que son auteur lit à l'instant est servi (la fonction le
+ * décide, sous la règle de `public_node_by_token`). Un jeton ou un identifiant mal formé, inconnu, désactivé, d'une
+ * autre organisation, un fichier cité par un seul brouillon ou hors du périmètre : `not_found`, la même réponse.
+ */
+export async function readPublicFile(host: string | null, token: string, fileId: string): Promise<PublicFile> {
+  if (!SHARE_TOKEN_PATTERN.test(token) || !fileIdSchema.safeParse(fileId).success) throw publicNotFound()
+  const db = createAnonPlatformDb()
+  const org = await publicOrg(db, host)
+  const [row] = await inTransaction(db, "public: file", (sql) => sql<{ file: PublicFileRow | null }[]>`
+    select platform.public_file_by_token(${org.id}, ${token}, ${fileId}) as file`)
+  const file = row?.file
+  if (!file) throw publicNotFound()
+  return { orgId: org.id, id: file.id, name: file.name, mime: file.mime, size: Number(file.size), nodePath: file.node_path }
 }

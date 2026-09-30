@@ -158,14 +158,21 @@ function headerChanges(before: Version | null, after: Version): string[] {
 
 type ChangeLine = { kind: "added" | "changed" | "moved" | "deleted"; block: DocBlock }
 
-/** Le markdown d'un bloc servi, un bloc `reference` rendu par `reference` (E03-S07). */
-function servedMarkdown(block: DocBlock, reference: ReferenceRender): string {
+/** Le rendu servi d'un bloc : `reference` pour un bloc `reference` (E03-S07), `fileRoute` pour un fichier joint (E10-S02, AC-d1). */
+export type ServedRender = { reference: ReferenceRender; fileRoute?: string }
+
+/**
+ * Le markdown d'un bloc servi, un bloc `reference` rendu par `reference` (E03-S07) ; un fichier joint, sur la route
+ * `fileRoute` (E10-S02, AC-d1).
+ */
+function servedMarkdown(block: DocBlock, { reference, fileRoute }: ServedRender): string {
+  if (fileRoute !== undefined && (block.type === "file" || block.type === "image")) return renderBlock(block, { headingBase: HEADING_BASE, fileRoute })
   return block.type === "reference" ? renderBlock(block, { headingBase: HEADING_BASE, reference }) : blockMarkdown(block)
 }
 
-function changeLines(change: ChangeLine, refs: Map<DocBlock, string> | null, reference: ReferenceRender): string[] {
+function changeLines(change: ChangeLine, refs: Map<DocBlock, string> | null, render: ServedRender): string[] {
   const ref = refs?.get(change.block)
-  return [`(${change.kind}${ref ? `, ref ${ref}` : ""})`, servedMarkdown(change.block, reference)]
+  return [`(${change.kind}${ref ? `, ref ${ref}` : ""})`, servedMarkdown(change.block, render)]
 }
 
 /**
@@ -178,7 +185,7 @@ export function diffLines(
   from: { revision: number; version: Version | null },
   to: { label: string; version: Version },
   refs: Map<DocBlock, string> | null,
-  reference: ReferenceRender,
+  render: ServedRender,
 ): string[] {
   const before = from.version?.blocks ?? []
   const { changes, deleted } = diffBlocks(before, to.version.blocks)
@@ -196,22 +203,23 @@ export function diffLines(
     const section = change.block.id === null ? null : sectionOfBlock(to.version.blocks, change.block.id)
     if (section !== group) lines.push(section === null ? "At the start:" : `In « ${section} »:`)
     group = section
-    lines.push(...changeLines(change, refs, reference))
+    lines.push(...changeLines(change, refs, render))
   }
   if (deleted.length > 0) lines.push("Deleted:")
   for (const block of deleted) {
     const section = block.id === null ? null : sectionOfBlock(before, block.id)
-    lines.push(section === null ? "(from the start)" : `(from « ${section} »)`, servedMarkdown(block, reference))
+    lines.push(section === null ? "(from the start)" : `(from « ${section} »)`, servedMarkdown(block, render))
   }
   return lines
 }
 
 /**
  * Le markdown servi de blocs, avec la ligne `<!-- ref: … -->` avant chacun quand `refs` est donné
- * (M05), et chaque bloc `reference` rendu par `reference` (E03-S07 AC11).
+ * (M05), et chaque bloc `reference` rendu par `reference` (E03-S07 AC11) ; les fichiers joints sur la route
+ * `fileRoute` (E10-S02, AC-d1).
  */
-export function renderServed(blocks: readonly DocBlock[], refs: Map<DocBlock, string> | null, reference: ReferenceRender): string {
-  return renderBlocks(blocks, { headingBase: HEADING_BASE, refs: refs ? (block) => refs.get(block) ?? null : undefined, reference })
+export function renderServed(blocks: readonly DocBlock[], refs: Map<DocBlock, string> | null, reference: ReferenceRender, fileRoute?: string): string {
+  return renderBlocks(blocks, { headingBase: HEADING_BASE, refs: refs ? (block) => refs.get(block) ?? null : undefined, reference, fileRoute })
 }
 
 // ------------------------------------------------------------------------------------ Curseur

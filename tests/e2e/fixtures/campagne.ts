@@ -46,7 +46,12 @@ export default async function campagne(config: FullConfig): Promise<() => Promis
 
   const slug = `t${hex(4)}`
   try {
-    await lancer(process.execPath, [path.join(RACINE, "scripts/demo-seed.mjs"), "--slug", slug], { cwd: RACINE, timeout: DELAI_DU_SEMIS })
+    // Le mode Supabase, verrouillé : un `PLATFORM_OIDC_ISSUER` de `.env.local` passerait le script en mode OIDC, sans compte E2E.
+    await lancer(process.execPath, [path.join(RACINE, "scripts/demo-seed.mjs"), "--slug", slug], {
+      cwd: RACINE,
+      timeout: DELAI_DU_SEMIS,
+      env: { ...process.env, PLATFORM_OIDC_ISSUER: "" },
+    })
     const [org] = await avecLaBase((sql) => sql<{ name: string }[]>`select name from platform.orgs where slug = ${slug}`)
     if (!org) throw new Error(`organisation ${slug} absente après le semis`)
     const adresse = new URL(base.origin)

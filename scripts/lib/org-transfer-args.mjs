@@ -7,6 +7,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import { ADMIN_VARIABLES, codeOf, envFileTexts, missingVariables, resolveVariables } from './env.mjs'
+import { STORAGE_VARIABLES } from './org-transfer-files.mjs'
 
 const EXPORT_SUFFIX = '.org-export.json'
 // Options de `parseArgs` (node:util), comme la CLI du paquet (`packages/plateforme/cli/index.mjs`).
@@ -44,14 +45,15 @@ const EMAIL = /^[^@\s]+@[^@\s]+$/
  * Variables de l'outillage (`ADMIN_VARIABLES` : URL et clé secrète du projet, connexion
  * d'administration) : sans `--env`, le processus, puis `.env.local`, puis `.env` ; avec `--env`, ce
  * fichier seul, qui l'emporte sur le processus (projet d'un ERP). `missing` : noms seulement, jamais
- * une valeur.
+ * une valeur. E10-S02 (AC-e4) : les cinq variables du stockage, facultatives, lues aux mêmes sources
+ * (les octets des fichiers joints).
  * @param {Record<string, string | undefined>} processEnv
  * @param {string[]} fileTexts
  * @param {boolean} fromEnvFile
  * @returns {{ values: Record<string, string>, missing: string[] }}
  */
 export function transferEnv(processEnv, fileTexts, fromEnvFile) {
-  return resolveVariables(fromEnvFile ? {} : processEnv, fileTexts, ADMIN_VARIABLES)
+  return resolveVariables(fromEnvFile ? {} : processEnv, fileTexts, ADMIN_VARIABLES, STORAGE_VARIABLES)
 }
 
 /**

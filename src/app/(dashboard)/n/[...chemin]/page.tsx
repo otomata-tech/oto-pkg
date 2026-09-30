@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { cache, Suspense, use, type ReactNode } from "react"
 import {
+  fileViewParamSchema,
   nodePathSchema,
   nodeVersionParamSchema,
   tableHeaderSchema,
@@ -10,6 +11,7 @@ import {
   type TableHeader,
 } from "@otomata_tech/oto_platform/schemas"
 import {
+  fileView,
   isPlatformError,
   lastConnections,
   listMembers,
@@ -31,6 +33,7 @@ import {
   blocsAffiches,
   EcranDeNoeud,
   EcranDeTableauChargement,
+  MESSAGES_DE_LA_VISIONNEUSE,
   MESSAGES_DU_TABLEAU,
   referencesRendues,
   reglagesDepuisLAdresse,
@@ -61,6 +64,7 @@ import { loginPath } from "@/lib/schemas/auth"
 // E05-S11 : « Ma fiche » part vers Profil (AC-8) ; l'aperçu part avec les lectures d'E05-S02 quand le
 // chemin est celui d'un Contexte. Une procédure s'affiche comme une page (D104, M59) : ni contrôle du
 // brouillon ni « Tester une phrase », donc ni `checkProcedure` ni aperçu d'une phrase.
+// E10-S02 (lot c, AC-c2) : `?view=<id>` ouvre la visionneuse d'un fichier joint au nœud, décidée par `fileView`.
 
 const PREFIXE = "/n/"
 const CONTEXTE = "contexte"
@@ -286,6 +290,13 @@ export default async function NoeudPage({ params, searchParams }: Parametres) {
   const ici = `${hrefDuChemin(commun.chemin)}${versionPubliee ? "?version=publiee" : ""}`
   const partage = lu.regles && lu.noeud.data ? { regles: lu.regles, sujets: sujetsDe(lu), gestionAccordable: identity.member.role === "admin", moi: identity.user.id } : undefined
   const vue = lu.noeud.data ?? null
+  // La visionneuse d'un fichier joint (E10-S02, AC-c2) : le service décide ; un tableau n'a pas de fichier à voir.
+  const vu = fileViewParamSchema.parse(parametres.view)
+  if (vue && vu !== undefined && vue.kind !== "table") {
+    const resultat = await resultatDe(sauf404(fileView(session.db, identity, { node: vue.id, file: vu })), MESSAGES_DE_LA_VISIONNEUSE)
+    const handle = identity.member.profile.handle ?? null
+    return <EcranDeNoeud {...commun} nomOrganisation={identity.org.name} handle={handle} noeud={lu.noeud} arbre={lu.arbre} equipes={lu.equipes} fichierVu={{ id: vu, resultat }} />
+  }
   const liens = vue ? liensLus : undefined
   const complement = vue?.kind === "table" ? complementDuTableau(session.db, identity, vue, parametres) : undefined
   // Les blocs `reference` (E07-S03) et ce qu'un Contexte ajoute (E05-S04), en parallèle.

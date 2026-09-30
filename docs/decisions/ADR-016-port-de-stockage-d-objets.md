@@ -82,8 +82,13 @@ Postgres (`bytea`) et contre Supabase Storage.
    par un bloc **publié** d'un nœud couvert par le lien, sous la règle du contenu : ce que l'auteur
    du lien lit à cet instant.
 8. **Transfert d'organisation** (E09-S04) : le JSON porte les métadonnées (carte `TABLES`), et les
-   octets vont dans un dossier `<out>.files/` à côté de lui. Ils sont relus par le port de la
-   source, puis réécrits par celui de la cible, sous les nouveaux identifiants.
+   octets vont dans un dossier `<out>.files/` à côté de lui. Ils sont relus dans le bucket de la
+   source, puis réécrits dans celui de la cible, sous les nouveaux identifiants. Les scripts de
+   transfert, du `.mjs` qui n'importe pas le TypeScript du paquet, signent leurs requêtes S3 par
+   `aws4fetch` directement (`scripts/lib/org-transfer-files.mjs`), sans reprendre l'adaptateur. Sans
+   les cinq variables de stockage, l'export d'une organisation qui a des fichiers et l'import d'un
+   document qui en porte échouent avant toute écriture, en nommant les variables ; sans fichier, le
+   transfert passe sans elles.
 
 ## Conséquences
 

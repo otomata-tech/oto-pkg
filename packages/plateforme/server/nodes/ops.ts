@@ -81,11 +81,12 @@ function sizesByHeading(blocks: readonly WorkBlock[]): Map<number, { size: numbe
 
 /**
  * Bornes d'une page après une opération (N6) : section, page, nombre de blocs. Seule une opération
- * qui fait grandir au-delà est refusée : un document déjà trop grand reste modifiable.
+ * qui fait grandir au-delà est refusée : un document déjà trop grand reste modifiable. `wholeFile` : un `.md`
+ * déposé par lien (E10-S02, AC-f7), écrit entier, que la borne de section ne coupe pas.
  */
-function checkBounds(before: readonly WorkBlock[], after: readonly WorkBlock[], path: string): void {
+function checkBounds(before: readonly WorkBlock[], after: readonly WorkBlock[], path: string, wholeFile: boolean): void {
   const previous = sizesByHeading(before)
-  for (const [uid, { size, title }] of sizesByHeading(after)) {
+  for (const [uid, { size, title }] of wholeFile ? [] : sizesByHeading(after)) {
     if (size <= SECTION_MAX || size <= (previous.get(uid)?.size ?? 0)) continue
     const which = title === null ? "the start of the page" : `section « ${title} »`
     throw new OpProblem(
@@ -108,12 +109,13 @@ function checkBounds(before: readonly WorkBlock[], after: readonly WorkBlock[], 
  * (`placeBlocks` les pose). Lève les refus des AC, préfixés de « Op <rang> (…): » et finis par
  * « Nothing was written. » : rien n'est écrit. `revision`, celle du nœud, que porte un refus de révision
  * de bloc (`details.revision`, AC37). `tolerant` (E10-S01, AC-a2) : les textes se lisent en mode tolérant, et
- * `keptAsText` compte ce qu'ils ont gardé en texte (0 sans lui).
+ * `keptAsText` compte ce qu'ils ont gardé en texte (0 sans lui). `wholeFile` (E10-S02, AC-f7) : un `.md` déposé par lien,
+ * sans borne de section ; celles de la page et du nombre de blocs restent.
  */
 export function applyOps(
   blocks: readonly DocBlock[],
   ops: readonly WriteOpBody[],
-  options: { path: string; revision?: number; tolerant?: boolean },
+  options: { path: string; revision?: number; tolerant?: boolean; wholeFile?: boolean },
 ): { blocks: WorkBlock[]; touched: Touched[]; keptAsText: number } {
   if (ops.length > OPS_MAX) {
     throw new PlatformError("invalid_arguments", `${formatCount(ops.length)} operations; ${OPS_MAX} at most per call: split them over several calls.`)
@@ -131,7 +133,7 @@ export function applyOps(
     try {
       checkFields(op)
       const outcome = isSectionOp(op) ? applySectionOp(state, op) : applyBlockOp(state, op)
-      checkBounds(state.blocks, outcome.blocks, state.path)
+      checkBounds(state.blocks, outcome.blocks, state.path, options.wholeFile === true)
       state.blocks = outcome.blocks
       touched.push(outcome.touched)
     } catch (error) {

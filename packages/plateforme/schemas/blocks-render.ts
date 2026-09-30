@@ -17,6 +17,7 @@
 // (→ plages de blocs).
 import { blockInputSchema, chars, isBlankLine, trimBlanks, type BlockInput } from "./blocks"
 import { fileBaseName } from "./csv"
+import { filePath, fileSizeText, fileTypeOf } from "./files"
 import { closesFence, LINE_SEPARATORS, openingFence, type Fence } from "./link-syntax"
 import { NODE_HEAD_MAX, OP_TEXT_MAX } from "./nodes"
 
@@ -40,6 +41,11 @@ export type RenderOptions<B extends BlockLike = BlockLike> = {
   reference?: (block: B) => string
   /** Référence affichée d'un bloc (E03-S03, `displayRefs`) : une chaîne donne la ligne `<!-- ref: … -->` avant lui. */
   refs?: (block: B) => string | null
+  /**
+   * La route des fichiers d'un bloc `file` ou d'une image jointe (E10-S02, AC-d1) : `read` passe `<origine>` suivie de
+   * `FILES_ROUTE`, pour qu'un assistant tienne une adresse absolue ; sans elle, `FILES_ROUTE`, relative à la page.
+   */
+  fileRoute?: string
 }
 
 /** Une section : son titre (`null` pour le début de page) et ses blocs, titre en tête, sous-sections comprises. */
@@ -95,8 +101,8 @@ export function orderBlocks<B extends BlockLike>(blocks: readonly B[]): B[] {
 
 // ---------------------------------------------------------------------------------------- Rendu
 
-/** Clôture d'accents graves plus longue que toute suite d'accents graves du texte, trois au moins. */
-function fenceFor(text: string): string {
+/** Clôture d'accents graves plus longue que toute suite d'accents graves du texte, trois au moins ; aussi celle du texte d'un fichier (`read {file}`, AC-d2). */
+export function fenceFor(text: string): string {
   let longest = 0
   for (const run of text.match(/`+/g) ?? []) longest = Math.max(longest, run.length)
   return "`".repeat(Math.max(3, longest + 1))
@@ -173,7 +179,8 @@ function renderBody<B extends BlockLike>(block: B, options: RenderOptions<B>): s
       return fenced("mermaid", valid.text, fenceFor(valid.text))
     case "image": {
       const caption = valid.text === null || valid.text === undefined ? "" : ` "${valid.text}"`
-      return `![${valid.data.alt ?? ""}](${valid.data.src}${caption})`
+      // Une image jointe (E10-S02, AC-d1) : l'adresse de lecture du fichier, sur la route donnée (`read` : absolue).
+      return `![${valid.data.alt ?? ""}](${valid.data.src ?? filePath(valid.data.file_id ?? "", options.fileRoute)}${caption})`
     }
     case "callout": {
       const tone = valid.data?.tone ? [`> [!${valid.data.tone.toUpperCase()}]`] : []
@@ -192,6 +199,11 @@ function renderBody<B extends BlockLike>(block: B, options: RenderOptions<B>): s
       return "---"
     case "toggle":
       return toggleLines(valid.data.summary, valid.text)
+    // Un fichier joint (E10-S02, AC-d1) : « [<nom> (<taille>, <type>)](<route>/<id>) », le nom tel quel, comme le texte
+    // alternatif d'une image ; `parseMarkdown` le relit de droite à gauche (`markdown-files.ts`). Le type est
+    // l'extension du nom (`pdf`), le type de la ligne pour un nom sans extension admise.
+    case "file":
+      return `[${valid.data.name} (${fileSizeText(valid.data.size)}, ${fileTypeOf(valid.data.name) ?? valid.data.mime})](${filePath(valid.data.file_id, options.fileRoute)})`
   }
 }
 

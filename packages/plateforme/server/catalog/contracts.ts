@@ -9,6 +9,7 @@
 // exemples d'appel par `<p>_call` (rien à appeler).
 import * as z from "zod/v4"
 import { tableHeaderPatchSchema } from "../../schemas/tables"
+import { UPLOAD_RULE } from "../../schemas/uploads"
 import { formatCount } from "../nodes/document"
 import { PROCEDURE_MAX_CHARS } from "../procedures-check"
 
@@ -96,6 +97,8 @@ const writeTable: Contract = {
       // E10-S01 (AC-c2) : un fichier donné par la personne, ce qu'il devient.
       "A CSV or a spreadsheet the user gives you becomes a table: use table.import, in pieces of 40,000 characters, each starting with the header line.",
       "A markdown file the user gives you becomes a page with write: its first # heading is the title, the rest goes in the text.",
+      // E10-S02 (lot f, AC-f2) : un fichier que l'assistant a déjà, déposé par lien.
+      `Use ${p}_call upload.link ${UPLOAD_RULE}.`,
     ],
     parts: [
       { title: "Header (JSON Schema):", lines: [headerSchema()] },

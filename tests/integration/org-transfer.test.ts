@@ -10,12 +10,15 @@
 // PostgREST. Le `describe` AC14, la carte face aux tables lues dans le catalogue, est portable (E11-S14).
 import { execFile } from "child_process"
 import fs from "fs"
+import http from "http"
+import type { AddressInfo } from "net"
 import os from "os"
 import path from "path"
 import { promisify } from "util"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { fingerprint } from "../../scripts/lib/org-transfer-plan.mjs"
 import { NEVER_EXPORTED, orgRowsSql, TABLES } from "../../scripts/lib/org-transfer.mjs"
+import { filesDir, STORAGE_VARIABLES } from "../../scripts/lib/org-transfer-files.mjs"
 import { pendingMigrations, pendingReason, privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 import { platformTables } from "../helpers/platform-tables"
 import { createFixtures, ctxCode, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type TestUser } from "../helpers/plateforme"
@@ -32,6 +35,52 @@ const TIMEOUT = 600_000
 const SCRIPTS = path.resolve(__dirname, "../../scripts")
 const CROCKFORD = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/
 const JOURNAL = ["ctx", "journal", "admin_journal", "feedback", "sim_outbox"]
+// E10-S02 (AC-e4) : les scripts parlent à un faux S3 local (`fakeS3`), quel que soit `.env.local` : aucun test
+// n'écrit dans un bucket réel. Sans les cinq variables, l'export et l'import d'une organisation avec des fichiers
+// échouent avant toute écriture (`NO_STORAGE`).
+const NO_STORAGE = Object.fromEntries(STORAGE_VARIABLES.map((name) => [name, ""]))
+const BUCKET = "plateforme"
+
+/**
+ * Un faux S3 en chemin (`/<bucket>/<clé>`) : `PUT` garde les octets, `GET` les rend ou 404. La signature n'est pas
+ * contrôlée : elle l'est en unitaire. `env` : les cinq variables, clés factices construites à l'exécution.
+ */
+function fakeS3() {
+  const objects = new Map<string, string>()
+  const server = http.createServer((request, response) => {
+    const key = decodeURIComponent(new URL(request.url ?? "/", "http://127.0.0.1").pathname)
+    if (request.method === "PUT") {
+      const chunks: Buffer[] = []
+      request.on("data", (chunk: Buffer) => chunks.push(chunk))
+      request.on("end", () => {
+        objects.set(key, Buffer.concat(chunks).toString("utf8"))
+        response.writeHead(200).end()
+      })
+      return
+    }
+    const body = request.method === "GET" ? objects.get(key) : undefined
+    if (body === undefined) response.writeHead(404).end()
+    else response.writeHead(200, { "content-type": "application/octet-stream" }).end(body)
+  })
+  const env: Record<string, string> = {}
+  return {
+    objects,
+    env,
+    object: (orgId: string, fileId: string) => objects.get(`/${BUCKET}/${orgId}/${fileId}`),
+    async start() {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+      Object.assign(env, {
+        PLATFORM_STORAGE_ENDPOINT: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+        PLATFORM_STORAGE_BUCKET: BUCKET,
+        PLATFORM_STORAGE_REGION: "fr-par",
+        PLATFORM_STORAGE_ACCESS_KEY_ID: `AK${hex(4)}`,
+        PLATFORM_STORAGE_SECRET_ACCESS_KEY: hex(16),
+      })
+    },
+    stop: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  }
+}
+const s3 = fakeS3()
 
 type Row = Record<string, unknown>
 type ExportFile = {
@@ -46,11 +95,11 @@ type Outcome = { code: number; stdout: string; stderr: string }
 
 const run = promisify(execFile)
 
-/** Lance un script de `scripts/` ; ne lève pas : son code de sortie et ses deux sorties. */
+/** Lance un script de `scripts/`, sur le faux S3 sauf `env` contraire ; ne lève pas : son code de sortie et ses deux sorties. */
 async function script(name: string, args: string[], env: Record<string, string> = {}): Promise<Outcome> {
   try {
     const { stdout, stderr } = await run(process.execPath, [path.join(SCRIPTS, name), ...args], {
-      env: { ...process.env, ...env },
+      env: { ...process.env, ...s3.env, ...env },
       timeout: TIMEOUT - 60_000,
     })
     return { code: 0, stdout, stderr }
@@ -108,6 +157,7 @@ describe.skipIf(!configured)(
     let sourceDoc: ExportFile
     let copyDoc: ExportFile
     let shareToken = ""
+    let sourceFileId = ""
     const other: { id: string; slug: string; ids: string[]; email: string } = { id: "", slug: "", ids: [], email: "" }
     const at = new Date().toISOString()
 
@@ -142,11 +192,21 @@ describe.skipIf(!configured)(
       await fx.addMember(source.id, q.id, { profile: { handle: qHandle, name: "Quentin Test" } })
       await fx.addTeamMember(ventes, q.id)
       const offre = await fx.createNode(source.id, { parentId: conseil, path: "conseil/offre", title: "Offre", summary: "Offre de conseil." })
+      // Un fichier joint (E10-S02, ADR-016) cité par un bloc publié, et un envoi en cours, que l'export laisse (AC-e4).
+      const file = await one(admin<{ id: string }[]>`
+        insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+        values (${source.id}, ${offre}, 'offre.pdf', 'application/pdf', 3, 'ready', ${e2e.id}) returning id`, "files")
+      sourceFileId = file.id
+      s3.objects.set(`/${BUCKET}/${source.id}/${file.id}`, "pdf")
+      await admin`
+        insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+        values (${source.id}, ${offre}, 'en_cours.pdf', 'application/pdf', 3, 'pending', ${e2e.id})`
       const { blockIds } = await fx.publishBlocks(
         offre,
         [
           { type: "heading", text: "Offre", data: { level: 1 }, key: "offre" },
           { type: "paragraph", text: `Voir [[conseil/grille_tarifaire#etudes]] et [[private/${qHandle}]].` },
+          { type: "file", data: { file_id: file.id, name: "offre.pdf", size: 3, mime: "application/pdf" } },
         ],
         { links: [{ block: 1, path: "conseil/grille_tarifaire", key: "etudes" }, { block: 1, path: `private/${qHandle}` }] },
       )
@@ -210,6 +270,7 @@ describe.skipIf(!configured)(
     }
 
     beforeAll(async () => {
+      await s3.start()
       fx = createFixtures()
       admin = testAdminSql()
       e2e = await fx.createUser({ fullName: "Compte E2E" })
@@ -244,6 +305,7 @@ describe.skipIf(!configured)(
       } finally {
         fs.rmSync(dir, { recursive: true, force: true })
         await admin?.end({ timeout: 5 })
+        await s3.stop()
       }
       if (deleted) throw new Error(`orgs delete failed: ${deleted.code}`)
     }, TIMEOUT)
@@ -336,7 +398,7 @@ describe.skipIf(!configured)(
       expect(copyDoc.source.org).toEqual({ id: copy.id, slug: copy.slug, prefix: copy.prefix, name: `Démo ${source.slug}` })
       const keys = (doc: ExportFile) =>
         new Set([
-          ...["teams", "accounts", "nodes", "blocks", "access_rules", "node_shares", "invitations", "platform_grants", "sim_outbox"].flatMap((table) => rows(doc, table).map((row) => row.id)),
+          ...["teams", "accounts", "nodes", "files", "blocks", "access_rules", "node_shares", "invitations", "platform_grants", "sim_outbox"].flatMap((table) => rows(doc, table).map((row) => row.id)),
           ...rows(doc, "ctx").map((row) => row.code),
           doc.source.org.id,
         ])
@@ -407,6 +469,67 @@ describe.skipIf(!configured)(
     it("AC8 — should give the source and its copy the same fingerprint", () => {
       const now = new Date()
       expect(fingerprint(copyDoc, now)).toEqual(fingerprint(sourceDoc, now))
+    })
+
+    it("AC-e4 (E10-S02) — should carry the ready files only, under new ids cited by the blocks and snapshots of the copy, their bytes under <new org>/<new id>", () => {
+      const cited = (doc: ExportFile) => {
+        const offre = node(doc, "conseil/offre")?.id
+        const block = rows(doc, "blocks").find((row) => row.node_id === offre && row.state === "published" && row.type === "file")
+        const version = rows(doc, "node_versions").find((row) => row.node_id === offre)
+        const entries = (Array.isArray(version?.blocks) ? version.blocks : []) as { type?: string; data?: { file_id?: string } }[]
+        return { block: (block?.data as { file_id?: string } | undefined)?.file_id, snapshot: entries.find((entry) => entry.type === "file")?.data?.file_id }
+      }
+      const files = (doc: ExportFile) => rows(doc, "files").map((row) => ({ id: String(row.id), name: row.name, status: row.status, node: row.node_id }))
+      const [copied] = files(copyDoc)
+      const written = (file: string, id: string) => fs.readFileSync(path.join(filesDir(file), id), "utf8")
+      expect({
+        source: files(sourceDoc).map(({ id, name, status }) => [id, name, status]),
+        copy: files(copyDoc).map(({ name, status }) => [name, status]),
+        newId: copied?.id !== sourceFileId,
+        node: copied?.node === node(copyDoc, "conseil/offre")?.id,
+        sourceCited: cited(sourceDoc),
+        copyCited: cited(copyDoc),
+        exported: exported.stdout.includes(`Fichiers joints : 1 objets écrits dans ${filesDir(sourceFile)}.`),
+        imported: imported.stdout.includes("Fichiers joints : 1 objets envoyés au stockage."),
+        sourceBytes: written(sourceFile, sourceFileId),
+        copyObject: s3.object(copy.id, copied?.id ?? ""),
+        copyBytes: written(copyFile, copied?.id ?? ""),
+      }).toEqual({
+        source: [[sourceFileId, "offre.pdf", "ready"]],
+        copy: [["offre.pdf", "ready"]],
+        newId: true,
+        node: true,
+        sourceCited: { block: sourceFileId, snapshot: sourceFileId },
+        copyCited: { block: copied?.id, snapshot: copied?.id },
+        exported: true,
+        imported: true,
+        sourceBytes: "pdf",
+        copyObject: "pdf",
+        copyBytes: "pdf",
+      })
+    })
+
+    describe("without storage, an organization or a file that carries ready files (AC-e4)", () => {
+      const target = org()
+      const out = path.join(dir, "sans-stockage.org-export.json")
+      let refusedExport: Outcome
+      let refusedImport: Outcome
+
+      beforeAll(async () => {
+        slugs.push(target.slug)
+        refusedExport = await script("org-export.mjs", ["--org", source.slug, "--out", out], NO_STORAGE)
+        refusedImport = await script("org-import.mjs", ["--in", sourceFile, "--slug", target.slug, "--prefix", target.prefix], NO_STORAGE)
+      }, TIMEOUT)
+
+      it("AC-e4 — should stop the export before any write, naming the five variables", () => {
+        expect(refusedExport).toMatchObject({ code: 1, stderr: expect.stringContaining(`Posez ${STORAGE_VARIABLES.join(", ")}, puis relancez.`) })
+        expect({ json: fs.existsSync(out), objects: fs.existsSync(filesDir(out)) }).toEqual({ json: false, objects: false })
+      })
+
+      it("AC-e4 — should stop the import before any write, naming the five variables, the organization absent", async () => {
+        expect(refusedImport).toMatchObject({ code: 1, stderr: expect.stringContaining(`Posez ${STORAGE_VARIABLES.join(", ")}, puis relancez.`) })
+        expect(await orgId(target.slug)).toBeNull()
+      })
     })
 
     it("AC13 — should pose the --domain addresses only, and import the pending invitation", () => {

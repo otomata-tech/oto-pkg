@@ -1,13 +1,14 @@
 // @vitest-environment node
 // `pnpm demo:seed` sans base : la garde de l'exécuteur (`security-patterns.md § Outillage à clé
-// service`), la clé secrète éprouvée avant la première écriture, et l'arrêt sur une variable manquante
+// service`), la clé secrète éprouvée avant la première écriture, le refus d'un `--user` qui n'est pas
+// un uuid, et l'arrêt sur une variable manquante
 // sans en imprimer aucune. Le passage réel est le test de fumée de `tests/integration/demo-seed.test.ts`
 // (M11 : un script d'outillage, un test de fumée).
 import { execFileSync } from "child_process"
 import { randomBytes } from "crypto"
 import path from "path"
 import { describe, expect, it, vi } from "vitest"
-import { guardOrg, orgSpec, prepareOrg } from "../../scripts/demo-seed.mjs"
+import { guardOrg, INVALID_USER, orgSpec, parseArgs, prepareOrg } from "../../scripts/demo-seed.mjs"
 
 const script = path.resolve(__dirname, "../../scripts/demo-seed.mjs")
 
@@ -83,6 +84,15 @@ describe("demo-seed prepareOrg", () => {
     )
     expect(listUsers.mock.calls).toEqual([[{ page: 1, perPage: 1 }]])
     expect(updates).toEqual([])
+  })
+})
+
+describe("demo-seed parseArgs", () => {
+  // HN-E11S14-10 : `parseArgs` précède, dans `main`, la lecture des variables et la connexion ; sans ce
+  // refus, la base rejetterait l'identifiant (`22P02`) à l'insertion du membre, l'organisation déjà créée.
+  it("should refuse a --user that is not a uuid, before any connection", () => {
+    // Un uuid à un chiffre de trop : l'expression est ancrée aux deux bouts.
+    expect(() => parseArgs(["--slug", "tabc123", "--user", "3f0c5a1e-0000-4000-8000-0000000000001"])).toThrow(INVALID_USER)
   })
 })
 

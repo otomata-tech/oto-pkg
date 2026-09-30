@@ -20,12 +20,15 @@
 // une construction que le mode strict refuse est gardée en texte (bloc `code` ou paragraphe, comptée dans
 // `keptAsText`) ou ramenée à une forme admise (titre `#` au niveau 1, liste coupée en listes de 500, liste
 // ramenée au troisième niveau, repli dans un repli gardé dans son corps). `write` reste strict.
+//
+// E10-S02 (AC-d1) : l'image et le fichier joints, par l'adresse de lecture d'un fichier (`markdown-files.ts`).
 import { blockInputSchema, NODE_PATH_PATTERN, type BlockInput } from "../../schemas"
 import { trimBlanks } from "../../schemas/blocks"
 import { closesFence, LINE_SEPARATORS, openingFence, type Fence } from "../../schemas/link-syntax"
 import { cut } from "../journal"
 import { charCount, formatCount } from "./document"
 import { FUNCTION_NAME_MAX, HEADING_TEXT_MAX, IMAGE_SRC_MAX, REFERENCE_PATH_MAX } from "./limits"
+import { fileIdOfUrl, fileLinkAt } from "./markdown-files"
 import { indentedFence, isBlank, isComment, markerOf, parseList } from "./markdown-lists"
 import { isDivider, ParseProblem, parseToggle, refuse, refuseOrKeep, tableAt, toggleOpening, type ParseMode } from "./markdown-rich"
 
@@ -183,7 +186,9 @@ function imageAt(line: string, number: number, mode: ParseMode): BlockInput | nu
     refuseOrKeep(mode, `line ${number}: an image source holds ${formatCount(IMAGE_SRC_MAX)} characters at most (${formatCount(charCount(src))}).`)
     return null
   }
-  return { type: "image", text: caption, data: { src, alt } }
+  // Une image jointe (E10-S02, AC-d1) : l'adresse de lecture d'un fichier devient son `file_id`, quelle que soit l'origine.
+  const fileId = fileIdOfUrl(src)
+  return { type: "image", text: caption, data: fileId ? { file_id: fileId, alt } : { src, alt } }
 }
 
 function parseCallout(reading: Reading, start: number): number {
@@ -202,7 +207,7 @@ function parseCallout(reading: Reading, start: number): number {
  * et un séparateur jamais (HN-E10S04-5), sauf un séparateur en mode tolérant (E10-S01, AC-a2).
  */
 function interrupts(line: string, number: number, mode: ParseMode): boolean {
-  if (openingFence(line, 3) || /^ {0,3}>/.test(line) || headingAt(line, number, mode) || imageAt(line, number, mode) || toggleOpening(line) !== null) return true
+  if (openingFence(line, 3) || /^ {0,3}>/.test(line) || headingAt(line, number, mode) || imageAt(line, number, mode) || fileLinkAt(line) || toggleOpening(line) !== null) return true
   if (mode.tolerant && isDivider(line)) return true
   const marker = markerOf(line)
   return marker !== null && (!marker.ordered || marker.number === 1)
@@ -235,7 +240,7 @@ function parseBlockAt(reading: Reading, at: number): number {
   if (isBlank(line) || isComment(line)) return at + 1
   const fence = openingFence(line, 3)
   if (fence) return parseFence(reading, at, fence)
-  const single = headingAt(line, at + 1, mode) ?? imageAt(line, at + 1, mode)
+  const single = headingAt(line, at + 1, mode) ?? imageAt(line, at + 1, mode) ?? fileLinkAt(line)
   if (single) {
     out.push({ block: single, line: at + 1 })
     return at + 1

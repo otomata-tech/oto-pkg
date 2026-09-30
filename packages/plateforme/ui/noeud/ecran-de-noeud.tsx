@@ -21,9 +21,10 @@
 // E11-S05 (lot e) : une page, une procédure et un Contexte en deux colonnes, le document à gauche, à droite les
 // annexes de l'hôte puis « Cité dans », « Cite » et « Sous-pages » ; un tableau garde toute la largeur, ses encarts
 // sur une ligne au-dessus de la grille ; la rangée du chapô ne reste que si elle porte quelque chose.
+// E10-S02 (lot c, AC-c2) : `?view=<id>` : la visionneuse d'un fichier joint remplace l'écran du nœud trouvé.
 import type { ReactNode } from "react"
 import { FileText } from "@phosphor-icons/react/dist/ssr/FileText"
-import { tableHeaderSchema, type NodeRulesView, type NodeView, type TreeNode } from "../../schemas"
+import { tableHeaderSchema, type FileView, type NodeRulesView, type NodeView, type TreeNode } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
@@ -42,6 +43,7 @@ import { titreDuContexte } from "./fil"
 import { ECRAN, genreDuNoeud, INTROUVABLE, PARTAGE, resumeMontre } from "./libelles"
 import { PartageDuNoeud } from "./partage-du-noeud"
 import { ciblesDesLiens, ContenusLies } from "./sous-pages"
+import { VisionneuseDeFichier } from "./visionneuse-de-fichier"
 
 type Equipe = { slug: string; name: string }
 
@@ -90,6 +92,11 @@ type EcranDeNoeudProps = {
    * bloc, pour les blocs que l'écran montre (`blocsAffiches`) ; un bloc sans rendu garde `ReferenceEnLien`.
    */
   referencesRendues?: Readonly<Record<string, ReactNode>>
+  /**
+   * `?view=<id>` (E10-S02, AC-c2) : l'identifiant demandé et ce que sert `fileView` (`null` : introuvable) ; l'écran
+   * montre alors la visionneuse du fichier à la place du nœud, une fois le nœud trouvé.
+   */
+  fichierVu?: { id: string; resultat: Resultat<FileView | null> }
 }
 
 // Les blocs montrés, lus par la page de l'hôte pour en résoudre les références (E07-S03).
@@ -237,6 +244,12 @@ export function EcranDeNoeud(props: EcranDeNoeudProps) {
   const ici = `${hrefDuChemin(chemin)}${versionPubliee ? "?version=publiee" : ""}`
   if (noeud.error !== undefined) return <EchecDuNoeud message={noeud.error} ici={ici} Lien={Lien} />
   if (noeud.data === null) return <Introuvable Lien={Lien} hrefDuChemin={hrefDuChemin} />
+  const { fichierVu } = props
+  if (fichierVu) {
+    const page = { titre: noeud.data.title, href: hrefDuChemin(noeud.data.path) }
+    const adresse = `${hrefDuChemin(chemin)}?view=${encodeURIComponent(fichierVu.id)}`
+    return <VisionneuseDeFichier fichier={fichierVu.resultat} nomOrganisation={props.nomOrganisation} page={page} ici={adresse} Lien={Lien} hrefDuChemin={hrefDuChemin} />
+  }
   return <PageDuNoeud {...props} vue={noeud.data} ici={ici} />
 }
 

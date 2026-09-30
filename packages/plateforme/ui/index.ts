@@ -102,3 +102,8 @@ export type { EcranProfilProps } from "./profil/ecran-profil"
 export { titreDuContexte } from "./noeud/fil"
 // E05-S12 (lot C, AC-7) : le chemin du Contexte d'une partie servie, servi ou non, que la page de l'hôte lit pour l'éditeur.
 export { cheminDuContexte } from "./contexte/parties-du-contexte"
+// E10-S02 (lot c) : les phrases des lectures de la visionneuse d'un fichier, pour `resultatDe` de la page de l'hôte.
+export { MESSAGES_DE_LA_VISIONNEUSE } from "./noeud/libelles-des-fichiers"
+// E10-S02 (lot f, AC-f15) : le formulaire de dépôt d'un lien à usage unique, et ses phrases pour `resultatDe` de la page de l'hôte.
+export { EcranDeDepot } from "./depot/ecran-de-depot"
+export { REFUS_DU_DEPOT } from "./depot/libelles"

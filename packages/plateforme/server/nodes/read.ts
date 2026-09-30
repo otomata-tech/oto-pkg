@@ -3,7 +3,7 @@
 // contrat d'une fonction, curseur au-delà de 45 000 caractères. Le niveau vient de `findNode`
 // (`access.ts`) ; le brouillon ne se lit qu'à partir du niveau 2, décidé avant sa lecture (H123, N35).
 // Sans lui, rien ne se lit.
-import type { BlockView, NodeView, ReadNodeInput } from "../../schemas"
+import { FILES_ROUTE, type BlockView, type NodeView, type ReadNodeInput } from "../../schemas"
 import { ACCESS_LEVELS, describeOwner, type AccessLevel } from "../access"
 import { getContract, renderContract } from "../catalog/contracts"
 import { catalogFunctions, catalogNames, describeFunction, findFunction, isActive, looksLikeFunction } from "../catalog/registry"
@@ -14,6 +14,7 @@ import { inTransaction, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import { readJournal } from "../journal-model"
 import { JOURNAL_PATH } from "../../schemas/journal"
+import { webUrl } from "../../schemas/oauth"
 import { countRows } from "../tables/rows"
 import { tableReadBody } from "../tables/schema"
 import type { ToolOutput } from "../tool-output"
@@ -22,6 +23,7 @@ import { OUTLINE_DATA_MAX, REFERENCES_DATA_MAX, REVISIONS_LISTED } from "./limit
 import { linkHeader } from "./link-lines"
 import { checkNodePath, findNode, movedNotice, unknownNode, type NodeRow } from "./lookup"
 import { serveBody, type Served } from "./read-body"
+import { readNodeFile } from "./read-file"
 import { headerLines, outlineOf, type PendingDraft, type Version } from "./read-format"
 import { checkCursor, paginate } from "./read-pages"
 import { readReference, referenceLines, resolveReferences, type ResolvedReference } from "./references"
@@ -47,6 +49,10 @@ async function readFunction(db: PlatformDb, identity: Identity, name: string): P
 function checkRequest(input: ReadNodeInput, path: string): void {
   checkNodePath(path)
   const modes = [input.section !== undefined, input.outline === true, input.since_revision !== undefined].filter(Boolean)
+  // `file` (E10-S02, AC-d2) : le texte d'un fichier seul, sans section, plan, écart ni brouillon.
+  if (input.file !== undefined && (modes.length > 0 || input.draft === true)) {
+    throw new PlatformError("invalid_arguments", "Give only one of section, outline, since_revision or file; file reads the text of a file, without draft.")
+  }
   if (modes.length > 1) throw new PlatformError("invalid_arguments", "Give only one of section, outline or since_revision.")
 }
 
@@ -120,6 +126,15 @@ async function contextOf(db: PlatformDb, identity: Identity, found: NonNullable<
   }
 }
 
+/**
+ * La route des fichiers joints servie à un assistant (E10-S02, AC-d1, HN-E10S02-3) : sur l'origine de la requête, lue
+ * par `webUrl` (`http:` ou `https:`, sans identifiants : `security-patterns.md § XSS Prevention`) ; relative sinon.
+ */
+function fileRouteOf(origin: string | undefined): string {
+  const url = webUrl(origin)
+  return url ? `${new URL(url).origin}${FILES_ROUTE}` : FILES_ROUTE
+}
+
 function pendingOf(draft: Context["draft"]): PendingDraft | null {
   return draft ? { baseRevision: draft.baseRevision, savedAt: draft.savedAt, title: draft.title, summary: draft.summary, kind: draft.kind } : null
 }
@@ -128,8 +143,10 @@ function pendingOf(draft: Context["draft"]): PendingDraft | null {
  * `read` (AC4 à AC18) : un nom de fonction sert son contrat ; `journal` sert le journal des appels
  * (E05-S05) ; un chemin sert l'en-tête du nœud et ses blocs rendus selon le mode demandé, coupés en
  * parties au-delà de 45 000 caractères. Un nœud invisible répond comme un chemin inconnu (H68).
+ * `origin` (E10-S02, AC-d1) : l'origine de la requête MCP, qui rend absolue l'adresse d'un fichier joint ;
+ * `file` (AC-d2) : le texte d'un fichier joint au nœud.
  */
-export async function readNode(db: PlatformDb, identity: Identity, input: ReadNodeInput): Promise<ToolOutput> {
+export async function readNode(db: PlatformDb, identity: Identity, input: ReadNodeInput, options: { origin?: string } = {}): Promise<ToolOutput> {
   const prefix = identity.org.prefix
   const path = input.path.trim()
   if (looksLikeFunction(path)) return readFunction(db, identity, path)
@@ -137,6 +154,11 @@ export async function readNode(db: PlatformDb, identity: Identity, input: ReadNo
   checkRequest(input, path)
   const found = await findNode(db, identity, path)
   if (!found) throw unknownNode(path, prefix)
+  if (input.file !== undefined) {
+    // Un curseur périmé est refusé avant la lecture de l'objet (AC14).
+    checkCursor(input, found.node)
+    return readNodeFile(db, identity, { input, file: input.file, node: found.node, prefix })
+  }
   checkTable(input, found.node, prefix)
   checkCursor(input, found.node)
   if (input.draft && found.level < ACCESS_LEVELS.write) {
@@ -160,7 +182,7 @@ export async function readNode(db: PlatformDb, identity: Identity, input: ReadNo
     moved: found.movedFrom && found.movedAt ? movedNotice(found.movedFrom, found.node, found.movedAt) : null,
     links: context.links.lines,
   })
-  const served = await servedOf(db, identity, { input, context, prefix, draftMode })
+  const served = await servedOf(db, identity, { input, context, prefix, draftMode, fileRoute: fileRouteOf(options.origin) })
   const data = dataOf(context, served)
   const nextActions = context.level >= ACCESS_LEVELS.write ? [`${prefix}_write`] : []
   return paginate({ input, node: context.node, prefix, header: header.join("\n"), served, data, nextActions, teamId: context.owner.teamId })
@@ -174,7 +196,7 @@ type Body = Served & { references: ResolvedReference[] }
  * AC11), écart depuis une révision compris ; pour un tableau, sa description (`tableReadBody`, E07-S01
  * AC18), aucun bloc.
  */
-async function servedOf(db: PlatformDb, identity: Identity, request: { input: ReadNodeInput; context: Context; prefix: string; draftMode: boolean }): Promise<Body> {
+async function servedOf(db: PlatformDb, identity: Identity, request: { input: ReadNodeInput; context: Context; prefix: string; draftMode: boolean; fileRoute: string }): Promise<Body> {
   const { input, context, draftMode } = request
   const { node } = context
   if (draftMode && !context.draft) return { body: `No pending draft on ${node.path}.`, footer: [], blocks: [], references: [] }

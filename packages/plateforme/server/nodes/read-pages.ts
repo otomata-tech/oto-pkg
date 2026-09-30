@@ -51,7 +51,9 @@ function fits(text: string, data: Record<string, unknown>, nextActions: string[]
  * sert l'appel de la partie suivante (E03-S07, AC7).
  */
 function requestKey(input: ReadNodeInput, node: NodeRow): string {
-  return fingerprint(JSON.stringify([node.path, input.section ?? null, input.outline ?? false, input.since_revision ?? null, input.draft ?? false, input.refs ?? false]))
+  // `file` (E10-S02, AC-d2) n'entre dans la clé que donné : les curseurs d'une lecture sans fichier ne changent pas.
+  const file = input.file === undefined ? [] : [input.file]
+  return fingerprint(JSON.stringify([node.path, input.section ?? null, input.outline ?? false, input.since_revision ?? null, input.draft ?? false, input.refs ?? false, ...file]))
 }
 
 function stale(node: NodeRow): PlatformError {
@@ -88,7 +90,7 @@ export function paginate(request: PageRequest): ToolOutput {
   const print = fingerprint(served.body)
   const tokenFor = (part: number) => encodeCursor({ node: node.id, request: key, text: print, part })
   const call = (part: number) =>
-    `${prefix}_read ${callArguments({ path: node.path, section: input.section, outline: input.outline, since_revision: input.since_revision, draft: input.draft, refs: input.refs, cursor: tokenFor(part) })}`
+    `${prefix}_read ${callArguments({ path: node.path, section: input.section, outline: input.outline, since_revision: input.since_revision, draft: input.draft, refs: input.refs, file: input.file, cursor: tokenFor(part) })}`
   const continued = (part: number, parts: number) => `Continued (part ${part} of ${parts}): read the rest with ${call(part + 1)}.`
   const shortHeader = (part: number, parts: number) => `# ${node.title} (continued, part ${part} of ${parts})`
 

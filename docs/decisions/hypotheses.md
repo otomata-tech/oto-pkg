@@ -989,6 +989,103 @@
 | HN-E10S06-20 | `---`, `***` ou `___` ne fait un séparateur que si le Texte valait juste avant un début de la marque (vide, `-`, `--`…) : « ---x » raccourci en `---` reste un Texte. |
 | HN-E10S06-21 | `simpleTableOf` (`schemas/blocks.ts`) est le seul lecteur du `data` d'un tableau simple : ce qui n'est pas un tableau se lit vide, une cellule qui n'est pas une chaîne `""`, un alignement inconnu `null` ; « Convertir en tableau de données » n'est au menu que d'un tableau simple qui a au moins une colonne, et ne fait rien pour un autre bloc. |
 
+### E10-S02 — Fichiers : dépôt, images, « Voir », dépôt par lien à usage unique
+
+Les hypothèses HN-E10S02-1 à 23, prises au cadrage, se lisent dans la story.
+
+| Id | Règle |
+|---|---|
+| HN-E10S02-24 | `node` de `fileRequestSchema` est le chemin du nœud (`nodePathSchema`), lu par `findNode`, ancien chemin compris. |
+| HN-E10S02-25 | Le type d'un fichier vient de l'extension de `name` (`FILE_TYPES`) : le `mime` du corps est reçu (255 caractères au plus, vide admis) mais jamais cru ; la ligne porte le type de l'extension, signé dans l'URL d'envoi et rendu dans `upload.headers` (D148). |
+| HN-E10S02-26 | Sans stockage, `GET files/<id>` et `POST files/<id>/complete` refusent aussi par `not_enabled`, avant de lire la ligne. |
+| HN-E10S02-27 | La demande d'envoi ne contrôle pas le genre du nœud : un fichier se joint à tout nœud que la personne écrit, et `writeNode` décide quels blocs le citent (HN-E10S02-74). |
+| HN-E10S02-28 | Le bloc `file` et la forme de l'image interne (`file_id` ou `src`, jamais les deux ; `width`) entrent dans une seule redéfinition de `blocks_shape_check`, à la parité de `schemas/blocks.ts`. |
+| HN-E10S02-29 | Privilèges de `files` à `authenticated` seul, sans `service_role` : insertion attribuée à l'appelant sur un nœud de l'organisation, mise à jour de `status` seule. |
+| HN-E10S02-30 | Le quota se lit sous le verrou consultatif de classe 7501, clé `org_id` (`database-patterns.md § Transactions`). |
+| HN-E10S02-31 | Adresses S3 en chemin (`<endpoint>/<bucket>/<clé>`), servies par MinIO, Scaleway et le point d'accès S3 de Supabase ; un fournisseur qui n'admet que l'adresse en sous-domaine demanderait une option, non livrée (D148). |
+| HN-E10S02-32 | Une panne du bucket (réseau, délai, 5xx) rend `internal` « File storage unreachable. Retry later. », le détail au log sans l'adresse signée ; `readFileText` au-delà de 4 Mo lus rend `too_large` ; un objet que le bucket rend en 403 ou 404 vaut absent : `not_found` à la lecture du texte, `head()` nul (`conflict` à la confirmation, `available: false` pour une carte). |
+| HN-E10S02-33 | `POST files` répond 201 ; `POST files/<id>/complete` prend le corps JSON de tout `POST` de la porte (`{}`), sans le lire. |
+| HN-E10S02-34 | `PLATFORM_STORAGE_ENDPOINT` qui n'est pas une adresse `http(s)` lève `PlatformConfigError` ; `null` reste réservé à une variable absente. |
+| HN-E10S02-35 | `files` est dans `TABLES` (`scripts/lib/org-transfer.mjs`), `created_by` nul pour une personne absente, `node_id` remplacé ; une ligne `files` dans A et dans B, dans l'organisation source d'`org-transfer.test.ts`, et l'état de création `pending` dans `isolation/tables.test.ts`. |
+| HN-E10S02-36 | Le genre d'un fichier joint vient de son extension : une image (`png`, `jpeg`, `jpg`, `gif`, `webp`, `svg`) devient un bloc `image`, même choisie par « Fichier » ; tout autre type admis, un bloc `file`. |
+| HN-E10S02-37 | L'écran apprend l'état du stockage par `GET files` au premier geste qui en a besoin (« + » survolé ou atteint au clavier, collage, dépôt), jamais au montage ; un échec n'est pas retenu ; tant qu'il ne le sait pas, « Image » et « Fichier » n'apparaissent pas. |
+| HN-E10S02-38 | « Image » et « Fichier » sont au « + » seul (groupe « Insérer »), pas dans « / ». |
+| HN-E10S02-39 | « Image » et « Fichier » ouvrent un `Dialog` (zone de dépôt d'E10-S01, `accepte`) qui dit types et limites avant la sélection. |
+| HN-E10S02-40 | Un dépôt ou un collage joint le premier fichier seul. |
+| HN-E10S02-41 | Un fichier lâché sur une rangée est reçu par la rangée (`rangee-de-bloc.tsx`) ; stockage désactivé, le comportement d'E10-S01 ; extension non admise, le refus nomme les formats admis, sous le bloc. |
+| HN-E10S02-42 | Texte alternatif et largeur s'écrivent par `modifierLeBloc` (différé de 1 200 ms, envoi à la sortie du champ) ; `image` et `file` sont dans `SANS_TEXTE` (`operations.ts`) : jamais vides. |
+| HN-E10S02-43 | La carte d'un fichier demande une fois montée, par un `useEffect`, `GET files/<id>?check`, qui rend `{ data: { available } }` sans redirection (`fileAvailability` : ligne `ready` sous la lecture du nœud, puis `head()`) ; « Fichier indisponible » sur `available: false`, `not_found` ou `not_enabled`, rien sur une panne ; exception écrite de `state-management.md § Règle d'or`. |
+| HN-E10S02-44 | « Voir » d'un `html` ou d'un `md` mène à `?view=<id>`, relatif à l'adresse où l'on est (`/n/…` comme `/p/<jeton>/…`). |
+| HN-E10S02-45 | Hors de `read`, le markdown d'un fichier cite la route relative (`filePath`, `schemas/files.ts`) ; seul `read` la rend absolue (HN-E10S02-68). |
+| HN-E10S02-46 | L'envoi en cours est une rangée locale `depot-local`, jamais envoyée (sans forme, hors de `SANS_TEXTE`), sans « + » ni poignée ; elle retient la reprise des blocs servis jusqu'à sa confirmation ou son retrait. |
+| HN-E10S02-47 | Un `PUT` au stockage hors 2xx se lit `internal` (« Le stockage des fichiers ne répond pas »), une coupure du réseau `reseau`. |
+| HN-E10S02-48 | Un CSV importé en tableau depuis une page (AC-b5, AC-b6) prend la première adresse libre `<page>/<segment du nom>` (`adressesAEssayer`). |
+| HN-E10S02-49 | Largeurs d'une image : `small` un tiers, `medium` deux tiers, `full` toute la colonne de lecture. |
+| HN-E10S02-50 | L'écran propose les fichiers dans tout nœud qu'il écrit (page, procédure, Contexte) ; tranchée par HN-E10S02-74. |
+| HN-E10S02-51 | `20260929200000_platform_files.sql` est la migration unique de la story, complétée lot par lot et appliquée aux seules bases locales avant la fusion ; elle est figée dès son application au projet partagé (D124). |
+| HN-E10S02-52 | La policy d'insertion de `files` exige `status = 'pending'` : seule la mise à jour rend une ligne `ready`, duplication et dépôt par lien compris. |
+| HN-E10S02-53 | L'URL de lecture sert le type de l'extension du nom (`FILE_TYPES`), jamais le `mime` de la ligne ; `application/octet-stream` pour un nom sans type admis. |
+| HN-E10S02-54 | L'écran traduit un refus par sa cause, retrouvée par le fichier envoyé (`invalid_arguments` sur une extension admise : nom refusé ; `too_large` d'un fichier de 0 octet : fichier vide) ; le service ne change ni ses codes ni ses messages. |
+| HN-E10S02-55 | `GET public/<jeton>/files/<id>` (302, `PUBLIC_HEADERS`) et les routes d'un lien sur la page publique (`routeDesFichiers` : image, « Voir », « Télécharger ») sont livrés avec « Voir » (lot c). |
+| HN-E10S02-56 | `public_file_by_token` rend `id`, `name`, `mime`, `size` et `node_path`, jamais la clé (composée par `objectKey`) ; un fichier est servi s'il est cité par un bloc publié `file` ou `image` de son nœud. |
+| HN-E10S02-57 | Un `.md` que l'analyse tolérante ne sait pas garder en blocs se montre entier en un bloc de code, sans phrase de plus. |
+| HN-E10S02-58 | La visionneuse d'un `html` ne lit pas l'objet : un `html` qui n'est pas de l'UTF-8 se dit dans l'iframe, en texte brut de la route ; « Ce fichier n'est pas en UTF-8 : téléchargez-le. » vaut pour un `.md` (raison `not_utf8` d'`objectText`). |
+| HN-E10S02-59 | `?view` vaut sur tout nœud qu'on lit sauf un tableau ; illisible ou répété, il vaut un identifiant vide : « Fichier introuvable », jamais l'écran du nœud (`fileViewParamSchema`). |
+| HN-E10S02-60 | La route HTML d'une personne connectée vérifie le jeton de session, l'identité, puis `Sec-Fetch-Dest` et le fichier (`fileHtml`) ; sans session, 401 même hors iframe ; toute erreur se sert `<code>: <message>` en `text/plain; charset=utf-8` aux autres en-têtes d'ADR-017 ; tout refus de lecture est `not_found: Unknown file.` (`not_found: Not found.` par un lien public). |
+| HN-E10S02-61 | L'iframe ne se monte qu'après l'hydratation (`useSyncExternalStore`) : un second chargement est une navigation de son contenu (O1) ; « Recharger » monte une iframe neuve. |
+| HN-E10S02-62 | Sur la page publique, la carte d'un fichier ne relit pas sa disponibilité (`?check` exige une session) ; seule l'`onError` d'une image y dit « Fichier indisponible ». |
+| HN-E10S02-63 | La bannière est une `Alert` en `role="note"` ; en public elle nomme la marque de l'adresse (`nomAffiche`), sinon « l'organisation » ; la visionneuse en échec se titre « Fichier », introuvable « Fichier introuvable ». |
+| HN-E10S02-64 | L'hôte de référence pose `nosniff` et `Permissions-Policy` partout, `X-Frame-Options` et sa `Referrer-Policy` partout sauf les deux routes HTML (source à lecture anticipée négative de `next.config.ts`). |
+| HN-E10S02-65 | Les liens internes d'un `.md` vu par un lien public se lisent en texte : aucun n'est dans `links` du lien. |
+| HN-E10S02-66 | La spec e2e d'AC-c6 (`e10s02-voir`) dépose ses fichiers par les routes du paquet et se saute quand le serveur n'a pas de stockage (`GET files` → `enabled: false`). |
+| HN-E10S02-67 | Un fichier se rend `[<nom> (<taille>, <type>)](<route>/<id>)` : nom tel quel, taille en octets exacts (`fileSizeText` : « 1,200 bytes », « 1 byte »), type par l'extension (le `mime` de la ligne sans extension admise) ; `parseMarkdown` relit la ligne de droite à gauche (dernière `](`, dernière ` (`). |
+| HN-E10S02-68 | `<origine>` est celle de la porte MCP (`McpDeps.origin`, lue par `webUrl`), sinon la route relative ; seul `read` la reçoit : `context`, `staleState`, le `.md` d'une page et la visionneuse servent la route relative, que `parseMarkdown` relit aussi. |
+| HN-E10S02-69 | Une ligne seule `[<étiquette>](<origine facultative>/api/plateforme/files/<uuid>)` est un bloc `file`, en strict comme en tolérant, uuid en minuscules ; une étiquette hors forme donne nom = étiquette, taille 1, `application/octet-stream`, que la ligne relue remplace ; un lien public ou d'une sous-route reste un paragraphe. |
+| HN-E10S02-70 | `writeNode` ne relit que les fichiers que le document (brouillon, sinon publié) ne citait pas encore (`ready`, joint au nœud) ; un fichier déjà cité par un bloc `file` passe avec ses métadonnées (restreinte par HN-E10S02-82). |
+| HN-E10S02-71 | Une création qui cite un fichier est refusée avant l'insertion du nœud (phrase d'AC-d3) ; le dépôt par lien crée la page, puis joint le fichier par une seconde écriture. |
+| HN-E10S02-72 | En mode tolérant, un fichier non joint à la page devient un bloc `code` qui porte son markdown, compté dans `kept_as_text`. |
+| HN-E10S02-73 | Une image jointe réécrite sans largeur garde la largeur du bloc qui citait le même fichier. |
+| HN-E10S02-74 | `writeNode` admet un bloc `file` ou une image jointe dans tout nœud à blocs (page, procédure, Contexte), jamais dans un tableau ; l'écran les propose partout où il écrit des blocs. |
+| HN-E10S02-75 | `read {file}` avec `section`, `outline`, `since_revision` ou `draft` : « Give only one of section, outline, since_revision or file; file reads the text of a file, without draft. » ; `refs` ignoré ; en-tête `<nom> (<taille>)`, données `{ path, file: { id, name, size, type } }`, sans `next_actions` ; tout nœud visible, publié ou non ; `file` n'entre dans la clé du curseur que donné. |
+| HN-E10S02-76 | La description de `read` finit par « To read an attached html, md, txt or csv file, give file = the id from its link /api/plateforme/files/<id>. » |
+| HN-E10S02-77 | `readFileText` dit « only html, md, txt and csv files are read as text. » ; le refus de taille garde « a text file (html, md, txt, csv) ». |
+| HN-E10S02-78 | Créer un tableau par import (AC-b5, AC-b6, `upload.link` `csv create`) n'exige que l'écriture sur le parent (D150) ; le bloc écrit après `complete` et celui du dépôt par lien sont publiés aussitôt, sauf `publish: false` (D135). |
+| HN-E10S02-79 | Un fichier lâché ou collé sur le Texte local d'une page vide se joint après ce Texte, qui reste. |
+| HN-E10S02-80 | La rangée `depot-local` reste dans les blocs que l'éditeur rend à la publication ; seul le Texte local d'une page vide en est exclu (`portage-ecrans.md § 6`). |
+| HN-E10S02-81 | Le `.md` téléchargé d'une page publique (`pageMarkdown`) cite ses fichiers par la route relative d'une session. |
+| HN-E10S02-82 | Un bloc `file` dont les métadonnées ne viennent ni d'une ligne relue `ready` jointe au nœud ni d'un bloc `file` déjà dans le document est refusé (phrase d'AC-d3), ou gardé en `code` en mode tolérant. |
+| HN-E10S02-83 | Après « Recharger », le focus va à l'iframe neuve ; l'avis vit dans une région `role="alert"` montée vide avec l'iframe, l'`Alert` en `role="presentation"`. |
+| HN-E10S02-84 | La porte vérifie la session en deux temps, `verifiedSession` (jeton, `verifyToken`, `verifiedCaller`, `createPlatformDb`) puis `sessionIdentity`, dans `api/session.ts` : dans `handlePlateforme`, l'origine d'une mutation, `cell` et le 404 d'une route inconnue passent entre les deux. |
+| HN-E10S02-85 | `read {file}` contrôle le curseur avant de lire l'objet, dans sa seule branche. |
+| HN-E10S02-86 | Canal ouvert O7 : le script d'un HTML vu par un lien public lit le jeton dans `location` et peut l'envoyer (O1) ; ce jeton ne donne que ce que le lien sert déjà, et seul un rédacteur de la page y joint un tel script, sous la bannière (ADR-017 § 2). |
+| HN-E10S02-87 | Sans les cinq variables de stockage, `org:export` d'une organisation qui a des fichiers `ready` échoue après sa lecture, avant le JSON et `<fichier>.files/`, et `org:import` d'un document qui porte des fichiers juste après la lecture des variables, avant toute connexion : message qui nomme les cinq (`requireTransferStore`), code 1 ; sans fichier, le transfert passe sans elles. Un objet absent est nommé, jamais une erreur ; une panne du stockage à l'export lève avant le JSON ; à l'import, les objets partent après le commit des lignes, un envoi en échec est nommé, code 1. |
+| HN-E10S02-88 | La duplication copie les fichiers qu'un bloc publié d'un nœud copié cite (`file`, image jointe), eux seuls, `pending` compris. |
+| HN-E10S02-89 | Les fichiers copiés comptent au quota : `requireQuota` relit la somme sous le verrou 7501 dans la transaction de la duplication ; au-delà de 10 Go, `too_large` (raison `quota`), et rien n'est écrit, la copie de page comprise (D149). |
+| HN-E10S02-90 | `duplicate_subtree` rend, par nœud copié, `copied_files` (ancien identifiant → nouveau) ; retirée puis recréée, son type rendu changeant. |
+| HN-E10S02-91 | Après le commit, les copies d'objets partent ensemble, puis une seule mise à jour sous la session passe les lignes copiées à `ready` ; sans stockage, elles restent `pending`, nommées au log (`[platform] files: copy left pending <clé>`). |
+| HN-E10S02-92 | La purge supprime les lignes `files` dans la même instruction que les nœuds (deux `delete` en `with`), limitée aux nœuds vraiment emportés ; les objets partent après le commit (`removeObjects`). |
+| HN-E10S02-93 | Le filtre `ready` de l'export s'écrit dans la carte (`TableSpec.only`, lu par `orgRowsSql`) ; l'empreinte d'E09-S04 désigne un fichier par `file:<chemin de son nœud>/<nom>` ; `transferEnv` lit les cinq variables en facultatives, masquées. |
+| HN-E10S02-94 | Le lien public d'une copie sert le fichier copié, jamais celui de l'original. |
+| HN-E10S02-95 | Le formulaire de dépôt est une page de l'hôte, `/upload/<token>` sous `(dashboard)`, qui monte `EcranDeDepot`, et une route à session, `POST /api/plateforme/uploads/<jeton>/form`, servie avant la table de dispatch, sous le contrôle d'origine des mutations (D146). |
+| HN-E10S02-96 | `form_url` est rendu par chaque `upload.link`, pas seulement quand `source_url` échoue. |
+| HN-E10S02-97 | L'identité d'un envoi se reconstruit par `identityInOrg(db, org, { userId, email })` sur l'organisation lue à l'adresse ; un e-mail absent vaut `""` ; `not_member` : « The person who asked for this link is no longer a member of <organisation>: nothing was written. » |
+| HN-E10S02-98 | `WriteOrigin` (agent) gagne `file?: { replace }`, posé par le seul service du dépôt : un `.md` déposé se lit en tolérant sous la provenance `agent` ; `replace` applique les opérations à une page vide ; `wholeFile` d'`applyOps` saute `SECTION_MAX`, `OP_TEXT_MAX` tenu par des morceaux de 40 000 caractères ; `PAGE_MAX` et `BLOCKS_MAX` restent. |
+| HN-E10S02-99 | Le premier titre `#` d'un `.md` déposé est retiré de son corps (`readPageMarkdown`) ; le titre de la page vient du ticket en `create` et ne change pas en `replace` ; un `.md` vide sous son titre est refusé (`invalid_arguments`). |
+| HN-E10S02-100 | Fichier en `create` : page créée en brouillon, puis ligne et objet (`storeFile`), puis bloc `file` écrit sous la révision 0 et publié selon `publish` ; un échec du stockage laisse la page en brouillon et le dit. En `attach`, le bloc s'écrit sous la `base_revision` du ticket, après le dernier bloc du document (`insert_after`, bloc structuré). |
+| HN-E10S02-101 | `name` est facultatif pour `md` et `csv` : il nomme le fichier dans la provenance d'un CSV (« Importé de <nom> », défaut `upload.link`) et dans les commandes rendues (sinon `<file>`). |
+| HN-E10S02-102 | La ligne de journal d'un envoi s'écrit sous la session de la personne du ticket, après la réponse (`defer`) à la porte de `curl` ; une personne retirée : aucune ligne tentée, `console.error("[platform] uploads: …")`. |
+| HN-E10S02-103 | `source_url` est masquée au journal par son nom normalisé exact (`MASKED_NAMES`, `server/journal.ts`), ses voisines restant lisibles ; un téléchargement en échec est un résultat, pas `isError` : la cause sans l'adresse, et `form_url`. |
+| HN-E10S02-104 | Toute adresse IPv6 qui porte une IPv4 (mappée, NAT64, `::/96`, 6to4, Teredo) est refusée entière ; la résolution contrôlée est celle de la connexion (`lookup`), toutes les adresses rendues doivent être publiques ; une adresse IP écrite dans l'URL se contrôle avant la requête. |
+| HN-E10S02-105 | RLS d'`upload_tickets` : lecture par un membre de ses tickets et des tickets expirés, insertion attribuée à l'appelant, suppression des seuls tickets expirés, aucune mise à jour, aucune clé vers `members`. |
+| HN-E10S02-106 | Textes de la porte sans session : refus 1 « Requests from a browser are refused: send the file with curl, or use the form link. » ; une seule `not_found` « Unknown upload link: it may have expired (15 minutes) or already been used. Ask for a new link. » (jeton mal formé, ticket inconnu, expiré, servi ou d'une autre organisation, adresse sans organisation) ; 200 pour un envoi écrit. |
+| HN-E10S02-107 | `storeFile` partage avec la demande d'envoi l'insertion `pending` sous quota (`insertPending`) et avec la confirmation `markReady` ; `admittedType` et `checkSize` décident type et taille au lien et à l'envoi. |
+| HN-E10S02-108 | Le ticket porte deux jetons, gardés en empreinte : celui de `curl` (`token_hash`) et celui du formulaire (`form_token_hash`) ; chaque porte n'accepte que le sien (`consume_upload_ticket(p_org, p_hash, p_form)`), `used_at` commun : le premier consommé rend l'autre `not_found` (ADR-018 § 8, D147). |
+| HN-E10S02-109 | Après un refus qui a servi le lien, la zone de dépôt est retirée et une phrase dit que le lien ne sert plus (`DEPOT.clos`), focus à l'alerte ; elle reste pour un refus du réseau, un 401, un `internal` ou un fichier de plus de 1 Mo. |
+| HN-E10S02-110 | La ligne d'un `.md` gardé en mode tolérant se lit « N elements kept as text. » (« 1 element kept as text. »). |
+| HN-E10S02-111 | `errorResponse`, `asPlatformError`, `addressOrigin` et `requireSameOrigin` vivent dans `api/session.ts`, lus par `handler.ts` et `api/uploads.ts` ; un refus de la route du formulaire ne porte plus `Cache-Control: private, no-store`, et une panne inattendue des deux routes du dépôt se journalise `[platform] api: unexpected error`. |
+| HN-E10S02-112 | À l'import, un ancien identifiant de fichier qui n'est pas un uuid est refusé avant de bâtir son chemin (nommé, code 1) ; à l'export, un dossier `<fichier>.files/` déjà là arrête le script comme le JSON (« relancez avec --force »), et `--force` le vide avant l'écriture. |
+| HN-E10S02-113 | `copyFileObjects` copie les objets par lots de 8 (`COPIES_AT_ONCE`) ; un échec dans un lot n'arrête pas les suivants. |
+
 ### E11-S04 — Routage des procédures : questions « comment », égalités, formulations du résumé, fautes de frappe
 
 | Id | Règle |
@@ -1087,13 +1184,18 @@ organisation qui compte beaucoup de membres sans email.
 | Id | Règle |
 |---|---|
 | HN-E11S14-1 | L'identité d'une suite portable est un jeton de la forme « supabase » du port (`sub` = identifiant interne), signé par une clé locale (`testIssuer`) et vérifié par `makeVerifyToken({ jwks, issuer })` injecté ; les personnes viennent de `createSqlFixtures` ; aucun service joint. |
+| HN-E11S14-2 | La suite d'isolation se sème par un mode OIDC du script Démo, sur le motif de `platform:staff` (fiche D77 A), `--user` exigé. Confirmée par le pilote (2026-09-30). |
 | HN-E11S14-3 | `api-invitations` pose `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` par `vi.stubEnv` (adresse en `.invalid`), `signInWithOtp` restant espionné : le client se construit, rien n'est joint. |
 | HN-E11S14-4 | La vérification d'un vrai jeton par la JWKS du projet est un `it` explicite de `mcp-http`, gardé par le projet (session par `createFixtures().sessionFor`). |
 | HN-E11S14-5 | AC1 et AC2 de `portabilite-schema` (lecture d'`auth.users` et `auth.oauth_*`) restent sur le projet, entiers. |
 | HN-E11S14-6 | `tests/unit/gardes-supabase.test.ts` lit les noms importés par `import {…} from`, `export {…} from` et un import dynamique déstructuré (`const {…} = await import(…)`), alias et `type` retirés. |
-| HN-E11S14-7 | La liste de `gardes-supabase.test.ts` est fermée dans les deux sens : un fichier qui importe une garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les fichiers du lot c y sont marqués « pending ». |
+| HN-E11S14-7 | La liste de `gardes-supabase.test.ts` est fermée dans les deux sens : un fichier qui importe une garde sans y être échoue, une ligne dont le fichier n'en importe plus échoue aussi ; les lignes « pending » des lots b et c en sont sorties avec leur lot. |
 | HN-E11S14-8 | Les noms de `describe` passés en A au lot b qui disaient « on the cloud project » disent « on a real database » ; rien d'autre de leur nom ne change. |
 | HN-E11S14-9 | Le `describe` principal d'`org-transfer` (export et import par les emails des comptes Auth) reste sur le projet, inchangé ; seul le `describe` AC14 passe en A. |
+| HN-E11S14-10 | `--user` du script Démo n'admet qu'un `uuid`, contrôlé par `parseArgs` avant toute connexion (code 1, « Identifiant invalide ») : la base le refuserait après la création de l'organisation. |
+| HN-E11S14-11 | Le mode OIDC du script Démo ne vérifie pas que l'identifiant de `--user` est lié à un sujet dans `identities` (contrairement à `platform:staff add --user`) : un jeton de test de la forme « supabase » ne pose sa ligne qu'au premier passage par une porte. |
+| HN-E11S14-12 | En mode OIDC, `members.name` et `profile.name` de la personne E2E valent « Compte E2E ». |
+| HN-E11S14-13 | Les deux refus de la ligne de commande du mode OIDC se jouent dans `demo-seed-oidc.test.ts`, hors garde ; leurs messages sont exportés par le script (`USER_WITHOUT_OIDC`, `OIDC_WITHOUT_USER`) et comparés à la sortie entière. |
 
 ### E11-S01 — Tableaux : créer sans écraser, colonne obligatoire stricte, recherche par mots, révision et auteur, décision de revue par l'agent, preuve par tableau, réglages à l'écran
 

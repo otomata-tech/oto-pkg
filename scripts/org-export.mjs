@@ -13,6 +13,9 @@
  * désigne jamais un nœud absent du fichier), table par table, les colonnes de la carte seulement
  * (jamais `select *` : ni colonne générée, ni `secret_ciphertext`), filtrées par organisation ;
  * `platform_staff` n'est jamais lue ; le journal, sur option. Aucune valeur de variable n'est imprimée.
+ * E10-S02 (AC-e4) : les octets des fichiers joints vont dans `<fichier>.files/`, écrits avant le JSON, lus
+ * dans le stockage des variables `PLATFORM_STORAGE_*` ; une organisation qui porte des fichiers `ready` ne s'exporte
+ * pas sans elles : le script le dit en les nommant, après la seule lecture, avant toute écriture.
  */
 import { existsSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -20,6 +23,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { adminSql, codeOf, identifiers, jsonRows, maskValues, messageOf, serviceKeyClient } from './lib/env.mjs'
 import { parseExportArgs, readOrFail, readVariables } from './lib/org-transfer-args.mjs'
 import { collectPeople, countRows, FORMAT, orgRowsSql, TABLES, VERSION } from './lib/org-transfer.mjs'
+import { exportObjects, filesDir, requireTransferStore, transferStore } from './lib/org-transfer-files.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PERSONAL_DATA = 'Ce fichier contient des données personnelles : ne le commitez pas.'
@@ -82,6 +86,9 @@ async function main(argv) {
     if (existsSync(options.out) && !options.force) {
       throw new Error(`Le fichier ${options.out} existe déjà : relancez avec --force pour le remplacer.`)
     }
+    if (existsSync(filesDir(options.out)) && !options.force) {
+      throw new Error(`Le dossier ${filesDir(options.out)} existe déjà : relancez avec --force pour le remplacer.`)
+    }
     values = readVariables(options.env, process.env, ROOT)
   } catch (error) {
     console.error(messageOf(error))
@@ -93,11 +100,16 @@ async function main(argv) {
     sql = adminSql(values)
     const url = values.NEXT_PUBLIC_SUPABASE_URL
     const doc = await exportOrg({ sql, admin: serviceKeyClient(values) }, { slug: options.org, withJournal: options.withJournal, url })
+    const files = doc.tables.files ?? []
+    // AC-e4 : sans stockage, des fichiers à exporter arrêtent le script ici, l'export n'ayant fait que lire.
+    const store = requireTransferStore(transferStore(values), files.length, 'exporter')
+    const objects = await exportObjects(store, { orgId: doc.source.org.id, files, file: options.out, force: options.force })
     // `wx` : un fichier apparu depuis le contrôle n'est pas écrasé sans --force.
     writeFileSync(options.out, `${JSON.stringify(doc, null, 2)}\n`, { flag: options.force ? 'w' : 'wx' })
     const { rows, tables } = countRows(doc.tables)
     console.log(`Organisation ${options.org} exportée dans ${options.out}.`)
     console.log(`${rows} lignes dans ${tables} tables, ${doc.people.length} personnes.`)
+    for (const line of objects) console.log(maskValues(line, hidden))
     console.log(PERSONAL_DATA)
     return 0
   } catch (error) {

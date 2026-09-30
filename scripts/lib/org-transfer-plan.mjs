@@ -155,6 +155,8 @@ function finish(name, source, out, state) {
   }
   // HN-E05S10e-9 : un lien public arrive désactivé (son jeton n'est pas exporté) ; on le recrée au besoin.
   if (name === 'node_shares' && out.revoked_at == null) out.revoked_at = state.now.toISOString()
+  // E10-S02 (AC-e4) : l'objet d'un fichier importé, lu sous son ancien identifiant, s'envoie sous le nouveau.
+  if (name === 'files') state.plan.files.push({ from: source.id, to: out.id, mime: out.mime })
 }
 
 function planRow(spec, row, state) {
@@ -185,7 +187,8 @@ function planRow(spec, row, state) {
  * prêtes à insérer, dans l'ordre de la carte, avec de nouveaux identifiants (AC6, AC7) ; les lignes
  * sautées pour une personne absente, en cascade (AC9) ; les lignes dont l'auteur est absent (AC10) ;
  * les invitations laissées (AC13) ; les accès plateforme révoqués (autre projet) ; les responsables à
- * poser après `team_members` ; les numéros des tickets dans l'ordre d'insertion.
+ * poser après `team_members` ; les numéros des tickets dans l'ordre d'insertion ; les fichiers importés, ancien et
+ * nouvel identifiant (E10-S02, AC-e4).
  * @param {any} doc
  * @param {{ people: Map<string, string | null>, defaultAuthor?: string | null,
  *   org: { slug: string, prefix: string, name?: string | null }, now?: Date, otherProject?: boolean }} options
@@ -202,6 +205,8 @@ export function planImport(doc, { people, defaultAuthor = null, org, now = new D
     teamLeads: [],
     /** @type {number[]} */
     tickets: [],
+    /** @type {{ from: string, to: string, mime: string }[]} */
+    files: [],
     closedInvitations: 0,
     revokedGrants: 0,
     absent: doc.people.filter((person) => !people.get(person.id)).map((person) => person.email ?? person.id).sort(),
@@ -261,6 +266,8 @@ function naturalRefs(doc) {
   for (const account of tables.accounts ?? []) refs.set(account.id, `account:${account.label}`)
   const paths = new Map((tables.nodes ?? []).map((node) => [node.id, node.path]))
   for (const [id, path] of paths) refs.set(id, `node:${path}`)
+  // E10-S02 (AC-e4) : un fichier joint, par son nœud et son nom ; son identifiant change à l'import.
+  for (const file of tables.files ?? []) refs.set(file.id, `file:${paths.get(file.node_id)}/${file.name}`)
   const blocks = [...(tables.blocks ?? [])].sort((a, b) => compare(a.state, b.state))
   for (const block of blocks) {
     const anchor = block.key == null ? `@${block.position}` : `#${block.key}`

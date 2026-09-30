@@ -137,7 +137,7 @@ jetons et l'option `verifyToken`.
 
 ### Lot c — Le semis de l'isolation sans Supabase Auth
 
-- [ ] **AC-c1 — Mode OIDC du script Démo (HN-E11S14-2, à confirmer).** **Given** `PLATFORM_OIDC_ISSUER`
+- [ ] **AC-c1 — Mode OIDC du script Démo (HN-E11S14-2, confirmée).** **Given** `PLATFORM_OIDC_ISSUER`
   posée, `PLATFORM_ADMIN_DATABASE_URL` et `E2E_USER_EMAIL` seules **When**
   `node scripts/demo-seed.mjs --slug t<hex> --user <identifiant>` **Then** l'organisation est semée comme
   en mode Supabase, la personne `<identifiant>` administratrice et responsable de Ventes, email
@@ -225,8 +225,11 @@ Aucune : `identity_for_caller` sert tel quel. **Schémas Zod** : aucun.
 - Signataires : `rg -l "generateKeyPair|new SignJWT" C:/apps/oto-pkg/tests` → `oidc-issuer.ts` et six
   tests (`mcp-admin-handler`, `unit/{api-token,issuer,mcp-auth,mcp-handler,verified-caller}`). Verdict :
   réutiliser `testIssuer` ; laisser les six, qui testent le vérificateur avec des clés et claims choisis.
-- Mode sans Supabase d'un script : `rg -n "OIDC_VARIABLE" C:/apps/oto-pkg/scripts` → `platform-staff.mjs`.
-  Verdict : reprendre le motif (même variable, même `--user`), sans module commun (trois lignes).
+- Mode sans Supabase d'un script : `rg -n "UUID|OIDC_VARIABLE|PLATFORM_OIDC_ISSUER" scripts` →
+  `platform-staff.mjs` (motif et `UUID`), `lib/org-transfer.mjs` (`UUID`). Verdict (décision du pilote,
+  correction 1 du lot c) : fusionner dans `scripts/lib/env.mjs`, déjà importé par les scripts : `UUID`,
+  `OIDC_VARIABLE` et `oidcMode` (lecture de `PLATFORM_OIDC_ISSUER`, mode qui en découle) ; `demo-seed.mjs`,
+  `platform-staff.mjs`, `org-transfer.mjs` et `org-transfer-files.mjs` les importent, messages inchangés.
 
 ### Effet produit
 - Paquet, schéma `platform`, RLS, outils MCP, connecteurs, hôte : aucun changement.
@@ -268,10 +271,11 @@ par ajout seul. Ordre proposé :
   où `identity_for_caller` n'admet qu'un sujet déjà lié, un email du staff ou une invitation ouverte
   (migration de base l. 527-538), où l'invitation part par SMTP (`server/invitations.ts` l. 248) et où
   le `fetch` global est remplacé : les assertions d'`api-invitations` changeraient.
-- **HN-E11S14-2 (à confirmer)** : l'isolation se sème par un mode OIDC du script Démo, sur le motif de
-  `platform:staff` (fiche D77 A), `--user` exigé (une personne sous un identifiant tiré au hasard ne
-  serait jamais reliée à un sujet OIDC). Alternative : les quatre suites d'isolation restent en B
-  (10 fichiers sautés au lieu de 6). À confirmer : surface ajoutée à un script d'exploitation.
+- **HN-E11S14-2 (confirmée par le pilote, 2026-09-30)** : l'isolation se sème par un mode OIDC du script
+  Démo, sur le motif de `platform:staff` (fiche D77 A), `--user` exigé (une personne sous un identifiant
+  tiré au hasard ne serait jamais reliée à un sujet OIDC). Alternative écartée : les quatre suites
+  d'isolation restent en B (10 fichiers sautés au lieu de 6). Confirmée sous l'autonomie donnée par JB,
+  option la plus proche des décisions (précédent `platform:staff`, fiche D77 A).
 - **HN-E11S14-3** : `api-invitations` pose `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   par `vi.stubEnv` (adresse en `.invalid`), `signInWithOtp` restant espionné : le client se construit
   (`invitations.ts` l. 142-146), rien n'est joint, les assertions sur le lien magique restent (source :
@@ -293,6 +297,24 @@ par ajout seul. Ordre proposé :
 - **HN-E11S14-9** (implémentation, lot b) : le `describe` principal d'`org-transfer` (export et import par
   les emails des comptes Auth) reste sur le projet, inchangé ; seul le `describe` AC14 passe en A (source :
   AC-b1).
+- **HN-E11S14-10** (implémentation, lot c) : `--user` n'admet qu'un `uuid`, contrôlé par `parseArgs` avant
+  toute connexion (code 1, « Identifiant invalide ») ; sans ce contrôle, la base refuserait l'identifiant
+  (`22P02`) à l'insertion du membre, après la création de l'organisation (source : `platform-staff.mjs`,
+  constante `UUID` ; `security-patterns.md § Outillage à clé service`, refus avant la première écriture).
+- **HN-E11S14-11** (implémentation, lot c) : contrairement à `platform:staff add --user` (M35), le mode OIDC
+  du script Démo ne vérifie pas que l'identifiant est lié à un sujet dans `identities` : les jetons de test
+  sont de la forme « supabase » (`sub` = identifiant interne, HN-E11S14-1) et ne posent leur ligne
+  `identities` qu'au premier passage par une porte, après le semis ; la vérification refuserait les personnes
+  de `createSqlFixtures` (source : AC-c1, qui n'exige que `--user` ; HN-E11S14-1).
+- **HN-E11S14-12** (implémentation, lot c) : en mode OIDC, `members.name` et `profile.name` de la personne
+  E2E valent « Compte E2E » (lettre d'AC-c1), et non le nom de la fixture (« Alice Acme ») que le mode
+  Supabase recopiait du compte ; aucune suite d'isolation ne lit ce nom
+  (`rg -n "Alice|Bruno|Compte E2E" tests/integration/isolation` : seuls les `createUser` de `donnees.ts`).
+- **HN-E11S14-13** (implémentation, lot c) : les deux refus de la ligne de commande (AC-c1) se jouent dans
+  `demo-seed-oidc.test.ts`, dans un `describe` sans garde : ils s'arrêtent avant toute connexion ; leurs
+  messages sont exportés par le script (`USER_WITHOUT_OIDC`, `OIDC_WITHOUT_USER`), comme ses messages
+  `INVALID_SLUG` et `OPTIONS`, et le test les compare à la sortie entière : le test ne recopie pas le texte
+  (source : forme des constantes du script ; `platform-staff-script.test.ts` compare aussi sa sortie entière).
 
 ## Textes proposés (écrits par le pilote à la fusion)
 
@@ -338,7 +360,7 @@ la fusion. »
 
 ### Écarts avec l'architecture
 
-Aucun : ni `packages/` ni `src/` ne changent. Lots a et b livrés ; le lot c reste ouvert (`status.md`).
+Aucun : ni `packages/` ni `src/` ne changent. Lots a, b et c livrés (lot c en revue, worktree `e10`).
 
 ### Composants créés
 | Composant/Hook/Action | Path | Notes |
@@ -346,6 +368,8 @@ Aucun : ni `packages/` ni `src/` ne changent. Lots a et b livrés ; le lot c res
 | `createLocalFixtures`, type `LocalFixtures` | `tests/helpers/session-locale.ts` | `createSqlFixtures()` plus `sessionFor(user)` (jeton signé localement) et `verifyToken` à passer aux portes |
 | champ `jwks` de `TestIssuer` | `tests/helpers/oidc-issuer.ts` | JWKS publique de l'émetteur de test, pour un vérificateur local sans `fetch` (ajout seul) |
 | liste fermée des fichiers gardés par Supabase | `tests/unit/gardes-supabase.test.ts` | AC-a7 ; chaque ligne porte sa raison |
+| mode OIDC du script Démo (`--user`) | `scripts/demo-seed.mjs`, `scripts/demo/10-identite.mjs` | AC-c1 ; `PLATFORM_OIDC_ISSUER` posée : `--user` exigé, ni compte ni sonde d'Auth ; hors de ce mode, `--user` refusé |
+| `UUID`, `OIDC_VARIABLE`, `oidcMode` | `scripts/lib/env.mjs` | correction 1 du lot c : une définition pour `demo-seed`, `platform-staff` et l'export-import ; `oidcMode` rend `{ oidc, issuer }` |
 
 ### Notes
 
@@ -355,9 +379,40 @@ Aucun : ni `packages/` ni `src/` ne changent. Lots a et b livrés ; le lot c res
 - Textes proposés écrits par le pilote : `CLAUDE.md § Vérifier, commiter, pousser` (puce « Base de test
   locale ») et `testing-strategy.md § Base de test locale` (puce « Ce qui se saute en local ») et sa fiche.
 - Tâche M24 : le signataire de jetons commun est livré, retiré de la tâche ; tâche de suite M85 ouverte pour
-  le mode sans Supabase des scripts à comptes (Hors périmètre). HN-E11S14-2 reste à confirmer avant le lot c.
+  le mode sans Supabase des scripts à comptes (Hors périmètre).
 - Lot b livré, revue approuvée, fusionné sur `main` sans commit (commit commun à venir) : `mcp-core`,
   `context-full`, `feedback-prompts`, `pilot-qualification` et le `describe` AC14 d'`org-transfer` passent sur
   Postgres nu, sans assertion changée ; leurs lignes sortent de `tests/unit/gardes-supabase.test.ts`
   (`org-transfer` y reste pour son `describe` principal, HN-E11S14-9). En base locale, 16 → 12 fichiers
   sautés en entier. Hypothèses HN-E11S14-8 et 9 reportées dans `docs/decisions/hypotheses.md`.
+- Lot c livré dans le worktree `e10`, par-dessus E10-S02 (non commitée), en attente de revue. HN-E11S14-2
+  confirmée par le pilote le 2026-09-30. `scripts/demo-seed.mjs` : mode OIDC (`PLATFORM_OIDC_ISSUER`
+  posée), `--user` exigé et contrôlé en `uuid`, seules `PLATFORM_ADMIN_DATABASE_URL` et `E2E_USER_EMAIL`
+  exigées, `prepareOrg` sans sonde d'Auth ; `scripts/demo/10-identite.mjs` : la personne de `--user`, sans
+  compte. `isolation/donnees.ts` sème A et B par ce mode (personnes de `createLocalFixtures`, jetons par
+  `sessionFor`) ; les lignes `files` et `upload_tickets` d'E10-S02 restent dans `seedRows`, inchangé.
+  `isolation/{api,contenu,mcp,tables}` et `mcp-read-write` passent sous `sqlConfigured` (`portable`) ;
+  `isolation/api` passe `verifyToken`. Leurs six lignes « pending » sortent de `gardes-supabase.test.ts`.
+  AC-a4 : `git diff -U0 -w main -- tests/integration/isolation tests/integration/mcp-read-write.test.ts |
+  rg '^[-+].*(expect\(|\bit\()'` ne rend rien ; `it` par fichier inchangés (api 1, contenu 2, mcp 3,
+  tables 5, mcp-read-write 4). En base locale, cinq fichiers de test de moins sautés en entier ; restent
+  les six de B (§ Classement), à constater au `verify` du pilote (AC-g1). Tests écrits, non lancés (`vagues.md`, « Aucune commande longue avant le commit »).
+  Hypothèses HN-E11S14-10 à 13 à reporter dans `docs/decisions/hypotheses.md`.
+
+### Correction 1 (lot c)
+
+Après la revue du lot c, sans assertion changée :
+- MOYENNE, doublons (`coding-standards.md § DRY`, option a du pilote) : `UUID`, `OIDC_VARIABLE` et `oidcMode`
+  (lecture de `PLATFORM_OIDC_ISSUER`, rend `{ oidc, issuer }`) exportés par `scripts/lib/env.mjs` ;
+  `demo-seed.mjs` et `platform-staff.mjs` les importent (leurs copies retirées, messages inchangés) ;
+  `lib/org-transfer.mjs` et `lib/org-transfer-files.mjs` importent `UUID` de `env.mjs` (l'`export { UUID }`
+  d'`org-transfer.mjs` retiré, son seul consommateur importe la source). `rg -n "UUID|OIDC_VARIABLE|PLATFORM_OIDC_ISSUER" scripts` :
+  une seule définition de chacun. Ligne « Doublons » du rayon d'impact mise à jour.
+- BASSE : en-têtes de `demo-seed.mjs` (le mode Supabase éprouve la clé ; le mode OIDC, sans clé ni compte,
+  sert aux tests) et de `demo/10-identite.mjs` (un uuid mal saisi crée un membre relié à personne) ;
+  `.env.example` : `demo:seed` ne crée le compte E2E qu'en mode Supabase ; mention « HN-E11S14-2 reste à
+  confirmer » retirée des Notes.
+- BASSE, tests : `tests/unit/demo-seed.test.ts` refuse par `parseArgs` un `--user` qui n'est pas un uuid
+  (HN-E11S14-10 ; `INVALID_USER` exporté, comme `INVALID_SLUG`) ; `tests/integration/demo-seed.test.ts` et
+  `tests/e2e/fixtures/campagne.ts` passent `PLATFORM_OIDC_ISSUER: ""` au script : le mode Supabase y est
+  verrouillé quel que soit `.env.local`. Tests écrits, non lancés (`vagues.md`).

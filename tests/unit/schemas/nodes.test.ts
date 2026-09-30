@@ -90,15 +90,24 @@ function strip(field: Json, added: string): void {
 describe("read and write input schemas, extended by additions only (AC1)", () => {
   const served = inputSchemas("acme")
 
-  it("should serve the E03-S01 JSON Schema of read plus the optional refs, last", () => {
+  it("should serve the E03-S01 JSON Schema of read plus the optional refs, then the optional file, last", () => {
     const read = structuredClone(toInputSchema(served.read))
     const properties = at(read, "properties")
-    expect(Object.keys(properties).at(-1)).toBe("refs")
+    // Les ajouts, dans leur ordre : `refs` (E03-S03), puis `file` (E10-S02 AC-d2, fiche D119).
+    expect(Object.keys(properties).slice(-2)).toEqual(["refs", "file"])
     expect(properties.refs).toEqual({
       description: "true: each block comes with its reference, e.g. <!-- ref: 3f9a2c1b -->, for the block operations of write (default false).",
       type: "boolean",
     })
+    expect(properties.file).toEqual({
+      description:
+        "Id of one text file attached to the page (html, md, txt, csv), from a file link /api/plateforme/files/<id>, to read its text alone (default: the whole page).",
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+    })
     delete properties.refs
+    delete properties.file
     expect(read).toEqual(E03_S01.read)
   })
 

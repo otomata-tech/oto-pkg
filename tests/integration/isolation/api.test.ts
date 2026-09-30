@@ -5,16 +5,16 @@
 // décide par l'organisation de l'adresse (`security-patterns.md § Droits dans le service`). Une
 // mutation qui vise une ligne de B par son identifiant rend 404, indistinct d'une ligne absente
 // (Oto `SECURITY.md` l. 91 : même 404) ; B, relue par la connexion d'administration ensuite, est inchangée.
-// Marqué Supabase : la porte vérifie des jetons de Supabase Auth.
+// Suite portable (E11-S14) : la porte vérifie des jetons signés localement (`verifyToken`,
+// `tests/helpers/session-locale.ts`).
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
-import { hex, SKIP_REASON, supabaseConfigured } from "../../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured } from "../../helpers/sql"
+import { hex } from "../../helpers/plateforme"
+import { portable, sqlConfigured } from "../../helpers/sql"
 import { MARKERS, preparer, type Isolation, type Place, type Row, type Who } from "./donnees"
 
 const SETUP_TIMEOUT = 300_000
 const NETWORK_TIMEOUT = 120_000
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "isolation through the platform API, by the address"
 const USER_AGENT = "isolation-api-test"
 /** Le refus d'une route inconnue (`api/handler.ts`) : un 404 lui aussi, que rien ne distinguerait sans son message. */
@@ -24,8 +24,8 @@ type Task = () => Promise<void>
 /** `routed` : la porte a trouvé la route, et le refus vient donc du service. */
 type Answer = { status: number; code: string | null; routed: boolean; data: unknown }
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
     let data: Isolation & { nettoyer: () => Promise<void> }
@@ -42,7 +42,7 @@ describe.skipIf(!configured)(
           body: request.body === undefined ? undefined : JSON.stringify(request.body),
           headers: { origin: `https://${place.host}`, "x-forwarded-proto": "https", "user-agent": USER_AGENT, "content-type": "application/json" },
         }),
-        { accessToken: tokens.get(who), host: place.host, defer: (task) => tasks.push(task) },
+        { accessToken: tokens.get(who), host: place.host, verifyToken: data.fx.verifyToken, defer: (task) => tasks.push(task) },
       )
       for (const task of tasks) await task()
       const body: { data?: unknown; error?: { code?: string; message?: string } } = await response.json()

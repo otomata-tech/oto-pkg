@@ -98,6 +98,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
     blockA: "",
     ruleA: "",
     shareA: "",
+    fileA: "",
     accountA: "",
     grantA: "",
     invitationToBea: "",
@@ -220,6 +221,14 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       insert into platform.node_shares (org_id, node_id, created_by) values (${a.org.id}, ${ids.pageA}, ${a.people.claire.id}) returning id`
     ids.shareA = shareA.id
     await fx.admin`insert into platform.node_shares (org_id, node_id, created_by) values (${b.id}, ${ids.pageB}, ${people.bea.id})`
+    // Un fichier joint dans A et dans B (E10-S02, ADR-016) : sa ligne seule, aucun objet dans un bucket.
+    const [fileA] = await fx.admin<{ id: string }[]>`
+      insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+      values (${a.org.id}, ${ids.pageA}, 'offre.pdf', 'application/pdf', 3, 'ready', ${a.people.claire.id}) returning id`
+    ids.fileA = fileA.id
+    await fx.admin`
+      insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+      values (${b.id}, ${ids.pageB}, 'offre.pdf', 'application/pdf', 3, 'ready', ${people.bea.id})`
     ids.accountA = await fx.createAccount(a.org.id, { ownerKind: "team", ownerTeamId: a.teams.ventes, label: "Mail Ventes" })
     await fx.createAccount(a.org.id, { ownerKind: "user", ownerUserId: a.people.claire.id, label: "Mail Claire" })
     ids.accountB = await fx.createAccount(b.id, { ownerKind: "org", label: "Mail B" })
@@ -365,6 +374,13 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         ],
         ["node_shares insert", "42501", () => insert("bea", "node_shares", { org_id: org, node_id: ids.pageA, created_by: people.bea.id })],
         ["node_shares update", "0 rows", () => bea((sql) => sql`update platform.node_shares set revoked_at = ${now} where id = ${ids.shareA} returning id`)],
+        [
+          "files insert",
+          "42501",
+          () => insert("bea", "files", { org_id: org, node_id: ids.pageA, name: "intrus.pdf", mime: "application/pdf", size: 3, status: "pending", created_by: people.bea.id }),
+        ],
+        ["files update", "0 rows", () => bea((sql) => sql`update platform.files set status = 'pending' where id = ${ids.fileA} returning id`)],
+        ["files delete", "0 rows", () => bea((sql) => sql`delete from platform.files where id = ${ids.fileA} returning id`)],
         // Une ligne de B qu'une mise à jour déplacerait dans A : refusée par le `with check`.
         ["members move", "42501", () => bea((sql) => sql`update platform.members set org_id = ${org} where org_id = ${b.id} and user_id = ${people.bea.id} returning user_id`)],
         [

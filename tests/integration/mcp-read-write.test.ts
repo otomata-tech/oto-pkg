@@ -1,15 +1,16 @@
 // @vitest-environment node
-// `read` et `write` sur le vrai projet (E03-S03), les deux seuls tests de la story dont la base est le
+// `read` et `write` sur une vraie base (E03-S03), les deux seuls tests de la story dont la base est le
 // sujet : AC38, bout en bout par `InMemoryTransport` sous le jeton de chaque personne (`open_draft`,
 // blocs sous leurs invariants et leurs droits de colonne, `publish_node`, `links`) ; AC25, part de la
 // base : deux personnes écrivent deux blocs différents du même brouillon en même temps (ADR-011,
-// Conséquences). Organisation de référence jetable (H120), sessions par `fx.sessionFor`. Marqué Supabase :
-// la porte reçoit le jeton d'une session de Supabase Auth ; depuis E01-S10 f2, les relectures passent par
-// la connexion d'administration, plus par PostgREST.
+// Conséquences). Organisation de référence jetable (H120), sessions par `fx.sessionFor`. Suite portable
+// (E11-S14) : personnes sans compte, jetons signés localement (`tests/helpers/session-locale.ts`) ;
+// depuis E01-S10 f2, les relectures passent par la connexion d'administration, plus par PostgREST.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { connectMcp } from "../helpers/mcp"
-import { createFixtures, hex, SKIP_REASON, supabaseConfigured, type Fixtures, type ReferenceOrg } from "../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured, testAdminSql, type TestSql } from "../helpers/sql"
+import { hex } from "../helpers/plateforme"
+import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
+import { portable, sqlConfigured, testAdminSql, type SqlReferenceOrg, type TestSql } from "../helpers/sql"
 import { privateFolderPending, privateFolderSuite } from "../helpers/pending-migrations"
 
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
@@ -17,22 +18,21 @@ import { privateFolderPending, privateFolderSuite } from "../helpers/pending-mig
 const privatePending = await privateFolderPending()
 
 const NETWORK_TIMEOUT = 120_000
-const configured = supabaseConfigured && sqlConfigured
-const SUITE = "read and write through MCP on the cloud project"
+const SUITE = "read and write through MCP on a real database"
 
 type Person = "lea" | "claire"
 
-describe.skipIf(!configured || privatePending)(
-  privateFolderSuite(configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`, privatePending),
+describe.skipIf(!sqlConfigured || privatePending)(
+  privateFolderSuite(portable(SUITE), privatePending),
   { timeout: NETWORK_TIMEOUT },
   () => {
-    let fx: Fixtures
+    let fx: LocalFixtures
     let admin: TestSql
-    let ref: ReferenceOrg
+    let ref: SqlReferenceOrg
     const tokens = {} as Record<Person, string>
 
     beforeAll(async () => {
-      fx = createFixtures()
+      fx = createLocalFixtures()
       admin = testAdminSql()
       ref = await fx.buildReferenceOrg()
       for (const person of ["lea", "claire"] as const) tokens[person] = (await fx.sessionFor(ref.people[person])).accessToken

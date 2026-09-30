@@ -27,6 +27,8 @@ export type BodyRequest = {
   draft: DraftRow | null
   /** Rendu des blocs `reference` : clôture et ligne résolue en commentaire (E03-S07 AC11). */
   reference: ReferenceRender
+  /** La route des fichiers joints, sur l'origine de la requête (E10-S02, AC-d1) ; sans elle, relative. */
+  fileRoute?: string
 }
 
 /** « {"path": "x", "section": "y"} » : les arguments d'un appel cité, dans l'ordre de l'entrée de `read`. */
@@ -70,7 +72,7 @@ function diffText(request: BodyRequest, refs: Map<DocBlock, string> | null): str
     ? { title: request.draft?.title ?? node.title, summary: request.draft?.summary ?? node.summary, kind: request.draft?.kind ?? node.kind }
     : { title: node.title, summary: node.summary, kind: node.kind }
   const to = { label: request.draftMode ? "the draft" : String(node.revision), version: { blocks: request.blocks, ...header } }
-  return diffLines({ revision: since, version: request.since }, to, refs, request.reference).join("\n")
+  return diffLines({ revision: since, version: request.since }, to, refs, { reference: request.reference, fileRoute: request.fileRoute }).join("\n")
 }
 
 /** Les sections d'un titre, toutes (N10), ou le refus qui liste les titres (AC9). */
@@ -82,7 +84,7 @@ function sectionText(request: BodyRequest, refs: Map<DocBlock, string> | null): 
     const listed = titles.length > 0 ? quotedList(titles) : "none"
     throw new PlatformError("not_found", `Unknown section « ${title} » in ${request.context.node.path}. Sections: ${listed}.`)
   }
-  return sections.map((section) => renderServed(section.blocks, refs, request.reference)).join("\n\n")
+  return sections.map((section) => renderServed(section.blocks, refs, request.reference, request.fileRoute)).join("\n\n")
 }
 
 /**
@@ -101,8 +103,8 @@ export function serveBody(request: BodyRequest): Served {
   if (input.outline) return served(outlineText(request, refs, false), false)
   const sections = splitSections(blocks)
   if (blocksSize(blocks) > PAGE_FULL_MAX && sections.length > 1) {
-    const start = renderServed(sections[0].blocks, refs, request.reference)
+    const start = renderServed(sections[0].blocks, refs, request.reference, request.fileRoute)
     return served([start, outlineText(request, refs, true)].filter((part) => part !== "").join("\n\n"), false)
   }
-  return served(renderServed(blocks, refs, request.reference))
+  return served(renderServed(blocks, refs, request.reference, request.fileRoute))
 }

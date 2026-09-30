@@ -70,7 +70,8 @@ describe("package manifest (AC1)", () => {
     // E03-S01 AC1 : le canal MCP à versions exactes ; le SDK suit le peer exact de mcp-handler 1.1.0,
     // et `zod/v4` exige zod 3.25 chez l'hôte. E01-S09 : le pilote Postgres de `db prepare` (ADR-012 § 1).
     // E01-S11 a2 : nodemailer, l'email d'invitation hors Supabase (`server/mail.ts`).
-    expect(pkg.dependencies).toEqual({ "@modelcontextprotocol/sdk": "1.26.0", jose: "6.2.12", "mcp-handler": "1.1.0", nodemailer: "10.0.10", postgres: "3.4.9" })
+    // E10-S02 lot a : aws4fetch, la signature SigV4 du port de stockage S3 (`server/files/s3.ts`, ADR-016).
+    expect(pkg.dependencies).toEqual({ "@modelcontextprotocol/sdk": "1.26.0", aws4fetch: "1.0.20", jose: "6.2.12", "mcp-handler": "1.1.0", nodemailer: "10.0.10", postgres: "3.4.9" })
     expect(pkg.peerDependencies.zod).toBe("^3.25")
   })
 })

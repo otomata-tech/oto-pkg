@@ -65,7 +65,8 @@ function runSeed(args: string[], account: Account): string {
     encoding: "utf8",
     stdio: "pipe",
     timeout: 90_000,
-    env: { ...process.env, E2E_USER_EMAIL: account.email, E2E_USER_PASSWORD: account.password },
+    // Le mode Supabase, verrouillé : un `PLATFORM_OIDC_ISSUER` de `.env.local` passerait le script en mode OIDC.
+    env: { ...process.env, E2E_USER_EMAIL: account.email, E2E_USER_PASSWORD: account.password, PLATFORM_OIDC_ISSUER: "" },
   })
 }
 

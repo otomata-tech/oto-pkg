@@ -27,7 +27,11 @@
 // (AC-a3) ; un tableau simple s'écrit dans sa grille, son menu ajoute, retire et aligne à la cellule courante, que la
 // rangée tient (AC-b1, AC-b2) ; un repli s'écrit en deux champs (AC-b4) ; un séparateur, sans champ, n'a pas de style.
 // La poignée précède le champ : d'un bloc dont le champ garde `Tab`, `Tab` sur la poignée sort du bloc (AC-a6).
-import { useId, useState, type KeyboardEvent, type ReactNode } from "react"
+//
+// E10-S02 (lot b) : le « + » propose « Image » et « Fichier » quand le stockage est activé (AC-b1, AC-b2, AC-b7) ; un
+// fichier lâché sur la rangée est un dépôt, jamais un déplacement (AC-b4) ; le bloc local d'un envoi n'a ni « + » ni
+// poignée ; une image se décrit dans son bloc et choisit sa largeur au menu (AC-b3) ; un CSV joint s'y convertit (AC-b6).
+import { useId, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react"
 import { ArrowDown } from "@phosphor-icons/react/dist/csr/ArrowDown"
 import { ArrowUp } from "@phosphor-icons/react/dist/csr/ArrowUp"
 import { Copy } from "@phosphor-icons/react/dist/csr/Copy"
@@ -35,18 +39,24 @@ import { DotsSixVertical } from "@phosphor-icons/react/dist/csr/DotsSixVertical"
 import { Plus } from "@phosphor-icons/react/dist/csr/Plus"
 import { Table } from "@phosphor-icons/react/dist/csr/Table"
 import { Trash } from "@phosphor-icons/react/dist/csr/Trash"
-import { simpleTableOf } from "../../../schemas/blocks"
+import { IMAGE_WIDTHS, simpleTableOf } from "../../../schemas/blocks"
+import { fileTypeOf } from "../../../schemas/files"
+import { aDesFichiers } from "../../coque/import-de-fichier"
 import { BlockRow } from "../../ds/react/block-row"
 import { AnimatedIcon } from "../../ds/react/icon"
 import { DropdownMenu, type MenuItem } from "../../ds/react/overlays"
 import { Button, IconButton } from "../../ds/react/primitives"
 import { texteLu } from "../en-ligne"
+import { largeurDe } from "../fichier-du-bloc"
 import { CHOIX_DE_BLOC, EDITEUR, FORMES, MENU_DU_BLOC } from "../libelles"
+import { FICHIERS } from "../libelles-des-fichiers"
 import { baliseDuTitre, RenduDUnBloc } from "../rendu-des-blocs"
 import type { Position } from "./blocs-de-page"
 import { ChampDeBloc, type LiensDesBlocs } from "./champ-de-bloc"
 import { itemsDuChoix } from "./choix-de-bloc"
 import { ConflitDeBloc } from "./conflit-de-bloc"
+import { enDepot, type Depot, type Genre } from "./envoi-de-fichier"
+import { DepotEnCours, FichierEdite } from "./fichier-edite"
 import { useGestes, type Gestes } from "./gestes"
 import { casesCochees, debutDe, formeDe, FORMES_ECRITES, premiersMots, texteDe, type BlocEdite, type Forme, type Rangee } from "./modele"
 import { RepliEdite } from "./repli-edite"
@@ -70,6 +80,10 @@ type RangeeDeBlocProps = {
   rendu?: ReactNode
   /** L'invite du champ vide : celle du Texte d'une page vide (E11-S05, AC-g1) ; absente ailleurs. */
   invite?: string
+  /** Le stockage est activé : le « + » propose « Image » et « Fichier » (E10-S02, AC-b7). */
+  fichiers: boolean
+  /** L'envoi en cours du bloc local d'un fichier (E10-S02, AC-b1, AC-b4). */
+  depot?: Depot
 }
 
 type Menu = {
@@ -89,7 +103,13 @@ type Menu = {
  * tableau simple a son propre menu, un séparateur n'a pas de style (E10-S06, AC-a3, AC-b2).
  */
 function stylesDuMenu({ cle, bloc, forme, cellule }: Menu, gestes: Gestes): MenuItem[] {
-  if (bloc.type === "divider") return []
+  if (bloc.type === "divider" || bloc.type === "file") return []
+  // La largeur d'une image (E10-S02, AC-b3), en choix `radio`, comme le style.
+  if (bloc.type === "image") {
+    const largeur = largeurDe(bloc.data.width)
+    const choisir = (une: (typeof IMAGE_WIDTHS)[number]) => gestes.modifierLeBloc(cle, { ...bloc, data: { ...bloc.data, width: une } })
+    return [{ group: FICHIERS.largeur }, ...IMAGE_WIDTHS.map((une) => ({ label: FICHIERS.largeurs[une], radio: true, checked: une === largeur, onSelect: () => choisir(une) }))]
+  }
   if (forme === "tableau") return itemsDuTableau(cle, bloc, cellule, gestes)
   if (!forme) return [{ group: EDITEUR.lectureSeule }]
   return [{ group: MENU_DU_BLOC.style }, ...FORMES_ECRITES.map((une) => ({ label: FORMES[une].libelle, radio: true, checked: une === forme, onSelect: () => gestes.changerDeForme(cle, une) }))]
@@ -105,6 +125,10 @@ function itemsDuMenu(menu: Menu, gestes: Gestes): MenuItem[] {
     ...stylesDuMenu(menu, gestes),
     { separator: true },
     ...(menu.tableauSimple ? [{ label: MENU_DU_BLOC.convertir, icon: icone(Table), onSelect: () => gestes.convertirEnTableau(cle) }] : []),
+    // Un CSV joint devient un tableau sous la page (E10-S02, AC-b6).
+    ...(menu.bloc.type === "file" && fileTypeOf(typeof menu.bloc.data.name === "string" ? menu.bloc.data.name : "") === "csv"
+      ? [{ label: FICHIERS.convertir, icon: icone(Table), onSelect: () => gestes.convertirLeCsv(cle) }]
+      : []),
     { label: MENU_DU_BLOC.dupliquer, icon: icone(Copy), onSelect: () => gestes.dupliquer(cle) },
     { label: MENU_DU_BLOC.supprimer, icon: icone(Trash), destructive: true, onSelect: () => gestes.supprimer(cle) },
   ]
@@ -233,11 +257,33 @@ function BlocEcrit(props: BlocEcritProps) {
   )
 }
 
-export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, verrouillee, erreur, conflit, liens, rendu, invite }: RangeeDeBlocProps) {
+/** Un fichier lâché sur la rangée (E10-S02, AC-b4) : un dépôt, que le glisser d'un bloc (`useGlisser`, au pointeur) ne voit pas. */
+function useDepotSurLaRangee(cle: string, verrouillee: boolean) {
   const gestes = useGestes()
+  return {
+    onDragOver: (evenement: DragEvent<HTMLDivElement>) => {
+      if (!verrouillee && aDesFichiers(evenement)) evenement.preventDefault()
+    },
+    onDrop: (evenement: DragEvent<HTMLDivElement>) => {
+      const fichier = evenement.dataTransfer.files[0]
+      if (!fichier || verrouillee) return
+      evenement.preventDefault()
+      gestes.deposerUnFichierDansLaPage(cle, fichier)
+    },
+  }
+}
+
+export function RangeeDeBloc(props: RangeeDeBlocProps) {
+  const { rangee, premiere, derniere, tenue, menuOuvert, verrouillee, erreur, conflit, liens, rendu, invite } = props
+  const gestes = useGestes()
+  const depot = useDepotSurLaRangee(rangee.cle, verrouillee)
   // La cellule courante d'un tableau simple, où son menu ajoute et retire (E10-S06, AC-b2).
   const [cellule, setCellule] = useState<Position>({ ligne: 0, colonne: 0 })
   const { cle, bloc } = rangee
+  // Le bloc local d'un envoi : ni « + » ni poignée, seulement « Annuler » (E10-S02, AC-b4).
+  if (enDepot(bloc)) {
+    return <BlockRow data-cle={cle}>{props.depot && <DepotEnCours cle={cle} depot={props.depot} />}</BlockRow>
+  }
   const forme = formeDe(bloc)
   const mots = premiersMots(bloc)
   // Un tableau sans colonne ne se convertit pas (le schéma d'un tableau de données en veut une) : pas d'entrée.
@@ -245,6 +291,8 @@ export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, ve
   const menu: Menu = { cle, bloc, forme, premiere, derniere, tableauSimple, cellule }
   const contenu = conflit ? (
     <ConflitDeBloc conflit={conflit} />
+  ) : bloc.type === "image" || bloc.type === "file" ? (
+    <FichierEdite rangee={rangee} erreur={erreur} lectureSeule={verrouillee} prefixe={liens.prefixe} />
   ) : forme ? (
     <BlocEcrit rangee={rangee} forme={forme} erreur={erreur} verrouille={verrouillee} liens={liens} menuOuvert={menuOuvert} suivreLaCellule={setCellule} invite={invite} />
   ) : (
@@ -267,21 +315,24 @@ export function RangeeDeBloc({ rangee, premiere, derniere, tenue, menuOuvert, ve
       <AnimatedIcon as={DotsSixVertical} size="xs" />
     </IconButton>
   )
-  // Le « + » ouvre le choix du bloc à insérer (E10-S06, AC-a1) ; Échap le ferme et lui rend le focus.
+  // Le « + » ouvre le choix du bloc à insérer (E10-S06, AC-a1) ; Échap le ferme et lui rend le focus. Approché, il lit
+  // l'état du stockage, pour proposer « Image » et « Fichier » à l'ouverture (E10-S02, HN-E10S02-6).
   const plus = (
-    <IconButton label={CHOIX_DE_BLOC.ajouter(mots)} variant="ghost" size="sm" data-geste="inserer">
+    <IconButton label={CHOIX_DE_BLOC.ajouter(mots)} variant="ghost" size="sm" data-geste="inserer" onPointerEnter={gestes.connaitreLesFichiers} onFocus={gestes.connaitreLesFichiers}>
       <AnimatedIcon as={Plus} size="xs" />
     </IconButton>
   )
+  const joindre = props.fichiers ? (quoi: Genre) => gestes.choisirUnFichier(cle, quoi) : undefined
   return (
     <BlockRow
       data-cle={cle}
+      {...depot}
       // La rangée qu'on glisse garde sa gouttière révélée : une présence, puis la teinte du design system (`blocks.css`).
       state={tenue ? "moving" : undefined}
       // Un bouton cliqué ne prend pas le focus sous Safari et Firefox macOS : l'appui dit que la rangée reste (M30).
       onPointerDown={() => gestes.appuyerDansLaRangee(cle)}
       onBlur={(evenement) => gestes.quitterLaRangee(cle, evenement)}
-      insert={<DropdownMenu side="bottom" align="start" trigger={plus} items={itemsDuChoix((choix) => gestes.inserer(cle, choix))} />}
+      insert={<DropdownMenu side="bottom" align="start" trigger={plus} items={itemsDuChoix((choix) => gestes.inserer(cle, choix), joindre)} />}
       // Le bloc en conflit se règle dans son panneau : sa poignée n'ouvre pas de menu.
       handle={
         conflit ? (

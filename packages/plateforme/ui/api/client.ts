@@ -1,6 +1,7 @@
 // Client HTTP de l'API du paquet, même origine, avec la session de l'utilisateur (ADR-008 § 4,
 // H03). Sans lui, chaque écran à mutation recoderait l'appel et la lecture de l'enveloppe
 // `{ data }` / `{ error }` (E05-S03 le réutilise).
+import type { FileAvailability } from "../../schemas/files"
 
 type MethodeHttp = "GET" | "POST" | "PATCH" | "DELETE"
 
@@ -58,7 +59,11 @@ export async function appelerPlateforme<T>({
   } catch {
     return { erreur: { code: "reseau", statut: 0 } }
   }
+  return lireLaReponse<T>(reponse)
+}
 
+/** Une réponse de l'API lue (H04) : `{ data }`, ou l'erreur lisible par l'écran ; partagée par les appels JSON et l'envoi d'un fichier. */
+async function lireLaReponse<T>(reponse: Response): Promise<ReponsePlateforme<T>> {
   let enveloppe: Enveloppe
   try {
     enveloppe = lireEnveloppe(await reponse.json())
@@ -77,4 +82,44 @@ export async function appelerPlateforme<T>({
   return {
     erreur: { code, raison: typeof raison === "string" ? raison : undefined, statut: reponse.status, ...(details ? { details } : {}) },
   }
+}
+
+/**
+ * Les octets d'un fichier joint, lus à son adresse de lecture (`GET files/<id>`), qui redirige vers le stockage
+ * (E10-S02, AC-b6 : « Convertir en tableau » d'un CSV joint). `null` : refusé, absent, ou le réseau a manqué.
+ */
+export async function lireUnFichier(adresse: string): Promise<ArrayBuffer | null> {
+  try {
+    const reponse = await fetch(adresse, { credentials: "same-origin" })
+    return reponse.ok ? await reponse.arrayBuffer() : null
+  } catch {
+    return null
+  }
+}
+
+/** Les refus qui disent un fichier indisponible : illisible ou absent (`not_found`), stockage retiré (`not_enabled`). */
+const INDISPONIBLE = ["not_found", "not_enabled"]
+
+/**
+ * Un fichier joint est-il servi (E10-S02, AC-b8, HN-E10S02-43) ? Sa route le dit en JSON (`GET files/<id>?check`),
+ * sans redirection : aucun octet ne sort du stockage, aucun CORS n'est en jeu. `false` : l'objet manque, ou le
+ * fichier n'est pas lisible ; une panne (réseau, stockage, session) n'en dit rien (`true`), la carte reste telle quelle.
+ */
+export async function fichierDisponible(id: string): Promise<boolean> {
+  const lu = await appelerPlateforme<FileAvailability>({ methode: "GET", ressource: `files/${encodeURIComponent(id)}?check` })
+  return lu.erreur ? !INDISPONIBLE.includes(lu.erreur.code) : lu.data.available
+}
+
+/**
+ * Un fichier déposé par le formulaire de dépôt (E10-S02, AC-f15 ; ADR-018 § 8) : ses octets tels quels, jamais en JSON,
+ * à la route à session du ticket (`POST uploads/<jeton>/form`), même origine. `T` : ce que l'envoi a écrit.
+ */
+export async function deposerParLeLien<T>(jeton: string, fichier: Blob): Promise<ReponsePlateforme<T>> {
+  let reponse: Response
+  try {
+    reponse = await fetch(`/api/plateforme/uploads/${encodeURIComponent(jeton)}/form`, { method: "POST", credentials: "same-origin", body: fichier })
+  } catch {
+    return { erreur: { code: "reseau", statut: 0 } }
+  }
+  return lireLaReponse<T>(reponse)
 }

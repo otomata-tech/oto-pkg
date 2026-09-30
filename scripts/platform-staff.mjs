@@ -27,15 +27,11 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { accountCopy } from './lib/account-copy.mjs'
-import { ADMIN_VARIABLES, adminSql, envFileTexts, jsonRows, maskValues, messageOf, missingVariables, resolveVariables, serviceKeyClient } from './lib/env.mjs'
+import { ADMIN_VARIABLES, adminSql, envFileTexts, jsonRows, maskValues, messageOf, missingVariables, OIDC_VARIABLE, oidcMode, resolveVariables, serviceKeyClient, UUID } from './lib/env.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PAGE = 1000
 const USAGE = 'Usage : pnpm platform:staff add <email> [--user <identifiant>] | remove <email> | list\n  --user (mode OIDC) : reprend l\'identifiant interne d\'une personne retirée puis rajoutée'
-/** Un identifiant interne (`uuid`) : contrôlé avant la requête, qui lèverait sinon `22P02`. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-/** Posée, l'hôte a un émetteur OIDC (E01-S11) : l'équipe plateforme entre par son email vérifié. */
-const OIDC_VARIABLE = 'PLATFORM_OIDC_ISSUER'
 /** La seule variable du mode OIDC : `platform_staff` par la connexion d'administration. */
 const ADMIN_DATABASE_VARIABLE = 'PLATFORM_ADMIN_DATABASE_URL'
 
@@ -220,8 +216,7 @@ async function main(argv) {
   const { command, email, userId } = args
   const texts = envFileTexts(ROOT)
   // L'émetteur de l'hôte : absent, Supabase Auth et ses comptes ; posé, aucun compte à chercher.
-  const issuer = resolveVariables(process.env, texts, [], [OIDC_VARIABLE]).values[OIDC_VARIABLE]
-  const oidc = Boolean(issuer)
+  const { oidc, issuer } = oidcMode(process.env, texts)
   if (userId && !oidc) {
     console.error(`--user ne sert qu'en mode OIDC (${OIDC_VARIABLE} posée) : sur Supabase Auth, l'identifiant est celui du compte de l'email.`)
     return 1

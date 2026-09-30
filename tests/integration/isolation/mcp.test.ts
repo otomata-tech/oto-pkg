@@ -3,18 +3,17 @@
 // `c`, administratrice d'A et de B, que la RLS laisse lire et écrire les deux ; seule l'adresse appelée
 // sépare A de B (HN-E09S05-3). Sessions par `connectMcp` (InMemoryTransport, câblées comme la route :
 // `resolveMcpRequest`), sur l'hôte d'A et sur celui de B. Les appels d'AC6 se font une fois, en
-// `beforeAll` : AC7 lit le journal et les `ctx` qu'ils ont écrits. Marqué Supabase : la porte reçoit le
-// jeton d'une session de Supabase Auth ; les relectures passent par la connexion d'administration.
+// `beforeAll` : AC7 lit le journal et les `ctx` qu'ils ont écrits. Suite portable (E11-S14) : la porte
+// reçoit un jeton signé localement ; les relectures passent par la connexion d'administration.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { isJsonObject } from "../../../packages/plateforme/server/json"
 import { connectMcp, type McpSession } from "../../helpers/mcp"
-import { hex, SKIP_REASON, supabaseConfigured } from "../../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured } from "../../helpers/sql"
+import { hex } from "../../helpers/plateforme"
+import { portable, sqlConfigured } from "../../helpers/sql"
 import { MARKERS, preparer, type Isolation, type Place, type Row, type Who } from "./donnees"
 
 const SETUP_TIMEOUT = 300_000
 const NETWORK_TIMEOUT = 120_000
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "isolation through MCP, by the address"
 const TOOLS = ["context", "find", "read", "call", "write", "feedback"]
 const FIND_QUERIES = ["tournées", "ZZ Marqueur", MARKERS.page.word, MARKERS.row.key]
@@ -55,8 +54,8 @@ function shown(called: Called, echoed: string): string {
   return plain(`${called.text}\n${JSON.stringify(called.result.structuredContent ?? {})}`).split(plain(echoed)).join("")
 }
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
     let data: Isolation & { nettoyer: () => Promise<void> }

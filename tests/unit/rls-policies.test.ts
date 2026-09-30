@@ -99,6 +99,10 @@ const ADDED = ["identities_select_own"]
 ADDED.push("lexicon_select_none")
 // Les liens publics (E05-S10, ADR-013) : isolation par organisation, attribution à l'appelant, nœud de l'organisation.
 ADDED.push("node_shares_select_member", "node_shares_insert_member", "node_shares_update_member")
+// Les fichiers joints (E10-S02, ADR-016) : isolation par organisation, attribution à l'appelant, nœud de l'organisation.
+ADDED.push("files_select_member", "files_insert_member", "files_update_member", "files_delete_member")
+// Les tickets de dépôt par lien (E10-S02 lot f, ADR-018) : isolation par organisation, attribution à l'appelant, ménage des expirés.
+ADDED.push("upload_tickets_select_member", "upload_tickets_insert_own", "upload_tickets_delete_expired")
 
 /** Portée plateforme : les seules policies où `is_staff()` reste (HN-E01S08-3). */
 const PLATFORM_SCOPE = [

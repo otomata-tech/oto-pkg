@@ -10,6 +10,7 @@
  * par le paquet ni par l'hôte.
  */
 import { randomBytes, randomInt } from 'node:crypto'
+import { UUID } from './env.mjs'
 
 export const FORMAT = 'oto-platform-org-export'
 export const VERSION = 1
@@ -34,6 +35,8 @@ export const VERSION = 1
  * @property {Record<string, string>} refs  clés remplacées : colonne → table désignée
  * @property {string[]} nullWhenSkipped  références remises à null quand leur cible est sautée
  * @property {Record<string, PersonPolicy>} people  colonnes de personne et leur politique
+ * @property {{ column: string, value: string }} [only]  seules les lignes où la colonne vaut cette valeur
+ *   s'exportent (fichiers joints : `ready`)
  */
 
 /** @returns {TableSpec} */
@@ -84,6 +87,15 @@ export const TABLES = [
     excluded: ['lpath', 'search_tsv'],
     refs: { org_id: 'orgs', parent_id: 'nodes', owner_team_id: 'teams' },
     people: { owner_user_id: 'membre', created_by: 'auteur', updated_by: 'auteur' },
+  }),
+  // Fichiers joints (E10-S02, ADR-016 § 8, AC-e4) : les lignes `ready` seules (un envoi en cours ne se transfère
+  // pas) ; leurs octets vont dans `<fichier>.files/` (`org-transfer-files.mjs`). L'import leur donne un nouvel
+  // identifiant, que `deepReplace` reporte dans le `file_id` des blocs et des instantanés.
+  table('files', {
+    columns: cols('id org_id node_id name mime size status created_by created_at'),
+    refs: { org_id: 'orgs', node_id: 'nodes' },
+    people: { created_by: 'null' },
+    only: { column: 'status', value: 'ready' },
   }),
   table('node_drafts', {
     parent: { table: 'nodes', column: 'node_id' },
@@ -207,6 +219,9 @@ export const NEVER_EXPORTED = ['platform_staff', 'identities']
 // Le lexique (E01-S13) a une organisation, mais se dérive de son contenu publié : jamais exporté,
 // l'import le reconstruit par les déclencheurs de `nodes` et de `blocks`.
 NEVER_EXPORTED.push('lexicon')
+// Les tickets de dépôt par lien (E10-S02 lot f, ADR-018) : 15 minutes, un envoi, liés à une conversation ; un ticket
+// ne se transfère pas (AC-f10).
+NEVER_EXPORTED.push('upload_tickets')
 
 /** @param {string} name */
 function tableSpec(name) {
@@ -227,10 +242,12 @@ function tableSpec(name) {
  * @returns {import('postgres').PendingQuery<any>}  un fragment de `where`
  */
 export function orgRowsSql(sql, spec, orgId) {
-  if (!spec.parent) return sql`${sql(spec.name === 'orgs' ? 'id' : 'org_id')} = ${orgId}`
+  // E10-S02 (AC-e4) : le filtre propre à une table (`only`), lu par l'export et par le compte d'AC1.
+  const kept = spec.only ? sql` and ${sql(spec.only.column)} = ${spec.only.value}` : sql``
+  if (!spec.parent) return sql`${sql(spec.name === 'orgs' ? 'id' : 'org_id')} = ${orgId}${kept}`
   const parent = tableSpec(spec.parent.table)
   if (!parent) throw new Error(`Table parente absente de la carte : ${spec.parent.table}.`)
-  return sql`${sql(spec.parent.column)} in (select "id" from ${sql(`platform.${parent.name}`)} where ${orgRowsSql(sql, parent, orgId)})`
+  return sql`${sql(spec.parent.column)} in (select "id" from ${sql(`platform.${parent.name}`)} where ${orgRowsSql(sql, parent, orgId)})${kept}`
 }
 
 /** Base 32 de Crockford, recopiée de `server/ctx.ts` (E03-S01) : un script n'importe pas le paquet. */
@@ -276,8 +293,6 @@ export function nodeDepth(node) {
 export function orderNodes(rows) {
   return [...rows].sort((a, b) => nodeDepth(a) - nodeDepth(b) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
 }
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Les `by` d'une provenance (document : `{by}` ; ligne : `{<colonne>: {by}}`), à toute profondeur. */
 function provenanceAuthors(value, ids) {

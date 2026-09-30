@@ -2,15 +2,17 @@
 // l'hôte délègue ici avec le jeton de sa session ; chaque ressource délègue à ses services.
 // Réponses `{ data }` ou `{ error: { code, message, details? } }`, au statut de `HTTP_STATUS`
 // (H04). Une ligne de journal par mutation, écrite après la réponse (H07).
-import { makeVerifyToken, verifiedCaller, type VerifyToken } from "../mcp/auth"
+import type { VerifyToken } from "../mcp/auth"
 import type { Json } from "../server/database"
-import { createPlatformDb, type PlatformDb } from "../server/db"
-import { HTTP_STATUS, isPlatformError, PlatformError } from "../server/errors"
-import { requestOrigin, resolveIdentity, type Identity } from "../server/identity"
+import type { PlatformDb } from "../server/db"
+import { PlatformError } from "../server/errors"
+import type { Identity } from "../server/identity"
 import { journalError, loggedArgs, writeJournal } from "../server/journal"
 import { brandRoutes } from "./brand"
 import { cellRoutes } from "./cell"
 import { feedbackRoutes } from "./feedback"
+import { filesRoutes } from "./files"
+import { fileHtmlResponse, isFileHtmlRoute } from "./files-html"
 import { invitationsRoutes } from "./invitations"
 import { membersRoutes } from "./members"
 import { nodesRoutes } from "./nodes"
@@ -19,8 +21,10 @@ import { profileRoutes } from "./profile"
 import { isPublicRoute, publicResponse } from "./public"
 import { rulesRoutes } from "./rules"
 import { searchRoutes } from "./search"
+import { addressOrigin, asPlatformError, authenticationRequired, errorResponse, requireSameOrigin, sessionIdentity, verifiedSession } from "./session"
 import { sharesRoutes } from "./shares"
 import { trashRoutes } from "./trash"
+import { isUploadFormRoute, isUploadRoute, uploadFormResponse, uploadResponse } from "./uploads"
 import { tablesRoutes } from "./tables"
 import { teamsRoutes } from "./teams"
 import { accountCreationRoute, accountDisablingRoute } from "./admin/accounts"
@@ -47,6 +51,11 @@ type RouteResult = {
   data: unknown
   /** Ce que le service rend pour le journal : sa cible et son équipe. */
   journal?: { target?: string | null; teamId?: string | null }
+  /**
+   * Une redirection (`status` 302) vers cette adresse, sans corps et jamais gardée en cache (`private, no-store`) :
+   * la lecture d'un fichier, vers son URL présignée (E10-S02, AC-a5). `data` n'est alors pas servi.
+   */
+  redirect?: string
 }
 
 type Route = {
@@ -93,6 +102,8 @@ const RESOURCES: Record<string, ResourceRoutes> = {
   // E05-S10 : la corbeille (partie e) et les liens publics (partie d, ADR-013).
   trash: trashRoutes,
   shares: sharesRoutes,
+  // E10-S02 : les fichiers joints (ADR-016).
+  files: filesRoutes,
 }
 
 type PlatformRequestOptions = {
@@ -114,7 +125,6 @@ type PlatformRequestOptions = {
 
 const PREFIX = "/api/plateforme/"
 const MUTATIONS: ReadonlySet<string> = new Set(["POST", "PATCH", "DELETE"])
-const AUTHENTICATION_REQUIRED = "Authentication required."
 
 /** `tool` : le nom de la ligne de journal, « <VERBE> <ressource>[/<segment fixe>] » (H07). */
 type MatchedRoute = { route: Route; params: string[]; tool: string }
@@ -126,18 +136,6 @@ function isHttpMethod(value: string): value is HttpMethod {
 function fits(route: Route, segments: string[]): boolean {
   if (route.params !== segments.length) return false
   return Object.entries(route.fixed ?? {}).every(([at, segment]) => segments[Number(at)] === segment)
-}
-
-function errorResponse(error: PlatformError, status = HTTP_STATUS[error.code]): Response {
-  const body = { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) }
-  return Response.json({ error: body }, { status })
-}
-
-/** Toute erreur devient un `PlatformError` ; une panne inattendue garde son détail au log serveur. */
-function asPlatformError(error: unknown): PlatformError {
-  if (isPlatformError(error)) return error
-  console.error("[platform] api: unexpected error", error)
-  return new PlatformError("internal", "Internal error.")
 }
 
 /** Segments du chemin après `/api/plateforme/`, encore encodés ; aucun hors de ce préfixe. */
@@ -192,6 +190,11 @@ type JournalLine = {
   host: null
 }
 
+/** Une redirection sans corps, jamais gardée par un cache (E10-S02, AC-a5) : son adresse est signée pour 60 s. */
+function redirection(location: string, status: number): Response {
+  return new Response(null, { status, headers: { Location: location, "Cache-Control": "private, no-store" } })
+}
+
 type Served = {
   response: Response
   failure: PlatformError | null
@@ -207,7 +210,7 @@ async function serve(match: MatchedRoute, context: Omit<RouteContext, "params" |
     if (request.method === "POST" || request.method === "PATCH") body = await readJson(request)
     const result = await match.route.handle({ ...context, params: match.params, body })
     return {
-      response: Response.json({ data: result.data }, { status: result.status }),
+      response: result.redirect ? redirection(result.redirect, result.status) : Response.json({ data: result.data }, { status: result.status }),
       failure: null,
       target: result.journal?.target ?? match.route.target?.({ params: match.params, body }) ?? null,
       teamId: result.journal?.teamId ?? null,
@@ -254,19 +257,20 @@ export async function handlePlateforme(request: Request, options: PlatformReques
     // La lecture d'un lien public (E05-S10 partie d, ADR-013 § 4) : hors session, avant le jeton, sans journal.
     const publicSegments = routeSegments(request)
     if (isPublicRoute(publicSegments, request.method)) return await publicResponse(request, options.host, publicSegments)
-    if (!options.accessToken) return errorResponse(new PlatformError("forbidden", AUTHENTICATION_REQUIRED), 401)
-    const verifyToken = options.verifyToken ?? makeVerifyToken()
-    const caller = verifiedCaller((await verifyToken(request, options.accessToken))?.extra)
-    if (!caller) return errorResponse(new PlatformError("forbidden", AUTHENTICATION_REQUIRED), 401)
-    const db = createPlatformDb({ caller })
+    // La route isolée d'un fichier HTML (E10-S02, AC-c3, ADR-017) : du texte, jamais du JSON, 401 compris ; elle vérifie le jeton elle-même.
+    if (isFileHtmlRoute(publicSegments, request.method)) return await fileHtmlResponse(request, options, publicSegments)
+    // Le dépôt par lien (E10-S02 lot f, ADR-018) : la seule porte sans session qui écrit, le ticket en tient lieu, en texte
+    // brut ; puis le formulaire de dépôt, à session, qui vérifie le jeton lui-même. Le corps de l'une et l'autre est le fichier.
+    if (isUploadRoute(publicSegments, request.method)) return await uploadResponse(request, options, publicSegments)
+    if (isUploadFormRoute(publicSegments, request.method)) return await uploadFormResponse(request, options, publicSegments)
+    const session = await verifiedSession(request, options)
+    if (!session) return errorResponse(authenticationRequired(), 401)
+    const { db } = session
 
     const method = request.method.toUpperCase()
-    const origin = requestOrigin(request.headers, options.host ?? "", new URL(request.url).protocol.replace(/:$/, ""))
-    // Un Route Handler n'a pas la protection d'origine des Server Actions
-    // (`security-patterns.md § CSRF Protection`) : une mutation vient de l'adresse elle-même.
-    if (MUTATIONS.has(method) && request.headers.get("origin")?.toLowerCase() !== origin) {
-      return errorResponse(new PlatformError("forbidden", "Cross-origin request refused."))
-    }
+    const origin = addressOrigin(request, options.host)
+    // Une mutation vient de l'adresse elle-même ; le refus rejoint le `catch` de la porte, même réponse.
+    if (MUTATIONS.has(method)) requireSameOrigin(request, origin)
     const segments = routeSegments(request)
     // La cellule ne désigne aucune organisation : ni identité par l'adresse, ni journal (NH4, H07).
     if (isCellRoute(segments, method)) {
@@ -278,8 +282,7 @@ export async function handlePlateforme(request: Request, options: PlatformReques
 
     let identity: Identity
     try {
-      // L'identifiant interne est celui de la session, que la base traduit (E01-S11).
-      identity = await resolveIdentity(db, options.host, { email: caller.email ?? "" })
+      identity = await sessionIdentity(session, options.host)
     } catch (error) {
       return errorResponse(asPlatformError(error))
     }

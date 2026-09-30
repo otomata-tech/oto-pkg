@@ -2,7 +2,7 @@
 
 | Champ | Valeur |
 |-------|--------|
-| **Date** | 2026-09-28, amendé le 2026-09-29 |
+| **Date** | 2026-09-28, amendé le 2026-09-29 et le 2026-09-30 (§ 2 : O7) |
 | **Statut** | Accepté (fiches D111, D112, D119, D137) |
 | **Décideur(s)** | JB (forme du contenu) ; le pilote (isolation) |
 
@@ -57,7 +57,7 @@ l'application (`uploads-patterns.md § Validation`), et le bucket sert un fichie
      (images, CSS, polices), envoi de formulaire, cadres imbriqués, workers `blob:`, navigation de
      l'onglet, téléchargement, `<base>`, ouverture hors iframe, fenêtres ouvertes (le `sandbox` s'y
      hérite), messages à l'écran (il n'en écoute aucun), envoi vers la route de dépôt.
-   - **Ouverts, acceptés** (O1 à O6 de la story) :
+   - **Ouverts, acceptés** (O1 à O7 de la story) :
      - navigation de l'iframe elle-même (`location`, `meta refresh`) : l'écran la voit, par un
        second chargement, et remplace le contenu par « Ce contenu a tenté de quitter la page »,
        mais la requête est déjà partie ;
@@ -66,7 +66,10 @@ l'application (`uploads-patterns.md § Validation`), et le bucket sert un fichie
        s'ouvrent) ;
      - résolution DNS par `dns-prefetch` et `preconnect` ;
      - WebRTC (serveurs STUN) ;
-     - les trois CDN admis, qui reçoivent l'adresse IP du lecteur.
+     - les trois CDN admis, qui reçoivent l'adresse IP du lecteur ;
+     - vu par un lien public, le script lit le jeton du lien dans sa propre adresse (`location`) et
+       peut l'envoyer en naviguant : ce jeton ne donne que ce que le lien sert déjà, et seul un
+       rédacteur de la page peut y joindre un tel script, sous la bannière (O7, HN-E10S02-86).
 
    Le risque qui reste est celui d'un auteur malveillant qui peut écrire dans la page. La bannière
    (§ 5) et le journal le traitent.
@@ -104,7 +107,7 @@ l'application (`uploads-patterns.md § Validation`), et le bucket sert un fichie
 
 - Un fichier HTML qui appelle une API extérieure ne fonctionne pas (`connect-src 'none'`), et une
   image par adresse `https` non plus : c'est voulu.
-- Six canaux de sortie restent ouverts (§ 2) : un fichier vu peut envoyer ce qu'on y saisit, en
+- Sept canaux de sortie restent ouverts (§ 2) : un fichier vu peut envoyer ce qu'on y saisit, en
   naviguant surtout. C'est accepté, sous la bannière.
 - La plateforme valide une politique de sécurité à la main : la revue d'E10-S02 la vérifie ligne à
   ligne.

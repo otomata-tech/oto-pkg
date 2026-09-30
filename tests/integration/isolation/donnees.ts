@@ -1,6 +1,6 @@
-// Données de la suite d'isolation (E09-S05), sur le projet Supabase d'oto-platform (H120) : deux
-// organisations semées par le script Démo (`pnpm demo:seed --slug t<8 hex>`, H121), A et B, chacune
-// avec sa personne administratrice passée au script comme compte E2E (`a` pour A, `b` pour B) ; les
+// Données de la suite d'isolation (E09-S05), sur une vraie base : deux organisations semées par le
+// script Démo en mode OIDC (`pnpm demo:seed --slug t<8 hex> --user <identifiant>`, H121, E11-S14), A et
+// B, chacune avec sa personne administratrice passée au script comme personne E2E (`a` pour A, `b` pour B) ; les
 // marqueurs de B (AC6, AC12) posés par le service `write` sous la session de `b`, le tableau et les
 // lignes par les aides de `tests/helpers/plateforme.ts` (aucun service ne crée un tableau avant
 // E07-S04) ; une ligne de B dans chaque table que le script ne remplit pas (AC3 : une table vide ne
@@ -8,8 +8,8 @@
 // de l'équipe plateforme, avec un accès en cours à A seulement et un accès révoqué à B. La connexion
 // d'administration sert ici seulement : préparation, relecture, nettoyage. Depuis E01-S10 f2, chaque
 // personne lit et écrit `platform` par la face SQL sous son appelant (`clientOf`, `asCaller`), plus par
-// PostgREST ; ses jetons de Supabase Auth ne servent qu'aux portes (`sessionOf`) : la suite reste marquée
-// Supabase (comptes du script Démo, portes sous jeton).
+// PostgREST ; ses jetons ne servent qu'aux portes (`sessionOf`). Suite portable (E11-S14) : personnes sans
+// compte, jetons signés localement (`tests/helpers/session-locale.ts`), aucun compte de Supabase Auth.
 import { execFile } from "child_process"
 import path from "path"
 import { promisify } from "util"
@@ -19,14 +19,17 @@ import type { Tx } from "../../../packages/plateforme/server/sql"
 import { resolveIdentity } from "../../../packages/plateforme/server/identity"
 import { isJsonObject } from "../../../packages/plateforme/server/json"
 import { writeNode } from "../../../packages/plateforme/server/nodes/write"
-import { createFixtures, hex, type Fixtures, type TestUser } from "../../helpers/plateforme"
+import { hex } from "../../helpers/plateforme"
 import { packagePolicies, platformTables } from "../../helpers/platform-tables"
-import { asCaller, testAdminSql, type TestSql } from "../../helpers/sql"
+import { createLocalFixtures, type LocalFixtures } from "../../helpers/session-locale"
+import { asCaller, testAdminSql, type SqlUser, type TestSql } from "../../helpers/sql"
 
 const execFileAsync = promisify(execFile)
 const SEED = path.resolve(__dirname, "../../../scripts/demo-seed.mjs")
 // Un passage du script : 7,4 s mesurées le 2026-09-25 ; marge pour la machine partagée.
 const SEED_TIMEOUT = 120_000
+/** Posée, le script Démo passe en mode OIDC : sa seule présence compte, aucun émetteur n'est joint. */
+const OIDC_ISSUER = "https://issuer.example.invalid/oidc"
 
 /** Domaines de travail de B, autres que ceux du script Démo (AC8 : la liste d'A ne cite pas ceux de B). */
 const DOMAINS_B = "logistics, delivery planning"
@@ -80,11 +83,14 @@ export const keyOf = (primaryKey: readonly string[], row: Row) => primaryKey.map
 
 export type Isolation = Awaited<ReturnType<typeof build>>
 
-/** Le script Démo sur `slug`, la personne passée comme compte E2E (l'environnement du processus l'emporte sur `.env.local`). */
-async function seedDemo(slug: string, admin: TestUser): Promise<void> {
-  await execFileAsync(process.execPath, [SEED, "--slug", slug], {
+/**
+ * Le script Démo sur `slug`, en mode OIDC : la personne passée par `--user` et son email comme personne E2E,
+ * sans compte (l'environnement du processus l'emporte sur `.env.local`).
+ */
+async function seedDemo(slug: string, admin: SqlUser): Promise<void> {
+  await execFileAsync(process.execPath, [SEED, "--slug", slug, "--user", admin.id], {
     timeout: SEED_TIMEOUT,
-    env: { ...process.env, E2E_USER_EMAIL: admin.email, E2E_USER_PASSWORD: admin.password },
+    env: { ...process.env, PLATFORM_OIDC_ISSUER: OIDC_ISSUER, E2E_USER_EMAIL: admin.email },
   })
 }
 
@@ -97,7 +103,7 @@ function settingsOf(value: Json | undefined): { [key: string]: Json | undefined 
  * A et B semées en même temps, chaque organisation enregistrée pour le nettoyage, script en échec
  * compris ; puis les domaines de travail de B changés : le script pose les mêmes aux deux.
  */
-async function seedBoth(fx: Fixtures, admin: TestSql, admins: { a: TestUser; b: TestUser }): Promise<{ a: Place; b: Place }> {
+async function seedBoth(fx: LocalFixtures, admin: TestSql, admins: { a: SqlUser; b: SqlUser }): Promise<{ a: Place; b: Place }> {
   const slugs = { a: `t${hex(4)}`, b: `t${hex(4)}` }
   const seeded = await Promise.allSettled([seedDemo(slugs.a, admins.a), seedDemo(slugs.b, admins.b)])
   const orgs = await admin<{ id: string; slug: string; prefix: string; name: string; settings: Json }[]>`
@@ -116,7 +122,7 @@ async function seedBoth(fx: Fixtures, admin: TestSql, admins: { a: TestUser; b: 
   return { a: place(slugs.a), b: { ...b, domains: DOMAINS_B } }
 }
 
-async function build(fx: Fixtures, admin: TestSql) {
+async function build(fx: LocalFixtures, admin: TestSql) {
   const [tables, people] = await Promise.all([
     platformTables(),
     Promise.all([
@@ -135,7 +141,7 @@ async function build(fx: Fixtures, admin: TestSql) {
   await fx.grantPlatformAccess(a.id, people.p.id, people.p.id)
 
   const sessions = new Map<Who, Promise<{ accessToken: string }>>()
-  /** La session Supabase Auth de la personne : son jeton, pour les portes (API, MCP). */
+  /** Le jeton de la personne, signé localement : pour les portes (API, MCP), que l'API vérifie par `fx.verifyToken`. */
   const sessionOf = (who: Who) => {
     const known = sessions.get(who) ?? fx.sessionFor(people[who])
     sessions.set(who, known)
@@ -223,7 +229,7 @@ async function build(fx: Fixtures, admin: TestSql) {
  * `zz-delta-only` dans le tableau du script Démo ; un brouillon ouvert sur la page témoin, avec un
  * bloc `draft` ajouté (AC11).
  */
-async function seedMarkers(fx: Fixtures, admin: TestSql, of: { b: Place; admin: TestUser }) {
+async function seedMarkers(fx: LocalFixtures, admin: TestSql, of: { b: Place; admin: SqlUser }) {
   const { b } = of
   const db = asCaller(of.admin.id, of.admin.email)
   const identity = await resolveIdentity(db, b.host, { userId: of.admin.id, email: of.admin.email })
@@ -272,7 +278,7 @@ async function one<T>(query: PromiseLike<readonly T[]>, what: string): Promise<T
  * accès plateforme révoqué de `p`, journal admin, `ctx` et journal, envoi simulé, quatrième retour
  * (le script en pose trois dans chaque organisation : `FB-0004` n'existe que chez B).
  */
-async function seedRows(fx: Fixtures, admin: TestSql, of: { b: Place; people: Record<Who, TestUser> }) {
+async function seedRows(fx: LocalFixtures, admin: TestSql, of: { b: Place; people: Record<Who, SqlUser> }) {
   const { b, people } = of
   const table = await fx.nodeId(b.id, MARKERS.table.path)
   await admin`insert into platform.node_aliases (org_id, old_path, node_id) values (${b.id}, 'exploitation/ancien_suivi', ${table})`
@@ -299,6 +305,16 @@ async function seedRows(fx: Fixtures, admin: TestSql, of: { b: Place; people: Re
   )
   // Le lien public de B (E05-S10, ADR-013 ; jeton tiré par la base).
   await admin`insert into platform.node_shares (org_id, node_id, created_by) values (${b.id}, ${table}, ${people.b.id})`
+  // Un fichier joint de B (E10-S02, ADR-016) : sa ligne seule, aucun objet dans un bucket.
+  await admin`
+    insert into platform.files (org_id, node_id, name, mime, size, status, created_by)
+    values (${b.id}, ${table}, 'tournees.pdf', 'application/pdf', 3, 'ready', ${people.b.id})`
+  // Un ticket de dépôt par lien de B (E10-S02 lot f, ADR-018) : son empreinte seule, jamais un jeton. Deux
+  // empreintes tirées à chaque passage : elles sont uniques dans toute la table, et les suites d'isolation
+  // sèment chacune leur B en parallèle.
+  await admin`
+    insert into platform.upload_tickets (org_id, user_id, token_hash, form_token_hash, kind, mode, target_path, expires_at)
+    values (${b.id}, ${people.b.id}, ${hex(32)}, ${hex(32)}, 'csv', 'merge', 'ventes/suivi_prospects', now() + interval '15 minutes')`
   // L'accès général de B (ADR-014) : toute l'organisation B peut modifier son tableau.
   await admin`insert into platform.access_rules (org_id, node_id, subject_org, level, created_by) values (${b.id}, ${table}, true, 'write', ${people.b.id})`
   const rule = await one(admin<{ id: string }[]>`select id from platform.access_rules where org_id = ${b.id} limit 1`, "rule of B read")
@@ -314,7 +330,7 @@ async function seedRows(fx: Fixtures, admin: TestSql, of: { b: Place; people: Re
  * relever son échec. `nettoyer` : en `afterAll`, même en échec.
  */
 export async function preparer(): Promise<Isolation & { nettoyer: () => Promise<void> }> {
-  const fx = createFixtures()
+  const fx = createLocalFixtures()
   const admin = testAdminSql()
   const nettoyer = async () => {
     try {

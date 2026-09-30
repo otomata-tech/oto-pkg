@@ -14,20 +14,17 @@ Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣
 
 ## Contenus riches et retours de la démo (epics E10 et E11, après le tag `v1.0.0`)
 
-Fiches D111 à D124, D131 à D134, D137 à D145, ADR-016 à ADR-018. E10-S04, E10-S01 et E10-S06 sont livrées et
-fusionnées (changelog du 2026-09-29) ; E10-S02 modifie les mêmes fichiers de blocs (`schemas/blocks.ts`,
-`schemas/blocks-render.ts`, `server/nodes/markdown-parse.ts`, `ui/noeud/rendu-des-blocs.tsx`, l'éditeur) et part
-après elles.
-
-| Ordre | ID | Titre | Est. | Ⓜ | Dépend de | Statut |
-|-------|----|-------|------|---|-----------|--------|
-| 4 | E10-S02 | Fichiers : port S3 (ADR-016), bloc `file`, images, « Voir » (HTML isolé, ADR-017), `read {file}`, dépôt par lien (`upload.link`, ADR-018) ; absorbe E10-S03 et E10-S05 (D137) | XL | Ⓜ | E10-S04, E10-S01, E10-S06 | 🟢 Ready (action JB avant la campagne visuelle) |
+Fiches D111 à D124, D131 à D134, D137 à D150, ADR-016 à ADR-018. E10-S04, E10-S01 et E10-S06 sont livrées et
+fusionnées (changelog du 2026-09-29) ; E10-S02 (fichiers, lots a à f, Ⓜ `20260929200000_platform_files.sql`) est
+livrée et fusionnée (changelog du 2026-09-30, commit commun à venir) ; restes : M86 à M89 et les actions de JB.
+Epic E10 sans story ouverte.
 
 Retours de la démo (epic E11, fiches D131 à D136, rapport de tests FB-0001 à FB-0010, retours
 d'écran du 2026-09-29). Neuf stories, longues à dessein. Deux stories en cours ne touchent jamais le
 même fichier source (`vagues.md § Parallélisme`), ni un fichier d'une story E10 en cours : l'ordre
 suit la matrice des fichiers communs, et la mémoire du poste ne laisse qu'un créneau aux commandes
-lourdes.
+lourdes. E11-S14 (harnais de test sans Supabase, lots a à c) est livrée et fusionnée (changelog du
+2026-09-30, commit commun à venir) : seules les suites de l'adaptateur Supabase gardent le projet.
 
 | Vague | ID | Titre | Est. | Ⓜ | Dépend de | Statut |
 |-------|----|-------|------|---|-----------|--------|
@@ -39,7 +36,6 @@ lourdes.
 | 4 | E11-S02 | Publication directe, brouillons refusés, corbeille et suppression de lignes depuis un assistant | L | Ⓜ | E11-S01, E11-S03 | ✅ approuvée, fusionnée sur main (commit à venir) ; Ⓜ `20260929190000_discard_draft.sql` à appliquer au projet de test (action JB) |
 | 5 | E11-S05 | Écrans d'un contenu : encarts repliables à droite, cellules, lignes à revoir, télécharger, résumé, page et tableau vides | L | | E10-S01, E10-S06, E11-S01, E11-S02, E11-S10 | ✅ approuvée, fusionnée sur main (commit à venir) |
 | 5 | E11-S06 | Éditeur : une puce par élément de liste, modifier un lien dans un panneau | M | | E10-S04, E10-S06 | ✅ approuvée, fusionnée sur main (commit commun à venir) |
-| 2 | E11-S14 | Harnais de test sans Supabase : 16 suites sur Postgres nu, 7 gardent le projet | L | | lot a : — ; lot b : E11-S03, E11-S10 ; lot c : E10-S02, E10-S04 | ✅ lots a et b approuvés, fusionnés sur main (commit commun à venir) ; lot c après E10-S02 |
 | 6 | E11-S07 | Adresses en anglais : routes, paramètres, ancres, préfixe d'API | L | | toutes les autres | 🟢 Ready (cassante) |
 
 - **Livraison** : une seule version, 1.1.0, pour les quatre stories d'E10 et les neuf d'E11 (fiches
@@ -55,8 +51,7 @@ lourdes.
   toutes additives ; avant le tag `v1.1.0`, le pilote réunit celles d'E10 (S04, S02) et
   d'E11 (S02, S03, S04, S10) en un seul fichier `<horodatage>_v1_1_0.sql` au contenu identique, puis
   répare l'historique du projet de test (D124).
-- **CI du paquet** : un service MinIO dans le job d'intégration (adaptateur S3 réel : SigV4, `copy`,
-  URL signées) ; le test d'isolation du HTML (E10-S02) en Playwright.
+- **CI du paquet** : M88.
 
 ## Stories V2 (marquées, non planifiées)
 
@@ -106,7 +101,11 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | M82 | E10-S04 : `beforeOpenFence` (`server/context/engine.ts` depuis E11-S03) lit ses clôtures par `openingFence` et `closesFence` (`schemas/link-syntax.ts`) ; sans cela, la coupe d'un Contexte ne reconnaît que les clôtures d'accents graves sans retrait ; coût : un test de `context` sur une clôture `~~~` coupée. |
 | M83 | E10-S01 : le cas « dashes under text » de `tests/unit/nodes-parse-tolerant.test.ts` (textes hostiles, moins d'une seconde) s'approche de sa borne de temps sous charge : le stabiliser. |
 | M84 | `choix-de-bloc.tsx` (E10-S06) l. 52, 57, 76-84 : reprendre `useOptionActive` d'E11-S06 (`ui/noeud/editeur/citer.tsx`), l'aide commune du clavier d'une liste d'options. |
-| M85 | Un mode sans Supabase pour `org:export`, `org:import`, `test:cleanup` et `oauth:clients` (hors périmètre d'E11-S14) : leurs suites restent gardées par le projet (`tests/unit/gardes-supabase.test.ts`). |
+| M85 | Un mode sans Supabase pour `org:export`, `org:import`, `test:cleanup` et `oauth:clients` (hors périmètre d'E11-S14) : leurs suites restent gardées par le projet (`tests/unit/gardes-supabase.test.ts`). Avec lui, E11-S14 lot c : deux lancements de `scripts/demo-seed.mjs` ne verrouillent pas encore le mode Supabase par `PLATFORM_OIDC_ISSUER: ""` (`tests/unit/demo-seed.test.ts`, cas « missing variables » ; `tests/integration/org-transfer.test.ts` l. 280) : cette variable posée dans `.env.local`, ils passeraient en mode OIDC. |
+| M86 | E10-S02 : les objets du stockage qui perdent leur ligne `files` sans passer par la purge restent orphelins dans le bucket : nœuds supprimés par `forget_user`, organisation supprimée en SQL (la cascade emporte les lignes), `pnpm test:cleanup` et `pnpm demo:seed` ; les supprimer par préfixe `<org_id>/` (ou lire les clés avant la suppression). |
+| M87 | E10-S02 : `pnpm org:export --force` vide `<fichier>.files/` avant d'écrire les objets (HN-E10S02-112), et une panne du stockage en cours lève avant le JSON (HN-E10S02-87) : l'ancien JSON reste à côté d'objets en partie réécrits. Écrire dans un dossier temporaire, puis remplacer JSON et dossier ensemble. |
+| M88 | E10-S02 : CI du paquet : un service MinIO dans le job d'intégration, pour l'adaptateur S3 réel (SigV4, `copy`, URL signées ; les tests n'ont que l'adaptateur en mémoire) ; la spec d'isolation du HTML (`tests/e2e/e10s02-voir.spec.ts`, F1 à F16, O1 à O7) en Playwright, qui se saute sans stockage. |
+| M89 | E10-S02 : `server/database.ts` (types générés) n'est pas régénéré : `pnpm db:types` après l'application de `20260929200000_platform_files.sql` au projet de test (`files`, `upload_tickets`, `duplicate_subtree`, deux fonctions `anon`). |
 | M90 | E11-S02 : `server/tables/import.ts:188` : reprendre `heldByOther` de `row-store.ts` (troisième copie du prédicat). |
 | M91 | E11-S02 : `ui/noeud/en-tete-modifiable.tsx` l. 10-11 : le commentaire dit encore qu'un nœud neuf est « jamais publié » ; `FileDOperations` : `brouillon` et `ecrit` de l'instantané sans lecteur ; `EN_TETE.enregistre`, `EN_TETE.aRenvoyer` morts. |
 
@@ -117,8 +116,10 @@ Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les 
 | Fin de la V1 (D126) | oto-saas se déploie chez Scaleway (responsable du déploiement, `docs/deploiement.md § 3` d'oto-saas) ; le projet Vercel reste sur l'archive jusque-là. Désactiver le service Windows `postgresql-x64-16` du poste. |
 | Après la ligne de base V1 | `supabase migration repair` sur le projet du premier client, par la procédure de `packages/plateforme/migrations/README.md` (notre projet est réparé). |
 | Sur le poste | Désactiver le service Windows `postgresql-x64-16`, inutilisé par la base de test locale. |
-| Après la fusion d'E10-S04, E10-S01, E10-S06, E11-S03, E11-S14 a et b, E11-S01, E11-S02 et E11-S05 | Appliquer la migration `20260929170000_platform_page_markdown.sql` au projet Supabase de test, puis `20260929180000_ctx_contexts.sql` (E11-S03) et `20260929190000_discard_draft.sql` (E11-S02), dans cet ordre ; puis jouer `tests/integration/mcp-read-write.test.ts` et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
-| Avant la campagne visuelle d'E10-S02 | Bucket du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3), règles CORS et variables `PLATFORM_STORAGE_*`. |
+| Après la fusion d'E10-S04, E10-S01, E10-S06, E11-S03, E11-S14, E11-S01, E11-S02, E11-S05 et E10-S02 | Appliquer la migration `20260929170000_platform_page_markdown.sql` au projet Supabase de test, puis `20260929180000_ctx_contexts.sql` (E11-S03), `20260929190000_discard_draft.sql` (E11-S02) et `20260929200000_platform_files.sql` (E10-S02), dans cet ordre ; puis jouer `tests/integration/mcp-read-write.test.ts` et les specs e2e `e10s04-markdown`, `import-de-fichiers` et `e10s06-editeur`, avec leur contrôle visuel dans les deux thèmes. |
+| Avant la campagne visuelle d'E10-S02 | Bucket privé du SaaS (Scaleway, ou Supabase Storage par son point d'accès S3) et ses clés d'accès S3, règles CORS (`PUT` et `GET` depuis chaque adresse de l'application, en-tête `content-type` : README du paquet), cinq variables `PLATFORM_STORAGE_*` du projet (ADR-016 § 2). |
+| Après le bucket et la migration d'E10-S02 | Jouer `tests/e2e/e10s02-voir.spec.ts` (AC-c6, F1 à F16 et O1 à O7, en-têtes reçus, « Voir », lien public ; sautée sans stockage) et la campagne de dépôt sur le bucket réel (image, PDF, `.html` : déposer, voir, relire, voir par un lien public), avec le contrôle visuel dans les deux thèmes ; AC-f17 : banc sur claude.ai (artefact publié, `source_url`) et ChatGPT (formulaire) avec un rapport HTML de 100 ko, résultat noté dans `docs/mcp-golden-queries.md` ; rejouer les golden queries qui mènent à `read` et à `call` (descriptions allongées, journal des révisions du 2026-09-30). |
+| Quand JB le veut | Trancher la fiche D118 (duplication d'une page qui a des fichiers) : la story avance sous l'option recommandée, la copie des objets. |
 | Après la fusion des stories d'E10 et d'E11 | Tag `v1.1.0` (après la fusion de leurs migrations, D131, D145) ; dans le dépôt SaaS, relire à la main la PR Renovate de cette version (adresses renommées) et renommer les routes de l'hôte. |
 | Avant le premier client | Remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (inscriptions, connexions et vérifications 30, rafraîchissements 150, par 5 minutes et par IP). |
 | Au premier client | Test d'installation réel du paquet publié dans l'ERP du premier client ; chaque écart devient une story ; réglages d'Auth par `pnpm auth:settings`, `platform` retiré du Data API par `pnpm data-api:close`. |

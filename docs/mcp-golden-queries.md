@@ -186,6 +186,14 @@ Delta : exploitation).
 | IM1 | Voici l'export CSV de nos clients, range-le dans l'espace ventes. <CSV joint> | `acme_context` → (`acme_read write.table` ou `acme_read table.import`, facultatif) → `acme_call table.import` avec `create` (`{title, summary}`) et un chemin sous `ventes/`, par morceaux de 40 000 caractères au plus, chacun ouvert par la ligne d'en-tête ; les morceaux suivants sans `create` ; aucun `table.write` ligne à ligne |
 | IM2 | Mets ce compte rendu (markdown) dans les réunions. <fichier .md joint> | `acme_context` → `acme_write` qui crée une page sous le dossier des réunions : titre tiré du premier `#` du fichier, le reste dans le texte, publiée à l'écriture ; aucun `table.import` |
 
+### Fichiers joints et dépôt par lien — E10-S02
+
+| # | Prompt | Attendu au journal |
+|---|--------|--------------------|
+| FJ1 | Qu'y a-t-il dans le rapport joint à ventes/rapports/mars ? | `acme_context` → `acme_read ventes/rapports/mars` (le fichier se lit `[<nom> (<taille>, <type>)](<origine>/api/plateforme/files/<id>)`) → `acme_read` avec `path: "ventes/rapports/mars"` et `file: "<id>"` ; aucune écriture |
+| FJ2 | (Claude Code) Range le rapport que tu viens de générer dans ventes/rapports. | `acme_context` → `acme_call upload.link` (`kind: "file"`, `mode: "create"`, `name`, `title`, `summary`) → `curl --data-binary` sur l'adresse rendue, puis ligne `api` `uploads` sous le même `ctx` ; jamais le contenu du fichier dans un `acme_write` |
+| FJ3 | (Claude ou ChatGPT dans le navigateur, sans shell) La même demande. | `acme_context` → `acme_call upload.link` avec `source_url` (l'adresse publique du rapport, un artefact publié) ; si le téléchargement échoue, la cause dite et `form_url` donné à la personne, puis `acme_read` de la destination au tour suivant (AC-f17 : banc à jouer, action JB) |
+
 ### Journal — E05-S05
 
 | # | Prompt | Attendu au journal |
@@ -294,6 +302,7 @@ L'attendu se lit dans `admin_journal`.
 | 2026-09-25 | Description de `<p>_call` : cite `table.rows` pour toute organisation, `mail.create_draft` et `table.rows` quand `mail` est actif (E07-S01) | fonction native de lecture toujours active | à rejouer après « Actualiser » : I3, T1, T2, N-T1 |
 | 2026-09-29 | Description de `<p>_write` (`move_block` vers une section, E11-S03) ; descriptions des fonctions `table.write` (`create_only`, preuve par tableau), `table.rows` (`q` par mots), `table.release` et du contrat `write.table` (E11-S01), réécrites en place (ADR-002 § 1) | FB-0001, FB-0003, FB-0008, FB-0009 (rapport de tests sur Démo) | à rejouer après « Actualiser » : C2, C2 bis, RW7, RW9, RW10, T6 à T10, N-T2 |
 | 2026-09-29 | Description de `<p>_write` et du champ `publish` (publié par défaut, `publish: false` garde un brouillon), règle de « How this workspace works », contrats `write.procedure` et `write.table` (règle 10 : abandonner un en-tête refusé) ; fonctions `node.discard_draft`, `node.trash`, `table.delete_rows` au catalogue (E11-S02, ADR-002 § 1, fiche D135) | FB-0007, FB-0010 partie 3 ; retour du responsable d'Oto sur les brouillons | à rejouer après « Actualiser » : RG1, RW4, RW5, PR1, PR2, TB1 à TB3, PD1 à PD4, PDN1 |
+| 2026-09-30 | Description de `<p>_read` (champ `file` : « To read an attached html, md, txt or csv file, give file = the id from its link /api/plateforme/files/<id>. ») et de `<p>_call` (« Use upload.link to put a file in a page, … otherwise, give the person the form link. ») allongées d'une phrase ; contrat `write.table` allongé de la même règle ; `upload.link` au catalogue (E10-S02, ADR-002 § 1, fiches D117, D119, D130) | — (fonctionnalité nouvelle) | à rejouer après « Actualiser » : les requêtes qui mènent à `read` et à `call` (RW1 à RW3, RW8, LK1 à LK3, CA1, CN2, T1 à T10, PD2 à PD4, IM1, DJ1, IJ1), puis FJ1 à FJ3 |
 
 ## Rapports de frictions agent (mcp-patterns §8)
 

@@ -10,13 +10,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { PlatformDb } from "../../../packages/plateforme/server/db"
 import { withAnonSession, type Tx } from "../../../packages/plateforme/server/sql"
 import { DISCARD_DRAFT_VERSION, pendingMigrations } from "../../helpers/pending-migrations"
-import { SKIP_REASON, supabaseConfigured } from "../../helpers/plateforme"
-import { SQL_SKIP_REASON, sqlConfigured } from "../../helpers/sql"
+import { portable, sqlConfigured } from "../../helpers/sql"
 import { MARKERS, preparer, type Isolation, type Row, type Who } from "./donnees"
 
 const SETUP_TIMEOUT = 300_000
 const NETWORK_TIMEOUT = 120_000
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "isolation of the content: blocks and search"
 /** `discard_draft` (E11-S02) pas encore appliquée au projet : son refus ne se joue pas (`database-patterns.md § Règles`). */
 const discardPending = (await pendingMigrations()).includes(DISCARD_DRAFT_VERSION)
@@ -34,8 +32,8 @@ function rowsOrError<T>(run: Promise<readonly T[]>): Promise<T[] | { code: strin
   )
 }
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
     let data: Isolation & { nettoyer: () => Promise<void> }

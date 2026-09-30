@@ -86,6 +86,11 @@ export const DOCUMENT_CASES: BlockCase[] = [
   invalid("an image without src", { type: "image", data: { alt: "Plan" } }),
   invalid("an image with an empty src", { type: "image", data: { src: "" } }),
   invalid("an image whose alt is a number", { type: "image", data: { src: "a.png", alt: 1 } }),
+  // E10-S02 (lot b) : une image jointe par son fichier, jamais avec une adresse ; sa largeur (AC-b1, AC-b3).
+  valid("an image joined by its file, small", { type: "image", data: { file_id: "f1000000-0000-4000-8000-000000000001", alt: "Plan", width: "small" } }),
+  invalid("an image with a source and a file", { type: "image", data: { src: "https://x.test/a.png", file_id: "f1000000-0000-4000-8000-000000000001" } }),
+  invalid("an image whose file is not a lowercase uuid", { type: "image", data: { file_id: "F1000000-0000-4000-8000-000000000001" } }),
+  invalid("an image of an unknown width", { type: "image", data: { src: "a.png", width: "huge" } }),
 
   valid("a callout with a tone", { type: "callout", text: "Attention.", data: { tone: "warning" } }),
   valid("a callout without data", { type: "callout", text: "Note." }),
@@ -118,6 +123,13 @@ export const DOCUMENT_CASES: BlockCase[] = [
   valid("a divider", { type: "divider", data: {} }),
   invalid("a divider with a text", { type: "divider", text: "---", data: {} }),
   invalid("a divider whose data is an array", { type: "divider", data: [] }),
+
+  // E10-S02 (lot b) : un fichier joint, de 1 octet à 50 Mo (AC-b2).
+  valid("a joined file", { type: "file", data: { file_id: "f2000000-0000-4000-8000-000000000002", name: "Rapport mars.pdf", size: 1200, mime: "application/pdf" } }),
+  invalid("a joined file with a text", { type: "file", text: "x", data: { file_id: "f2000000-0000-4000-8000-000000000002", name: "a.pdf", size: 1, mime: "application/pdf" } }),
+  invalid("a joined file of no byte", { type: "file", data: { file_id: "f2000000-0000-4000-8000-000000000002", name: "a.pdf", size: 0, mime: "application/pdf" } }),
+  invalid("a joined file over 50 MB", { type: "file", data: { file_id: "f2000000-0000-4000-8000-000000000002", name: "a.pdf", size: 52_428_801, mime: "application/pdf" } }),
+  invalid("a joined file without name", { type: "file", data: { file_id: "f2000000-0000-4000-8000-000000000002", size: 12, mime: "application/pdf" } }),
 
   valid("a toggle", { type: "toggle", text: "Corps [[ventes/devis]].\n\n```\n<b>\n```", data: { summary: "Détails" } }),
   valid("an empty toggle", { type: "toggle", text: "", data: { summary: "Rien" } }),

@@ -16,7 +16,8 @@ Texte complet : `.method/conventions/security-patterns.md`. La fiche suffit pour
 - Aucune clé secrète dans une variable `NEXT_PUBLIC_` ; `.env.example` sans valeurs ; un client SMTP exige TLS (`requireTLS` ou `smtps://`). § Environment Variables & Secrets
 - Un script n'écrit ni ne supprime une organisation qu'il n'a pas créée : sa marque se vérifie avant la première écriture (code 1), et la fonction qui supprime la revérifie ; un test joue le refus sur une organisation sans marque. § Outillage à clé service
 - Un script qui tient la connexion et la clé éprouve la clé par une lecture d'Auth avant sa première écriture ; une personne sans compte Auth ne l'arrête pas (`getUserById` tient le 404). § Outillage à clé service
+- En mode OIDC, le script Démo ne tient ni clé ni compte : `--user` (uuid contrôlé avant toute connexion) nomme la personne E2E, sans sonde d'Auth ; hors de ce mode, `--user` est refusé. § Outillage à clé service
 - Le service décide chaque droit et pose chaque filtre avant sa requête (`server/access.ts`), le refus dit à qui demander ; « aucune ligne rendue » n'est jamais un refus ; un test par service, sur une base qui rend des lignes interdites. § Droits dans le service
 - Une fonction PostgreSQL prend des paramètres, jamais du SQL concaténé (`EXECUTE 'SELECT … ' || nom`). § SQL Injection Prevention
 - Un message d'erreur ne révèle pas si un email existe ; aucune donnée sensible dans les claims d'un JWT. § Auth Security Checklist
-- En-têtes de sécurité dans `next.config.ts` : `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. § Headers de sécurité
+- En-têtes de sécurité dans `next.config.ts` : `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` ; les deux routes HTML d'ADR-017 sont exclues de `X-Frame-Options` et de la `Referrer-Policy` globale, et posent leurs propres en-têtes. § Headers de sécurité

@@ -3,7 +3,9 @@
  * `pnpm org:export` et `pnpm org:import` (E09-S04), `pnpm oauth:clients` (E02-S04),
  * `pnpm platform:staff`, `pnpm test:cleanup` ; et ce qu'un script imprime d'une erreur : son message,
  * le code d'une erreur de la base ou d'Auth, les valeurs secrètes masquées (M15b-1 : lus par plusieurs
- * scripts, ils vivaient dans le script Démo et dans la carte de l'export-import).
+ * scripts, ils vivaient dans le script Démo et dans la carte de l'export-import). Aussi l'identifiant
+ * interne (`UUID`) et le mode OIDC des scripts à comptes (`oidcMode`), lus par `demo:seed`,
+ * `platform:staff` et l'export-import (E11-S14 : trois copies, une par script).
  *
  * Deux accès (E01-S10, AC-f4) : `platform` par la connexion d'administration
  * (`PLATFORM_ADMIN_DATABASE_URL`, `adminSql`), jamais par la clé secrète sur le Data API ; les comptes
@@ -29,6 +31,15 @@ export const SERVICE_KEY_VARIABLES = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SECR
  * d'administration d'Auth, `platform` par la connexion d'administration.
  */
 export const ADMIN_VARIABLES = [...SERVICE_KEY_VARIABLES, 'PLATFORM_ADMIN_DATABASE_URL']
+
+/**
+ * Un identifiant interne (`uuid`) : contrôlé avant de servir (requête, chemin d'un fichier), la base
+ * refusant sinon la valeur (`22P02`) après une première écriture.
+ */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Posée, l'hôte a un émetteur OIDC (E01-S11) : les scripts à comptes n'ont aucun compte Supabase (`oidcMode`). */
+export const OIDC_VARIABLE = 'PLATFORM_OIDC_ISSUER'
 
 /**
  * Textes de `.env.local` puis `.env` de `root`, dans cet ordre ; vide pour un fichier absent.
@@ -63,6 +74,19 @@ export function resolveVariables(processEnv, fileTexts, required, optional = [])
     else if (required.includes(key)) missing.push(key)
   }
   return { values, missing }
+}
+
+/**
+ * Le mode d'un script à comptes (`demo:seed`, `platform:staff`) : `OIDC_VARIABLE` lue comme les autres
+ * variables (`resolveVariables`) ; absente ou vide, Supabase Auth et ses comptes ; posée, l'émetteur OIDC
+ * de l'hôte, sans compte à chercher ni à créer.
+ * @param {Record<string, string | undefined>} processEnv
+ * @param {string[]} fileTexts
+ * @returns {{ oidc: boolean, issuer: string | undefined }}
+ */
+export function oidcMode(processEnv, fileTexts) {
+  const issuer = resolveVariables(processEnv, fileTexts, [], [OIDC_VARIABLE]).values[OIDC_VARIABLE]
+  return { oidc: Boolean(issuer), issuer }
 }
 
 /**

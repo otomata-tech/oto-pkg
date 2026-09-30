@@ -35,7 +35,10 @@
 // E11-S06 : les repères d'une liste suivent ses éléments, une seule puce, un numéro ou une case par élément, sur sa
 // première ligne (`ElementsDeListe`, lot a) ; le curseur dans un lien, ou un clic sur un lien au repos, ouvre sous le
 // champ le panneau « Lien » (`lien-du-bloc.tsx`, lot b).
-import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type SyntheticEvent } from "react"
+//
+// E10-S02 (lot b) : une image collée se joint après le bloc (AC-b1) ; un fichier lâché sur le champ est reçu par sa
+// rangée, qui en fait un dépôt (AC-b4).
+import { useId, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type SyntheticEvent } from "react"
 import type { SearchMatch } from "../../../schemas/search"
 import type { Resultat } from "../../api/resultat"
 import { useRechercheDeContenus } from "../../api/use-recherche-de-contenus"
@@ -148,8 +151,9 @@ function useCitation(cle: string, texte: string) {
 const collageBrut = (evenement: KeyboardEvent<HTMLTextAreaElement>) => (evenement.ctrlKey || evenement.metaKey) && evenement.shiftKey && evenement.key.toLowerCase() === "v"
 
 /**
- * Le collage et le dépôt d'un fichier (E10-S01, AC-a1, AC-a4) : plusieurs lignes, ou un `.md`, partent au geste ; un
- * tableur collé dans un Texte vide devient un tableau simple (E10-S06, AC-b3). Seul `text/plain` est lu.
+ * Le collage (E10-S01, AC-a1) : plusieurs lignes partent au geste ; un tableur collé dans un Texte vide devient un
+ * tableau simple (E10-S06, AC-b3) ; une image collée se joint après le bloc (E10-S02, AC-b1). Seul `text/plain` est lu.
+ * Un fichier lâché va à la rangée (`rangee-de-bloc.tsx`).
  */
 function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
   const gestes = useGestes()
@@ -161,21 +165,18 @@ function useCollage(cle: string, lectureSeule: boolean, texteVide: boolean) {
     coller: (evenement: ClipboardEvent<HTMLTextAreaElement>) => {
       const texteBrut = brut.current
       brut.current = false
+      // Un presse-papiers sans fichier (simulé, ou vieux navigateur) n'a pas de `files`.
+      const image = Array.from(evenement.clipboardData.files ?? []).find((fichier) => fichier.type.startsWith("image/"))
+      if (image && !lectureSeule) {
+        evenement.preventDefault()
+        return gestes.collerUneImage(cle, image)
+      }
       const colle = evenement.clipboardData.getData("text/plain")
       if (texteBrut || lectureSeule || !colle.trim().includes("\n")) return
       evenement.preventDefault()
       const tableau = texteVide ? tableauColle(colle) : null
       if (tableau) return gestes.remplacerParChoix(cle, "tableau", tableau)
       gestes.insererDuMarkdown(cle, colle)
-    },
-    survoler: (evenement: DragEvent<HTMLTextAreaElement>) => {
-      if (!lectureSeule && Array.from(evenement.dataTransfer.types).includes("Files")) evenement.preventDefault()
-    },
-    deposer: (evenement: DragEvent<HTMLTextAreaElement>) => {
-      const fichier = evenement.dataTransfer.files[0]
-      if (!fichier || lectureSeule) return
-      evenement.preventDefault()
-      gestes.deposerUnFichier(cle, fichier)
     },
   }
 }
@@ -262,8 +263,6 @@ export function ChampDeBloc({ cle, texte, nom, decritPar, genre, debut, cases, l
           }}
           onKeyDown={toucher}
           onPaste={collage.coller}
-          onDragOver={collage.survoler}
-          onDrop={collage.deposer}
           onSelect={selectionner}
           onKeyUp={toutSelectionner}
           onBlur={(evenement) => {

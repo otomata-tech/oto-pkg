@@ -9,8 +9,10 @@
  * jamais écrit. Le compte E2E est créé s'il manque et jamais modifié s'il existe : ce peut être celui de
  * JB (N2). Noms fictifs (ADR-010). L'organisation créée ici porte `settings.demo` : la marque sans
  * laquelle la garde de l'exécuteur (`guardOrg`) refuse de la resemer ou de la réinitialiser. Le
- * compte passe par l'API d'administration d'Auth (`ctx.auth`), tout le reste par la connexion
- * d'administration (`ctx.sql`, E01-S10 f1).
+ * compte passe par l'API d'administration d'Auth (`ctx.auth`, nulle en mode OIDC : la personne de
+ * `--user`), tout le reste par la connexion d'administration (`ctx.sql`, E01-S10 f1). Le mode OIDC sert
+ * aux tests (`tests/integration/isolation/donnees.ts`) : l'identifiant de `--user` n'est confronté à aucun
+ * sujet de l'émetteur (HN-E11S14-11), un uuid mal saisi crée un membre relié à personne.
  */
 import { PILOT_DOMAINS } from '../lib/pilot-qualification.mjs'
 import { accountCopy } from '../lib/account-copy.mjs'
@@ -59,8 +61,13 @@ async function findUser(auth, email) {
 }
 
 // L'email et le nom du compte, que la ligne `members` recopie : sans clé vers `auth.users`, la base
-// ne les lit plus dans le compte (E01-S09, AC15).
+// ne les lit plus dans le compte (E01-S09, AC15). En mode OIDC (`auth` nul, E11-S14), aucun compte : la
+// personne est l'identifiant de `--user`, sous l'email du compte E2E et le nom de la Démo.
 async function ensureE2eUser({ auth, env, report }) {
+  if (!auth) {
+    report('compte E2E : personne de --user, sans compte Auth (mode OIDC)')
+    return { id: env.e2eUserId, email: env.e2eEmail, name: E2E_NAME }
+  }
   const existing = await findUser(auth, env.e2eEmail)
   if (existing) {
     report('compte E2E : existant, laissé tel quel')

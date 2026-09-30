@@ -97,10 +97,12 @@ Pour une application Next 15 (App Router) sur Supabase.
    - `GET nodes/links?path=` : liens sortants et entrants d'un nœud (« Contenus liés »).
    - `GET nodes/impact?path=&new_path=` : qui gagne, perd ou change d'accès si le nœud se déplace.
    - `POST nodes/position` `{ path, after }` : range un nœud juste après un frère (`null` : en tête).
-   - `POST nodes/duplicate` `{ path }` : copie le nœud et son sous-arbre, juste après lui.
+   - `POST nodes/duplicate` `{ path }` : copie le nœud et son sous-arbre, juste après lui ; les fichiers joints
+     que ses blocs publiés citent sont copiés sous des identifiants neufs (objets copiés dans le bucket).
    - `POST nodes/access` `{ path, access, level? }` : accès général, `organisation` (niveau `read`,
      `write` ou `manage`, `read` par défaut ; `manage` à l'administrateur) ou `restricted`.
-   - `GET trash`, `POST trash` `{ path }`, `POST trash/restore` `{ path }` : la corbeille (30 jours).
+   - `GET trash`, `POST trash` `{ path }`, `POST trash/restore` `{ path }` : la corbeille (30 jours) ; la
+     purge supprime aussi les fichiers joints des nœuds purgés et leurs objets.
    - `GET shares?path=`, `GET shares`, `POST shares` `{ path, include_children? }`, `DELETE shares/<id>` :
      les liens publics d'un nœud, ceux de l'organisation (administrateur).
    - `GET public/<jeton>?path=` : la lecture publique d'un lien, **hors session** (la route de l'hôte la
@@ -121,6 +123,49 @@ Pour une application Next 15 (App Router) sur Supabase.
    `pnpm data-api:close --to <ref>` (l'écart), puis `--apply` (l'écriture, la relecture et le contrôle :
    `/rest/v1/nodes` sous `Accept-Profile: platform` est refusé). Jeton de gestion :
    `SUPABASE_ACCESS_TOKEN`, jamais affiché.
+
+9. Fichiers joints (facultatif, ADR-016) : un stockage d'objets compatible S3, par cinq variables de
+   l'environnement serveur, `PLATFORM_STORAGE_ENDPOINT` (le point d'accès, sans le bucket),
+   `PLATFORM_STORAGE_BUCKET`, `PLATFORM_STORAGE_REGION`, `PLATFORM_STORAGE_ACCESS_KEY_ID` et
+   `PLATFORM_STORAGE_SECRET_ACCESS_KEY`. Les cinq, ou aucune : sans elles, les fichiers sont désactivés
+   (`GET files` rend `{ enabled: false }`, tout envoi est refusé par `not_enabled`) et tout le reste
+   fonctionne. Les octets ne passent jamais par l'application : le navigateur envoie au bucket par une URL
+   présignée de 5 minutes, et lit par une redirection vers une URL présignée de 60 secondes.
+   - Bucket **privé**, sans ACL publique ; clés d'accès S3 limitées à ce bucket quand le fournisseur le
+     permet (AWS, Scaleway, MinIO). Supabase Storage se branche par son point d'accès S3
+     (`https://<ref>.supabase.co/storage/v1/s3`, région du projet) et des clés d'accès S3 créées dans
+     Storage → S3 Access Keys, jamais la clé `service_role` : ces clés valent pour **tous les buckets du
+     projet**, aucune ne se limite à un bucket.
+   - CORS du bucket : `PUT` et `GET` depuis l'origine de chaque adresse de l'application, en-tête
+     `content-type` admis.
+   - CSP de l'application, si elle en pose une : `img-src` et `connect-src` admettent l'origine du bucket.
+   - Routes de `/api/plateforme/*` : `GET files` (l'état du stockage) ; `POST files`
+     `{ node, name, mime, size }` (la demande d'envoi : droit d'écrire le nœud, type par l'extension du nom,
+     50 Mo, 4 Mo pour `html`, `md`, `txt` et `csv`, 10 Go par organisation) ; `POST files/<id>/complete`
+     `{}` (la confirmation, après l'envoi) ; `GET files/<id>[?disposition=inline]` (redirection 302 ;
+     `inline` pour une image matricielle, et sur demande pour un PDF, un `txt` ou un `csv`, `attachment`
+     pour tout le reste) ; `GET files/<id>?check` (`{ data: { available } }`, sans redirection : le stockage
+     sert-il encore l'objet ?) ; `GET files/<id>/markdown` (les blocs d'un `.md`) ; `GET files/<id>/html` (la route
+     isolée d'un fichier HTML, ADR-017). Par un lien public, sans session : `GET public/<jeton>/files/<id>`,
+     `…/markdown` et `…/html`, pour un fichier cité par un bloc publié du contenu partagé.
+   - « Voir » d'un fichier `html` ou `md` ouvre la visionneuse à l'adresse du contenu, `?view=<id>` : la page de
+     l'hôte passe `fileView` (`/n/<chemin>`) ou `publicFileView` (`/p/<jeton>/<chemin>`, avec
+     `routeDesFichiers={publicFilesRoute(<jeton>)}`) à l'écran. Un fichier HTML s'y exécute dans une iframe
+     `sandbox` sans `allow-same-origin`, chargée depuis la route isolée, qui pose elle-même sa CSP, `nosniff`,
+     `Referrer-Policy: no-referrer` et `frame-ancestors 'self'`. L'hôte **exclut ces deux routes**
+     (`/api/plateforme/files/<id>/html` et `/api/plateforme/public/<jeton>/files/<id>/html`) de son
+     `X-Frame-Options` et de sa `Referrer-Policy` globaux, et de toute CSP globale (`next.config.ts` de l'hôte de
+     référence : une source `/((?!api/plateforme/(?:public/[^/]+/)?files/[^/]+/html/?$).*)`). Sa propre CSP, s'il en
+     pose une sur ses pages, admet `frame-src 'self'`.
+   - Dépôt par lien à usage unique (ADR-018) : `upload.link`, derrière `call`, rend à un assistant une adresse
+     `POST /api/plateforme/uploads/<jeton>`, servie **sans session** (le ticket en tient lieu : 15 minutes, un envoi,
+     1 Mo, le droit relu à l'envoi), en texte brut ; une requête qui porte un en-tête `Origin` y est refusée, et
+     l'hôte n'y pose aucun CORS. Pour un assistant sans shell, un formulaire : l'hôte sert la page
+     `/upload/<token>`, sous session, qui passe `uploadForm(db, identity, token)` à `EcranDeDepot` (phrases :
+     `REFUS_DU_DEPOT`) ; l'écran envoie le fichier à `POST /api/plateforme/uploads/<jeton>/form` (à session, même
+     origine). Le formulaire a son propre jeton, distinct de celui de `curl` : chacun n'ouvre que sa route, et le
+     ticket sert une fois, par l'un ou par l'autre. `upload.link` peut aussi télécharger une adresse `https` publique (`source_url`) : la seule requête
+     du paquet vers une adresse choisie par un appelant, adresses privées et de métadonnées refusées.
 
 ## Émetteur d'identité : trois combinaisons
 

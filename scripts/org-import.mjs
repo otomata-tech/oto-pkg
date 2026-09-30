@@ -18,6 +18,10 @@
  * service`) : `platform` par la connexion d'administration, les comptes de la cible par l'API
  * d'administration d'Auth (E01-S10, AC-f4). Il n'écrit que dans l'organisation qu'il crée ; une
  * insertion refusée annule la transaction, l'organisation comprise (AC12) : rien n'est supprimé.
+ * E10-S02 (AC-e4) : après le commit, les octets des fichiers joints (`<fichier>.files/`) sont envoyés au stockage
+ * des variables `PLATFORM_STORAGE_*` sous les nouveaux identifiants ; un document qui porte des fichiers ne s'importe
+ * pas sans elles : le script le dit en les nommant, avant la connexion et toute écriture ; un envoi en échec
+ * est nommé et le code de sortie vaut 1.
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -27,6 +31,7 @@ import { adminSql, codeOf, identifiers, maskValues, messageOf, serviceKeyClient 
 import { parseImportArgs, readOrFail, readVariables } from './lib/org-transfer-args.mjs'
 import { planImport } from './lib/org-transfer-plan.mjs'
 import { batches, formatSummary, nodeDepth, TABLES, validateDoc } from './lib/org-transfer.mjs'
+import { importObjects, requireTransferStore, transferStore } from './lib/org-transfer-files.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const USERS_PER_PAGE = 1000
@@ -235,10 +240,13 @@ async function main(argv) {
   let options
   let doc
   let values
+  let store
   try {
     options = parseImportArgs(argv)
     doc = readDoc(options.in)
     values = readVariables(options.env, process.env, ROOT)
+    // AC-e4 : avant la connexion, la lecture des comptes de la cible (`prepare`) et toute écriture.
+    store = requireTransferStore(transferStore(values), (doc.tables.files ?? []).length, 'importer')
   } catch (error) {
     console.error(messageOf(error))
     return 1
@@ -260,8 +268,9 @@ async function main(argv) {
       tickets,
       domains: options.domains,
     })
-    for (const line of summary) console.log(maskValues(line, hidden))
-    return 0
+    const files = await importObjects(store, { orgId: plan.rows.orgs[0].id, files: plan.files, file: options.in })
+    for (const line of [...summary, ...files.lines]) console.log(maskValues(line, hidden))
+    return files.failed > 0 ? 1 : 0
   } catch (error) {
     console.error(maskValues(messageOf(error), hidden))
     return 1

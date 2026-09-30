@@ -1,7 +1,7 @@
 // @vitest-environment node
-// Isolation de deux organisations, table par table (E09-S05 : AC1 à AC5), sur le projet Supabase
-// d'oto-platform (la base est ici le sujet, testing-strategy.md § Budget de tests). La liste des tables
-// vient du projet (spécification OpenAPI de PostgREST) : une table ajoutée plus tard entre d'elle-même
+// Isolation de deux organisations, table par table (E09-S05 : AC1 à AC5), sur une vraie base (la base
+// est ici le sujet, testing-strategy.md § Budget de tests ; suite portable, E11-S14). La liste des tables
+// vient de la base (catalogue `information_schema`) : une table ajoutée plus tard entre d'elle-même
 // dans la preuve ; tables, RLS, policies et privilèges d'`authenticated` viennent des migrations du
 // paquet (`packagePolicies`). Les données : A et B de `donnees.ts`. Une écriture tentée sur une ligne
 // de B est attendue refusée par le privilège quand `authenticated` ne l'a pas, sinon par l'isolation.
@@ -14,14 +14,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import type { PlatformDb } from "../../../packages/plateforme/server/db"
 import { withAnonSession, type Tx } from "../../../packages/plateforme/server/sql"
-import { hex, SKIP_REASON, supabaseConfigured } from "../../helpers/plateforme"
+import { hex } from "../../helpers/plateforme"
 import { platformFunctions, type Command } from "../../helpers/platform-tables"
-import { SQL_SKIP_REASON, sqlConfigured } from "../../helpers/sql"
+import { portable, sqlConfigured } from "../../helpers/sql"
 import { keyOf, preparer, type Isolation, type Row, type Scope, type Who } from "./donnees"
 
 const SETUP_TIMEOUT = 300_000
 const NETWORK_TIMEOUT = 120_000
-const configured = supabaseConfigured && sqlConfigured
 const SUITE = "isolation of two organisations, table by table"
 
 /**
@@ -44,6 +43,10 @@ const PLATFORM_JOURNAL = "admin_journal"
 const ANON_FUNCTIONS: Record<string, string> = {
   org_by_host: "E02-S01",
   public_node_by_token: "ADR-013 § 4",
+  // E10-S02 (lot c) : un fichier servi par un lien, borné au jeton et aux blocs publiés du périmètre.
+  public_file_by_token: "ADR-016 § 7",
+  // E10-S02 (lot f) : la consommation d'un ticket de dépôt par lien, bornée à son empreinte et à l'organisation de l'adresse.
+  consume_upload_ticket: "ADR-018 § 3",
 }
 
 /**
@@ -64,6 +67,10 @@ const AUTHORS = ["user_id", "created_by", "invited_by", "granted_by", "activated
 const CREATION: Readonly<Record<string, Row>> = {
   feedback: { state: "open", resolution: null, handled_by: null, handled_at: null },
   sim_outbox: { status: "draft", sent_at: null, sent_by: null },
+  // Un fichier joint naît `pending` (`files_insert_member`, E10-S02).
+  files: { status: "pending" },
+  // Un ticket de dépôt porte deux empreintes uniques (E10-S02 lot f) : le clone en prend des neuves, que seule l'organisation refuse.
+  upload_tickets: { token_hash: "0".repeat(64), form_token_hash: "1".repeat(64) },
 }
 
 type Failure = { code?: string; message?: string }
@@ -112,8 +119,8 @@ function answerOf(run: Promise<readonly unknown[]>, rows: boolean): Promise<Answ
   )
 }
 
-describe.skipIf(!configured)(
-  configured ? SUITE : `${SUITE} (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!sqlConfigured)(
+  portable(SUITE),
   { timeout: NETWORK_TIMEOUT },
   () => {
     let data: Isolation & { nettoyer: () => Promise<void> }

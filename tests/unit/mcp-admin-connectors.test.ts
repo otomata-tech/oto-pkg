@@ -176,15 +176,19 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       ])
       const { connector } = await session()
       const listed = await connector({ op: "catalogue" })
-      // Deux connecteurs natifs : `table`, et `node` (E11-S02, AC-h1 : abandon d'un brouillon, corbeille).
+      // Trois connecteurs natifs : `table`, `node` (E11-S02, AC-h1 : abandon d'un brouillon, corbeille) et `upload`
+      // (E10-S02 lot f, ADR-018 : le dépôt par lien).
       const native = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "table")
       const nodes = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "node")
+      const uploads = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "upload")
       expect(nodes.map((fn) => `${fn.name} (${fn.class})`)).toEqual(["node.discard_draft (sensitive)", "node.trash (sensitive)"])
+      expect(uploads.map((fn) => `${fn.name} (${fn.class})`)).toEqual(["upload.link (write)"])
       expect(listed.text).toBe(
         [
           "- mail (simulated): active since 2026-09-24 by Ada Martin — mail.create_draft (write), mail.send_draft (sensitive)",
           `- table (built in): always active — ${native.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           `- node (built in): always active — ${nodes.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
+          "- upload (built in): always active — upload.link (write)",
           "- application functions: always active — erp.lookup_customer (read)",
         ].join("\n"),
       )
@@ -202,6 +206,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
         },
         { name: "table", kind: "built_in", activable: false, state: "always_active", since: null, functions: native.map((fn) => ({ name: fn.name, class: fn.class })) },
         { name: "node", kind: "built_in", activable: false, state: "always_active", since: null, functions: nodes.map((fn) => ({ name: fn.name, class: fn.class })) },
+        { name: "upload", kind: "built_in", activable: false, state: "always_active", since: null, functions: [{ name: "upload.link", class: "write" }] },
         { name: "application", kind: "application", activable: false, state: "always_active", since: null, functions: [{ name: "erp.lookup_customer", class: "read" }] },
       ])
       // Sans activation, le connecteur activable est dit inactif (HN-E08S06-9).

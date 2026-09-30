@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
- * demo-seed — sème l'organisation « Démo » dans le projet Supabase (E01-S05).
+ * demo-seed — sème l'organisation « Démo » (E01-S05) : dans le projet Supabase ; en mode OIDC, pour les
+ * tests, dans une base sans Supabase Auth (E11-S14).
  *
  * Ce que ça empêche : des contrôles visuels, des smoke tests et des essais sans organisation où se
  * connecter. Outillage du dépôt : jamais importé par le paquet ni par l'hôte (architecture § 4,
  * ADR-006 § 3), ce que garde `tests/unit/cle-service-hors-paquet.test.ts`. `platform` se lit et
  * s'écrit par la connexion d'administration (`PLATFORM_ADMIN_DATABASE_URL`), jamais par le Data API
- * (E01-S10, AC-f4) ; la clé secrète ne sert plus qu'à l'API d'administration d'Auth : le compte E2E,
- * et elle est éprouvée avant la première écriture (`prepareOrg`).
+ * (E01-S10, AC-f4). En mode Supabase, la clé secrète ne sert plus qu'à l'API d'administration d'Auth :
+ * le compte E2E, et elle est éprouvée avant la première écriture (`prepareOrg`) ; en mode OIDC, ni clé
+ * ni compte (ci-dessous).
  *
  * Les données viennent des sections `scripts/demo/NN-<nom>.mjs`, chargées dans l'ordre du
  * préfixe : chaque story qui ajoute un type de donnée ajoute son fichier (contrat : `DemoSection`,
@@ -16,6 +18,13 @@
  * Usage : `pnpm demo:seed` ; `--reset` supprime l'organisation (cascade) avant de la resemer ;
  * `--slug <slug>` sème « Démo <slug> » au lieu de `demo`. Variables : environnement du processus,
  * puis `.env.local`, puis `.env` ; aucune valeur n'est imprimée.
+ *
+ * Mode OIDC (`PLATFORM_OIDC_ISSUER` posée, E11-S14, HN-E11S14-2, sur le motif de `platform-staff.mjs`,
+ * fiche D77 A) : aucun compte Supabase. `--user <identifiant>` est exigé : la personne E2E est cet
+ * identifiant interne, email `E2E_USER_EMAIL`, nom « Compte E2E » ; un identifiant tiré ici ne serait
+ * relié à aucun sujet de l'émetteur. Seules la connexion d'administration et `E2E_USER_EMAIL` sont
+ * exigées ; ni l'API d'administration d'Auth, ni sa sonde (`prepareOrg`). Hors de ce mode, `--user` est
+ * refusé et rien ne change.
  *
  * Le script crée l'organisation si elle manque, et n'agit sur une organisation existante que si elle
  * est de démonstration (`guardOrg`) : marquée `settings.demo` par la section `identite` qui l'a
@@ -26,7 +35,7 @@ import { readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { maybeOne, must } from './demo/publication.mjs'
-import { adminSql, codeOf, envFileTexts, maskValues, messageOf, missingVariables, resolveVariables, serviceKeyClient } from './lib/env.mjs'
+import { adminSql, codeOf, envFileTexts, maskValues, messageOf, missingVariables, OIDC_VARIABLE, oidcMode, resolveVariables, serviceKeyClient, UUID } from './lib/env.mjs'
 
 
 /**
@@ -38,9 +47,11 @@ import { adminSql, codeOf, envFileTexts, maskValues, messageOf, missingVariables
 /**
  * @typedef {object} DemoContext
  * @property {import('postgres').Sql} sql  connexion d'administration (`PLATFORM_ADMIN_DATABASE_URL`) : tout `platform`
- * @property {import('@supabase/supabase-js').GoTrueAdminApi} auth  API d'administration d'Auth, à la clé secrète : les comptes
- * @property {{ supabaseUrl: string, anonKey: string, siteUrl: string | undefined,
- *              e2eEmail: string, e2ePassword: string }} env
+ * @property {import('@supabase/supabase-js').GoTrueAdminApi | null} auth  API d'administration d'Auth, à la clé
+ *   secrète : les comptes ; nulle en mode OIDC, où la personne E2E est `env.e2eUserId`
+ * @property {{ supabaseUrl: string | undefined, anonKey: string | undefined, siteUrl: string | undefined,
+ *              e2eEmail: string, e2ePassword: string | undefined, e2eUserId?: string }} env
+ *   Supabase et mot de passe absents en mode OIDC ; `e2eUserId` : l'identifiant de `--user`, en mode OIDC seul
  * @property {{ slug: string, name: string, prefix: string, isDemo: boolean }} spec
  * @property {{ id: string } | null} org  posé par `identite`
  * @property {{ id: string, email: string, name?: string | null } | null} e2eUser  posé par `identite`
@@ -65,16 +76,22 @@ const REQUIRED_ENV = [
   'E2E_USER_PASSWORD',
 ]
 const OPTIONAL_ENV = ['NEXT_PUBLIC_SITE_URL']
+/** Les seules variables du mode OIDC : `platform` par la connexion d'administration, l'email de la personne E2E. */
+const OIDC_REQUIRED_ENV = ['PLATFORM_ADMIN_DATABASE_URL', 'E2E_USER_EMAIL']
 
 export const INVALID_SLUG = 'Slug invalide : 2 à 12 minuscules ou chiffres, commençant par une lettre.'
-export const OPTIONS = 'Options : --reset, --slug <slug>'
+export const INVALID_USER = 'Identifiant invalide : --user attend l\'identifiant interne (uuid) de la personne E2E.'
+export const OPTIONS = 'Options : --reset, --slug <slug>, --user <identifiant> (mode OIDC)'
+export const USER_WITHOUT_OIDC = `--user ne sert qu'en mode OIDC (${OIDC_VARIABLE} posée) : sur Supabase Auth, la personne E2E est le compte de E2E_USER_EMAIL.`
+export const OIDC_WITHOUT_USER = `Mode OIDC (${OIDC_VARIABLE} posée) : --user <identifiant> exigé, l'identifiant interne de la personne E2E ; aucun compte n'est créé.`
 
 /**
  * @param {string[]} argv
- * @returns {{ reset: boolean, slug: string }}
+ * @returns {{ reset: boolean, slug: string, user: string | undefined }}
  */
 export function parseArgs(argv) {
-  const options = { reset: false, slug: DEMO_SLUG }
+  /** @type {{ reset: boolean, slug: string, user: string | undefined }} */
+  const options = { reset: false, slug: DEMO_SLUG, user: undefined }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === '--reset') {
@@ -82,11 +99,15 @@ export function parseArgs(argv) {
     } else if (arg === '--slug') {
       options.slug = argv[i + 1] ?? ''
       i += 1
+    } else if (arg === '--user') {
+      options.user = argv[i + 1] ?? ''
+      i += 1
     } else {
       throw new Error(`Option inconnue : ${arg}. ${OPTIONS}`)
     }
   }
   if (!SLUG_PATTERN.test(options.slug)) throw new Error(INVALID_SLUG)
+  if (options.user !== undefined && !UUID.test(options.user)) throw new Error(INVALID_USER)
   return options
 }
 
@@ -102,13 +123,15 @@ export function orgSpec(slug) {
 /**
  * Variables du script : l'environnement du processus l'emporte, puis `fileTexts` dans l'ordre
  * (`.env.local`, puis `.env`). Comme `vitest.config.ts`, une variable présente, même vide, masque
- * les sources suivantes ; vide, elle manque. `missing` : noms seulement.
+ * les sources suivantes ; vide, elle manque. `missing` : noms seulement. `oidc` : les seules variables
+ * du mode OIDC sont exigées.
  * @param {Record<string, string | undefined>} processEnv
  * @param {string[]} fileTexts
+ * @param {boolean} [oidc]
  * @returns {{ values: Record<string, string>, missing: string[] }}
  */
-export function resolveEnv(processEnv, fileTexts) {
-  return resolveVariables(processEnv, fileTexts, REQUIRED_ENV, OPTIONAL_ENV)
+export function resolveEnv(processEnv, fileTexts, oidc = false) {
+  return resolveVariables(processEnv, fileTexts, oidc ? OIDC_REQUIRED_ENV : REQUIRED_ENV, OPTIONAL_ENV)
 }
 
 /**
@@ -231,18 +254,20 @@ export async function resetOrg(sql, slug, orgId, print) {
  * d'Auth, où la section `identite` lit et crée le compte E2E ; la garde, qui peut déjà poser la marque ;
  * puis `--reset`. Une clé refusée, ou l'API injoignable (`codeOf` : « réseau », un 5xx), arrête tout
  * avant la garde : la Démo n'est ni marquée ni supprimée pour échouer ensuite, faute de compte (comme
- * avant E01-S10, quand la garde lisait à la clé).
- * @param {{ sql: import('postgres').Sql, auth: import('@supabase/supabase-js').GoTrueAdminApi }} access
- *   connexion d'administration ; API d'administration d'Auth
+ * avant E01-S10, quand la garde lisait à la clé). En mode OIDC (`auth` nul), ni clé ni compte : aucune sonde.
+ * @param {{ sql: import('postgres').Sql, auth: import('@supabase/supabase-js').GoTrueAdminApi | null }} access
+ *   connexion d'administration ; API d'administration d'Auth, nulle en mode OIDC
  * @param {{ slug: string, isDemo: boolean }} spec
  * @param {boolean} reset
  * @param {(line: string) => void} print
  * @returns {Promise<void>}
  */
 export async function prepareOrg({ sql, auth }, spec, reset, print) {
-  const { error } = await auth.listUsers({ page: 1, perPage: 1 })
-  if (error) {
-    throw new Error(`API d'administration d'Auth injoignable ou clé secrète refusée (${codeOf(error)}) : rien n'est écrit ni supprimé.`)
+  if (auth) {
+    const { error } = await auth.listUsers({ page: 1, perPage: 1 })
+    if (error) {
+      throw new Error(`API d'administration d'Auth injoignable ou clé secrète refusée (${codeOf(error)}) : rien n'est écrit ni supprimé.`)
+    }
   }
   const orgId = await guardOrg(sql, spec, print)
   if (reset) await resetOrg(sql, spec.slug, orgId, print)
@@ -257,7 +282,18 @@ async function main(argv) {
     return 1
   }
 
-  const { values, missing } = resolveEnv(process.env, envFileTexts(ROOT))
+  const texts = envFileTexts(ROOT)
+  // L'émetteur de l'hôte : absent, Supabase Auth et son compte E2E ; posé, la personne de `--user`, sans compte.
+  const { oidc } = oidcMode(process.env, texts)
+  if (options.user !== undefined && !oidc) {
+    console.error(USER_WITHOUT_OIDC)
+    return 1
+  }
+  if (oidc && options.user === undefined) {
+    console.error(OIDC_WITHOUT_USER)
+    return 1
+  }
+  const { values, missing } = resolveEnv(process.env, texts, oidc)
   if (missing.length > 0) {
     console.error(`${missingVariables(missing)} (voir .env.example)`)
     return 1
@@ -272,7 +308,7 @@ async function main(argv) {
     const spec = orgSpec(options.slug)
     // Dans le `try` : une URL illisible lève ici, et seul son message masqué est imprimé.
     sql = adminSql(values)
-    const auth = serviceKeyClient(values).auth.admin
+    const auth = oidc ? null : serviceKeyClient(values).auth.admin
     print(`Organisation ${spec.slug} (« ${spec.name} »)`)
     await prepareOrg({ sql, auth }, spec, options.reset, print)
     /** @type {DemoContext} */
@@ -285,6 +321,7 @@ async function main(argv) {
         siteUrl: values.NEXT_PUBLIC_SITE_URL,
         e2eEmail: values.E2E_USER_EMAIL,
         e2ePassword: values.E2E_USER_PASSWORD,
+        e2eUserId: options.user,
       },
       spec,
       org: null,

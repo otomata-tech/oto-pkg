@@ -1,0 +1,60 @@
+// @vitest-environment node
+// Le markdown des fichiers joints (E10-S02 lot d, AC-d1) : le rendu de l'image jointe et du bloc `file`, relatif ou sur
+// l'origine que `read` donne, et leur relecture par `parseMarkdown`, de toute origine (aller-retour, ADR-011 § 5) ; un
+// lien ordinaire reste un paragraphe ; une étiquette écrite à la main donne des métadonnées provisoires, que `writeNode`
+// remplace (AC-d3) ; un texte hostile se lit en temps linéaire (`security-patterns.md § Validation des inputs`).
+import { describe, expect, it } from "vitest"
+import { PAGE_MAX, renderBlock, renderBlocks, type BlockInput } from "../../packages/plateforme/schemas"
+import { fileSizeText } from "../../packages/plateforme/schemas/files"
+import { parseMarkdown } from "../../packages/plateforme/server/nodes/markdown-parse"
+import { TEMPS_LINEAIRE_MS } from "../helpers/temps-lineaire"
+
+const IMAGE = "f1000000-0000-4000-8000-000000000001"
+const FILE = "f2000000-0000-4000-8000-000000000002"
+const ORIGIN = "https://acme.oto.test/api/plateforme/files"
+
+const report: BlockInput = { type: "file", text: null, data: { file_id: FILE, name: "Rapport (v2) ](final).pdf", size: 1_234_567, mime: "application/pdf" } }
+const plan: BlockInput = { type: "image", text: null, data: { file_id: IMAGE, alt: "Plan du site" } }
+
+/** Les blocs d'un texte lu comme `write` le lit (strict). */
+function blocksOf(text: string): BlockInput[] {
+  const parsed = parseMarkdown(text)
+  if ("problem" in parsed) throw new Error(parsed.problem)
+  return parsed.blocks
+}
+
+describe("markdown of attached files (AC-d1)", () => {
+  it("should render an internal image and a file on the route given, relative without one", () => {
+    expect(renderBlocks([plan, report], { fileRoute: ORIGIN })).toBe(
+      `![Plan du site](${ORIGIN}/${IMAGE})\n\n[Rapport (v2) ](final).pdf (1,234,567 bytes, pdf)](${ORIGIN}/${FILE})`,
+    )
+    expect(renderBlock(report)).toBe(`[Rapport (v2) ](final).pdf (1,234,567 bytes, pdf)](/api/plateforme/files/${FILE})`)
+    expect([fileSizeText(1), fileSizeText(2)]).toEqual(["1 byte", "2 bytes"])
+  })
+
+  it.each([
+    ["the origin of read", ORIGIN],
+    ["another origin", "http://localhost:3000/api/plateforme/files"],
+    ["no origin", "/api/plateforme/files"],
+  ])("should read both forms back from %s, identical", (_name, route) => {
+    expect(blocksOf(renderBlocks([plan, report], { fileRoute: route }))).toEqual([plan, report])
+  })
+
+  it("should take the uuid in lower case, give a hand-written label provisional metadata, and keep an ordinary link as a paragraph", () => {
+    expect(blocksOf(`![](${ORIGIN}/${IMAGE.toUpperCase()})`)).toEqual([{ type: "image", text: null, data: { file_id: IMAGE, alt: "" } }])
+    expect(blocksOf(`[le rapport](/api/plateforme/files/${FILE})`)).toEqual([
+      { type: "file", text: null, data: { file_id: FILE, name: "le rapport", size: 1, mime: "application/octet-stream" } },
+    ])
+    for (const text of [`[x](https://acme.oto.test/api/plateforme/public/jeton/files/${FILE})`, "[x](https://example.com/rapport.pdf)", `[x](/api/plateforme/files/${FILE}/html)`]) {
+      expect(blocksOf(text)).toEqual([{ type: "paragraph", text, data: {} }])
+    }
+  })
+
+  it("should read a hostile line of brackets in linear time", () => {
+    const line = `[${"](".repeat(Math.floor((PAGE_MAX - 60) / 2))}](/api/plateforme/files/${FILE})`
+    const start = performance.now()
+    const blocks = blocksOf(line)
+    expect(performance.now() - start).toBeLessThan(TEMPS_LINEAIRE_MS)
+    expect(blocks.map((block) => block.type)).toEqual(["file"])
+  })
+})

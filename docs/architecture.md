@@ -35,6 +35,8 @@ graph TB
 | Écran du paquet (mutation) | API du paquet | `/api/plateforme/<ressource>`, même origine |
 | Lecteur anonyme | Page publique d'un lien de partage | `/p/<jeton>`, sans session (ADR-013) |
 | Services du paquet | Schéma `platform` | SQL au nom de l'appelant vérifié, sous RLS d'isolation (ADR-012 § 1) |
+| Services du paquet, navigateur | Stockage d'objets compatible S3 (fichiers joints) | Troisième port (ADR-016) : URL présignées, clés d'accès S3 de l'hôte ; sans elles, fichiers désactivés |
+| Claude Code (`curl`) | Dépôt d'un fichier | `POST /api/plateforme/uploads/<jeton>`, sans session : ticket à usage unique d'`upload.link` (ADR-018) |
 | Services du paquet | API des tiers (CRM, mail, ERP) | V2 : connecteurs TypeScript du paquet, secret du compte lu dans le coffre (ADR-019) |
 
 **Trois cas de client, un seul code.**
@@ -87,6 +89,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   │   ├── page.tsx                            # Accueil
 │   │   ├── n/[...chemin]/page.tsx              # Tout nœud de l'arbre : page, procédure, Contexte, tableau
 │   │   ├── equipes/, journal/, connect/        # Équipes et droits ; journal ; brancher un assistant
+│   │   ├── upload/[token]/page.tsx             # Formulaire de dépôt d'un assistant sans shell (`form_url`, ADR-018 § 8)
 │   │   └── admin/…                             # Tableau de bord : organisation, accès, connecteurs, drapeaux, marque, usage, retours
 │   ├── app/(auth)/, app/auth/callback, app/auth/confirmer   # Mode Supabase : connexion, lien magique, réinitialisation, invitation acceptée au retour
 │   ├── app/auth/oidc/{login,callback,logout}   # Mode OIDC : connexion chez l'émetteur, session en cookie chiffré
@@ -152,6 +155,8 @@ erDiagram
     nodes ||--o{ blocks : "contenu (lignes comprises)"
     nodes ||--o| node_drafts : "brouillon ouvert"
     nodes ||--o{ node_shares : "liens publics"
+    nodes ||--o{ files : "fichiers joints"
+    orgs ||--o{ upload_tickets : ""
     nodes ||--o{ access_rules : ""
     accounts ||--o{ access_rules : ""
     orgs ||--o{ accounts : ""
@@ -175,11 +180,13 @@ erDiagram
 | `teams`, `team_members` | Équipes et appartenance | `slug` (ni `guide`, ni `perso`, ni `private`, ni `contexte`, ni `journal`), `name`, `lead_user_id` ; `team_members.role` (`lead` · `member`), dérivé du responsable |
 | `nodes` | Page, procédure, Contexte ou tableau (métadonnées ; le contenu est dans `blocks`) | `parent_id` (racine : null), `path` (unique par organisation ; suit le titre, l'ancien reste un alias ; un chemin pris donne le premier libre, `<segment>_2`, `_3`…, jamais un refus ; les espaces personnels sous `private`, anciens chemins `perso/…` gardés en alias), `lpath` (ltree généré), `kind` (`page` · `procedure` · `context` · `table` ; `context` ⇔ chemin de Contexte), `title` (≤ 200), `summary` (1 à 200), `status`, `revision` (0 = jamais publié), `position` (ordre parmi les frères ; nul = rangé par chemin), `deleted_at` (corbeille), `meta` (schéma d'un tableau seulement), `owner_kind` / `owner_team_id` / `owner_user_id` (null = hérité), `created_by`, `updated_by`, dates, `search_tsv` (générée : titre poids A, résumé poids B) |
 | `node_drafts` | Brouillon ouvert d'un nœud | `node_id` (clé), `base_revision`, en-tête en attente (`title`, `summary`, `kind`, `meta`), `created_by`, `updated_by`, dates |
-| `blocks` | Tout le contenu : blocs des documents et lignes des tableaux | `id` (fabriqué par la base), `state` (`draft` · `published`), `org_id` (posé par la base), `node_id`, `position`, `type` (`heading` · `paragraph` · `list` · `checklist` · `code` · `call` · `mermaid` · `image` · `callout` · `reference` · `simple_table` · `divider` · `toggle` · `row` ; titres de niveau 1 à 5, listes imbriquées sur trois niveaux), `text` (nul pour un `row`), `data`, `key` (obligatoire et immuable pour un `row`), `provenance`, `revision`, `claimed_by`, `claimed_by_user`, `lease_until`, auteurs, dates, `search_tsv` ; clé (`id`, `state`) ; unique (`node_id`, `state`, `key`) |
+| `blocks` | Tout le contenu : blocs des documents et lignes des tableaux | `id` (fabriqué par la base), `state` (`draft` · `published`), `org_id` (posé par la base), `node_id`, `position`, `type` (`heading` · `paragraph` · `list` · `checklist` · `code` · `call` · `mermaid` · `image` · `callout` · `reference` · `simple_table` · `divider` · `toggle` · `file` · `row` ; titres de niveau 1 à 5, listes imbriquées sur trois niveaux ; `file` : `{file_id, name, size, mime}`, repris de la ligne `files` ; `image` : `src` (`https`) ou `file_id`, jamais les deux, et `width` facultatif `small` · `medium` · `full`), `text` (nul pour un `row` et un `file`), `data`, `key` (obligatoire et immuable pour un `row`), `provenance`, `revision`, `claimed_by`, `claimed_by_user`, `lease_until`, auteurs, dates, `search_tsv` ; clé (`id`, `state`) ; unique (`node_id`, `state`, `key`) |
 | `node_versions` | Historique publié | `node_id`, `revision`, `title`, `summary`, `kind`, `meta`, `blocks` (instantané des blocs publiés ; sans lignes pour un tableau), `author`, `created_at` |
 | `node_aliases` | Anciens chemins | `old_path`, `node_id` ; clé (`org_id`, `old_path`) |
 | `links` | Liens `[[…]]` et blocs `reference` | `source_node_id`, `source_block_id`, `target_path`, `target_key` (`[[chemin#clé]]`), `target_node_id` (null si sans cible) |
 | `node_shares` | Lien public d'un nœud (ADR-013) | `node_id`, `token` (43 caractères base64url, unique), `include_children`, `created_by`, `created_at`, `revoked_at` ; un seul lien actif par nœud |
+| `files` | Fichier joint à un nœud (ADR-016) : métadonnées seules, les octets dans le stockage sous la clé `<org_id>/<id>` | `node_id` (cascade), `name` (1 à 255, jamais dans la clé), `mime`, `size` (1 octet à 50 Mo), `status` (`pending` · `ready` ; insertion `pending` seule), `created_by`, `created_at` ; quota de 10 Go par organisation sous le verrou 7501 ; un fichier appartient à un seul nœud |
+| `upload_tickets` | Ticket d'envoi d'`upload.link` (ADR-018), jamais exporté | `user_id`, `ctx`, `token_hash` et `form_token_hash` (empreintes SHA-256 des jetons de `curl` et du formulaire, uniques, jamais un jeton), `kind` (`file` · `md` · `csv`), `mode`, `target_path`, `name`, `title`, `summary`, `key`, `base_revision`, `publish`, `expires_at` (15 minutes), `used_at` ; lu par sa personne et, expiré, par tout membre ; aucune mise à jour hors `consume_upload_ticket` |
 | `access_rules` | Un droit | `node_id` **ou** `account_id` ; exactement un sujet : `subject_team_id`, `subject_user_id` ou `subject_org` (nœud seulement, ADR-014) ; `level` (`none` · `read` · `write` · `manage`) ; unique par cible et sujet |
 | `platform_staff` | Équipe plateforme (sans `org_id`) | `user_id` (clé), `email`, `name`, `added_by`, `added_at` ; écrite par l'outillage seul |
 | `platform_grants` | Accès d'un consultant à une organisation | `user_id`, `granted_by`, `granted_at`, `revoked_at`, `revoked_by`, `reason` ; `user_email`, `user_name` copiés de `platform_staff` ; un seul accès en cours par couple ; révocation datée par la base |
@@ -219,8 +226,10 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `open_draft(node)` | Ouvre le brouillon d'un nœud : ligne `node_drafts`, copie des blocs publiés sous les mêmes `id` ; rend la révision de base |
 | `publish_node(node, base_revision, draft_stamp, links)` | Publication atomique sous verrou consultatif : garde de révision et de tampon (`PT409` → `stale_revision`), blocs `draft` → `published`, révision + 1, instantané dans `node_versions`, liens écrits, brouillon effacé ; ne lit aucun niveau (le service décide, dès l'écriture) |
 | `discard_draft(node, draft_stamp)` | Abandon atomique du brouillon entier d'un nœud publié, sous le verrou 7401 de `publish_node` : `42501` hors des organisations de l'appelant, `55000` sans brouillon, `PT409` sur tampon changé ; blocs `draft` puis `node_drafts` supprimés, état publié intact ; rend la révision. Seul chemin de suppression d'un brouillon hors publication (ADR-011 § 3) |
-| `duplicate_subtree(source, nodes, segment, title, position)` | Copie d'un nœud et des descendants que le service a choisis, blocs publiés et lignes compris, en une transaction ; ne borne que l'organisation de l'appelant et la forme |
+| `duplicate_subtree(source, nodes, segment, title, position)` | Copie d'un nœud et des descendants que le service a choisis, blocs publiés et lignes compris, en une transaction ; ne borne que l'organisation de l'appelant et la forme ; chaque fichier cité par un bloc publié copié reçoit une ligne neuve `pending` sous la copie, `file_id` réécrit, paires rendues (`copied_files`) : le service copie les objets après le commit (ADR-016 § 6) |
 | `public_node_by_token(org, token, path)` | Lecture publique bornée au jeton et à l'organisation de l'adresse (`anon` seul, ADR-013) : dernière version publiée, enfants si le lien les couvre, dans la limite de ce que l'auteur du lien lit à cet instant (`node_level_of`) ; lignes publiées d'un tableau, 500 au plus ; null pour tout le reste |
+| `public_file_by_token(org, token, file)` | Même règle pour un fichier (`anon` seul, ADR-016 § 7) : fichier `ready` cité par un bloc publié (`file` ou `image`) d'un nœud du périmètre ; rend `id`, `name`, `mime`, `size`, le chemin du nœud, jamais la clé ; null pour tout le reste |
+| `consume_upload_ticket(org, hash, form)` | Porte sans session du dépôt (`anon` seul, ADR-018 § 3) : un `update` conditionnel sert le ticket une fois, par le jeton de la porte appelante, dans sa propre transaction ; rend la personne, son e-mail dans `members` et la destination, ou null |
 | `norm(text)`, `norm_words(text)`, configuration `platform.fr` | Normalisation sans accent, mots `[a-z0-9]`, plein texte français |
 | `block_search_text(type, text, data, key)` | Texte cherchable d'un bloc, source de `blocks.search_tsv` |
 | `route_candidates(org, query, kind, limit)` | Composantes du score de routage sur le titre et le résumé : chaque formulation du résumé cherchée à part (`s_phrase`), mots pesés par leur rareté parmi les candidates lisibles, titre compté à part (`lexical_title`), demande corrigée par `lexicon_fix` en plus de la demande telle quelle ; présélection par index, niveau de lecture et corbeille appliqués avant la coupe ; le service redécide (ADR-003) |
@@ -259,7 +268,8 @@ dans les colonnes accordées une à une. Seule la portée plateforme appelle `is
 les droits se décident dans le service (ADR-012 § 3). Les écritures sans porte de l'API passent
 par les fonctions du paquet : racine et `private` jamais supprimés, versions, liens et alias écrits
 par `publish_node` et les déclencheurs, `identities` par `identity_for_caller()`, `orgs` créées
-par `create_org`. Rien pour `anon`, sauf `org_by_host` et `public_node_by_token`.
+par `create_org`. Rien pour `anon`, sauf `org_by_host`, `public_node_by_token`, `public_file_by_token`
+et `consume_upload_ticket`.
 
 **Outillage.** Organisation Démo, équipe plateforme, export-import, oubli d'une personne, ménage
 OAuth, tests d'intégration : par la connexion d'administration (`PLATFORM_ADMIN_DATABASE_URL`),
@@ -285,6 +295,9 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `context/` | Moteur de blocs de `context` : `code` (règles « How this workspace works » et langue de réponse), procédure servie, une partie par Contexte (Tout le monde, Privé, chaque équipe) ouverte par sa ligne de faits (organisation, personne, équipe, connecteurs de l'équipe par défaut) puis le Contexte, les contenus rangés dessous et ses pages liées, nouveautés, procédures utiles, « Recent content » ; blocs servis entiers sous un plafond de 35 000 caractères, coupe dite (ADR-002 § 7) ; `BlockReport.head` | MCP, écrans (aperçu) |
 | `routing.ts`, `find.ts` | Score, décision au seuil de l'organisation, consigne des candidats ; recherche de `find` | MCP, écrans |
 | `nodes/` | `read` (blocs rendus en markdown : en-tête, plan, section, référence au bloc ; un bloc de type ou de forme inconnus rendu en ligne de commentaire, que `write` refuse de perdre), `write` (markdown analysé en blocs, opérations par section et par bloc, publiées par défaut, brouillon sur `publish: false` ; mode tolérant réservé à l'écran : collage, `.md` importé), export `.md` d'un nœud publié (`export.ts`), publication dès le niveau écriture (le chemin suit le titre au même niveau), abandon d'un brouillon (`discard.ts`, `node.discard_draft`), liens, alias, blocs `reference`, déplacement, ordre des frères, duplication, corbeille (purge après 30 jours par le service, sans tâche planifiée ; `node.trash` derrière `call`), liens de partage public | MCP, API, écrans |
+| `files/` | Fichiers joints (ADR-016) : le port `FileStore` (`store.ts`, nul sans les cinq variables `PLATFORM_STORAGE_*`), l'adaptateur S3 signé par `aws4fetch` (`s3.ts`) et celui des tests (`memory.ts`) ; demande d'envoi, confirmation, lecture par redirection, disponibilité, texte d'un fichier (`readFileText`), purge, copie, envoi par le serveur (`service.ts`) ; visionneuse et lecture publique (`view.ts`) ; en-têtes et texte des deux routes HTML (`html.ts`, ADR-017) | API, écrans, MCP (`read {file}`) |
+| `uploads.ts`, `uploads-write.ts`, `uploads-fetch.ts` | `upload.link` (ADR-018) : ticket, consommation sous `anon`, identité reconstruite, journal, formulaire de dépôt ; destination décidée au lien et relue à l'envoi, écriture d'un fichier, d'un `.md` ou d'un CSV ; téléchargement contrôlé d'une adresse fournie (schéma, port, adresses résolues, redirections, 10 s, 1 Mo) | MCP (`call`), API |
+| `bounded-read.ts` | `readBounded` : seul lecteur borné d'un corps (porte du dépôt, adresse fournie, texte d'un fichier), refus choisi par l'appelant | API, services |
 | `procedures.ts`, `procedures-check.ts`, `prompts.ts` | Contrôle à la publication des blocs `call` d'une procédure ; prompts (procédures publiées lisibles, message = titre) | MCP, API |
 | `catalog/` | Registre des fonctions, recherche et contrats servis par `read` ; fonctions `table.*` ; `node.discard_draft` et `node.trash` (connecteur natif `node`) ; contrats non appelables `write.*` ; source des fonctions métier de l'ERP | MCP, MCP admin |
 | `connectors/` | Activation, comptes simulés, résolution du compte dans un ordre fixe, équipe porteuse, connecteur simulé `mail` | MCP, API, MCP admin |
@@ -313,7 +326,15 @@ rejoue sur chaque lot, et les règles d'une valeur de tableau (`tables.ts` : `is
   ressource sans organisation (`cell`, équipe plateforme) se reconnaît avant l'identité par
   l'adresse. Routes du tableau de bord sous `admin/*`. `GET nodes/export` et `GET tables/export`
   rendent `{filename, content}`, des lectures sans ligne de journal (D138) ; `POST tables/import`
-  écrit un lot de 500 lignes d'un CSV.
+  écrit un lot de 500 lignes d'un CSV. Vérification de la session en deux temps, réponses d'erreur
+  JSON et contrôle d'origine d'une mutation dans `api/session.ts`, partagés par la table de dispatch
+  et les branches qui passent avant elle. Fichiers : `api/files.ts` (`GET files`, `POST files`,
+  `POST files/<id>/complete`, `GET files/<id>` en redirection 302, `?check`, `…/markdown`) et
+  `api/files-html.ts` (route isolée `files/<id>/html` et son pendant public, branche avant le
+  dispatch, texte brut, ADR-017) ; `public/<jeton>/files/…` passe par la porte publique.
+  **Porte sans session qui écrit** (ADR-018) : `api/uploads.ts`, `POST uploads/<jeton>`, avant le
+  jeton de session, texte brut, toute requête à `Origin` refusée ; à côté, la route à session du
+  formulaire, `POST uploads/<jeton>/form`, que monte la page `/upload/<token>` de l'hôte.
 - `ui/` : écrans en Server Components, qui reçoivent leurs données et leurs rappels par props
   (`.method/conventions/portage-ecrans.md`) ; mutations par `api/`. Une procédure s'y édite et s'y
   lit comme une page (texte seul, un bloc `call` déjà écrit rendu en texte) ; ses blocs `call`, la
@@ -380,7 +401,9 @@ L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platf
   compte-rendu dit le mode du compte et les identifiants de ce qui est parti.
 - Coffre (V2) : secrets chiffrés par le paquet (AES-GCM, clé dans l'environnement).
 - En-têtes de sécurité dans `next.config.ts` (`X-Frame-Options: DENY`…) : à rouvrir par ADR le
-  jour où une vue s'intègre en cadre chez un client.
+  jour où une vue s'intègre en cadre chez un client. Les deux routes HTML d'ADR-017 en sont exclues
+  (`X-Frame-Options`, `Referrer-Policy`) : l'iframe de la visionneuse les charge, et elles posent
+  leurs propres en-têtes.
 
 ## 7. Installation et exploitation d'un hôte
 
@@ -404,7 +427,8 @@ Pas à pas, variables et vérifications : `packages/plateforme/README.md` et oto
   `demo:seed` (organisation Démo), `platform:staff`, `org:export` et `org:import` (une
   organisation, corbeille comprise, d'une base à une autre ; accès plateforme importés révoqués ;
   personnes rapprochées par email vérifié ; les personnes se lisent par l'API d'administration de
-  Supabase Auth), `oauth:clients` (ménage), `test:cleanup` (données de test orphelines) ; pour un projet Supabase : `auth:settings` (réglages d'Auth reproductibles) et
+  Supabase Auth ; les octets des fichiers joints dans `<fichier>.files/`, stockage exigé s'il y en a,
+  ADR-016 § 8), `oauth:clients` (ménage), `test:cleanup` (données de test orphelines) ; pour un projet Supabase : `auth:settings` (réglages d'Auth reproductibles) et
   `data-api:close` (`platform` hors des schémas exposés).
 - **CI du dépôt du paquet** : `pnpm check:migrations` (le SQL reste dans `platform` et additif),
   `pnpm build`, et `bare-postgres` : `db prepare`, la ligne de base, la fumée, puis la suite
@@ -445,7 +469,7 @@ choix ne changent pas sans ADR.
   fonction bornée au jeton (ADR-013).
 - Fichiers derrière un troisième port, un stockage d'objets compatible S3 configuré par l'hôte ;
   les octets jamais en base (ADR-016). Un fichier HTML ne se voit que dans un iframe isolé, origine
-  opaque, sans accès à l'hôte (ADR-017). La seule porte sans session qui écrit est le ticket d'envoi (ADR-018, proposé).
+  opaque, sans accès à l'hôte (ADR-017). La seule porte sans session qui écrit est le ticket d'envoi (ADR-018).
 
 **Code** : les quatre invariants de `CLAUDE.md § Invariants techniques` (Server Components par
 défaut, Server Actions pour les mutations de l'hôte, un schéma Zod par donnée, RLS sur toute table

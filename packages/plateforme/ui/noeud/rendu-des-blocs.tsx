@@ -21,8 +21,13 @@
 //
 // E10-S04 : un titre prend la balise de son niveau (AC-b3, remplace E05-S10 AC-a5), une liste ses sous-listes
 // (AC-b1) ; tableau simple, séparateur et repli (AC-a1 à AC-a3) ; barré et saut de ligne en ligne (AC-c1).
+//
+// E10-S02 (lot b) : une image jointe se lit à la route de ses octets, toute image à sa largeur, agrandie au clic
+// (AC-b1, AC-b3) ; un fichier joint, en carte (AC-b2, `fichier-du-bloc.tsx`). Lot c : les routes des fichiers d'un lien
+// public (`routeDesFichiers`, AC-c5), celles d'une personne connectée par défaut.
 import { Suspense, use, type ReactNode } from "react"
 import { LIST_DEPTH_MAX, simpleTableOf } from "../../schemas/blocks"
+import { filePath } from "../../schemas/files"
 import { fencedParts } from "../../schemas/link-syntax"
 import { isRecord } from "../../schemas/tables"
 import type { Resultat } from "../api/resultat"
@@ -33,6 +38,7 @@ import { LinkedContent } from "../ds/react/linked-content"
 import { ReaderHeading, ReaderList, ReaderParagraph } from "../ds/react/reader"
 import { texteDUnAppel } from "../procedure/libelles"
 import { cibleDe, estUnTableau, segmentsEnLigne, titreDuLien, type CiblesDesLiens, type Segment } from "./en-ligne"
+import { CarteDeFichier, ImageAgrandissable, largeurDe } from "./fichier-du-bloc"
 import { GlypheDeNature } from "./glyphes"
 import { ECRAN } from "./libelles"
 import { ciblesLues } from "./sous-pages"
@@ -49,7 +55,8 @@ type BlocARendre = { type: string; text: string | null; data: Record<string, unk
  */
 type Liens = { Lien: LienDUnBloc; hrefDuChemin: (chemin: string) => string; cibles?: CiblesDesLiens; lecture?: Promise<Resultat<Record<string, unknown>>> }
 
-type RenduProps = Liens & { bloc: BlocARendre }
+/** `routeDesFichiers` : les routes des fichiers d'un lien public (`publicFilesRoute`, AC-c5) ; `FILES_ROUTE` sans elle. */
+type RenduProps = Liens & { bloc: BlocARendre; routeDesFichiers?: string }
 
 /** `numeroter` : chaque lien rendu porte son rang dans `liensDuTexte` (`data-lien`), que l'éditeur lit au clic (E11-S06, AC-b2). */
 type EnLigneProps = Liens & { texte: string; numeroter?: boolean }
@@ -275,16 +282,20 @@ function Preformate({ id, legende, texte }: { id?: string; legende: string; text
   )
 }
 
-function ImageDuBloc({ bloc, ...liens }: RenduProps) {
+/**
+ * Une image (AC-b1, AC-b3) : un fichier joint se lit à sa route, une adresse `https` telle quelle ; l'hôte de la source
+ * ne reçoit pas l'adresse de la page qui l'affiche (`no-referrer`), et une image sous le pli ne part que lorsqu'on
+ * l'approche. Toute autre source n'est pas affichée.
+ */
+function ImageDuBloc({ bloc, routeDesFichiers, ...liens }: RenduProps) {
   const source = chaine(bloc.data.src)
+  const jointe = chaine(bloc.data.file_id)
   const alternatif = chaine(bloc.data.alt)
+  const adresse = jointe !== "" ? filePath(jointe, routeDesFichiers) : /^https:/i.test(source) ? source : null
   return (
     <figure id={bloc.ref} className={`${APRES} space-y-1`}>
-      {/^https:/i.test(source) ? (
-        // Hôte quelconque : il ne reçoit pas l'adresse de la page qui l'affiche (`no-referrer`), et une
-        // image sous le pli ne part que lorsqu'on l'approche.
-        // eslint-disable-next-line @next/next/no-img-element -- source quelconque écrite dans un bloc : next/image exigerait de déclarer chaque hôte, et ui/ n'importe pas Next
-        <img src={source} alt={alternatif} referrerPolicy="no-referrer" loading="lazy" className="max-w-full rounded-md" />
+      {adresse !== null ? (
+        <ImageAgrandissable source={adresse} alt={alternatif} largeur={largeurDe(bloc.data.width)} jointe={jointe !== ""} />
       ) : (
         <p className="text-sm text-ink">{`Image non affichée : adresse non sûre. ${alternatif}`.trim()}</p>
       )}
@@ -331,7 +342,7 @@ function Paragraphe({ bloc, ...liens }: RenduProps) {
  * montré dans un îlot de réglages (E05-S11, AC-24) ; sans elle, `h2` (`baliseDuTitre`).
  */
 export function RenduDUnBloc(props: RenduProps & { rendu?: ReactNode; baliseDeTitre?: "h3" }): ReactNode {
-  const { bloc, rendu, baliseDeTitre, ...liens } = props
+  const { bloc, rendu, baliseDeTitre, routeDesFichiers, ...liens } = props
   switch (bloc.type) {
     case "heading":
       return (
@@ -375,6 +386,17 @@ export function RenduDUnBloc(props: RenduProps & { rendu?: ReactNode; baliseDeTi
       )
     case "reference":
       return rendu === undefined ? <ReferenceEnLien {...props} /> : <div id={bloc.ref}>{rendu}</div>
+    case "file":
+      return (
+        <div id={bloc.ref} className={APRES}>
+          <CarteDeFichier
+            id={chaine(bloc.data.file_id)}
+            nom={chaine(bloc.data.name)}
+            taille={typeof bloc.data.size === "number" ? bloc.data.size : 0}
+            routeDesFichiers={routeDesFichiers}
+          />
+        </div>
+      )
     default:
       return bloc.text ? (
         <ReaderParagraph id={bloc.ref} className="whitespace-pre-line">

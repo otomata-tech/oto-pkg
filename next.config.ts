@@ -16,15 +16,24 @@ const nextConfig: NextConfig = {
     return [{ source: "/plateforme/invitations", destination: "/equipes", permanent: true }]
   },
   // ADR à rouvrir le jour où une vue s'intègre en cadre chez un client (E09).
+  // E10-S02 (AC-c3, ADR-017 § 1) : la route isolée d'un fichier HTML, `/api/plateforme/files/<id>/html` et
+  // `/api/plateforme/public/<jeton>/files/<id>/html`, se charge dans l'iframe de la visionneuse et pose elle-même sa
+  // politique (`frame-ancestors 'self'`, `Referrer-Policy: no-referrer`) : ni `X-Frame-Options` ni la
+  // `Referrer-Policy` globale ne s'y appliquent. Toute autre adresse les garde.
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: [
-          { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+      {
+        source: "/((?!api/plateforme/(?:public/[^/]+/)?files/[^/]+/html/?$).*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
     ]

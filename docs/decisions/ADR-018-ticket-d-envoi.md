@@ -3,7 +3,7 @@
 | Champ | Valeur |
 |-------|--------|
 | **Date** | 2026-09-28 |
-| **Statut** | Proposé (principe : JB, 2026-09-28, fiche D117 ; mise en œuvre : E10-S02 lot f, à valider à sa revue) |
+| **Statut** | Accepté (principe : JB, 2026-09-28, fiches D117, D130 ; mise en œuvre : E10-S02 lot f, approuvée à sa revue ; § 8 : fiches D146, D147) |
 | **Décideur(s)** | JB (le lien à usage unique) ; le pilote (la porte) |
 
 ## Contexte
@@ -27,12 +27,14 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
    - est lié à la personne, à l'organisation, au `ctx`, à la destination, au type et au mode ;
    - vaut 15 minutes et un seul envoi.
 3. **Consommation** : une fonction `security definer` exécutée sous `anon`,
-   `platform.consume_upload_ticket(org, empreinte)`. Elle est bornée à l'empreinte et à
+   `platform.consume_upload_ticket(p_org, p_hash, p_form)`. Elle est bornée à l'empreinte du jeton
+   de la porte appelante (`p_form` : celle du formulaire, § 8, sinon celle de `curl`) et à
    l'organisation de l'adresse de la requête. Elle marque le ticket consommé dans sa propre
-   transaction, **avant** l'écriture, et rend la personne et la destination.
-4. **Identité reconstruite, droits relus** : le serveur bâtit l'appelant `{ userId }` depuis le
-   ticket, puis relit l'appartenance et les droits comme pour toute requête
-   (`security-patterns.md § Droits dans le service`). Un membre retiré ou un droit perdu entre le
+   transaction, **avant** l'écriture, et rend la personne, son e-mail lu dans `members` et la
+   destination.
+4. **Identité reconstruite, droits relus** : le serveur bâtit l'appelant `{ userId, email }` depuis
+   le ticket, puis relit l'appartenance par `identityInOrg` sur l'organisation déjà lue à l'adresse,
+   et les droits comme pour toute requête (`security-patterns.md § Droits dans le service`). Un membre retiré ou un droit perdu entre le
    lien et l'envoi fait échouer l'envoi.
    Un fichier à joindre est envoyé par le serveur au stockage d'ADR-016, par l'URL présignée du
    port, sous les contrôles d'une demande d'envoi (type, taille, quota).
@@ -46,13 +48,19 @@ publics (ADR-013), ne fait que lire, et seulement ce que l'auteur du lien lit à
 
 Cet ADR amende ADR-012 § 3 et la garde de portabilité : la vérification du jeton de l'émetteur
 vaut sur chaque porte, **sauf** cette route, où le ticket en tient lieu.
-7. **Téléchargement d'une adresse fournie** (fiche D130, proposé) : pour un assistant sans shell,
+7. **Téléchargement d'une adresse fournie** (fiche D130) : pour un assistant sans shell,
    `upload.link` accepte une adresse `https` publique que le serveur télécharge. C'est la seule
    requête du paquet vers une adresse choisie par un appelant : schéma, port et adresse résolue sont
    contrôlés avant la requête et à chaque redirection (E10-S02 AC-f13), la taille et le délai bornés.
-8. **Formulaire de dépôt** (fiche D130, proposé) : si le téléchargement échoue, le ticket se consomme
-   depuis une page de la plateforme, sous la session web de la personne du ticket, par une route à
-   session distincte de la porte sans session (§ 5 garde son refus des requêtes à `Origin`).
+8. **Formulaire de dépôt** (fiches D130, D146, D147) : le ticket se consomme aussi depuis une page
+   de la plateforme (`/upload/<token>`, page de l'hôte qui monte l'écran du paquet), sous la session
+   web de la personne du ticket, par une route à session distincte de la porte sans session,
+   `POST /api/plateforme/uploads/<jeton>/form`, sous le contrôle d'origine des mutations (§ 5 garde
+   son refus des requêtes à `Origin`). Le formulaire a **son propre jeton** (32 octets, gardé en
+   empreinte comme le premier) : la porte sans session n'accepte que le jeton de `curl`, la route du
+   formulaire que le sien, et le ticket sert une fois, par l'un ou par l'autre ; un jeton de l'autre
+   porte rend la même `not_found` qu'un ticket inconnu. Sans ce second jeton, qui voyait l'adresse du
+   formulaire écrivait par `curl` sans session, et la session exigée ne protégeait rien.
 
 ## Conséquences
 

@@ -18,15 +18,20 @@
 //
 // E10-S06 : le « + » insère le bloc choisi, « / » change le Texte en lui (AC-a1, AC-a2) ; un séparateur part tout de
 // suite, jamais vide (AC-a4) ; un tableau et un repli, écrits dans leurs propres champs, partent comme un texte.
+//
+// E10-S02 (lot b) : une image et un fichier joint partent comme un texte (texte alternatif, largeur) ; les gestes des
+// fichiers vivent dans `gestes-des-fichiers.ts`.
 import type { FocusEvent, RefObject } from "react"
 import { EDITEUR } from "../libelles"
 import type { Tableau } from "./blocs-de-page"
 import { clavier } from "./clavier"
+import type { FichiersDeLEditeur } from "./envoi-de-fichier"
 import type { Gestes } from "./gestes"
+import { gestesDesFichiers } from "./gestes-des-fichiers"
 import { gestesDuMenu } from "./gestes-du-menu"
 import * as modeleDEdition from "./modele"
 import { avecTexte, formeDe, type BlocEdite, type Choix, type Focus, type Rangee, type Retiree, type Suite } from "./modele"
-import { controler, estVide } from "./operations"
+import { controler, estVide, SANS_TEXTE } from "./operations"
 import { estLaPageVide } from "./page-vide"
 import type { useEnvois } from "./use-envois"
 
@@ -45,6 +50,8 @@ export type EtatDeLEditeur = {
   annulerLeDiffere: (cle: string) => void
   /** Le dernier appui du pointeur dans une rangée, et quand : la sortie d'une rangée qui le suit n'en est pas une (M30). */
   appui: RefObject<{ cle: string; instant: number } | null>
+  /** Les fichiers joints (E10-S02) : le stockage, les envois en cours, le dialogue ouvert. */
+  fichiers: FichiersDeLEditeur
 }
 
 const FIN = Number.MAX_SAFE_INTEGER
@@ -65,7 +72,7 @@ function memeBloc(a: BlocEdite, b: BlocEdite): boolean {
  * a du texte. La publication seule l'attend, et quitter l'onglet demande confirmation.
  */
 export function aEnvoyer(rangee: Rangee, fixe: BlocEdite | undefined): boolean {
-  if (formeDe(rangee.bloc) === null) return false
+  if (formeDe(rangee.bloc) === null && !SANS_TEXTE.has(rangee.bloc.type)) return false
   return fixe ? !memeBloc(fixe, rangee.bloc) : !estVide(rangee.bloc)
 }
 
@@ -130,8 +137,9 @@ function textes(etat: EtatDeLEditeur, supprimer: (cle: string, ailleurs: boolean
     annulerLeDiffere(cle)
     const rangee = trouver(cle)
     if (!rangee || envois.conflit?.cle === cle) return true
-    // Un séparateur, sans forme, part quand il est neuf ou qu'il remplace un Texte (E10-S06, AC-a4).
-    if (formeDe(rangee.bloc) === null && rangee.bloc.type !== "divider") return true
+    // Un séparateur, sans forme, part quand il est neuf ou qu'il remplace un Texte (E10-S06, AC-a4) ; une image ou un
+    // fichier joint, quand son texte alternatif ou sa largeur change (E10-S02, AC-b1, AC-b3).
+    if (formeDe(rangee.bloc) === null && !SANS_TEXTE.has(rangee.bloc.type)) return true
     const fixe = fixes.current.get(cle)
     if (estVide(rangee.bloc) || (fixe && memeBloc(fixe, rangee.bloc))) {
       setErreur(cle, null)
@@ -340,11 +348,13 @@ export function actionsDeLEditeur(etat: EtatDeLEditeur): Omit<Gestes, "poignee" 
   const { envoyerLeTexte, retirerSiVide } = textes(etat, supprimer)
   const { retablirSuppression, fondre, ...struct } = structure(etat, envoyerLeTexte)
   const { envois } = etat
+  const menu = gestesDuMenu(etat, envoyerLeTexte)
   return {
     ...struct,
     supprimer,
     ...sorties(etat, envoyerLeTexte, retirerSiVide),
-    ...gestesDuMenu(etat, envoyerLeTexte),
+    ...menu,
+    ...gestesDesFichiers(etat, menu.deposerUnFichier),
     envoyerLeTexte,
     annoncer: (message: string) => envois.annoncer(message),
     toucher: clavier(etat, { envoyerLeTexte, fondre, deplacer: struct.deplacer }),

@@ -2,7 +2,7 @@
 
 Texte complet : `.method/conventions/state-management.md`. La fiche suffit pour écrire ; le texte complet se lit sur un doute, et toujours pour une revue. Chaque règle renvoie à sa section.
 
-- Une donnée serveur se lit dans un Server Component, jamais par `useEffect`, `fetch` et `useState`. § Règle d'or
+- Une donnée serveur se lit dans un Server Component, jamais par `useEffect`, `fetch` et `useState` ; seule exception écrite : la carte d'un fichier joint demande une fois montée si le stockage sert encore son objet (`GET files/<id>?check`). § Règle d'or
 - Un état partageable (filtres, tri, page, recherche) vit dans l'URL. § Hiérarchie des sources de state · § URL State (recommandé pour les filtres)
 - Une écriture d'URL déclenchée par une frappe passe par `router.replace` dans `startTransition`, jamais `push`. § URL State (recommandé pour les filtres)
 - Tout composant qui appelle `useSearchParams()` est rendu sous un `<Suspense>`. § URL State (recommandé pour les filtres)

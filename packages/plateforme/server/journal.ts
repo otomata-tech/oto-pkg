@@ -28,6 +28,9 @@ const MASKED = "[masked]"
 // Nom de clé comparé sans casse, sans `-` ni `_` (N5) : `api_key`, `x-api-key`, `passwd` et
 // `private_key` compris. `key` seul n'y est pas : c'est la clé métier des lignes de tableau.
 const SECRET_KEY = /secret|token|passw|authorization|apikey|privatekey/
+// `source_url` d'`upload.link` (E10-S02, AC-f14) : l'adresse d'un fichier, parfois signée, jamais gardée au journal.
+// Nom normalisé comparé en entier : `resource_url` ou `datasource_url` restent lisibles.
+const MASKED_NAMES: ReadonlySet<string> = new Set(["sourceurl"])
 const MAX_SIGNATURE_CHARS = 200
 /** `journal.error` : « <code>: <message> » coupé à 500 caractères (N4), aux deux portes et à la lecture (E05-S05). */
 export const MAX_ERROR_CHARS = 500
@@ -82,7 +85,8 @@ export function wellFormed<T>(value: T): T {
 }
 
 function isSecretKey(key: string): boolean {
-  return SECRET_KEY.test(key.toLowerCase().replace(/[-_]/g, ""))
+  const name = key.toLowerCase().replace(/[-_]/g, "")
+  return SECRET_KEY.test(name) || MASKED_NAMES.has(name)
 }
 
 function masked(value: unknown, depth: number): unknown {

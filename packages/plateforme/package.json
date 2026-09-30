@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
+    "aws4fetch": "1.0.20",
     "jose": "6.2.12",
     "mcp-handler": "1.1.0",
     "nodemailer": "10.0.10",

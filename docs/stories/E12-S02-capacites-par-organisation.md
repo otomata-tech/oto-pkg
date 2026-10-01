@@ -175,8 +175,9 @@ Registre et schéma (`schemas/limits.ts`), enregistrement et lecture (`server/li
   (« Abonnement » aux réglages de l'entreprise, écran `abonnement` du fil), et les primitives exportées par `/ui`
   (`Badge`, `Island*`, `SegmentedControl`, `Dialog`, `ConfirmDialog`, `Table`, `Column`, `Skeleton*`, `EmptyState`,
   `Checkbox`, `EnTeteDAdministration`).
-- Reste ouvert : une lecture sans session des compteurs (membres) pour le seuil souple de l'offre payante du SaaS ; elle
-  poserait le même problème que l'écriture sans appelant (ADR-022, contexte). À trancher par JB.
+- Lecture sans session des compteurs, décidée par JB le 2026-10-01 (ADR-022 § 10) : `orgUsage(orgId)`, membres et
+  invitations en attente, par `org_usage` accordée à `anon` (migration de la 1.2.0, partie 2). Les deux migrations
+  de la version réunies en `20261001090000_v1_2_0.sql` (README du paquet, « Publier une version »).
 - AC-9 (MCP) : aucun code de `mcp/` touché, la liste d'outils ne lit aucune capacité ; le refus de stockage passe par
   le formateur commun, déjà testé. Test MCP par `InMemoryTransport` non écrit : il ne prouverait rien que le test du
   service ne prouve (`testing-strategy.md § Budget de tests`).

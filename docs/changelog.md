@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.2.0 : compteurs sans session, inscription OIDC testée à la porte, migrations réunies
+
+**Quoi :** `orgUsage(orgId)` lit sans session les membres et invitations en attente d'une organisation (`org_usage`, accordée à `anon`, ADR-022 § 10) ; un test de la route d'inscription sur un émetteur OIDC de test (forme Logto ou Keycloak : personne inconnue de la base, email non vérifié refusé), à côté de celui de la forme Supabase ; les deux migrations de la version réunies en `20261001090000_v1_2_0.sql` ; `version` 1.2.0 et `## 1.2.0 — 2026-10-01` du CHANGELOG du paquet.
+**Pourquoi :** décisions de JB : compteurs sans session pour le seuil souple du SaaS, inscription dans les deux modes d'émetteur, publication de la 1.2.0.
+**Fichiers :** `packages/plateforme/{server/limits.ts,server/index.ts,migrations/20261001090000_v1_2_0.sql,package.json,CHANGELOG.md,README.md}` (retiré : `migrations/20260930221702_platform_signup.sql`) ; `supabase/migrations/` (même échange) ; tests `e12s01-inscription`, `e12s02-capacites` ; `docs/decisions/ADR-022-*.md` (§ 10), `docs/architecture.md`, `docs/stories/E12-S0{1,2}-*.md`, `.method/sprint/status.md`.
+
 ## [2026-10-01] — Case des conditions de l'hôte à l'inscription (E12-S01), pour la 1.2.0
 
 **Quoi :** `FormulaireDInscription` accepte `conditions={{ libelle, url }}` : une case obligatoire vers les conditions de l'hôte, cochée avant tout envoi ; `signupSchema` porte `accepted_terms` (facultatif) ; `admit` reçoit `acceptedTerms`. Sans `conditions`, aucune case.

@@ -62,6 +62,11 @@ l'organisation, faits pour la mise en service progressive d'un comportement.
    déclarés et lus ; leur contrôle dans `createAccount` appartient au chantier des connecteurs.
 9. **La surface MCP ne change pas** (ADR-002) : la liste des six outils est la même quelles que soient
    les capacités ; seul l'effet d'un outil est refusé, avec le message du service.
+10. **Des compteurs se lisent sans session** (amendement du 2026-10-01, décidé par JB) : l'hôte prévient d'un
+   seuil de membres hors de toute requête d'une personne (tâche planifiée, webhook de paiement). `orgUsage(orgId)`
+   rend le nombre de membres et d'invitations en attente d'une organisation, et rien d'autre, par la fonction
+   `org_usage`, accordée à `anon` comme `org_by_host` et `org_contact` ; `platform` reste hors du Data API, la
+   fonction ne se joint que par le serveur de l'hôte. Une organisation inconnue rend `null`.
 
 ## Conséquences
 

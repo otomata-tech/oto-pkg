@@ -24,8 +24,8 @@ export { fromDatabaseError, HTTP_STATUS, isPlatformError, PLATFORM_ERROR_CODES, 
 export type { PlatformErrorCode } from "./errors"
 export { FLAGS, isEnabled, listFlags, setFlag } from "./flags"
 // E12-S02 (ADR-022) : les capacités d'une organisation, dont l'hôte enregistre la source ; l'état pour les écrans.
-export { orgLimitsView, registerOrgLimits } from "./limits"
-export type { OrgLimitsSource } from "./limits"
+export { orgLimitsView, orgUsage, registerOrgLimits } from "./limits"
+export type { OrgLimitsSource, OrgUsage } from "./limits"
 export {
   identityInOrg,
   normalizeHost,

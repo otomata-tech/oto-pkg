@@ -221,6 +221,7 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `unique_handle(org, email)` | `handle` de l'espace personnel : partie locale de l'email, ASCII, unique dans l'organisation (outillage) |
 | `create_org(name, slug, prefix, hosts)` | Organisation avec sa racine, son dossier `private`, son nœud `contexte` et ses adresses (équipe plateforme), par `org_skeleton` (interne, exécutable par aucun rôle), l'accès `creation` du créateur en plus |
 | `signup_org(name, slug, prefix, hosts)` | Inscription (ADR-023) : l'identité de l'appelant s'il n'en a pas (mode OIDC), l'arbre de départ par `org_skeleton`, les adresses et le premier membre `admin`, sans équipe ni accès plateforme ; refus `42501` sans email, ou pour une personne déjà membre d'une organisation ; verrou 7801 sur la personne. Seconde barrière : l'activation est décidée par le service |
+| `org_usage(org)` | Compteurs d'une organisation lus sans session (ADR-022 § 10) : membres et invitations en attente, rien d'autre ; aucune ligne pour une organisation inconnue (`anon`) |
 | `is_context_path(org, path)` | Seule définition d'un chemin de Contexte : `contexte`, `<équipe>/contexte`, `private/<handle>/contexte` |
 | `node_owner(node)` | Propriétaire effectif d'un nœud : le plus proche ancêtre, lui compris, qui en porte un |
 | `level_rank(level)`, `node_level_of(user, …)`, `node_level_for(…)` | Rang d'un niveau ; `node_level_of` porte le seul corps SQL du niveau de lecture d'un nœud pour une personne (règles de personne, d'équipe et d'organisation, propriétaire, espaces personnels ; ADR-012 § 3, ADR-014), appelable par les fonctions du paquet seulement ; `node_level_for` l'applique à l'appelant pour la recherche, égal au calcul du service (test de parité) |
@@ -270,8 +271,8 @@ dans les colonnes accordées une à une. Seule la portée plateforme appelle `is
 les droits se décident dans le service (ADR-012 § 3). Les écritures sans porte de l'API passent
 par les fonctions du paquet : racine et `private` jamais supprimés, versions, liens et alias écrits
 par `publish_node` et les déclencheurs, `identities` par `identity_for_caller()`, `orgs` créées
-par `create_org`. Rien pour `anon`, sauf `org_by_host`, `public_node_by_token`, `public_file_by_token`
-et `consume_upload_ticket`.
+par `create_org`. Rien pour `anon`, sauf `org_by_host`, `public_node_by_token`, `public_file_by_token`,
+`consume_upload_ticket` et `org_usage`.
 
 **Outillage.** Organisation Démo, équipe plateforme, export-import, oubli d'une personne, ménage
 OAuth, tests d'intégration : par la connexion d'administration (`PLATFORM_ADMIN_DATABASE_URL`),
@@ -308,7 +309,7 @@ dans une transaction, journal. Il rend `{ data }` ou lève `PlatformError`.
 | `feedback.ts` | Tickets | MCP, MCP admin, écrans |
 | `journal-read.ts`, `journal-rows.ts`, `journal-model.ts`, `usage.ts`, `activities.ts` | Lecture du journal par conversation, dans la portée décidée par le service (ses lignes, celles des équipes qu'on mène, toutes pour l'admin) ; arguments masqués et coupés ; un appel sur l'espace personnel d'autrui ne livre à un autre lecteur que son outil, son heure, son issue, son code et sa cible coupée à `private/<handle>` (`perso/<handle>` sur une ligne d'avant ce nom, le journal n'étant pas réécrit) ; usage agrégé ; activités de l'accueil (le journal classé en gestes sur un contenu, dans la même portée, titre et lien seulement pour un contenu que la personne lit) | écrans, MCP, MCP admin |
 | `admin/` | Opérations des huit outils admin, partagées avec le tableau de bord ; journal admin ; point d'extension de la création d'une organisation, que l'hôte branche ; inscription libre (`signup.ts`, ADR-023), sur l'option `signup` de `handlePlateforme` | MCP admin, API |
-| `limits.ts` | Capacités par organisation (ADR-022) : la source de l'hôte (`registerOrgLimits`), lue hors transaction ; le refus au plafond (`requireUnderLimit`, `limitedTx`, verrou 7601) de `inviteMember`, `createTeam`, `activateConnector` ; le quota de fichiers (`orgStorageQuota`, 10 Go par défaut) ; l'état servi aux écrans (`orgLimitsView`) | API, MCP, MCP admin, écrans |
+| `limits.ts` | Capacités par organisation (ADR-022) : la source de l'hôte (`registerOrgLimits`), lue hors transaction ; le refus au plafond (`requireUnderLimit`, `limitedTx`, verrou 7601) de `inviteMember`, `createTeam`, `activateConnector` ; le quota de fichiers (`orgStorageQuota`, 10 Go par défaut) ; l'état servi aux écrans (`orgLimitsView`) ; les compteurs sans session (`orgUsage`, ADR-022 § 10) | API, MCP, MCP admin, écrans |
 | `flags.ts`, `cell.ts`, `brand.ts` | Drapeaux par organisation ; état de la cellule (version, migrations, variables exigées selon le mode) ; marque | MCP admin, écrans |
 | `share-image.ts` | Données de l'image de partage d'une adresse, sans session (E11-S21) : l'organisation de l'adresse (`org_by_host`, logo lu par `fetchSource`, en `data:`), et, pour un lien public, le titre et le résumé que `readPublicNode` sert ; jamais un nœud sans lien ; ne lève jamais (repli générique). Dessinée par `ImageDePartage` (`ui/`), rendue par `ImageResponse` chez l'hôte | Routes d'image de l'hôte |
 

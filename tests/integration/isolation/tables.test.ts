@@ -47,6 +47,8 @@ const ANON_FUNCTIONS: Record<string, string> = {
   public_file_by_token: "ADR-016 § 7",
   // E10-S02 (lot f) : la consommation d'un ticket de dépôt par lien, bornée à son empreinte et à l'organisation de l'adresse.
   consume_upload_ticket: "ADR-018 § 3",
+  // E12-S02 : deux compteurs d'une organisation lus sans session (membres, invitations en attente), rien d'autre.
+  org_usage: "ADR-022 § 10",
 }
 
 /**

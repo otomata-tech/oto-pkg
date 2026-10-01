@@ -187,7 +187,7 @@ Service `signUp`, route `POST /api/platform/signup` servie sans organisation (co
 | isSignupRoute, signupResponse | `packages/plateforme/api/signup.ts` | route sans organisation |
 | signupSchema | `packages/plateforme/schemas/admin.ts` | registry |
 | FormulaireDInscription | `packages/plateforme/ui/inscription/formulaire-d-inscription.tsx` | registry |
-| signup_org, org_skeleton | `migrations/20260930221702_platform_signup.sql` | fonctions seules |
+| signup_org, org_skeleton | `migrations/20261001090000_v1_2_0.sql` (partie 1) | fonctions seules |
 
 ### Notes
 - **HN-E12S01-4** : le refus d'`admit` porte son texte dans `details.text` : l'API ne sert pas le message d'une erreur

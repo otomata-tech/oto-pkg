@@ -379,6 +379,9 @@ paquet ne connaît ni offre, ni prix, ni prestataire. Sans rien enregistrer, rie
   « Relever la limite », vers `<raiseUrl>?capacity=<nom>` (`raiseUrl` : `https://…` ou un chemin de
   l'hôte, résolu sur l'adresse de l'organisation). `AdressesDuRail.abonnement` ajoute l'écran
   « Abonnement » de l'hôte aux réglages de l'entreprise.
+- **Compteurs sans session** : `orgUsage(orgId)` rend `{ members, pendingInvitations }` d'une organisation
+  hors de toute requête d'une personne (tâche planifiée, webhook de paiement), pour prévenir d'un seuil sans
+  refuser ; `null` pour une organisation inconnue.
 
 ## Inscription libre
 
@@ -394,7 +397,7 @@ Une personne connectée, membre d'aucune organisation, crée la sienne et en dev
   l'adresse de la nouvelle organisation, où la personne se reconnecte (la session est liée à l'adresse).
   `conditions={{ libelle, url }}` y ajoute une case obligatoire vers les conditions de l'hôte ; le corps porte
   alors `accepted_terms: true`, qu'`admit` reçoit (`acceptedTerms`) pour refuser sans elle et en garder la preuve.
-- **Comptes** : en mode OIDC, l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
+- **Comptes** : l'inscription marche dans les deux modes d'émetteur. En mode OIDC (Logto, Keycloak), l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
   crée l'identité de la personne. En mode Supabase, `hook_before_user_created` refuse tout compte sans
   invitation : l'hôte qui ouvre l'inscription retire ce hook de ses réglages d'Auth.
 - **Refus** : `email_required`, `already_member` (une organisation par compte), `signup_refused` (le

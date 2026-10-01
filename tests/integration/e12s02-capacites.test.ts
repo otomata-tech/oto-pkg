@@ -10,6 +10,7 @@ import {
   createTeam,
   inviteMember,
   orgLimitsView,
+  orgUsage,
   registerOrgLimits,
   resolveIdentity,
   type Identity,
@@ -20,6 +21,10 @@ import { memoryFileStore } from "../../packages/plateforme/server/files/memory"
 import { requestFileUpload } from "../../packages/plateforme/server/files/service"
 import { hex } from "../helpers/plateforme"
 import { createSqlFixtures, SQL_SKIP_REASON, sqlConfigured, type SqlFixtures, type SqlReferenceOrg } from "../helpers/sql"
+import { pendingMigrations } from "../helpers/pending-migrations"
+
+/** `org_usage` (migration de la 1.2.0) : son cas se saute tant qu'elle manque à la base visée. */
+const usagePending = (await pendingMigrations()).includes("20261001090000")
 
 const storage = vi.hoisted(() => ({ store: null as ReturnType<typeof import("../../packages/plateforme/server/files/memory").memoryFileStore> | null }))
 
@@ -181,6 +186,16 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? "organisation limits (E12-S02)" 
     expect(() => registerOrgLimits({ read: () => null, raiseUrl: "http://acme.test/billing" })).toThrow(TypeError)
     expect(() => registerOrgLimits({ read: () => null, raiseUrl: "/billing" })).not.toThrow()
     expect(() => registerOrgLimits({ read: () => null, raiseUrl: "https://acme.test/billing" })).not.toThrow()
+  })
+
+  it.skipIf(usagePending)("should read the members and pending invitations of an organisation without a session (ADR-022 § 10)", async () => {
+    const [{ members }] = await fx.admin<{ members: number }[]>`select count(*)::int as members from platform.members where org_id = ${o.org.id}`
+    const [{ pending }] = await fx.admin<{ pending: number }[]>`
+      select count(*)::int as pending from platform.invitations
+       where org_id = ${o.org.id} and accepted_at is null and declined_at is null and revoked_at is null and expires_at > now()`
+    expect(await orgUsage(o.org.id)).toEqual({ members, pendingInvitations: pending })
+    expect(await orgUsage("00000000-0000-4000-8000-000000000000")).toBeNull()
+    expect(await refusal(orgUsage("not-an-id"))).toMatchObject({ code: "invalid_arguments" })
   })
 
   it("should read account_owner_kinds and accounts_per_owner_max without refusing anything (AC-11)", async () => {

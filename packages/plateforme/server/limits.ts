@@ -6,10 +6,11 @@
 //
 // La fonction de l'hôte se lit hors de toute transaction (elle peut lire sa propre base) ; le compte et l'écriture
 // qu'il garde tiennent dans la transaction du service, sous le verrou de l'organisation.
+import * as z from "zod/v4"
 import { ORG_QUOTA_BYTES, orgLimitsSchema, type LimitState, type OrgLimits, type OrgLimitsView } from "../schemas"
 import { describeOwner, isOrgAdmin } from "./access"
-import type { PlatformDb } from "./db"
-import { inTransaction, PlatformError } from "./errors"
+import { createAnonPlatformDb, type PlatformDb } from "./db"
+import { inTransaction, invalidInput, PlatformError } from "./errors"
 import type { Identity } from "./identity"
 import type { Tx } from "./sql"
 
@@ -149,4 +150,21 @@ export async function orgLimitsView(db: PlatformDb, identity: Identity): Promise
     return max === undefined ? null : { max, used: counts[name] }
   }
   return { members: state("members_max"), teams: state("teams_max"), connectors: state("connectors_max"), raiseUrl }
+}
+
+/** Ce qu'une organisation compte, lu sans session : ses membres et ses invitations en attente. */
+export type OrgUsage = { members: number; pendingInvitations: number }
+
+/**
+ * Les compteurs de l'organisation `orgId`, lus sans session (ADR-022 § 10) : l'hôte en a besoin hors de toute requête
+ * d'une personne (tâche planifiée, webhook de paiement), pour prévenir d'un seuil sans refuser. Par `org_usage`, sous
+ * `anon`, deux nombres et rien d'autre ; `null` pour une organisation inconnue.
+ */
+export async function orgUsage(orgId: string): Promise<OrgUsage | null> {
+  const parsed = z.uuid().safeParse(orgId)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const [row] = await inTransaction(createAnonPlatformDb(), "orgUsage: org_usage", (sql) =>
+    sql<{ members: number; pending_invitations: number }[]>`select members, pending_invitations from platform.org_usage(${parsed.data})`,
+  )
+  return row ? { members: row.members, pendingInvitations: row.pending_invitations } : null
 }

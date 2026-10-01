@@ -5,16 +5,17 @@
 // Portable : personnes de `createLocalFixtures`, jetons signés localement ; le point de création de l'hôte simulé. Les
 // organisations créées par le service sont retirées en fin de suite, puis les personnes oubliées.
 import { randomUUID } from "crypto"
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import { createPlatformDb, signUp, type OrgCreationHook, type PlatformDb, type SignupOptions } from "@otomata_tech/oto_platform/server"
 import { hex } from "../helpers/plateforme"
 import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
 import { failureOf, SQL_SKIP_REASON, sqlConfigured, type SqlReferenceOrg, type SqlUser } from "../helpers/sql"
 import { pendingMigrations, pendingReason } from "../helpers/pending-migrations"
+import { testIssuer } from "../helpers/oidc-issuer"
 
 /** La migration de l'inscription : les cas se sautent, la version nommée, tant qu'elle manque à la base visée. */
-const SIGNUP_VERSION = "20260930221702"
+const SIGNUP_VERSION = "20261001090000"
 const pending = (await pendingMigrations()).includes(SIGNUP_VERSION)
 
 const NETWORK_TIMEOUT = 60_000
@@ -162,6 +163,46 @@ describe.skipIf(!sqlConfigured || pending)(pending ? `${suite} (${pendingReason(
     expect(results.filter((result) => result === null)).toHaveLength(1)
     expect(results.find((result) => result !== null)).toMatchObject({ code: "forbidden", details: { reason: "already_member" } })
     expect(await fx.admin`select org_id from platform.members where user_id = ${user.id}`).toHaveLength(1)
+  })
+
+  describe("an OIDC host, as with Logto or Keycloak (AC-8)", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+      vi.unstubAllGlobals()
+    })
+
+    it("should sign up a person unknown to the base through the route, and refuse an unverified email", async () => {
+      const issuer = await testIssuer()
+      const audience = "https://signup.test/api/mcp"
+      vi.stubEnv("PLATFORM_OIDC_ISSUER", issuer.issuer)
+      vi.stubEnv("PLATFORM_OIDC_AUDIENCE", audience)
+      vi.stubGlobal("fetch", issuer.fetch)
+      const subject = `logto-${randomUUID()}`
+      const email = `test-${hex(6)}@example.invalid`
+      const post = (token: string, body: unknown) =>
+        handlePlateforme(
+          new Request("https://signup.test/api/platform/signup", {
+            method: "POST",
+            headers: { origin: "https://signup.test", "x-forwarded-proto": "https", "content-type": "application/json" },
+            body: JSON.stringify(body),
+          }),
+          { accessToken: token, host: "signup.test", signup: SIGNUP, defer: () => {} },
+        )
+
+      const unverified = await issuer.sign({ sub: `logto-${randomUUID()}`, email, email_verified: false }, { audience })
+      const refused = await post(unverified, { ...draft(), confirm: true })
+      expect(refused.status).toBe(403)
+      expect(await refused.json()).toMatchObject({ error: { code: "forbidden", details: { reason: "email_required" } } })
+
+      const input = draft()
+      createdSlugs.push(input.org)
+      const token = await issuer.sign({ sub: subject, email, email_verified: true, name: "Iris Blanc" }, { audience })
+      const created = await post(token, { ...input, confirm: true })
+      expect(created.status).toBe(201)
+      const [identity] = await fx.admin<{ user_id: string }[]>`select user_id from platform.identities where issuer = ${issuer.issuer} and subject = ${subject}`
+      mintedUsers.push(identity.user_id)
+      expect(await fx.admin`select m.role from platform.members m join platform.orgs g on g.id = m.org_id where g.slug = ${input.org} and m.user_id = ${identity.user_id}`).toEqual([{ role: "admin" }])
+    })
   })
 
   describe("the route (AC-1, AC-2, AC-11)", () => {

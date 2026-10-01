@@ -1,3 +1,10 @@
+-- Version 1.2.0 du paquet : les migrations de la version, réunies dans ce fichier, chacune précédée d'une bannière
+-- qui nomme sa story ; un seul bloc ROLLBACK en fin de fichier, les parties dans l'ordre inverse.
+
+-- ====================================================================================================
+-- Partie 1 : E12-S01 (inscription libre, ADR-023).
+-- ====================================================================================================
+
 -- E12-S01 (ADR-023) : l'inscription libre. Une personne vérifiée crée son organisation, si l'hôte l'active
 -- (`signup` de `handlePlateforme`) ; la décision est celle du service (`server/admin/signup.ts`, ADR-012 § 3), cette
 -- fonction en est la seconde barrière et tient la création en une transaction. Aucune table ni colonne.
@@ -116,7 +123,34 @@ $_$;
 REVOKE ALL ON FUNCTION platform.signup_org(p_name text, p_slug text, p_prefix text, p_hosts text[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION platform.signup_org(p_name text, p_slug text, p_prefix text, p_hosts text[]) TO authenticated;
 
--- ROLLBACK: (jamais exécuté depuis le paquet)
+-- ====================================================================================================
+-- Partie 2 : E12-S02 (compteurs d'une organisation lus sans session, ADR-022 § 10).
+-- ====================================================================================================
+
+-- L'hôte qui vend le paquet prévient d'un seuil de membres hors de toute requête d'une personne (tâche planifiée,
+-- webhook de paiement) : il lit, sans session, deux nombres d'une organisation qu'il désigne par son identifiant, et
+-- rien d'autre. Accordée à `anon`, comme `org_by_host` et `org_contact`, par l'ADR qui l'ouvre ; `platform` reste hors
+-- du Data API de Supabase (`data-api:close`), la fonction ne se joint que par le serveur de l'hôte. Une organisation
+-- inconnue ne rend aucune ligne.
+CREATE FUNCTION platform.org_usage(p_org uuid) RETURNS TABLE(members integer, pending_invitations integer)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+  select (select count(*)::int from platform.members m where m.org_id = o.id),
+         (select count(*)::int from platform.invitations i
+           where i.org_id = o.id and i.accepted_at is null and i.declined_at is null
+             and i.revoked_at is null and i.expires_at > now())
+    from platform.orgs o
+   where o.id = p_org
+$_$;
+
+REVOKE ALL ON FUNCTION platform.org_usage(p_org uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION platform.org_usage(p_org uuid) TO anon;
+
+-- ROLLBACK: (jamais exécuté depuis le paquet) — les parties dans l'ordre inverse de ce fichier.
+-- E12-S02 :
+--   drop function platform.org_usage(uuid) ;
+-- E12-S01 :
 --   drop function platform.signup_org(text, text, text, text[]) ;
 --   -- create_org : reprendre le corps de 20260929090000_platform_e05s13.sql (partie 3), puis
 --   drop function platform.org_skeleton(text, text, text, text[], uuid).

@@ -7,7 +7,7 @@
 import { randomUUID } from "crypto"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
-import { createPlatformDb, signUp, type OrgCreationHook, type PlatformDb, type SignupOptions } from "@otomata_tech/oto_platform/server"
+import { createPlatformDb, listMyOrganisations, resolveIdentity, signUp, type OrgCreationHook, type PlatformDb, type SignupOptions } from "@otomata_tech/oto_platform/server"
 import { hex } from "../helpers/plateforme"
 import { createLocalFixtures, type LocalFixtures } from "../helpers/session-locale"
 import { failureOf, SQL_SKIP_REASON, sqlConfigured, type SqlReferenceOrg, type SqlUser } from "../helpers/sql"
@@ -16,7 +16,10 @@ import { testIssuer } from "../helpers/oidc-issuer"
 
 /** La migration de l'inscription : les cas se sautent, la version nommée, tant qu'elle manque à la base visée. */
 const SIGNUP_VERSION = "20261001090000"
-const pending = (await pendingMigrations()).includes(SIGNUP_VERSION)
+const missing = await pendingMigrations()
+const pending = missing.includes(SIGNUP_VERSION)
+/** La migration de la 1.3.0 (`signup_org` sans borne) : ses cas se sautent tant qu'elle manque à la base visée. */
+const manyPending = missing.includes("20261001180000")
 
 const NETWORK_TIMEOUT = 60_000
 const SETUP_TIMEOUT = 180_000
@@ -79,17 +82,27 @@ describe.skipIf(!sqlConfigured || pending)(pending ? `${suite} (${pendingReason(
     expect(await refusal(signUp(db, { email: "" }, draft(), { signup: SIGNUP, request }))).toMatchObject({ code: "forbidden", details: { reason: "email_required" } })
   })
 
-  it("should refuse a member of an organisation in the service, and in signup_org behind it (AC-4)", async () => {
+  it.skipIf(manyPending)("should let a member of an organisation create another one, and list both for the switcher", async () => {
     const ada = o.people.ada
-    expect(await refusal(signUp(fx.as(ada), ada, { ...draft(), confirm: true }, { signup: SIGNUP, request }))).toEqual({
-      code: "forbidden",
-      message: "You already belong to an organisation. To create another one, ask the platform team.",
-      details: { reason: "already_member" },
-    })
+    const db = fx.as(ada)
     const input = draft()
-    expect(await failureOf(fx.as(ada).tx((sql) => sql`select platform.signup_org(${input.name}, ${input.org}, ${input.prefix}, ${["x.signup.test"]}::text[])`))).toMatchObject({
-      code: "42501",
-    })
+    await signed(db, ada, input)
+    expect(await fx.admin`select m.role from platform.members m join platform.orgs g on g.id = m.org_id where g.slug = ${input.org} and m.user_id = ${ada.id}`).toEqual([{ role: "admin" }])
+
+    const identity = await resolveIdentity(db, o.host, { userId: ada.id, email: ada.email })
+    const mine = await listMyOrganisations(db, identity)
+    expect(mine.map((org) => [org.name, org.host, org.current]).sort()).toEqual(
+      [
+        [o.org.name, o.host, true],
+        [input.name, `${input.org}.signup.test`, false],
+      ].sort(),
+    )
+  })
+
+  it("should refuse a caller without an identity nor an issuer in signup_org itself", async () => {
+    const input = draft()
+    const anonymous = createPlatformDb({ caller: { issuer: "https://issuer.signup.test", issuerKind: "supabase", subject: "not-a-uuid", email: "x@example.invalid", name: null } })
+    expect(await failureOf(anonymous.tx((sql) => sql`select platform.signup_org(${input.name}, ${input.org}, ${input.prefix}, ${["x.signup.test"]}::text[])`))).toMatchObject({ code: "42501" })
   })
 
   it("should pass the host's refusal text as is, and serve its failure as internal (AC-5)", async () => {
@@ -155,14 +168,13 @@ describe.skipIf(!sqlConfigured || pending)(pending ? `${suite} (${pendingReason(
     expect(await fx.admin`select org_id from platform.members where user_id = ${user.id}`).toHaveLength(0)
   })
 
-  it("should create one organisation out of two concurrent signups of the same person (AC-10)", async () => {
+  it.skipIf(manyPending)("should create both organisations of two concurrent signups of the same person", async () => {
     const { user, db } = await newcomer()
     const [first, second] = [draft(), draft()]
     createdSlugs.push(first.org, second.org)
     const results = await Promise.all([first, second].map((input) => refusal(signUp(db, user, { ...input, confirm: true }, { signup: SIGNUP, request }))))
-    expect(results.filter((result) => result === null)).toHaveLength(1)
-    expect(results.find((result) => result !== null)).toMatchObject({ code: "forbidden", details: { reason: "already_member" } })
-    expect(await fx.admin`select org_id from platform.members where user_id = ${user.id}`).toHaveLength(1)
+    expect(results).toEqual([null, null])
+    expect(await fx.admin`select org_id from platform.members where user_id = ${user.id} and role = 'admin'`).toHaveLength(2)
   })
 
   describe("an OIDC host, as with Logto or Keycloak (AC-8)", () => {

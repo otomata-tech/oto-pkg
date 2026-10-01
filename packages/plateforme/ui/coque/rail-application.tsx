@@ -77,7 +77,7 @@ function useTiroirDuRail(chemin: string) {
 
 export type RailApplicationProps = DonneesDuRail & { adresses: AdressesDuRail }
 
-export function RailApplication({ entreprise, arbre: servi, equipes, handle, compte, administre, adresses }: RailApplicationProps) {
+export function RailApplication({ entreprise, arbre: servi, equipes, handle, compte, administre, adresses, organisations }: RailApplicationProps) {
   const { chemin } = useHote()
   const tiroir = useTiroirDuRail(chemin)
   const { arbre, enPanne } = useArbreDuRail(servi, chemin)
@@ -90,7 +90,7 @@ export function RailApplication({ entreprise, arbre: servi, equipes, handle, com
         <AnimatedIcon as={List} size="sm" />
       </IconButton>
       <Rail id={idDuRail} open={tiroir.ouvert} onClose={tiroir.fermer}>
-        <EntrepriseDuRail entreprise={entreprise} adresses={adresses} administre={administre} />
+        <EntrepriseDuRail entreprise={entreprise} adresses={adresses} administre={administre} organisations={organisations} />
         <RailScroll>
           {adresses.accueil !== undefined && (
             <RailItem as={LigneDuRail} href={adresses.accueil} label={RAIL.accueil} icon={<AnimatedIcon as={SquaresFour} size="xs" />} active={chemin === adresses.accueil} />

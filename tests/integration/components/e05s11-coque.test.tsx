@@ -45,12 +45,12 @@ function Lien({ href, children, ...reste }: AnchorHTMLAttributes<HTMLAnchorEleme
   )
 }
 
-function monterLeRail() {
+function monterLeRail(props: Partial<RailApplicationProps> = {}) {
   render(
     <CoquilleOto pleinePage>
       <ContexteDeRafraichissement.Provider value={vi.fn()}>
         <ContexteDeLHote.Provider value={{ Lien, chemin: "/n/ventes/qualifier", naviguer: vi.fn(), deconnecter: vi.fn() }}>
-          <RailApplication {...PROPS} />
+          <RailApplication {...PROPS} {...props} />
         </ContexteDeLHote.Provider>
       </ContexteDeRafraichissement.Provider>
     </CoquilleOto>,
@@ -137,5 +137,48 @@ describe("the table glyph (E11-S05, AC-h2)", () => {
 
     render(<NavigateurDArbre resultat={{ data: [{ chemin: "ventes/suivi", titre: "Suivi des prospects", nature: "tableau" }] }} hrefDuNoeud={(n) => `/n/${n.chemin}`} Lien={Lien} />)
     expect(traceDans(screen.getByRole("link", { name: "Suivi des prospects" }))).toBe(TRACE_DE_TABLE)
+  })
+})
+
+describe("the organisation switcher of the company menu (several organisations per person)", () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  const ORGANISATIONS = [
+    { id: "org-a", name: "Atelier", host: "atelier.oto.test", current: false },
+    { id: "org-d", name: "Démo", host: "demo.oto.test", current: true },
+    { id: "org-s", name: "Sans adresse", host: null, current: false },
+  ]
+
+  it("should list the reachable organisations of the person, the current one checked, and leave for the address of the chosen one", () => {
+    const assign = vi.fn()
+    vi.stubGlobal("location", { ...window.location, protocol: "https:", assign })
+    const rail = monterLeRail({ organisations: ORGANISATIONS })
+    fireEvent.click(within(rail).getByRole("button", { name: /^Entreprise : Démo\. Réglages et changement d'entreprise/ }))
+    const choix = within(screen.getByRole("menu")).getAllByRole("menuitemradio")
+    expect(choix.map((item) => [item.textContent, item.getAttribute("aria-checked")])).toEqual([
+      ["Atelier", "false"],
+      ["Démo", "true"],
+    ])
+    fireEvent.click(choix[0])
+    expect(assign).toHaveBeenCalledWith("https://atelier.oto.test/")
+  })
+
+  it("should offer to create an organisation under the switcher when the host gives its signup address, and not otherwise", () => {
+    const rail = monterLeRail({ organisations: ORGANISATIONS, adresses: { ...PROPS.adresses, inscription: "/signup" } })
+    fireEvent.click(within(rail).getByRole("button", { name: /^Entreprise : Démo/ }))
+    const menu = screen.getByRole("menu")
+    const items = [...menu.querySelectorAll("[role^='menuitem']")].map((item) => item.textContent)
+    expect(items.slice(-3)).toEqual(["Atelier", "Démo", "Créer une organisation"])
+    cleanup()
+
+    const sans = monterLeRail({ organisations: ORGANISATIONS })
+    fireEvent.click(within(sans).getByRole("button", { name: /^Entreprise : Démo/ }))
+    expect(within(screen.getByRole("menu")).queryByRole("menuitem", { name: "Créer une organisation" })).toBeNull()
+  })
+
+  it("should show no switcher with a single organisation", () => {
+    const rail = monterLeRail({ organisations: [ORGANISATIONS[1]] })
+    fireEvent.click(within(rail).getByRole("button", { name: /^Entreprise : Démo/ }))
+    expect(within(screen.getByRole("menu")).queryAllByRole("menuitemradio")).toEqual([])
   })
 })

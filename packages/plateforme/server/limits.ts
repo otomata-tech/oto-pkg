@@ -103,9 +103,19 @@ function limitText(orgName: string, name: CountedLimit, max: number): string {
 }
 
 /**
+ * L'équipe plateforme avec un accès en cours à l'organisation : elle passe les limites comptées (décision du
+ * 2026-10-01), ce qu'un administrateur de l'organisation ne fait pas. Un membre de l'équipe plateforme sans accès en
+ * cours reste un membre comme un autre.
+ */
+function passesLimits(identity: Identity): boolean {
+  return identity.isStaff && identity.hasOpenGrant
+}
+
+/**
  * Refuse l'ajout qui passerait la limite `name` (ADR-022 § 3), dans la transaction qui écrira ensuite : le verrou de
  * l'organisation, puis le compte ; au plafond, `forbidden` (`reason: "limit"`, `limit`, `max`). À qui n'administre pas,
- * le refus nomme qui peut la faire relever. Sans valeur pour `name`, rien n'est lu.
+ * le refus nomme qui peut la faire relever. Sans valeur pour `name`, rien n'est lu. L'équipe plateforme passe : une
+ * ligne du journal de l'organisation, écrite dans la même transaction que l'ajout, nomme la limite passée.
  */
 export async function requireUnderLimit(sql: Tx, { db, identity, limits }: LimitScope, name: CountedLimit): Promise<void> {
   const max = limits[name]
@@ -113,6 +123,12 @@ export async function requireUnderLimit(sql: Tx, { db, identity, limits }: Limit
   await sql`select pg_catalog.pg_advisory_xact_lock(${LIMIT_LOCK}, pg_catalog.hashtext(${identity.org.id}::text))`
   const counts = await limitCounts(sql, identity.org.id)
   if (counts[name] < max) return
+  if (passesLimits(identity)) {
+    await sql`
+      insert into platform.journal (org_id, user_id, method, tool, target, args)
+      values (${identity.org.id}, ${identity.user.id}, 'api', 'limit passed', ${name}, ${sql.json({ max, used: counts[name] })})`
+    return
+  }
   const text = limitText(identity.org.name, name, max)
   const ask = isOrgAdmin(identity) ? "" : ` Ask ${await describeOwner(db, identity, { kind: "org", teamId: null, userId: null })} about it.`
   throw new PlatformError("forbidden", `${text}${ask}`, { reason: "limit", limit: name, max })
@@ -137,11 +153,13 @@ export async function orgStorageQuota(org: { id: string; slug: string }): Promis
 
 /**
  * L'état des limites comptées pour les écrans (ADR-022 § 7) : plafond et compte de chaque limite posée, `null` pour les
- * autres ; sans aucune limite comptée, aucune lecture de la base.
+ * autres ; sans aucune limite comptée, aucune lecture de la base. Rien n'est grisé pour l'équipe plateforme, qui passe
+ * les limites.
  */
 export async function orgLimitsView(db: PlatformDb, identity: Identity): Promise<OrgLimitsView> {
-  const limits = await orgLimits(identity.org)
   const raiseUrl = source?.raiseUrl ?? null
+  if (passesLimits(identity)) return { members: null, teams: null, connectors: null, raiseUrl }
+  const limits = await orgLimits(identity.org)
   const posed = (["members_max", "teams_max", "connectors_max"] as const).some((name) => limits[name] !== undefined)
   if (!posed) return { members: null, teams: null, connectors: null, raiseUrl }
   const counts = await inTransaction(db, "orgLimitsView: counts", (sql) => limitCounts(sql, identity.org.id))

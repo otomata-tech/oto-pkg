@@ -22,6 +22,11 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ### Hosts
 - MCP: the operations of `write.ops` are strict at the MCP door, as the served schema says (`additionalProperties: false`); the API body of the screens is unchanged.
+- Migrations: copy `20261001180000_v1_3_0.sql` and apply it: `signup_org` no longer refuses a person who already belongs to an organisation.
+- API: `POST /api/platform/signup` no longer answers `already_member`: a person creates as many organisations as they want. The package sets no bound; a host that wants one (one free organisation per account) refuses in its `admit`, counting on its side.
+- Server: `listMyOrganisations(db, identity)` gives the organisations the person is a member of, by name: `{ id, name, host, current }` (`PersonOrganisation`; `host`: one address of the organisation, `null` without any).
+- UI: `RailApplication` takes `organisations?` (that list): from two reachable organisations, the company menu at the top of the rail carries the switcher; choosing one leaves for its address, where the session resumes. The reference host's dashboard layout passes it. `AdressesDuRail.inscription?` (a path of the host, the page that mounts `FormulaireDInscription`) adds « Créer une organisation » under the switcher, for everyone; absent, nothing shows.
+- Server: the platform team, with an open platform access to the organisation, passes the counted limits (`members_max`, `teams_max`, `connectors_max`); the write leaves a journal line (`tool` « limit passed », `target` the limit, `args` `{ max, used }`), and `orgLimitsView` greys nothing for it. The file quota is unchanged.
 
 ## 1.2.1 — 2026-10-01
 

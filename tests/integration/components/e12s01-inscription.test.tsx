@@ -57,12 +57,12 @@ describe("FormulaireDInscription (AC-12)", () => {
 
   it("should say a refusal in French, and the host's abuse check in its own words", async () => {
     fetchMock
-      .mockResolvedValueOnce(reponse(403, { error: { code: "forbidden", message: "…", details: { reason: "already_member" } } }))
+      .mockResolvedValueOnce(reponse(403, { error: { code: "forbidden", message: "…", details: { reason: "email_required" } } }))
       .mockResolvedValueOnce(reponse(403, { error: { code: "forbidden", message: "…", details: { reason: "signup_refused", text: "Captcha invalide." } } }))
     render(<FormulaireDInscription />)
     fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent("Vous faites déjà partie d'une organisation.")
+    expect(await screen.findByRole("alert")).toHaveTextContent("L'inscription demande une adresse email vérifiée.")
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Captcha invalide."))
   })

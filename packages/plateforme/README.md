@@ -385,7 +385,7 @@ paquet ne connaît ni offre, ni prix, ni prestataire. Sans rien enregistrer, rie
 
 ## Inscription libre
 
-Une personne connectée, membre d'aucune organisation, crée la sienne et en devient l'administratrice
+Une personne connectée crée une organisation, autant qu'elle en veut, et en devient l'administratrice
 (ADR-023). Désactivée par défaut : un ERP garde l'entrée sur invitation seule.
 
 - **Activer** : `handlePlateforme(request, { …, signup: { orgCreation, admit? } })`. `orgCreation` est le
@@ -400,7 +400,11 @@ Une personne connectée, membre d'aucune organisation, crée la sienne et en dev
 - **Comptes** : l'inscription marche dans les deux modes d'émetteur. En mode OIDC (Logto, Keycloak), l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
   crée l'identité de la personne. En mode Supabase, `hook_before_user_created` refuse tout compte sans
   invitation : l'hôte qui ouvre l'inscription retire ce hook de ses réglages d'Auth.
-- **Refus** : `email_required`, `already_member` (une organisation par compte), `signup_refused` (le
+- **Plusieurs organisations** : la page passe `listMyOrganisations(db, identity)` à `RailApplication`
+  (`organisations`) : à partir de deux, le menu de l'entreprise porte la bascule, qui mène à l'adresse de
+  l'organisation choisie. `AdressesDuRail.inscription` (le chemin de la page d'inscription) y ajoute « Créer une
+  organisation ».
+- **Refus** : `email_required`, `signup_refused` (le
   texte d'`admit`, dans `details.text`), `conflict` pour un slug, un préfixe ou une adresse pris.
 
 ## Migrations

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { Content, CoquilleOto, Desk, RailApplication, resultatDe, type AdressesDuRail } from "@otomata_tech/oto_platform/ui"
-import { handlesFeedback, isOrgAdmin, preferredTheme, readBrand, type Identity } from "@otomata_tech/oto_platform/server"
+import { handlesFeedback, isOrgAdmin, listMyOrganisations, preferredTheme, readBrand, type Identity } from "@otomata_tech/oto_platform/server"
 import { lireLArbre, lireLesEquipes } from "@/lib/plateforme/lectures"
 import { getPlatformIdentitySafely } from "@/lib/plateforme/session"
 import { FournisseurDeRafraichissement } from "./fournisseur-de-rafraichissement"
@@ -62,14 +62,16 @@ export default async function DashboardLayout({
   const identity = lu?.identity
   // La marque vient de l'identité (`org_by_host` la rend) : aucune requête de plus.
   const brand = identity ? readBrand(identity.org) : null
-  const [arbre, equipes] = lu
+  const [arbre, equipes, organisations] = lu
     ? await Promise.all([
         resultatDe(lireLArbre(lu.session.db, lu.identity)),
         // Des équipes, le rail ne lit que le dossier et le nom : l'annuaire (membres, emails, rôles) ne
         // part pas dans chaque page rendue.
         resultatDe(lireLesEquipes(lu.session.db, lu.identity).then((lues) => lues.map(({ slug, name }) => ({ slug, name })))),
+        // Les organisations de la personne, pour la bascule du menu de l'entreprise ; leur panne ne montre pas de bascule.
+        listMyOrganisations(lu.session.db, lu.identity).catch(() => undefined),
       ])
-    : [ECHEC, ECHEC]
+    : [ECHEC, ECHEC, undefined]
 
   return (
     // La seule racine `.oto` des pages du groupe (ADR-008 § 3) : une page qui en poserait une autre
@@ -88,6 +90,7 @@ export default async function DashboardLayout({
             // chaque page `/admin/*` revérifie l'accès.
             administre={identity ? isOrgAdmin(identity) : false}
             adresses={adressesDe(identity)}
+            organisations={organisations}
           />
           <Content>{children}</Content>
         </Desk>

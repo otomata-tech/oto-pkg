@@ -25,6 +25,8 @@ export const ENTREPRISE = {
   equipes: "Équipes & accès",
   /** L'écran d'abonnement de l'hôte qui vend le paquet (E12-S02) : présent seulement quand l'hôte en donne l'adresse. */
   abonnement: "Abonnement",
+  /** Créer une organisation de plus, sous la bascule : présent seulement quand l'hôte donne l'adresse de son inscription. */
+  creer: "Créer une organisation",
 } as const
 
 /** Le menu du compte, ouvert par l'engrenage du pied : Contexte, Profil, « Brancher mon Claude, ChatGPT ou Mistral », Corbeille, puis Déconnexion (E05-S11, AC-6, AC-e22 ; E11-S09, AC-14). */

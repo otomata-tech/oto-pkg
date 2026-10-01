@@ -1,6 +1,6 @@
 // Les données du rail (E05-S09, partie a), lues par la page de l'hôte avec le jeton de la session et
 // passées telles quelles : aucune fonction ne traverse la frontière client (portage-ecrans.md § 2).
-import type { TreeNode } from "../../schemas"
+import type { PersonOrganisation, TreeNode } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 
 /**
@@ -32,6 +32,11 @@ export type AdressesDuRail = {
   contexte?: string
   /** L'écran d'abonnement de l'hôte (E12-S02) : aux réglages de l'entreprise, pour qui administre, et dans la palette ; absente, rien. */
   abonnement?: string
+  /**
+   * La page d'inscription de l'hôte, un chemin de son application (elle monte `FormulaireDInscription`) : « Créer une
+   * organisation », sous la bascule du menu de l'entreprise, pour toute personne ; absente, rien.
+   */
+  inscription?: string
 }
 
 export type EquipeDuRail = { slug: string; name: string }
@@ -47,4 +52,6 @@ export type DonneesDuRail = {
   compte: string | null
   /** `isOrgAdmin` de l'identité : les entrées d'administration. */
   administre: boolean
+  /** Les organisations de la personne (`listMyOrganisations`) : à partir de deux, le menu de l'entreprise porte la bascule. */
+  organisations?: PersonOrganisation[]
 }

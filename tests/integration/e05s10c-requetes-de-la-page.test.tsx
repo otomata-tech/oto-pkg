@@ -59,12 +59,14 @@ const TABLEAU = ACME_TABLE.path
  * Les nombres atteints par la partie c pour un affichage par Ada, administratrice : les instructions que les
  * services envoient, et les transactions, qui en coûtent chacune trois de plus (`begin`, les réglages de la
  * session, `commit`). Avant elle : une page 65 instructions dans 33 transactions, une procédure 55 dans 29, un
- * tableau 72 dans 40.
+ * tableau 72 dans 40. Depuis la bascule d'organisation (plusieurs organisations par personne), le layout lit en plus
+ * les organisations de la personne (`listMyOrganisations`) : une instruction et une transaction de plus par affichage, en
+ * parallèle des autres lectures du rail.
  */
 const PLAFONDS = {
-  page: { instructions: 31, transactions: 6 },
-  procedure: { instructions: 29, transactions: 6 },
-  tableau: { instructions: 40, transactions: 8 },
+  page: { instructions: 32, transactions: 7 },
+  procedure: { instructions: 30, transactions: 7 },
+  tableau: { instructions: 41, transactions: 9 },
 } as const
 
 /** Les promesses que la page laisse à ses `<Suspense>`, où qu'elles soient dans l'arbre rendu. */

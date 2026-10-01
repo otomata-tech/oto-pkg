@@ -7,7 +7,6 @@ const PAR_RAISON = new Map<string, string>([
   ["forbidden/not_allowed", "Inviter est réservé aux administrateurs et aux responsables d'équipe."],
   ["forbidden/admin_role_reserved", "Seul un administrateur peut inviter un administrateur."],
   ["forbidden/team_required", "Choisissez une équipe que vous dirigez."],
-  ["forbidden/already_member", "Vous faites déjà partie d'une organisation. Pour en créer une autre, demandez à l'équipe plateforme."],
   ["forbidden/email_required", "L'inscription demande une adresse email vérifiée."],
   ["conflict/already_member", "Cette personne fait déjà partie de l'organisation."],
   ["conflict/already_invited", "Une invitation attend déjà cette adresse. Révoquez-la pour en envoyer une autre."],

@@ -122,6 +122,24 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? "organisation limits (E12-S02)" 
     expect(await count("teams")).toBe(teams + 1)
   })
 
+  it("should let the platform team pass a limit with an open access, leaving a journal line, and grey nothing for it", async () => {
+    const sam = await fx.createUser({ fullName: "Sam Support" })
+    await fx.makeStaff(sam.id)
+    await fx.grantPlatformAccess(o.org.id, sam.id, null)
+    const db = fx.as(sam)
+    const identity = await resolveIdentity(db, o.host, { userId: sam.id, email: sam.email })
+    const teams = await count("teams")
+    limit({ teams_max: teams, members_max: 0 })
+
+    expect(await refusal(createTeam(as("ada").db, as("ada").identity, { name: `Refus ${hex(3)}` }))).toMatchObject({ details: { limit: "teams_max" } })
+    expect(await refusal(createTeam(db, identity, { name: `Support ${hex(3)}` }))).toBeNull()
+    expect(await count("teams")).toBe(teams + 1)
+    expect(await fx.admin`select tool, target, args from platform.journal where org_id = ${o.org.id} and user_id = ${sam.id} and tool = 'limit passed'`).toEqual([
+      { tool: "limit passed", target: "teams_max", args: { max: teams, used: teams } },
+    ])
+    expect(await orgLimitsView(db, identity)).toMatchObject({ members: null, teams: null, connectors: null })
+  })
+
   it("should let one of two concurrent creations pass at the limit minus one (AC-7)", async () => {
     const teams = await count("teams")
     limit({ teams_max: teams + 1 })

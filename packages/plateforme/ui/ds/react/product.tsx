@@ -37,10 +37,12 @@ type OrgSwitcherProps = Omit<ComponentProps<"button">, "onSelect"> & {
   orgs?: Entreprise[]
   settings?: MenuItem[]
   onSelectOrg?: (entreprise: Entreprise) => void
+  /** Ce qui suit la bascule, sous un filet : « Créer une organisation ». */
+  after?: MenuItem[]
 }
 
-/** La pastille d'entreprise ; son menu : les réglages, un filet, puis la bascule (`menuitemradio`). */
-export function OrgSwitcher({ org, logo, orgs, settings, onSelectOrg, className, ...rest }: OrgSwitcherProps) {
+/** La pastille d'entreprise ; son menu : les réglages, un filet, la bascule (`menuitemradio`), un filet, puis `after`. */
+export function OrgSwitcher({ org, logo, orgs, settings, onSelectOrg, after, className, ...rest }: OrgSwitcherProps) {
   const nom = org.name || "Oto"
   const menu: MenuItem[] = [
     ...(settings ?? []),
@@ -51,6 +53,8 @@ export function OrgSwitcher({ org, logo, orgs, settings, onSelectOrg, className,
       checked: entreprise.id === org.id,
       onSelect: () => onSelectOrg?.(entreprise),
     })),
+    ...(after?.length && (settings?.length || orgs?.length) ? [{ separator: true }] : []),
+    ...(after ?? []),
   ]
   // Le nom accessible ne promet la bascule que si le menu la porte.
   const promesse = orgs?.length ? "Réglages et changement d'entreprise" : "Réglages de l'entreprise"

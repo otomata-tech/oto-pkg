@@ -129,6 +129,12 @@ export const signupSchema = z.strictObject({
 
 export type SignupInput = z.infer<typeof signupSchema>
 
+/**
+ * Une organisation dont la personne est membre, pour la bascule du menu de l'entreprise : son nom, une de ses
+ * adresses (`null` sans adresse), et si c'est celle de la requête.
+ */
+export type PersonOrganisation = { id: string; name: string; host: string | null; current: boolean }
+
 /** `create` d'`admin_org` : slug, nom, préfixe, première adresse facultative, deux temps (N8). */
 export const orgCreateSchema = z.strictObject({
   org: orgSlugSchema,

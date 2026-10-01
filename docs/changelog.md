@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Plusieurs organisations par personne, bascule d'organisation, limites passées par l'équipe plateforme (pour la 1.3.0)
+
+**Quoi :** l'inscription ne refuse plus une personne déjà membre d'une organisation (`already_member` retiré du service et de `signup_org`, migration `20261001180000_v1_3_0.sql`) ; `listMyOrganisations` rend les organisations de la personne avec leur adresse, et le menu de l'entreprise du rail porte la bascule à partir de deux (`RailApplication`, `organisations`) ; l'équipe plateforme, avec un accès en cours, passe les limites comptées, une ligne du journal de l'organisation le dit (`limit passed`), et `orgLimitsView` ne grise rien pour elle. Conception mise à jour sur place (`docs/conception/offres-de-l-hote.md`), exigences passées à « Livrée (1.2.0) ».
+**Pourquoi :** décisions de JB du 2026-10-01 sur les deux questions ouvertes de l'offre de l'hôte : aucune borne du nombre d'organisations dans le paquet, et un statut à part pour l'équipe plateforme.
+**Fichiers :** `packages/plateforme/{server/limits.ts,server/organisations.ts,server/admin/signup.ts,server/index.ts,schemas/admin.ts,schemas/index.ts,ui/coque/entreprise-du-rail.tsx,ui/coque/rail-application.tsx,ui/coque/types.ts,ui/api/messages.ts,migrations/20261001180000_v1_3_0.sql,CHANGELOG.md,README.md}` ; `supabase/migrations/20261001180000_v1_3_0.sql` ; `src/app/(dashboard)/layout.tsx` ; tests `e12s01-inscription`, `e12s02-capacites`, `components/e12s01-inscription`, `components/e05s11-coque` ; `docs/conception/offres-de-l-hote.md`, `docs/reference/{services-et-portes,schema-platform}.md`, `docs/produit/prd.md`, `.method/conventions/{database-patterns.md,fiches/database-patterns.md,component-registry.md}`.
+
 ## [2026-10-01] — Une opération de `write` refuse ses clés inconnues au MCP
 
 **Quoi :** les opérations de `write.ops` passent en objet strict dans les schémas d'entrée du MCP ; `parseInput` nomme la clé par son rang et cite les clés d'une opération (« ops.1: unknown key « content »; keys: op, section, … »). Le JSON Schema servi ne change pas (il disait déjà `additionalProperties: false`), ni le corps de l'API des écrans.

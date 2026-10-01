@@ -186,7 +186,7 @@ Les agents IA sont des visiteurs. Ils lisent le HTML servi et ne cliquent nulle 
 
 - **`robots.ts` n'exclut aucun crawler IA.** `GPTBot`, `ClaudeBot`, `PerplexityBot`,
   `Google-Extended` et `CCBot` sont couverts par la règle `userAgent: "*"`. Un blocage ciblé
-  est une **décision** : elle passe par un ADR (`docs/decisions/`), jamais par un copier-coller
+  est une **décision** : elle s'écrit dans le document de conception du sujet (`docs/conception/`), jamais par un copier-coller
   de blocklist trouvée en ligne. Les `disallow` existants portent sur des zones privées
   (`/dashboard/`, `/api/`, `/auth/`), pas sur des agents.
 - **404 réelle.** Un chemin inexistant renvoie le **statut HTTP 404**. `not-found.tsx` le fait ;

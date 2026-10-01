@@ -24,7 +24,7 @@
 - [ ] Le modèle de données est-il impacté ? (nouvelles tables, colonnes, relations)
 - [ ] Les Server Actions sont-elles impactées ? (nouvelles, modifiées, supprimées)
 - [ ] Les RLS policies sont-elles impactées ?
-- [ ] Un invariant d'architecture est-il touché ? → ADR obligatoire
+- [ ] Un invariant d'architecture est-il touché ? → document de conception du sujet révisé (`docs/conception/`), obligatoire
 
 ### Stories
 - [ ] Des stories existantes sont-elles impactées ? (AC modifiés, scope élargi)
@@ -47,7 +47,7 @@
 
 - [ ] Le PRD est mis à jour (parcours + FR/NFR)
 - [ ] (si maquettes) Les maquettes sont mises à jour ou créées
-- [ ] L'architecture est mise à jour si impactée
+- [ ] La conception (`docs/conception/`) et la référence (`docs/reference/`) sont mises à jour si impactées
 - [ ] Les stories impactées sont mises à jour ou créées
 - [ ] Le changelog est mis à jour
 - [ ] Le sprint status reflète les changements

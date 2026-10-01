@@ -11,11 +11,11 @@
 
 ## Documents
 
-- [ ] `docs/prd.md` est rempli, organisé par parcours utilisateur
-- [ ] `docs/architecture.md` est rempli, modèle de données défini (ou « sans base de données », déclaré)
+- [ ] `docs/produit/prd.md` est rempli, organisé par parcours utilisateur
+- [ ] `docs/conception/` couvre les sujets touchés (un document par sujet, `docs/conception/README.md` à jour) et le modèle de données est décrit dans `docs/reference/` (ou « sans base de données », déclaré)
 - [ ] oto-saas : `docs/design/system.md` a les tokens (couleurs, typo, spacing)
-- [ ] Au moins 1 epic dans `docs/epics/` et 1 story 🟢 Ready dans `docs/stories/`
-- [ ] (niveau Initial) `docs/brief.md` est rempli et validé — en Évolution sur un projet qui n'a jamais eu de brief, déclarer sans objet
+- [ ] Au moins une issue parente (l'épic) et ses sous-issues ; une story 🟢 Ready dans `docs/produit/stories/` pour chaque sous-issue que l'issue seule ne spécifie pas, son chemin dans le corps de l'issue
+- [ ] (niveau Initial) `docs/produit/brief.md` est rempli et validé — en Évolution sur un projet qui n'a jamais eu de brief, déclarer sans objet
 
 ## Parcours & Design
 

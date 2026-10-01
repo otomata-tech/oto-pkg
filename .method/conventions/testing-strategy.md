@@ -102,7 +102,7 @@ permutation de plus sans nommer la faille qu'elle révélerait.
   Une spec ne lit jamais une adresse jetable par `page.request` (Node ne résout pas `*.localhost`) : elle
   passe par `fetch` dans la page (`lireLeHtml`, `tests/e2e/fixtures/espace.ts`).
 - **Démo n'est jamais vidée par un script écrit à la main** : ses lignes se retirent table par table
-  d'après `docs/architecture.md § 4` (un nom trompe : `org_domains` porte les adresses qui servent
+  d'après `docs/reference/schema-platform.md` (un nom trompe : `org_domains` porte les adresses qui servent
   l'organisation, pas ses domaines de travail), après un `pnpm org:export`, et l'adresse de Démo répond
   encore après le ménage (`curl -s -o /dev/null -w '%{http_code}' <adresse>/login` = 200 ; les specs
   `connect`, consentement et authentification ne se sautent plus).

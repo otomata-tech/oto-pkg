@@ -17,7 +17,7 @@
 - [ ] (échelle Standard ou Module) La section « **Rayon d'impact** » est remplie : appelants avec commande citée, doublons avec verdict, effet produit, refacto proposé ou écarté — et tout refacto proposé a été **posé en question** via `AskUserQuestion`, pas laissé en note
 - [ ] Le champ **Conventions** est renseigné dans la section Meta — utile surtout pour les tags que les globs ne peuvent pas déduire (`datetime`, `i18n`, `flags`), voir `.method/conventions/_index.md`
 - [ ] (story fonctionnelle) Chaque AC est vérifiable par un test automatisé
-- [ ] (story fonctionnelle) Les refs PRD (parcours + FR) et architecture sont renseignées
+- [ ] (story fonctionnelle) Les refs PRD (parcours + FR) et conception (`docs/conception/<sujet>.md`) sont renseignées
 
 ## Stories du paquet
 
@@ -25,7 +25,7 @@
 - [ ] Les AC couvrent les erreurs et les états vides, avec les codes d'erreur nommés (`PlatformErrorCode`, `packages/plateforme/server/errors.ts`)
 - [ ] Deux AC ne donnent pas deux issues à la même requête (même route, même méthode, même état de session) ; un AC qui fait ramener une Server Action à la connexion dit ce qu'en fait le middleware (`auth-patterns.md § Middleware`)
 - [ ] Un texte de refus que la story fixe mot pour mot pour une désignation ambiguë d'une action (au moins deux équipes, comptes ou fonctions y répondent) porte la consigne de montrer la liste à l'utilisateur et de lui demander, sans choisir à sa place ; un refus « inconnu » (aucune correspondance) liste ce qui existe, sans cette consigne ; toute liste d'un refus est bornée (`mcp-patterns.md § 3` « Résolution par nom », `§ 4` « Un refus tient aussi sous le plafond »)
-- [ ] Une garantie de sécurité que la story ou son ADR promet (« isolé », « sans sortie », « illisible par… ») nomme chaque canal qu'elle ferme **et** chaque canal qui reste ouvert, et chaque canal a son cas dans les tests attendus
+- [ ] Une garantie de sécurité que la story ou son document de conception promet (« isolé », « sans sortie », « illisible par… ») nomme chaque canal qu'elle ferme **et** chaque canal qui reste ouvert, et chaque canal a son cas dans les tests attendus
 - [ ] Fichiers à créer ou modifier rangés **par face** du paquet (`ui/`, `schemas/`, `api/`, `mcp/`, `server/`, `migrations/`) et dans l'hôte
 - [ ] **Migrations prévues** écrites (tables, colonnes, index, RLS), additives ; ou « Aucune » avec la raison
 - [ ] **Schémas Zod partagés** nommés, avec leur fichier

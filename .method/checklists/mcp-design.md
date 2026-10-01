@@ -5,7 +5,7 @@
 > Faits mesurés sur le banc MCP (campagnes des 22 et 23/09/2026) ; détail et limites : `.method/conventions/mcp-patterns.md`. Les hosts changent : à revérifier chaque trimestre.
 
 ## 1. Intentions
-- [ ] 10 à 20 phrases réelles d'utilisateurs par cas d'usage, plus 2 ou 3 phrases voisines hors sujet : elles deviennent les golden queries (`docs/mcp-golden-queries.md`)
+- [ ] 10 à 20 phrases réelles d'utilisateurs par cas d'usage, plus 2 ou 3 phrases voisines hors sujet : elles deviennent les golden queries (`docs/reference/mcp-golden-queries.md`)
 - [ ] Un outil = une intention, dite avec les mots de l'utilisateur ; moins de 10 outils par cas d'usage
 - [ ] Lectures séparées des écritures et des suppressions
 - [ ] Un seul MCP tant que les cas d'usage partagent les mêmes utilisateurs, les mêmes droits et une quinzaine d'outils au plus ; plusieurs dès que l'un de ces points diverge

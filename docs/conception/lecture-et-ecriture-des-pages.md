@@ -1,0 +1,114 @@
+# Lecture et écriture des pages
+
+- **Statut** : validé avec JB le 24/09/2026
+- **Dernière révision** : 2026-10-01
+
+## Résumé
+
+`read` sert une page en markdown rendu de ses blocs, par sections, avec un plan au-delà d'une taille ; `write` la modifie par sections, par blocs ou en entier, et publie par défaut. Une écriture d'assistant est entière ou rien : un refus n'écrit rien. Bornes, révisions et références courtes rendent chaque écriture vérifiable sans relire la page entière.
+
+## Contexte
+
+Un assistant lit et écrit du texte : les six outils ne transportent que du markdown (ADR-009), alors que le contenu est fait de blocs (ADR-011). Il faut donc un rendu déterministe et son inverse, des adresses stables à l'intérieur d'une page (sections, blocs) et une concurrence au bloc pour que deux écritures ne s'écrasent pas. Les retours sur la 1.1.2 (E11-S18, 2026-09-30) ont montré qu'une écriture refusée laissait un brouillon derrière elle et que l'assistant ne savait plus ce qui était écrit. Le modèle des blocs est dans [pages et blocs](pages-et-blocs.md), le rangement et la publication dans [nœuds et arbre](noeuds-et-arbre.md), le contrat des six outils dans [outils MCP](outils-mcp.md).
+
+## Objectifs et non-objectifs
+
+- L'assistant et l'écran lisent le même texte ; une écriture se fait au plus près (bloc, section) et dit ce qu'elle a fait.
+- Un refus ne laisse aucun état partiel ; un dépassement est refusé en chiffrant, jamais tronqué.
+- Hors objectif : un champ `pages` dans `write` (le lot passe par `node.write_many`) ; changer le genre d'un tableau ou d'un Contexte ; un vocabulaire ou des pointeurs par sujet (ADR-011 § 7).
+
+## Conception
+
+### Lire (ADR-011 § 5)
+
+- `read` sert les blocs rendus en markdown, sections comprises, et la référence courte de chaque bloc sur demande. E03-S03 N43 : rendu, sections et emplacement d'un `call` viennent de `schemas/blocks-render.ts` (`orderBlocks`, `renderBlocks`, `splitSections`, `findSections`, `sectionOfBlock`, `callLocation`…), consommés sans réécriture par `server/` et `ui/`.
+- E03-S03 N1 : `read` sert la page entière jusqu'à 12 000 caractères rendus, au-delà le début de page puis le plan ; une page sans titre est servie entière ; au-delà de 45 000 caractères, elle se sert par parties avec `cursor`.
+- E03-S03 N2 : le plafond d'un résultat se mesure sur `structuredContent` sérialisé ; les champs ne répètent jamais un texte de bloc ; le plan en champs est borné à 100 titres. E03-S03 N36 : `MAX_RESULT_CHARS` et `MAX_DATA_CHARS` vivent dans `server/tool-output.ts`, réexportées par `mcp/result.ts`.
+- E03-S03 N3 : un curseur est opaque et lié au nœud, à la requête (mode, section, `draft`, `refs`, `since_revision`), à la partie et à l'empreinte du texte complet ; autre chose → `invalid_arguments`.
+- E03-S03 N5 : enfants d'un nœud : 50 au plus, rangés par `position` puis par chemin (une position nulle se range par chemin), comptés après le filtre de visibilité. E03-S03 N56 : un parent que le lecteur ne voit pas (niveau 0) est servi `parent: none` (`null` en champ) : son titre serait une fuite.
+- E03-S03 N14 : `refs: true` rend une ligne `<!-- ref: … -->` avant chaque bloc ; l'analyse l'ignore, et les tailles comme le seuil de 12 000 se mesurent sans elle.
+- E03-S03 N24 : l'écart depuis une révision se donne au bloc : ajoutés, changés, déplacés (hors de la plus longue suite ordonnée), supprimés, groupés par section.
+- E03-S03 N35 : le brouillon n'est servi qu'à partir du niveau écriture, décidé par le service avant de le lire.
+- H57 : les liens `[[chemin]]`, `[[chemin#clé]]` et `[[chemin|libellé]]` des blocs de texte et des `reference` sont extraits à la publication dans `links` ; `read` les relit pour le lecteur et sert liens entrants et sortants ; un lien sans cible est signalé (détail : [nœuds et arbre](noeuds-et-arbre.md), E03-S07). E03-S03 N23 : ils sont extraits par le service des blocs de texte humain et des blocs `reference`, jamais du code (syntaxe de `schemas/link-syntax.ts`), et passés à `publish_node` : 1 000 au plus, omis pour un tableau.
+- E03-S03 N32 : arbre des écrans : nœuds de niveau calculé ≥ 1 (un lot), brouillons compris, rangés par `position` puis par chemin, rattachés à l'ancêtre visible le plus proche, 5 000 au plus après ce filtre. E03-S03 N60 : `closestExisting` retient l'ancêtre visible le plus profond par son nombre de segments (racine à 0). E03-S03 N59 : blocs, enfants et arbre sont rangés en mémoire (blocs par position puis id, chemins en unités de code par `comparePaths`) : l'ordre ne dépend pas de la collation de la base de l'hôte.
+- `find` cherche au bloc près dans les blocs publiés des nœuds que la personne lit, hors corbeille : titre, puis résumé, puis blocs ; un brouillon n'est jamais trouvé (ADR-011 § 4 ; [routage et recherche](routage-et-recherche.md)). Ni dictionnaire de sigles ni pointeurs par sujet : titre, résumé et contenu publié suffisent (ADR-011 § 7).
+
+### Le markdown et son analyse
+
+- E03-S03 N7 : formes canoniques du markdown par type, dont `parseMarkdown` est l'inverse : légende d'image en titre du lien, encart `> [!TON]`, `reference` en clôture ```` ```reference ````, suite de liste indentée de deux espaces ; `headingBase` 2 dans `read`.
+- E03-S03 N8 : l'analyse lit la syntaxe du rendu : clôture non fermée, ligne `#` et plus de trois niveaux refusés ; une liste à puces, ou numérotée depuis 1, interrompt un paragraphe ; une ligne faite d'un seul commentaire `<!-- … -->` hors clôture est ignorée (les titres vont depuis jusqu'au niveau 5, [pages et blocs](pages-et-blocs.md), D115).
+- E03-S03 N44 : une clôture indentée sous un élément de liste coupe la liste et devient son propre bloc, la liste reprenant à `start` = le numéro écrit ; une clôture ```` ```call ```` réduite au nom vaut `args` `{}` ; mal formée, elle est refusée.
+- E03-S03 N52 : une ligne `##` sans texte ou `#mot` sans espace est du texte ; une ligne de titre refusée interrompt un paragraphe ; une image seule sur sa ligne devient un bloc `image` (`alt` toujours posé) ; un refus cite la ligne du texte envoyé.
+- E03-S03 N70 : tout ce qui lit un texte du client est linéaire ; le code en ligne suit CommonMark (une suite d'accents graves fermée par la suivante de même longueur) ; une ligne qui porte U+2028 ou U+2029 n'est ni titre, ni image, ni clôture ouvrante. E03-S03 N21 : tout texte écrit en base est rendu bien formé (`toWellFormed`) : aucune moitié de paire de substitution.
+- HN-E11S18-9 : un frontmatter est une première ligne `---`, des lignes YAML simples (`clé: valeur`, élément de liste, ligne indentée, ligne vide ; une ligne de commentaire `#` en tête de ligne n'en est pas), puis `---` ou `...`, dans les 100 premières lignes ; sinon rien n'est retiré (un séparateur en tête reste un séparateur). Clés lues sans casse : `title`, `titre` ; `summary`, `resume`, `résumé`, `description` ; une valeur entre guillemets est ce qu'ils entourent, une valeur nue s'arrête à un commentaire (` #`) ; un bloc littéral ou replié (`title: |`, `>`) n'est pas lu : le titre vient alors du premier `#` ou du nom du fichier, le résumé du premier paragraphe. Avec un titre de frontmatter, un premier titre `#` identique (sans casse ni accent) est retiré du corps ; différent, il reste.
+
+### Sections et blocs
+
+- H54 : une section est un titre et les blocs qui le suivent jusqu'au titre de même niveau ou plus haut ; `write` a cinq opérations par section et quatre par bloc (référence courte) ; titres comparés sans casse ni accent ; un échec refuse tout le lot.
+- E03-S03 N9 : une section comprend ses sous-sections, annoncées quand elles partent ; le texte d'une opération par section ne porte aucun titre de ce niveau ou plus haut. E03-S03 N10 : titres homonymes : `read` sert toutes les sections qui répondent ; `write` refuse en donnant leurs références ; `add_section` refuse un titre existant. E03-S03 N11 : un texte qui rouvre le titre de sa propre section (même niveau, même titre) le voit absorbé.
+- E03-S03 N13 : référence d'un bloc : sa clé, sinon les 8 premiers caractères de son id, sinon l'id complet ; résolue par la clé exacte, puis par un début d'id (tirets ignorés) d'au moins 8 caractères qui désigne un seul bloc.
+- E03-S03 N15 : opérations par bloc : `replace_block` (le premier bloc du texte prend la place), `insert_after` (en tête sans `block`), `delete_block` (un titre seul part, ses blocs rejoignent la section précédente), `move_block`.
+- E03-S03 N12 : identifiants gardés sans deviner : une opération par bloc garde l'id du bloc visé, `replace_text` celui du bloc édité, `replace_section` apparie exactement dans l'ordre ; un bloc réécrit par `replace_section` prend un id neuf.
+- HN-E11S18-10 : sans `section` ni `block`, `replace_text` cherche dans le rendu de toute la page ; une occurrence à cheval sur deux blocs n'y est remplacée que dans une section (réécriture de son corps), sinon refusée en nommant `set_markdown`. `count` : 1 à 1 000. Un remplacement dans un titre doit laisser un titre du même niveau ; dans un autre bloc, aucun titre au niveau de sa section ou au-dessus ; un bloc avant le premier titre, aucune borne de titre. La taille qu'aurait la portée (taille + `count` × (texte − `find`)) est refusée en `too_large` au-delà de sa borne (section ou bloc : `SECTION_MAX` ; page : `PAGE_MAX`) avant toute construction, et le texte neuf s'assemble en une passe.
+- HN-E11S18-11 : `set_markdown` écrit le corps seul (titre et résumé restent des champs de `write`) ; un premier titre `#` du texte reste un titre de section ; les blocs identiques gardent leur id. Le lot passe par `node.write_many` (classe `write`, 50 pages) : `path` est requis dans le JSON Schema de `write`, et le rendre facultatif serait une rupture (ADR-002 § 1). Les pages s'écrivent dans l'ordre (un parent avant ses enfants) ; chaque ligne de résultat, et le refus d'une page dans les données, est coupée à 400 caractères, sauf le refus `needs_confirmation`, dont l'appel à refaire se garde entier. Une panne hors refus (un bogue) arrête le lot : la réponse dit les pages déjà écrites et que les suivantes ne le sont pas (`stopped`).
+- HN-E11S18-7 : la coupe au mot vaut dans `slugOf`, sa seule définition : segment d'un titre, slug d'équipe, nom de colonne et segment d'un import ; et dans `cutAtWord`, qu'elle partage avec un nom de colonne préfixé (`c_`) ou numéroté (`_2`). Un premier mot plus long que la borne reste coupé à la borne. Aucune compatibilité due (aucun client) : un nom tiré avant sous l'ancienne coupe n'est pas repris ; les slugs d'équipe stockés font foi (`checkName` les compare, jamais un slug recalculé d'un nom). Déplacer : `node.move` (HN-E11S18-5, HN-E11S18-6, [nœuds et arbre](noeuds-et-arbre.md)).
+
+### Contrat et bornes
+
+- E03-S03 N16 : le contrat de `write` s'étend dans `ops` par ajout seulement : quatre valeurs d'`op` en fin d'énumération, `block` et `after_block` facultatifs, `section` exigé par le service ; aucune borne du service dans le schéma. E03-S03 N17 : un champ qu'une opération n'utilise pas est refusé en le nommant.
+- E03-S03 N6 : bornes contrôlées par le service : texte d'une opération ≤ 40 000 caractères, 50 opérations par appel, section ≤ 100 000, page ≤ 300 000 et ≤ 1 000 blocs ; un dépassement est refusé en chiffrant, jamais tronqué. E03-S03 N78 : les bornes d'un bloc (titre 200, liste 500, fonction 100, image 2 000, chemin 1 000) sont déclarées dans `limits.ts` et chaque refus écrit ses nombres depuis ces constantes ; `blockInputSchema` les juge aussi.
+- D153 : une écriture faite depuis l'écran (`POST /api/platform/nodes`, origine humaine) porte autant d'opérations qu'une page a de blocs au plus (`BLOCKS_MAX`, 1 000), pour qu'une sélection de blocs se supprime ou se déplace en une écriture ; `write` d'un assistant garde 50 opérations par appel, son schéma et sa description inchangés ; la borne se décide par la porte dans le service, jamais par le corps.
+- E03-S03 N40 : `writeNode` valide son entrée par `writeNodeBodySchema`, même pour le MCP qui l'a déjà validée par son sous-ensemble : une seule source pour les deux portes. E03-S03 N45 : le corps de l'API (`writeNodeBodySchema`) étend l'entrée de `write` : bloc structuré `input`, `revision` lue du bloc visé (écart → `stale_revision`), `draft_stamp` ; jamais servis au modèle ; la réponse rend id, référence et révision. E03-S03 N49 : `writeNodeBodySchema` vit dans `schemas/node-body.ts`, exporté par `schemas/index.ts` : dans `nodes.ts`, il fermerait un cycle d'imports avec `blocks.ts` ; les types de lecture restent dans `nodes.ts`. E03-S03 N42 : la vue d'un bloc `reference` n'est contrôlée à l'écriture que comme un objet JSON ; sa forme appartient à `schemas/tables.ts`.
+- E03-S03 N74 : `findNode` et `lookupNode` refusent un chemin mal formé ou de plus de 1 000 caractères avant toute requête (`invalid_arguments`, refus de chemin de `read`). E03-S03 N47 : `findNode` lit le nœud par chemin dans l'organisation, calcule son niveau, rend `null` au niveau 0 et sinon ce `level`, réutilisé sans second calcul ; écriture et publication se décident avant toute écriture, `23505` en seconde barrière.
+- E03-S03 N26 : `page` ↔ `procedure` se change au brouillon et s'applique à la publication ; `table` et `context` ne changent jamais de genre. E03-S03 N27 : un tableau n'a pas de blocs de document : ses lignes ne passent jamais par le brouillon et `ops` y est refusé ; son en-tête passe par `header` (`readHeaderPatch`). E03-S03 N29 : l'espace `private/<handle>` et son Contexte naissent en base ; `write` n'en crée jamais et refuse un espace personnel qui n'est pas celui de l'appelant. E03-S03 N31 : créer sur un chemin occupé par un nœud invisible rend `conflict` « not available », sans dire qu'il existe.
+
+### Écrire, publier, refuser
+
+- E03-S03 N18 : l'écriture d'un brouillon (`open_draft` au besoin, en-tête, mises à jour, insertions, suppressions) tient en une transaction : arrêtée au milieu, elle n'écrit rien ; la publication est atomique. E03-S03 N19 : le brouillon s'ouvre à la première écriture qui enregistre quelque chose et se partage ; concurrence au bloc (`revision`) et sur l'en-tête (`node_drafts.updated_at`) : deux blocs différents s'écrivent en même temps. E03-S03 N46 : chaque écriture de bloc `draft` exige la ligne `node_drafts` (verrou, sinon `PT409`) et avance `node_drafts.updated_at` ; `publishNode` lit ce tampon avant ses contrôles et le passe en `p_draft_stamp` (`PT409` → `stale_revision`).
+- E03-S03 N20 : provenance d'un bloc écrit : `{origin: "agent", by, ctx, at}` par le MCP, `{origin: "human", by, at}` par l'API ; révision + 1 quand type, texte, données ou clé changent, inchangée sur un déplacement seul.
+- E03-S03 N22 : publication en trois temps (préparer, `publish_node`, dériver), avec des branches explicites par genre.
+- HN-E11S18-1 : « assistant » = toute écriture de porte `agent` : `write` du MCP, `upload.link`, la création du tableau de `table.import`, `node.write_many`. Toute l'écriture (création du nœud, brouillon, publication, adresse qui suit le titre, ligne du `ctx` de l'auteur) tient dans une transaction ; tout refus l'annule (décision de JB, amende ADR-011 § 3). L'écran garde son brouillon (il sauve la frappe d'une personne) ; `admin_node publish` publie un brouillon qui existe déjà : inchangé.
+- E03-S03 N28 : `write` publie par défaut, `publish: false` garde un brouillon ; un refus de publication rend `isError` avec son code et, à l'écran, garde le brouillon ; le refus d'une procédure finit par « Writing it in several calls? Pass publish: false until the last one. »
+- HN-E11S18-2 : les transactions des services appelés reprennent celle de l'écriture (`db.tx` sous la même session), sans point de sauvegarde : une erreur de la base (une course) interrompt la transaction, et le refus qui la relirait y devient une panne (`internal`) ; l'écriture, annulée entière, se rejoue alors une fois et dit l'état d'après la course (`stale_revision` avec l'état courant). Rejouée après une course sur le tampon du brouillon, une publication sans opérations publie le brouillon partagé tel que l'autre l'a laissé. Un service qui, pour l'écran, rattrape une erreur de base (purge d'après publication, `followTitle`) perd sous elle toute l'écriture : exception écrite de `supabase-patterns.md § Couplage à Supabase` ; `finishTablePublication` reste dans `publishNode`, partagé avec l'écran.
+- HN-E11S18-3 : les textes de refus des services (« The draft is kept; nothing was published. » et le renvoi à `node.discard_draft`) sont réécrits par `write-atomic.ts`, seul point : « Nothing was written. » ; quand un brouillon écrit avant l'appel reste, relu après l'annulation, « Nothing was written; the draft saved before this call stays. » et le renvoi gardé. `needs_confirmation` y reçoit l'appel à refaire (le même appel, `header` augmenté de `"confirm_remove": true`).
+- HN-E11S18-4 : ce qu'a fait l'écriture suit « Published … (<n> sections, <m> blocks) » après deux-points ; pour un tableau, ses fragments précèdent le résumé de l'en-tête publié ; la réponse de `publish: false` est inchangée. HN-E11S02-27 ([nœuds et arbre](noeuds-et-arbre.md)) : la ligne de publication donne « Next write: base_revision N. ».
+- HN-E11S18-8 : FB-0015 : les lignes rendues par `insert … returning` se lisent dans l'ordre des valeurs insérées, jamais par l'égalité d'une position flottante relue (une session où `extra_float_digits` est sous 1 relit un `double precision` à 15 chiffres) ; un nombre ou un type qui ne correspond pas est un `conflict` journalisé (un `internal` est masqué par la porte MCP).
+- HN-E11S18-12 : `acceptOwnContextWrite(db, identity, { ctx, path, revision })` (E11-S19) suit une écriture d'assistant qui a changé un Contexte (`rules_changed`), après sa transaction : une panne ne défait jamais l'écriture ; elle est journalisée, et la réponse garde alors la consigne de rappeler `context`. Sans `ctx` (écran, ticket sans `ctx`), rien ([contexte servi](contexte-servi.md)).
+- HN-E11S18-13 : `functions` est un chemin réservé comme `journal` (P22) : `write` le refuse, et une équipe ne peut pas prendre ce slug : `RESERVED_SLUGS` du service, et la contrainte `teams_slug_reserved` recréée par la partie 2 de `20260930150000_v1_1_3.sql` (une équipe déjà au slug `functions` la fait échouer : l'hôte lui donne un autre slug avant).
+- HN-E11S18-14 : activités de l'accueil : un `node.move` paraît « déplacé », sans confirmation, à son ancien chemin, que la relecture suit par l'alias jusqu'au nœud déplacé. Un `node.write_many` ne paraît pas : ses arguments, au-delà de 2 048 caractères, sont coupés au journal, et le résultat d'une fonction n'y inscrit que des nombres.
+
+### Erreurs et conflits
+
+- E03-S03 N41 : codes de la base : `23503` visant le nœud désigné → `not_found`, `55000` → `invalid_arguments`, `P0002` → `not_found`, `PT409` → `stale_revision` ; un brouillon perdu par une publication concurrente rend `stale_revision`, jamais `forbidden`. E03-S03 N48 : les hypothèses sur PostgREST vivent dans `server/errors.ts` seul : `PT409` → `stale_revision` (message constant) et la taille de page `READ_PAGE_ROWS` (1 000) ; la face SQL lit blocs, enfants et arbre en une requête.
+- E03-S03 N71 : une suppression de blocs qui ne rend pas chaque bloc demandé, ou un brouillon absent à la relecture de fin d'écriture, est un conflit : `publishedMeanwhile` si la révision a avancé, sinon le conflit de bloc ou de brouillon. E03-S03 N75 : un conflit d'écriture du brouillon est journalisé avant le refus : `[platform] nodes: draft of <id> changed while writing (<header|block|draft>)`. E03-S03 N76 : tout refus `stale_revision` d'un nœud porte `details.revision`, la révision relue du nœud.
+
+## Décisions et alternatives écartées
+
+- **Un refus de publication d'assistant qui garde le brouillon** (E03-S03 N28 d'origine, HN-E11S02-22) : remplacé pour les assistants par l'écriture entière ou rien (HN-E11S18-1, JB, 2026-09-30) : l'assistant ne savait plus ce qui était écrit ; l'écran garde son brouillon.
+- **Écriture partielle dite** : E03-S03 N72 (plus en vigueur) : l'écriture du brouillon tient en une transaction, annulée entière sur un refus ou une panne ; aucune écriture partielle n'est plus dite.
+- **Alias dépréciés du contrat** : E03-S03 N65 (plus en vigueur) : `sectionOpSchema` et `SectionOp` ont été retirés ; seuls `writeOpSchema` et `WriteOp` restent.
+- **Points de sauvegarde par service** (HN-E11S18-2) : écartés (`sql.savepoint` échappe aux espions des tests `spyDb`, `watchDb` ; posés à la main, deux allers-retours de plus ; dans `server/sql.ts`, hors du lot). **Un indicateur passé aux constructeurs de refus** (HN-E11S18-3) : écarté pour un seul point de réécriture.
+- **Un champ `pages` dans `write`** (HN-E11S18-11) : écarté, `path` étant requis dans le JSON Schema figé (ADR-002 § 1).
+- **Même borne d'opérations pour l'écran et l'assistant** : écartée par D153 ; la borne de l'écran suit `BLOCKS_MAX` pour qu'une sélection de blocs s'écrive en une fois.
+
+## Sécurité et confidentialité
+
+- Le brouillon ne se lit qu'à partir du niveau écriture (E03-S03 N35) ; un parent invisible est servi `parent: none` (E03-S03 N56) ; un chemin occupé par un nœud invisible ne se trahit pas (E03-S03 N31).
+- Tout texte du client est lu en temps linéaire (E03-S03 N70) : aucune expression rationnelle à retour arrière sur une entrée du modèle.
+- Les champs de concurrence de l'API (`revision`, `draft_stamp`, `input`) ne sont jamais servis au modèle (E03-S03 N45).
+
+## Écart avec le code
+
+- M100 : poser `extra_float_digits = 3` dans `server/sql.ts`, pour que toute position relue soit exacte (suggestion du lot A d'E11-S18, non faite).
+- M77 : une panne de la relecture du propriétaire que `writeNode` fait après `publish_node` fait sortir `createTable` sans `details.created`, le tableau déjà publié.
+- `node.write_many` ne paraît pas dans les activités de l'accueil (HN-E11S18-14) : il faudrait que `call` journalise les chemins écrits.
+
+## Questions ouvertes
+
+Aucune à ce jour.
+
+## Historique
+
+- 2026-09-24 : `read` en markdown rendu des blocs, `write` par section et par bloc, liens extraits à la publication — décidé par JB (source : ADR-011 § 4, § 5, § 7 ; story E03-S03).
+- 2026-09-30 : une écriture d'assistant est entière ou rien ; `set_markdown`, `replace_text` sur toute la page avec `count`, `node.write_many`, frontmatter YAML, coupe au mot ; l'écran écrit jusqu'à 1 000 opérations — décidé par JB (source : story E11-S18, fiche D153).
+- 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-011 § 4, § 5 et § 7, la fiche D153 et les choix H54, H57, E03-S03, E11-S18 — décidé par Alexis, accord de JB.

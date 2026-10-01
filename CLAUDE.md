@@ -9,15 +9,16 @@ de base à la racine, le paquet dans `packages/plateforme/` (faces `ui/`, `schem
 `server/`, `migrations/`, `cli/` ; `ui/` n'importe jamais `server/`, `migrations/` ni un client de
 base — frontière appliquée par ESLint).
 
-Docs qui font foi : `docs/architecture.md` (technique : paquet, données, services, invariants),
-`docs/prd.md` (fonctionnel : parcours, exigences), `docs/decisions/` (ADR, questions ouvertes),
-`.method/sprint/status.md` (ce qui reste ouvert). Aucune création ni modification de service
-extérieur (GitHub, Supabase, Vercel, npm), ni vrai secret, sans l'accord de JB.
+Docs qui font foi : la carte `docs/README.md` mène au produit (`docs/produit/prd.md`), à la
+conception (`docs/conception/`, un document vivant par sujet), à la référence (`docs/reference/`) et
+à l'exploitation (`docs/exploitation/`) ; ce qui reste ouvert : les issues GitHub et
+`.method/sprint/status.md` (§ Documentation : où vit chaque information). Aucune création ni
+modification de service extérieur (GitHub, Supabase, Vercel, npm), ni vrai secret, sans l'accord de JB.
 
 **Effet produit — les systèmes de ce projet** (remplace la liste générique de « Rayon d'impact ») :
 l'autre face du paquet (`ui/` ↔ `api/` ↔ `server/`) ; le schéma `platform` et ses policies RLS ; la
 liste d'outils MCP servie aux hosts (surface figée : ajout seulement, ADR-002) ; les connecteurs
-du paquet et le coffre de leurs secrets (ADR-019) ; l'application hôte qui monte le paquet (route,
+du paquet et le coffre de leurs secrets (`docs/conception/connecteurs-et-comptes.md`) ; l'application hôte qui monte le paquet (route,
 middleware, thème) ; les migrations copiées et appliquées par l'hôte.
 
 Stack : Next.js 15 (App Router) · TypeScript strict · Tailwind v4 · Shadcn/ui · pnpm workspace ·
@@ -34,6 +35,45 @@ paquet, montée sur `src/app/api/mcp/route.ts` ; ses règles sont dans le tag `m
 - **Le paquet ne dépend de Supabase qu'aux points admis** : `supabase-patterns.md § Couplage à Supabase`.
 - **Un refus est décidé par le service**, avant sa requête : `security-patterns.md § Droits dans le service`.
 
+## Documentation : où vit chaque information
+
+Règle : **un seul endroit par nature d'information**. Une même décision ne s'écrit jamais deux fois.
+
+| Nature | Où | Forme |
+|---|---|---|
+| Ce que fait le produit, pour qui, pourquoi | `docs/produit/` | le PRD, par parcours |
+| Le détail d'un chantier, quand l'issue ne suffit pas | `docs/produit/stories/<sujet>.md` | une story : contexte, critères d'acceptation ; `/dev` la consomme |
+| Comment le système est conçu, et pourquoi | `docs/conception/` | un document vivant par sujet (voir plus bas), et l'index `docs/conception/README.md` |
+| Ce qu'on consulte : fonctions, schéma, routes, variables, textes servis | `docs/reference/` | — |
+| Installer, déployer, monter de version | `docs/exploitation/` | — |
+| Méthode, conventions, règles de contribution | `docs/contribuer/` (et `.method/` pour l'outillage) | — |
+| Ce qui s'ouvre et se ferme : besoin, bug, question à trancher, chantier | une issue GitHub | type, assigné, jalon, étiquettes |
+| Ce qui a changé, version par version | `docs/changelog.md` | — |
+
+`docs/README.md` est la carte : quelle question mène à quel dossier.
+
+### Issues et stories
+
+- Tout besoin arrive en issue. Une épic est une issue parente ; ses chantiers sont des sous-issues.
+- Métadonnées d'une issue :
+  - le **type** dit la nature (Feature, Task, Bug) ;
+  - l'**assigné** dit qui agit (ou qui tranche, pour une question) ;
+  - le **jalon** dit l'échéance ;
+  - les **étiquettes** sont limitées au domaine (`area: …`), à `bloquant` et à `leçon oto 1`.
+- Une story n'est écrite que si l'issue ne suffit pas à spécifier le chantier. **C'est l'issue qui pointe vers la story** : son corps porte le chemin du fichier. Les documents du dépôt ne citent jamais d'issue, de PR ni d'URL GitHub.
+- Pour travailler une issue, on lit l'issue (`gh issue view <n>`), puis la story qu'elle désigne, s'il y en a une.
+- Un chantier livré : ce qui doit durer passe dans le document de conception du sujet, et la story est retirée.
+
+### Documents de conception vivants
+
+- **Un document par sujet** : un ensemble de décisions qui changent ensemble, et qui répond à une question avec laquelle le lecteur arrive. On le découpe s'il sert deux lecteurs ou deux rythmes, ou au-delà de 200 lignes environ. Une décision proche d'un sujet existant enrichit son document : elle n'en ouvre pas un nouveau.
+- **En tête** : le statut (`proposé`, ou `validé avec X le JJ/MM/AAAA`) et la date de dernière révision.
+- **Sections**, dans cet ordre et jamais vides : Résumé ; Contexte ; Objectifs et non-objectifs ; Conception ; Décisions et alternatives écartées ; Sécurité et confidentialité ; Écart avec le code ; Questions ouvertes ; Historique.
+- **Le corps décrit toujours l'état présent.** Une phrase devenue fausse se corrige sur place. Une option abandonnée reste dans « Décisions et alternatives écartées », avec la raison de son abandon.
+- **Historique** : une ligne par révision de fond, sous la forme `AAAA-MM-JJ : ce qui change — décidé par X (source : compte rendu ou réunion)`. Tant que le document est `proposé`, Git suffit et l'historique n'est pas obligatoire.
+- Les identifiants hérités (anciens ADR, fiches `Dnnn`, hypothèses `Hnn`, `Nnn`, `Pnn`) restent cités dans le document qui les porte désormais, pour que les références du code se retrouvent par une recherche.
+- Une question qui attend une décision vit en issue, assignée à qui tranche. Une fois tranchée, sa décision est reportée dans le document du sujet.
+
 ## Style de réponse
 
 Réponses courtes, droit au but, le minimum de mots. Pas de récap de ce que l'utilisateur vient de
@@ -41,7 +81,7 @@ dire, pas de tableau décoratif ni d'emoji sauf demande, pas d'introduction ni d
 
 ## Avant de coder
 
-- **Toute décision qui revient à l'utilisateur passe par `AskUserQuestion`, jamais par une phrase dans un récap.** Demande à plusieurs lectures, arbitrage produit, refacto proposé, option écartée qui coûterait à rattraper : la question porte le contexte nécessaire pour trancher — par option, sa conséquence et son coût — et la recommandation en premier. Le filtre reste « des lectures différentes mènent à un travail matériellement différent » ; le reste se tranche seul et s'écrit dans le récap. Un **sous-agent ne tranche pas** : il s'arrête et remonte l'arbitrage à qui l'a lancé. Quand l'utilisateur a demandé d'avancer sans lui, l'ambiguïté ne bloque pas : l'option la plus proche des ADR et de `docs/architecture.md`, sinon la plus simple, s'écrit en hypothèse sourcée ; seul ce qui changerait l'expérience d'un client ou coûterait cher à défaire lui remonte. Contrôlable sur la trace : un arbitrage rendu en prose (« j'ai choisi X », « à toi de voir ») sans appel à l'outil ni hypothèse écrite est une violation.
+- **Toute décision qui revient à l'utilisateur passe par `AskUserQuestion`, jamais par une phrase dans un récap.** Demande à plusieurs lectures, arbitrage produit, refacto proposé, option écartée qui coûterait à rattraper : la question porte le contexte nécessaire pour trancher — par option, sa conséquence et son coût — et la recommandation en premier. Le filtre reste « des lectures différentes mènent à un travail matériellement différent » ; le reste se tranche seul et s'écrit dans le récap. Un **sous-agent ne tranche pas** : il s'arrête et remonte l'arbitrage à qui l'a lancé. Quand l'utilisateur a demandé d'avancer sans lui, l'ambiguïté ne bloque pas : l'option la plus proche des documents de `docs/conception/`, sinon la plus simple, s'écrit en hypothèse sourcée ; seul ce qui changerait l'expérience d'un client ou coûterait cher à défaire lui remonte. Contrôlable sur la trace : un arbitrage rendu en prose (« j'ai choisi X », « à toi de voir ») sans appel à l'outil ni hypothèse écrite est une violation.
 - **Edits chirurgicaux.** Chaque ligne changée trace à la demande. Pas de cleanup adjacent, pas de reformatage opportuniste, pas de refacto non demandé. Dead code repéré : le mentionner, pas le supprimer. Un refacto **repéré** n'est pas un refacto **fait** : il se nomme dans le rayon d'impact et devient une question (§ ci-dessus), pas un silence.
 - **Rayon d'impact avant d'éditer, dès l'échelle Standard.** Le plus petit changement local, répété N fois sans regarder autour, produit un Frankenstein : doublons, appelants oubliés, effets de bord que personne n'a nommés. Avant la première ligne — dans la story (section « Rayon d'impact ») ou dans le plan proposé en live — quatre items, chacun observable : **(1) Appelants** : pour chaque fonction, table, colonne, composant ou Server Action modifié, les usages trouvés (**commande de recherche citée**, chemin absolu, sans borne de sortie : ni `head` ni `head_limit`, qui cachent les appelants au-delà de la coupe) et ce qui change pour chacun, doublures de test comprises (une doublure qui sert l'ancienne forme passe le type-check et n'échoue qu'à l'exécution) ; « aucun autre appelant » se prouve par la commande, jamais par affirmation. **(2) Doublons** : ce qui fait déjà la même chose (`component-registry.md` + recherche sur le concept, **commande citée**, sur ce que fait la surface et non sur son nom, qui manque les synonymes), avec le verdict réutiliser / fusionner / laisser et sa raison. **(3) Effet produit** : quel parcours voit une différence hors de l'écran modifié — autre route ou layout partagé, Server Action appelée ailleurs, policy RLS, webhook ou cron, email transactionnel, export / sitemap / SEO ; **un projet dérivé de ce template remplace cette liste par ses propres systèmes** (§ Projet). **(4) Refacto** : proposé ou écarté, écrit ; s'il est proposé, il est posé en question avec son coût et ce qui se passe sans lui. Contrôlable : un plan ou une story Standard+ sans ces quatre items, ou un item (1) ou (2) sans commande citée, est une violation. Micro en est exempt — sinon plus personne ne le fait.
 - **Critères de succès vérifiables d'abord.** Reformuler la tâche en checks concrets : test qui reproduit le bug, assertion qui valide la feature, type-check qui passe. Pas de « make it work » flou.
@@ -65,19 +105,19 @@ Ces deux obligations sont la **trace** de « réutiliser avant de créer » (`.m
 
 | Apprentissage | Emplacement |
 |---|---|
-| Invariant d'architecture absent, flou ou violé | ADR dans `docs/decisions/` (`.method/templates/adr.tmpl.md`) + màj `docs/architecture.md` |
+| Invariant d'architecture absent, flou ou violé | Document de conception du sujet, `docs/conception/<sujet>.md` (§ Documents de conception vivants ; un sujet nouveau : `.method/templates/conception.tmpl.md`) |
 | Règle technique manquante ou fausse | Fichier du tag dans `.method/conventions/` (globs : `_index.md`), et sa fiche |
 | Point de contrôle absent de la review | `.method/checklists/code-review.md` |
 | Story acceptée alors qu'elle était floue | `.method/checklists/story-ready.md` |
 | Composant recréé au lieu de réutilisé | `.method/conventions/component-registry.md` |
 | Règle de travail globale / gotcha projet | `CLAUDE.md` |
-| Contexte de l'erreur (incident, date, story) | Section « Post-implémentation » de la story, entrée de `docs/changelog.md` |
+| Contexte de l'erreur (incident, date, chantier) | Commentaire de l'issue, entrée de `docs/changelog.md` |
 
 L'écriture ne se demande pas et ne s'ajourne pas : la garde s'écrit dans la foulée du fix, et le
 récap dit **quel fichier, quelle section, quelle règle en une phrase** (§ Modifications
 documentaires).
 
-- **Une règle porte sa raison, pas son histoire.** Le « pourquoi » tient en une clause qui nomme le mécanisme (« le pooler rend la connexion sans la remettre à zéro »), jamais une date, une story, une revue ni un incident : ceux-là vont à la story et au changelog, où ils se lisent dans leur contexte. Une règle en contredit une autre : elle la remplace. Une règle dont le mécanisme a disparu (commande, fichier, service) part avec lui.
+- **Une règle porte sa raison, pas son histoire.** Le « pourquoi » tient en une clause qui nomme le mécanisme (« le pooler rend la connexion sans la remettre à zéro »), jamais une date, une story, une revue ni un incident : ceux-là vont à l'issue et au changelog, où ils se lisent dans leur contexte. Une règle en contredit une autre : elle la remplace. Une règle dont le mécanisme a disparu (commande, fichier, service) part avec lui.
 - **Une erreur avérée vaut occurrence suffisante.** Le seuil « 2+ occurrences » de `wrap-up` vise les patterns observés, pas les gardes anti-récidive. Le plafond de 400 lignes par fichier de conventions s'applique en revanche à l'identique : si la garde fait déborder, élaguer plutôt qu'empiler. `wrap-up` reste le filet de fin de chantier ; il ne remplace pas cette boucle immédiate.
 - **Trois écueils :**
   1. **Ne rien écrire parce que « ça ne se reproduira pas ».** La bonne foi n'est pas un mécanisme.
@@ -87,9 +127,9 @@ documentaires).
 ## Règles absolues
 
 1. **Conventions chargées + `pnpm type-check` : à toute échelle, sans exception** — y compris pour un changement d'une ligne.
-2. Lire avant de coder : la story si applicable, sa référence UI si elle n'est pas `N/A`, `docs/architecture.md`, et les conventions routées.
+2. Lire avant de coder : l'issue et la story qu'elle désigne si applicable, sa référence UI si elle n'est pas `N/A`, le document de conception du sujet (`docs/conception/`), et les conventions routées.
 3. Ne jamais créer un composant, hook ou util sans avoir vérifié `.method/conventions/component-registry.md`. S'il existe, le réutiliser.
-4. Ne jamais modifier un invariant d'architecture sans ADR dans `docs/decisions/`.
+4. Ne jamais modifier un invariant d'architecture sans réviser le document de conception de son sujet (`docs/conception/`).
 5. Les tests s'écrivent AVEC le code : unit, puis intégration, puis e2e si applicable — au **minimum vital** (`testing-strategy.md § Budget de tests`).
 6. **Aucun artefact n'est obligatoire ; son absence est déclarée, pas subie.** Pas de maquette, pas de story, pas de base de données : le travail se fait quand même. Une référence UI à `N/A` n'est jamais un défaut et la review ne la pénalise pas.
 7. **Cadrage = documentation uniquement.** Pendant un `/plan` : aucune dépendance installée, aucun fichier de code créé, aucun build lancé. Seuls `docs/` et `.method/sprint/` sont modifiés.
@@ -100,7 +140,7 @@ documentaires).
 |---|---|
 | `type-check`, `lint`, `test`, `check:framework` (`pnpm verify`) | Conventions réellement **lues** avant d'écrire (règles 1-2) |
 | Le gate de commit : reçu obligatoire, `--no-verify` / `--force` bloqués | Registry consulté avant de créer (règle 3) |
-| Routing, citations, fiches, globs morts, RLS, routes dupliquées (`check:framework`) | ADR posé sur un invariant touché (règle 4) |
+| Routing, citations, fiches, globs morts, RLS, routes dupliquées (`check:framework`) | Document de conception révisé sur un invariant touché (règle 4) |
 | | Échelle du changement correctement estimée |
 
 Rien ne vérifie qu'une convention a été lue — seulement qu'elle a été **annoncée** : l'annonce est
@@ -115,12 +155,12 @@ demande. En cas de doute entre deux échelles, prendre la plus haute et le dire.
 |---------|----------------|---------|
 | **Micro** | 1-2 fichiers, aucune nouvelle surface | conventions → implémentation → type-check → **review inline** |
 | **Standard** | 3-5 fichiers, ou création d'une fonction / composant / action | + tests → skill `revue` → changelog |
-| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → ADR si invariant → sprint status |
+| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → sprint status |
 
 Micro retire le cérémonial (rapport de review, changelog d'un changement invisible), pas la
 vérification. En Module, la story se **propose** : seul endroit où les AC précèdent le code, donc
 seul moyen pour la review de statuer « AC non livré ». Refusée, on **reste en Module sans story** :
-registry, ADR et changelog restent dus ; seuls post-implémentation et sprint status tombent.
+registry, document de conception et changelog restent dus ; seuls post-implémentation et sprint status tombent.
 
 ### Garde-fous conditionnels
 
@@ -153,14 +193,14 @@ Tout vit dans `.claude/skills/`. Un skill se déclenche **sur l'intention** et r
 | `revue` | auto — fin d'implémentation dès l'échelle Standard | Conventions routées, confrontées au diff |
 | `verify` | auto — « vérifie », « ça compile ? », après un fix | `pnpm verify` : 4 checks + reçu |
 | `commit-push` | auto — « commit », « push », « envoie » | Checks (sans les rejouer) + changelog + commit + push |
-| `wrap-up` | auto — « on a fini », « c'est bouclé » | Capture les apprentissages de fin de chantier : conventions, ADR, registry |
+| `wrap-up` | auto — « on a fini », « c'est bouclé » | Capture les apprentissages de fin de chantier : conventions, documents de conception, registry |
 | `conventions` | auto — question sur une règle, sans fichier touché | Répond depuis `.method/conventions/` en citant la source |
 | `audit` | demande explicite d'audit large | Confronte la **codebase existante** aux conventions, par lots |
 | `plan` | **explicite uniquement** | Cadrage : refus / story seule / évolution / initial |
 
 `revue` audite un **diff**, `audit` audite **l'existant**. Mêmes sources citables, même barème de
 gravité. `plan` ne s'auto-déclenche jamais (`disable-model-invocation`) : un cadrage réécrit PRD,
-architecture et stories. Face à un besoin produit large, le **proposer** et attendre l'accord.
+conception et stories. Face à un besoin produit large, le **proposer** et attendre l'accord.
 
 ## Déléguer à un sous-agent
 
@@ -201,7 +241,7 @@ s'en exclut, `revue` ne relit pas la prose) ; cinq règles s'appliquent quand m�
    Contrôle : `pnpm check:public`, avec la liste de refus `.public-denylist` posée à la racine
    (jamais commitée).
 
-`docs/changelog.md`, `.method/sprint/`, `docs/stories/`, `docs/decisions/` et le registry sont
+`docs/changelog.md`, `.method/sprint/`, `docs/produit/stories/`, `docs/conception/` et le registry sont
 exclus du reçu de vérification : les éditer n'invalide pas des checks déjà passés.
 
 ## Vérifier, commiter, pousser
@@ -224,7 +264,7 @@ déduisent d'aucun chemin de fichier.
 1. **Server Components par défaut.** `"use client"` seulement pour state, effets ou event handlers, et poussé le plus bas possible dans l'arbre.
 2. **Server Actions pour les mutations.** Pas de Route Handler sauf webhook ou cron. Chaque action : auth → Zod → exécution → revalidation → `{data}` ou `{error}`. Exceptions écrites : les écrans du paquet (`ui/`) ne connaissent pas `server/`, leurs mutations passent par `/api/platform/*` (ADR-008 § 4) ; les routes MCP (`/api/mcp`, `/api/mcp-admin`) et OAuth sont des Route Handlers par nature.
 3. **Un schema Zod = une source de vérité**, partagé entre le formulaire et l'action.
-4. **RLS activée sur toute table**, sans exception non documentée par un ADR. Auth revérifiée dans chaque Server Action — le middleware ne suffit pas. La décision d'accès est dans le service, jamais dans la seule RLS (`security-patterns.md § Droits dans le service`, ADR-012 § 3).
+4. **RLS activée sur toute table**, sans exception non documentée par un document de conception. Auth revérifiée dans chaque Server Action — le middleware ne suffit pas. La décision d'accès est dans le service, jamais dans la seule RLS (`security-patterns.md § Droits dans le service`, ADR-012 § 3).
 
 ## Design system
 
@@ -239,15 +279,15 @@ Hôte de référence : violet corporate, dark mode class-based (next-themes), In
 ## Workflow
 
 1. Échelle, puis conventions routées (plus les tags de la story), **liste annoncée**.
-2. Story : la lire entièrement, passer `.method/checklists/story-ready.md`, lire la référence UI si ≠ `N/A`. Sinon : critères vérifiables et, dès Standard, plan proposé avant d'éditer.
+2. Issue : la lire (`gh issue view <n>`), puis la story qu'elle désigne, entièrement ; passer `.method/checklists/story-ready.md`, lire la référence UI si ≠ `N/A`. Sinon : critères vérifiables et, dès Standard, plan proposé avant d'éditer.
 3. Implémenter : migration DB → schemas Zod → Server Actions + tests → composants + tests → page + tests d'intégration ; garde-fous conditionnels ; `pnpm verify`.
 4. Review — inline en Micro, skill `revue` dès Standard. Tout problème HAUTE ou MOYENNE **cite sa source** (`conventions/<fichier>.md § <section>`, `CLAUDE.md § <section>`, `checklists/code-review.md § <section>`, ou un AC). Sans source : BASSE, non bloquant.
-5. Finaliser selon l'échelle (changelog · registry · post-implémentation · sprint status · ADR), puis `commit-push`.
+5. Finaliser selon l'échelle (changelog · registry · post-implémentation · sprint status · document de conception), puis `commit-push`.
 
 ## Quand le PRD évolue
 
-`docs/prd.md` modifié (parcours concerné, statut 🔶 Draft) → `.method/checklists/prd-evolution.md`
-→ impacts **réels** seulement (parcours, référence UI, architecture, stories, DB) → `docs/architecture.md`,
-plus un ADR si un invariant est touché → stories impactées, nouvelles seulement si nécessaires →
-entrée de `docs/changelog.md`. Un changement qui ne touche ni parcours ni modèle de données passe
+`docs/produit/prd.md` modifié (parcours concerné, statut 🔶 Draft) → `.method/checklists/prd-evolution.md`
+→ impacts **réels** seulement (parcours, référence UI, conception, issues et stories, DB) → le document
+de conception du sujet et `docs/reference/` → issues et stories impactées, nouvelles seulement si
+nécessaires → entrée de `docs/changelog.md`. Un changement qui ne touche ni parcours ni modèle de données passe
 directement en implémentation.

@@ -52,5 +52,5 @@ Point de contrôle de `CLAUDE.md § Justifier une surface nouvelle` — ne pas y
 - [ ] `docs/changelog.md` mis à jour
 - [ ] `.method/conventions/component-registry.md` mis à jour si nouveau composant réutilisable
 - [ ] (mode story) Section « Post-implémentation » de la story remplie
-- [ ] ADR créé dans `docs/decisions/` si un invariant d'architecture a été touché
+- [ ] Document de conception du sujet mis à jour dans `docs/conception/` si un invariant d'architecture a été touché
 - [ ] Si une règle a dû être inventée pendant l'implémentation → elle est écrite dans la convention concernée **et annoncée** (fichier, section, règle en une phrase), pas laissée implicite

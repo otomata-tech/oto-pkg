@@ -89,7 +89,7 @@ graph LR
 
 ## 5. Modèle de données (résumé)
 
-<!-- Vue consolidée des entités. Détail complet dans docs/architecture.md -->
+<!-- Vue consolidée des entités. Détail complet dans docs/reference/ et docs/conception/ -->
 
 ```mermaid
 erDiagram
@@ -101,11 +101,8 @@ erDiagram
 
 ## 6. Epics
 
-<!-- Les epics regroupent les stories par parcours. -->
-
-| ID | Titre | Parcours | Priorité | Dépendances | Statut |
-|----|-------|----------|----------|-------------|--------|
-| E01 | | [Parcours] | P0 | — | 🔶 |
+<!-- Les épics sont des issues parentes GitHub, une par parcours ou chantier ; leurs chantiers
+     sont des sous-issues. Le PRD n'en recopie ni la liste ni l'état. -->
 
 ## 7. Hors scope
 

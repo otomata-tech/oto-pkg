@@ -15,10 +15,10 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
   l'étape d'avant. Des tâches Micro ou S sans migration, prêtes ensemble, partent dans un seul agent
   et un seul worktree, l'une après l'autre, avec une seule vérification et une seule fusion.
 - **Hypothèses, jamais bloquantes.** Face à une ambiguïté, l'agent prend l'option la plus proche des
-  ADR et de `docs/architecture.md`, sinon la plus simple, et l'écrit sourcée dans la section
-  « Hypothèses » de la story ; le pilote la reporte dans `docs/decisions/hypotheses.md`. Ce qui
-  changerait l'expérience d'un client ou coûterait cher à défaire va aussi dans
-  `docs/decisions/fiche-decisions.md`, et la story avance sous l'option recommandée.
+  documents de `docs/conception/`, sinon la plus simple, et l'écrit sourcée dans la section
+  « Hypothèses » de la story ; le pilote la reporte dans le document de conception du sujet. Ce qui
+  changerait l'expérience d'un client ou coûterait cher à défaire devient aussi une question à JB
+  (une issue, `CLAUDE.md § Issues et stories`), et la story avance sous l'option recommandée.
 - **Une consigne du pilote ne contredit pas un AC en silence** : une consigne qui s'en écarte cite
   l'AC et dit pourquoi ; sans cette citation, l'AC prévaut sur la consigne, et l'agent qui voit le
   conflit suit l'AC et le signale en tête de rapport. Le pilote relit chaque consigne contre les AC
@@ -29,13 +29,13 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
   sur la trace : aucune question n'est suivie d'une attente alors qu'un lot indépendant restait à lancer.
 - **Oto est une source de détails, jamais de conception** : une reprise d'un fichier d'Oto dit ce
   qu'elle reprend et ce qu'elle retire ; la revue refuse celle qui réintroduit une ligne de
-  `docs/architecture.md § 10`.
+  `docs/conception/vue-d-ensemble.md` (« Oto : ce qui ne revient jamais »).
 - **Actions réservées à JB**, listées dans le rapport, jamais exécutées : vrais secrets, création de
   services ou de comptes externes, réglages des projets Supabase et Vercel.
 - **Fichiers partagés, écrits par le pilote seul à la fusion** : `docs/changelog.md`,
   `.method/sprint/status.md`, `.method/conventions/component-registry.md`, `.method/conventions/_index.md`,
-  `CLAUDE.md`, `docs/architecture.md`, `docs/decisions/hypotheses.md`,
-  `docs/decisions/fiche-decisions.md`, `docs/mcp-golden-queries.md` et `packages/plateforme/CHANGELOG.md`.
+  `CLAUDE.md`, `docs/conception/`, `docs/reference/` (dont `docs/reference/mcp-golden-queries.md`)
+  et `packages/plateforme/CHANGELOG.md`.
   L'agent met dans son rapport ce qu'il faudrait y écrire.
 - **Rapport de fin de vague** : stories livrées, hypothèses prises, actions JB en attente.
 

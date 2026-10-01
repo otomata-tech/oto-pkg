@@ -15,9 +15,10 @@ Ce dépôt porte :
 - les tests (`tests/`), l'outillage de tout hôte (`scripts/`), la méthode (`CLAUDE.md`, `.method/`,
   `.claude/`) et les documents du paquet (`docs/`).
 
-Documents qui font foi : [`docs/architecture.md`](docs/architecture.md), [`docs/decisions/`](docs/decisions/),
-[`docs/prd.md`](docs/prd.md), [`docs/mcp-golden-queries.md`](docs/mcp-golden-queries.md), et pour les
-utilisateurs [`docs/pilote/guide-installation.md`](docs/pilote/guide-installation.md).
+Documents qui font foi : la carte [`docs/README.md`](docs/README.md) mène au produit
+([`docs/produit/prd.md`](docs/produit/prd.md)), à la conception ([`docs/conception/`](docs/conception/README.md)),
+à la référence ([`docs/reference/`](docs/reference/)) et, pour les utilisateurs, à
+[`docs/exploitation/guide-installation.md`](docs/exploitation/guide-installation.md).
 
 ## Installer le paquet
 
@@ -96,7 +97,7 @@ affichée, jamais commitée.
 
 Jamais dans l'environnement de l'application déployée : `PLATFORM_ADMIN_DATABASE_URL` (connexion
 d'administration), `PLATFORM_APP_PASSWORD`, `SUPABASE_SECRET_KEY`, `SUPABASE_DB_URL`,
-`SUPABASE_ACCESS_TOKEN` : outillage seulement (`docs/architecture.md` § 6, « Isolation et secrets »).
+`SUPABASE_ACCESS_TOKEN` : outillage seulement ([`docs/conception/base-et-portabilite.md`](docs/conception/base-et-portabilite.md), sécurité et confidentialité).
 
 Le mode OIDC n'a besoin d'aucune variable Supabase : l'essai a joué tout le parcours sans elles
 (§ 4.3), et `admin_cell` contrôle les variables exigées selon le mode.

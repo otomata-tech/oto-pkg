@@ -14,7 +14,7 @@
 //
 // Repris d'Oto (`oto_mcp/access/chain_resolution.py` l. 1-4) : une lecture impossible lève, elle ne
 // signifie jamais « absent ». Retiré : les paliers `user > group > org > platform`, les arêtes de
-// `grants`, les observateurs de comparaison (`docs/architecture.md § 10`).
+// `grants`, les observateurs de comparaison (`docs/conception/vue-d-ensemble.md`, « Oto : ce qui ne revient jamais »).
 import {
   ACCESS_LEVELS,
   ancestorPaths,

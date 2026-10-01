@@ -2,7 +2,7 @@
 name: dev
 description: "Écrire ou explorer du code en respectant les conventions du projet : conventions routées par globs, implémentation, tests, vérification, review, finalisation."
 when_to_use: "Avant toute modification de code applicatif — correction de bug, ajout de fonctionnalité, réorganisation, implémentation de story — et pour toute exploration read-only du code. NE PAS déclencher pour une modification purement documentaire (docs/, .method/, README) : voir CLAUDE.md § Modifications documentaires. NE PAS déclencher pour répondre à une question sans toucher au code : c'est le skill conventions. NE PAS déclencher sur 'audite' ou 'passe le projet en revue' : c'est le skill audit."
-argument-hint: "[E01-S01 | next | description de ce qu'il faut faire]"
+argument-hint: "[#<n> (issue) | next | description de ce qu'il faut faire]"
 paths:
   - "src/**"
   - "tests/**"
@@ -48,7 +48,7 @@ En cas de doute entre deux échelles, prendre la plus haute et le dire.
 |---------|----------------|---------|
 | **Micro** | 1-2 fichiers, aucune nouvelle surface (pas de route, table, Server Action ou dépendance nouvelle) | conventions → implémentation → type-check → **review inline** (pas de rapport) |
 | **Standard** | 3-5 fichiers, ou création d'une fonction / composant / action | + tests écrits avec le code → **review complète** (skill `revue`) → changelog |
-| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → ADR si invariant → sprint status |
+| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → sprint status |
 
 **Micro** ne veut pas dire « sans garantie » : les conventions sont chargées et le type-check
 tourne. Ce qui disparaît, c'est le cérémonial (rapport de review, entrée de changelog pour un
@@ -62,7 +62,7 @@ changement invisible), pas la vérification.
 Si l'utilisateur refuse : **rester en Module sans story**, ne pas rétrograder en Standard.
 L'échelle est déterminée par ce que le changement touche, pas par la réponse à une question.
 Ce qui disparaît avec la story, ce sont les seules obligations qui en dépendent :
-post-implémentation et sprint status. **Registry, ADR et changelog restent dus.**
+post-implémentation et sprint status. **Registry, document de conception et changelog restent dus.**
 
 La review perd alors ses AC : elle ne peut plus statuer « AC non livré ». Le dire à ce
 moment-là, pas après.
@@ -81,16 +81,20 @@ relecture (§ 6). Le registry n'a pas de fiche : il se consulte tel quel.
 Le registry (`registry`) et la stack (`stack`) sont routés comme les autres : ils se chargent
 quand le diff touche ce qu'ils couvrent, pas à chaque changement d'une ligne.
 
-**Si une story pilote le travail** (`E01-S01` ou `next` → `.method/sprint/status.md`) — lire la
-story, vérifier `.method/checklists/story-ready.md`, ajouter les tags de son champ `Conventions`
-(union avec les globs), lire sa référence UI **si elle n'est pas `N/A`**.
+**Si une issue pilote le travail** (`#<n>`, ou `next` → `.method/sprint/status.md`) — la lire
+(`gh issue view <n>`, commentaires compris) ; si son corps désigne une story
+(`docs/produit/stories/<sujet>.md`), lire la story, vérifier `.method/checklists/story-ready.md`,
+ajouter les tags de son champ `Conventions` (union avec les globs), lire sa référence UI **si elle
+n'est pas `N/A`**. Sans story, l'issue tient lieu de spécification : ses critères deviennent les
+critères de succès ci-dessous (`CLAUDE.md § Issues et stories`).
 
 **Sinon** — reformuler la demande en **critères de succès vérifiables** (test qui reproduit,
 assertion qui valide, type-check qui passe). Les ambiguïtés se posent via `AskUserQuestion`
 avec le contexte pour trancher (`CLAUDE.md § Avant de coder`) : ne pas trancher en silence, ne
 pas trancher en prose. À partir de l'échelle Standard, **proposer le plan avant d'éditer**.
 
-Lire `docs/architecture.md` uniquement sur les sections concernées.
+Lire le document de conception du sujet (la table de `docs/conception/README.md` mène au bon),
+et `docs/reference/` pour le schéma, les services ou les portes, sur les seules sections concernées.
 
 ### 2 bis. Rayon d'impact — dès Standard, avant la première ligne
 
@@ -162,9 +166,10 @@ Au-delà de 2 cycles sans converger → s'arrêter et remonter à l'utilisateur.
 | `component-registry.md` | — | si composant réutilisable | oui |
 | Story post-implémentation | — | si story | si story |
 | `.method/sprint/status.md` | — | si story | si story |
-| ADR `docs/decisions/` | — | si invariant touché | si invariant touché |
+| Document de conception `docs/conception/<sujet>.md` | — | si invariant touché | si invariant touché |
 
-En mode story, passer `.method/checklists/story-done.md` avant de basculer la story en ✅ Done.
+En mode story, passer `.method/checklists/story-done.md` avant de clore l'issue : ce qui doit durer
+passe dans le document de conception du sujet, et la story est retirée du dépôt.
 
 Le commit et le push passent par le skill `commit-push` — un `git commit`/`git push` direct est
 bloqué par le hook.

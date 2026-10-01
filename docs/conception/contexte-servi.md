@@ -1,0 +1,114 @@
+# Contexte servi
+
+- **Statut** : validé avec JB le 23/09/2026
+- **Dernière révision** : 2026-10-01
+
+## Résumé
+
+`context` ouvre chaque conversation : il émet un code `ctx` et sert, sous un plafond de 35 000 caractères, les règles, la procédure reconnue, une partie par Contexte (Tout le monde, Privé, chaque équipe), les nouveautés, les procédures utiles et les contenus récents.
+Le code devient périmé quand l'un des Contextes qu'il a servis change de contenu : le refus porte alors un nouveau code et les parties changées, et l'appel se rejoue sans relire tout `context`.
+
+## Contexte
+
+Le banc a mesuré que le seul levier qui force la lecture des règles sur tous les hosts est un champ obligatoire dont la valeur vient d'un de nos outils (ADR-002, [outils MCP](outils-mcp.md)). Le code `ctx` joue ce rôle, regroupe les appels d'une conversation au journal et porte ce qu'une session porterait (ADR-009). Les retours de la démo (story E11-S03) ont montré qu'un assistant tournait en boucle sur des codes périmés par la publication de Contextes qu'il n'avait pas lus, et qu'un budget par bloc coupait des Contextes utiles ; ceux d'un assistant qui migrait une base de connaissances (story E11-S19) qu'un auteur de Contexte était refusé par sa propre écriture.
+
+## Objectifs et non-objectifs
+
+- La règle d'une organisation est relue à chaque conversation, et relue de nouveau dès qu'elle change pour la personne.
+- Un refus pour code périmé coûte un rejeu, pas un `context` complet.
+- Le texte servi tient sous l'avertissement de Claude Code sur un résultat d'outil, et dit ce qu'il coupe.
+- Hors objectif : un compteur de taille à l'écran ; une priorité propre entre blocs au-delà du plafond ; la reprise des codes émis avant 1.1.0.
+
+## Conception
+
+### Le code `ctx` (ADR-002 § 2)
+
+- `ctx` est requis sur tous les outils sauf `context`. C'est une ligne en base créée par `context` (personne, organisation, `rules_version`, Contextes servis, host, heure). H27 : forme Crockford `XXXX-XXXX`.
+- Le code garde (`ctx.contexts`), pour chaque Contexte que `context` attendait pour la personne (Tout le monde, son Privé si elle a un `handle`, chacune de ses équipes), la révision publiée lue à l'émission. Il devient périmé quand l'un d'eux change de contenu servi : première publication, retrait, ou republication différente. La publication d'un autre Contexte, ou une republication à l'identique, ne l'invalide pas.
+- H27 : un code absent ou inconnu reçoit son texte fixe qui dit de rappeler `<p>_context` ; un code périmé reçoit les chemins changés, un nouveau code avec lequel rejouer l'appel et les parties changées (sans code, le texte qui dit de rappeler `<p>_context` : code émis avant 1.1.0, émission ou lecture en panne) ; l'auteur d'un Contexte garde son code (E11-S19).
+- Le refus : « context has changed (<chemins>). New ctx: <code>: retry this call with it… ». HN-E11S03-17 : il nomme les chemins changés dans l'ordre des parties (`expectedContextPaths`), bornés à 20 par `boundedList`. HN-E11S19-2 : il émet un **nouveau** code (même host, même agent) plutôt que de réécrire l'ancien, pour qu'un code partagé par des sous-agents qui n'ont pas lu l'écart ne passe pas ; le nouveau code garde les révisions lues par la garde (`ctxState`, passées à `issueCtx` par `request.contexts`), jamais relues à l'émission, les corps étant lus après : un Contexte republié entre les deux est servi plus récent que la révision gardée et le code est refusé une fois de plus, jamais gardé au-delà de ce qui a été servi (même règle pour le `context` léger, AC-b1).
+- HN-E11S19-3 : l'écart servi est la partie entière de chaque Contexte changé, telle que `context` la sert (en-tête et corps, sans les lignes de faits, qui ne périment pas le code), pas un diff de blocs ; un Contexte retiré, vidé ou dépublié a son en-tête et la ligne `CONTEXT_GONE`.
+- HN-E11S03-6 : le contenu comparé est celui des blocs publiés (type, texte, données, clé) ; titre et résumé exclus. H28 : une republication à l'identique n'invalide aucun `ctx` et `write` n'en dit rien : les blocs publiés se comparent par `samePublishedContent`.
+- HN-E11S03-7 : la révision d'un Contexte se lit sans filtre de niveaux, à l'émission comme à la garde ; un droit ou une équipe changés sans révision n'invalident rien. HN-E11S03-16 : à la garde, un chemin gardé par le code mais plus attendu (équipe quittée), ou attendu mais pas gardé (équipe rejointe), est ignoré.
+- HN-E11S03-20 : un instantané de `node_versions` absent pour l'une des deux révisions comparées vaut un changement : le code est périmé. HN-E11S03-4 : un code sans `contexts` (émis avant 1.1.0) est périmé, sans reprise.
+- HN-E11S03-5 : les révisions se lisent dans la transaction d'`issueCtx`, en parallèle des corps : une publication entre les deux lectures peut périmer le code une fois de trop, ou le laisser valide sur un corps plus ancien de quelques millisecondes (accepté).
+- H28 : `rules_version` augmente, par déclencheur en base (`bump_rules_version`), à chaque publication d'un nœud Contexte (`contexte`, `<équipe>/contexte`, `private/<handle>/contexte`), republication à l'identique comprise ; HN-E11S03-3 : le déclencheur et la colonne restent, comptés, plus lus par la garde.
+- HN-E11S03-1 : `feedback` accepte un code `ctx` connu, de la personne et de l'organisation, mais périmé ; un code absent ou inconnu reste `ctx_missing` (validée par le responsable d'Oto le 2026-09-29).
+
+### L'auteur d'un Contexte garde son code (story E11-S19)
+
+- `write` avance la ligne du code de l'auteur à la révision qu'il publie, si ce code gardait la précédente (policy `ctx_update_own`, colonne `contexts` seule). HN-E11S19-1 : la ligne n'avance (`acceptOwnContextWrite`) que si le code est à la personne dans l'organisation, garde ce Contexte à la révision précédente, que le chemin est attendu pour elle et que le Contexte est publié à la révision dite : un changement d'un autre auteur entre-temps reste à lire, par le refus qui le porte. Policy plutôt qu'une fonction `security definer` (`database-patterns.md § Règles`) ; la personne ne peut qu'avancer ou reculer ses propres codes.
+- HN-E11S19-12 : un code partagé par un orchestrateur et ses sous-agents avance par `acceptOwnContextWrite` quand l'un d'eux publie un Contexte : l'orchestrateur connaît l'écriture de son sous-agent, et un sous-agent frère n'est pas refusé (AC-a1, décision du pilote, option a).
+
+### Le `context` léger : `since_ctx` (story E11-S19)
+
+- `context` accepte `since_ctx`, un code précédent de la personne : il ne rend que le routage de la phrase, les parties des Contextes changés depuis, et un code (le même si rien n'a changé).
+- HN-E11S19-4 : `since_ctx` sert aussi à tester le routage d'une phrase (pas de fonction `route.test`). Sans changement, le même code, aucune ligne `ctx` écrite, la borne des nouveautés immobile ; règles, parties inchangées, nouveautés, procédures utiles et contenus récents retirés du mode léger, sans filtre sémantique (D132). Un code inconnu, d'une autre personne, d'une autre organisation, mal formé ou émis avant 1.1.0 : `context` complet.
+
+### Ce que sert `context`
+
+Ordre servi : le bloc `code` (première ligne « ctx: XXXX-XXXX », règles « How this workspace works », langue de réponse, puis « ## This request » et la ligne du routage, la procédure reconnue suivant immédiatement sa ligne), une partie par Contexte, « What's new », « Procedures you can run », « Recent content ». Le routage lui-même : [routage et recherche](routage-et-recherche.md).
+
+- HN-E05S12-1 : D109 se lit comme la première ligne sous l'en-tête `## Context: …`, qui garde son rôle (nom de la partie, gardé par la coupe) ; les faits de l'ancien bloc personne (deux lignes) tiennent en une ; « You work for » devient « You: ».
+- D109 : dans le texte servi par `context` et dans l'onglet « Contexte » de l'accueil, les faits de la personne, de l'organisation et d'une équipe sont la première ligne de la partie du Contexte correspondant (Privé, Tout le monde, chaque équipe), servie même quand ce Contexte est vide ; « Code de la conversation » devient « Règles Oto », replié, non modifiable.
+- H31 : les faits de la personne (nom, handle, rôle, équipes, celle par défaut marquée, langue de réponse), lus dans `members.profile`, ouvrent la partie Privé ; la personne édite son prénom, son nom et sa langue dans son Profil ; ton et préférences s'écrivent dans son Contexte privé.
+- H32 : la ligne de l'organisation donne le nom et les domaines de travail ; le contenu de l'organisation est son Contexte `contexte`, servi avec ses sous-pages, tableaux et pages liées.
+- E03-S08 N10 : Contextes servis : Tout le monde, Privé (anciennement Perso) si le profil a un `handle`, puis chaque équipe de l'identité, celle par défaut d'abord, les autres par nom.
+- E03-S08 N9 : une partie de Contexte : « ## Context: … », ses blocs publiés rendus un niveau sous `read`, puis la liste de ses contenus (intitulé « Pages, tables and procedures here: » depuis E05-S12, D110) et « Linked pages: » (cibles publiées et lisibles, sans doublon), jamais leur corps ; coupée, elle finit par un pointeur vers `read`.
+- E03-S08 N20 : un Contexte coupé, ou dont une liste s'arrête à 20 lignes, finit par le pointeur « Rest of this context: <p>_read {"path": "<chemin>"}. » et compte `cut`.
+- E03-S08 N13 : pannes : un Contexte illisible devient son en-tête et un pointeur vers `read`, un bloc dynamique illisible est omis ; `context` répond toujours, pour que le `ctx` serve les autres outils.
+- H34 : « What's new » liste, depuis le dernier `ctx` de la personne sinon 14 jours, les versions publiées qu'elle lit et les connecteurs activés : 10 lignes et 600 caractères au plus ; sans nouveauté depuis une borne du jour même, le bloc est omis. E03-S08 N1 : la borne est le dernier `ctx` de la personne dans cette organisation, sinon maintenant − 14 jours. E03-S08 N2 : une activation compte à sa date de dernière mise à jour à l'état actif (`updated_at`, sinon `created_at`).
+- H35 : « Procedures you can run » liste 60 procédures lisibles au plus, triées par l'usage sur 90 jours que la personne lit au journal, puis par chemin ; les 15 premières par chemin et résumé, les suivantes par chemin et titre (amendée par E11-S16 : sur le jeu à l'échelle, les 40 premières tiennent en 3 932 caractères au lieu de 6 836, toutes visibles). E03-S08 N3 : l'usage compte les lignes de journal de la personne et des équipes qu'elle mène (toutes ses équipes si elle administre l'organisation), choisies par la requête du service ; un simple membre ne compte que les siennes.
+- H36 : « Recent content » (anciennement « Recent documents ») liste 20 pages et tableaux au plus, lus ou écrits par la personne sur 90 jours (journal, blocs qu'elle a écrits, nœuds qu'elle a publiés), sans procédure ni Contexte. E03-S08 N4 : visibles, hors racine, que la personne a lus ou écrits au journal, dont elle a écrit des blocs ou qu'elle a publiés ; procédures et Contextes exclus (ils ont leurs parties).
+
+### Plafond et coupe (ADR-002 § 7)
+
+- D134 : `context` n'a plus de taille par bloc : chaque bloc est servi entier sous un seul plafond de 35 000 caractères (environ 10 000 tokens, sous l'avertissement de Claude Code sur un résultat d'outil) ; au-delà, les blocs partent par la fin dans l'ordre servi et la coupe est dite à l'assistant. Aucun compteur à l'écran.
+- H30 : blocs entiers, dans l'ordre servi, sous le plafond (`CONTEXT_BUDGET`) ; le bloc `code` (règles) passe toujours en premier ; restent des bornes en lignes (listes d'un Contexte 20, procédures utiles 60, nouveautés 10, contenus récents 20, HN-E11S03-15, validée le 2026-09-29). Au-delà du plafond, le premier bloc qui dépasse est coupé à la dernière ligne entière et les suivants omis et nommés ; une partie de Contexte coupée finit par un pointeur vers `read`. Les faits ne sont plus des blocs mais une ligne en tête de leur partie (D109) ; un Contexte liste ses enfants, procédures comprises (D110).
+- HN-E11S03-13 : au-delà du plafond, l'ordre est l'ordre servi, sans priorité propre ; l'avis de fin « Context budget reached. Omitted: … » est inchangé. HN-E11S03-11 : `context` n'a pas de champ `cut` dans `data` : le texte dit la coupe.
+- HN-E11S03-14 : une partie coupée recule avant un bloc clôturé resté ouvert et finit par « This context is cut… » ; la procédure reconnue qui ne tient pas cède la place à son pointeur ; l'écran reprend ses lignes existantes, sans phrase neuve. HN-E11S03-18 : le nombre du pointeur est tiré du plafond (`formatCount(CONTEXT_BUDGET)`, « 35,000 »), jamais écrit en dur.
+- HN-E11S03-19 : une partie dont même la tête ne tient pas n'est omise que si son corps est servi (`path` posé) ; les autres blocs se coupent à la dernière ligne entière.
+- HN-E11S03-21 : nouveautés et contenus récents, arrêtés à 10 et 20 lignes, n'ajoutent pas de ligne « … and k more » ; les listes d'un Contexte et les procédures utiles disent leur arrêt.
+
+### Aperçu, onglet « Contexte » et activités de l'accueil
+
+- E03-S08 N14 : l'aperçu est calculé par la page d'aperçu du contexte (formulaire GET) via `previewContext`, sans route d'API ; son rapport par bloc donne le chemin du nœud Contexte d'où vient le bloc (`null` pour les autres). E03-S08 N8 : il rend la même première ligne « ctx: XXXX-XXXX » qu'un vrai `context`, pour que les tailles soient les mêmes.
+- HN-E05S12-10 : ancres de la vue renommées (`regles`, `contenus`) ; `vous`, `organisation`, `equipes`, `code`, `documents` retirées ; les ancres des Contextes (HN-E05S11-9) inchangées.
+- HN-E05S12-27 : aucun changement serveur pour ranger des contenus sous un Contexte (D110 a) : création, déplacement, droits et arbre acceptent déjà un parent Contexte ; un test sur base réelle le fige (AC-24).
+- HN-E05S12-15 : classement d'une activité : `<p>_write` et `POST nodes` : `publish: true` → publié ; sans `base_revision` → créé ; sinon → modifié ; arguments coupés (> 2 ko) → modifié ; `POST nodes/move` → déplacé ; `POST nodes/duplicate` → dupliqué ; `POST trash` / `POST trash/restore` → corbeille / restauré ; `<p>_call` `table.write` → écrit dans le tableau (chemin illisible dans les arguments : ligne omise) ; `POST tables/review` → revue ; `<p>_context` dont la cible est une procédure lisible → procédure lancée. Nature et titre : le nœud au chemin (ou à l'ancien chemin).
+- HN-E05S12-16 : regroupement : même personne, même contenu, même verbe, moins d'une heure entre deux gestes. HN-E05S12-19 : 20 activités, la semaine (`PERIODE` de la page), « Tout le journal » gardé. HN-E05S12-21 : une ligne par activité par le CSS de l'accueil (`.oto-home-main .oto-feed-item`), aucune prop de `FeedItem`. Portée et écran de l'accueil : [écrans et coque](ecrans-et-coque.md).
+
+## Décisions et alternatives écartées
+
+- **Péremption par `rules_version`** (toute publication d'un Contexte de l'organisation périmait tous les codes) : remplacée le 2026-09-29 par la comparaison des seuls Contextes servis à la conversation, sans reprise des codes existants (ADR-002 § 2 amendé par E11-S03, D132) : l'assistant tournait en boucle sur des Contextes qu'il n'avait pas lus.
+- **Refus sans nouveau code** (« call <préfixe>_context again… ») : remplacé par un refus qui porte un nouveau code et les parties changées (E11-S19) ; il ne reste que sur une panne d'émission ou de lecture, ou un code émis avant 1.1.0.
+- **Réécrire l'ancien code au refus** : écarté, un code partagé par des sous-agents qui n'ont pas lu l'écart passerait (HN-E11S19-2). **Fonction `security definer` pour avancer le code de l'auteur** : écartée au profit d'une policy (HN-E11S19-1). **Fonction `route.test`** : écartée, `since_ctx` suffit (HN-E11S19-4).
+- **Budget de 20 000 caractères et tailles nominales par bloc** : remplacés par le plafond seul de 35 000 (D134, 2026-09-29). E03-S08 N6 (plus en vigueur) : plus de taille nominale ni de coupe par bloc ; un bloc coupé par le plafond ou arrêté par une borne en lignes est rapporté `cut`. Le bloc `code` a perdu sa taille de 400 caractères : il passe toujours en premier (H30 amendé par HN-E05S12-8).
+- **Avertir l'auteur d'un Contexte qui fait dépasser le plafond** (HN-E11S03-12) : retiré le 2026-09-29 ; l'assistant voit la coupe au service.
+- **Faits en blocs séparés** (personne, organisation, équipe) : remplacés par une ligne en tête de chaque partie (D109).
+
+## Sécurité et confidentialité
+
+- Le code d'une autre organisation de la même personne est inconnu, pas périmé (E03-S01 N13, [outils MCP](outils-mcp.md)) ; `since_ctx` d'une autre personne ou organisation sert un `context` complet (HN-E11S19-4).
+- La personne n'écrit que la colonne `contexts` de ses propres codes (`ctx_update_own`).
+- Les parties servies, procédures utiles et contenus récents ne listent que ce que la personne lit ; l'usage d'un simple membre ne compte que ses lignes (E03-S08 N3).
+
+## Écart avec le code
+
+- M82 : `beforeOpenFence` (`server/context/engine.ts`) ne reconnaît que les clôtures d'accents graves sans retrait ; il doit lire ses clôtures par `openingFence` et `closesFence` (`schemas/link-syntax.ts`).
+- M72 : pour un Contexte écrivable, la ligne « Not loaded: … » (échec de lecture des Contextes) est masquée par l'éditeur dans la vue « Contexte ».
+
+## Questions ouvertes
+
+Relevées par la story E05-S12, à trancher par JB ; le code suit l'option A :
+
+- Q1 : ordre des parties servies (HN-E05S12-2). **A.** Tout le monde, Privé, équipes (défaut d'abord), l'ordre de P39 (`contextPaths`), les faits de la personne après ceux de l'organisation. **B.** Privé d'abord, la ligne de langue en tête. Change ce que lit l'assistant de chaque organisation.
+- Q2 : texte des « Règles Oto » servi à tous les assistants (HN-E05S12-7). **A.** Anglais, sans le mot « Oto », chemins d'exemple neutres (`<team>/<page>`) ; le libellé d'écran reste « Règles Oto ». **B.** Un autre texte relu par JB.
+
+## Historique
+
+- 2026-09-23 : code `ctx` exigé partout sauf sur `context`, invalidé par `rules_version` ; budget de `context` — décidé par JB (source : ADR-002).
+- 2026-09-28 : faits en une ligne en tête de la partie de chaque Contexte, « Règles Oto », activités de l'accueil — décidé par JB (source : fiche D109, story E05-S12).
+- 2026-09-29 : péremption par les seuls Contextes servis ; plafond unique de 35 000 caractères, coupe dite ; `feedback` accepte un code périmé — décidé par JB et le responsable d'Oto (source : fiches D132, D134, story E11-S03).
+- 2026-09-30 : le refus porte un nouveau code et les parties changées ; l'auteur d'un Contexte garde son code ; `context` léger par `since_ctx` ; procédures utiles au-delà de 15 par titre — décidé par le pilote (source : stories E11-S19, E11-S16).
+- 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-002 § 2 et § 7, D109, D134, H27, H28, H30 à H36, Q1, Q2, les choix d'E03-S08, E11-S03, E11-S19 et ceux d'E05-S12 cités par le code — décidé par Alexis, accord de JB.

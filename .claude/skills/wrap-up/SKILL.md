@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: "Capturer les apprentissages méta d'une session (nouvelles conventions, ADR, composants du registry). Écrire directement dans .method/conventions/, docs/decisions/ ou CLAUDE.md, puis annoncer chaque écriture : fichier, section, règle en une phrase."
+description: "Capturer les apprentissages méta d'une session (nouvelles conventions, décisions de conception, composants du registry). Écrire directement dans .method/conventions/, docs/conception/ ou CLAUDE.md, puis annoncer chaque écriture : fichier, section, règle en une phrase."
 when_to_use: "Quand l'utilisateur signale une fin de chantier — 'on a fini', 'c'est bouclé', 'wrap up', 'on termine', 'on récapitule' — OU après la clôture de plusieurs stories/fix dans la même session. NE PAS déclencher : sur une session exploratoire ou de lecture seule (rien n'a été modifié) ; sur une micro-modif (typo, rename) ; si l'utilisateur a déjà refusé la proposition dans la session en cours ; s'il vient de lancer commit-push sans passer par wrap-up — respecter son choix."
 argument-hint: "[scope optionnel]"
 ---
@@ -26,11 +26,11 @@ Ignorer ce qui est déjà évident à la lecture du code ou du changelog.
 | Type d'apprentissage | Destination |
 |---|---|
 | Nouvelle règle / invariant technique | `.method/conventions/<fichier>.md` (section Règles) |
-| Décision d'architecture non-triviale | Nouvel ADR dans `docs/decisions/` (`.method/templates/adr.tmpl.md`) |
+| Décision d'architecture non-triviale | Le document de conception du sujet, `docs/conception/<sujet>.md` : corps corrigé en place, ligne d'historique datée ; un sujet nouveau part de `.method/templates/conception.tmpl.md` et s'ajoute à `docs/conception/README.md` (`CLAUDE.md § Documents de conception vivants`) |
 | Gotcha / config / commande projet-spécifique | `CLAUDE.md` |
 | Composant / hook / util réutilisable créé | `.method/conventions/component-registry.md` |
 | Nouveau domaine technique récurrent | Nouveau tag : une ligne dans `_index.md` (avec ses **globs**) + le fichier de conventions. Rien d'autre. |
-| Story / bug découvert en chemin | `docs/stories/` ou `.method/sprint/status.md` |
+| Besoin, bug ou question découvert en chemin | Une issue GitHub, avec l'accord de JB (`CLAUDE.md § Issues et stories`), ou `.method/sprint/status.md` |
 
 Règles de sélection :
 - **Une seule occurrence = pas un pattern.** Attendre 2+ avant de promouvoir en convention.
@@ -58,7 +58,7 @@ périmées vaut mieux qu'une session qui en ajoute 10.
 ## Phase 3 — Écrire
 
 Éditer les fichiers retenus (Edit plutôt que Write). Aucun accord préalable n'est requis, y
-compris dans `.method/conventions/`, `docs/decisions/` et `CLAUDE.md`
+compris dans `.method/conventions/`, `docs/conception/` et `CLAUDE.md`
 (`CLAUDE.md § Modifications documentaires`, règle 1).
 
 Une règle qui en contredit une existante la **remplace** — ne pas laisser les deux cohabiter.
@@ -71,7 +71,7 @@ Une règle qui en contredit une existante la **remplace** — ne pas laisser les
 **Écrits :**
 1. [CONVENTION] api-patterns.md § Error handling — mapper les codes Supabase vers des messages user
    → vu 3× cette session
-2. [ADR] docs/decisions/adr-004-soft-delete.md — soft delete via `deleted_at`, impact RLS
+2. [CONCEPTION] docs/conception/noeuds-et-arbre.md § Conception — soft delete via `deleted_at`, impact RLS
 3. [REGISTRY] component-registry.md — `<ConfirmDialog>`, utilisé 3×
 
 **Écartés (one-off) :**

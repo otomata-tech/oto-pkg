@@ -77,7 +77,7 @@ CREATE TRIGGER set_updated_at
 - **Jamais de modification manuelle** en base — toujours via migration
 - **Portable : Supabase comme Postgres nu** (ADR-012 § 1). Aucune clé ni lecture vers `auth.users` (une personne est un `uuid`, son email et son nom des copies), aucune extension hors de `pg_trgm`, `unaccent` et `ltree` ; `updated_at` par `platform.set_updated_at()` ; une colonne de personne entre dans `platform.forget_user` dans la migration qui la crée ; un privilège de `service_role` ou de `supabase_auth_admin` s'accorde dans un bloc `do` qui vérifie d'abord le rôle. **Vérifiable :** `pnpm check:migrations` (`auth-users-foreign-key`, `auth-users-read`, `extension-not-allowed`), puis le job de CI `bare-postgres`, qui applique toutes les migrations sur un Postgres nu ; la couverture de `forget_user` pour les colonnes existantes par `tests/integration/portabilite-schema.test.ts` (une instruction par colonne dans `pg_proc.prosrc`), et pour une colonne de personne nouvelle par la revue du diff de sa migration.
 - **Une migration n'est jamais rejouée.** La CLI Supabase applique chaque fichier exactement une fois (`supabase_migrations.schema_migrations`) : `IF NOT EXISTS` n'apporte rien et fait passer une migration en silence sur une table préexistante de forme différente, ce qui crée une dérive de schéma invisible entre staging et prod. Une migration qui ne peut pas s'appliquer doit échouer bruyamment. Seule exception : `CREATE EXTENSION IF NOT EXISTS` — Supabase préinstalle certaines extensions, et une extension n'a pas de « forme » qui puisse dériver ; jamais pour un schéma, une table ou un index.
-- **Une migration appliquée est figée, commentaires compris : elle ne cite que ce qui est déjà écrit.** Elle ne se modifie ni ne se renomme ; une correction, de revue comprise, est une migration additive nouvelle. Un agent l'applique par `supabase db push`, jamais par `supabase migration repair`, qui réécrit l'historique du projet (geste du responsable, procédure du README des migrations). Un renvoi à une hypothèse, à une décision ou à un fichier existe, avec ce sens, avant le `db push` ; après, il ne se corrige plus, et une numérotation qui bouge le rend faux. **Vérifiable :** chaque renvoi que cite une migration du diff se lit, avec ce sens, dans la story ou dans `docs/decisions/` à l'heure de son application.
+- **Une migration appliquée est figée, commentaires compris : elle ne cite que ce qui est déjà écrit.** Elle ne se modifie ni ne se renomme ; une correction, de revue comprise, est une migration additive nouvelle. Un agent l'applique par `supabase db push`, jamais par `supabase migration repair`, qui réécrit l'historique du projet (geste du responsable, procédure du README des migrations). Un renvoi à une hypothèse, à une décision ou à un fichier existe, avec ce sens, avant le `db push` ; après, il ne se corrige plus, et une numérotation qui bouge le rend faux. **Vérifiable :** chaque renvoi que cite une migration du diff se lit, avec ce sens, dans la story ou dans `docs/conception/` à l'heure de son application.
 - **Objets non idempotents par nature** (`CREATE POLICY`, `CREATE TRIGGER` : il n'existe pas de `IF NOT EXISTS` pour eux) → les précéder d'un `DROP ... IF EXISTS` explicite. La règle vise un objet qu'une migration antérieure a pu poser : la ligne de base, qui crée elle-même le schéma `platform` (`CREATE SCHEMA` sans `IF NOT EXISTS`), n'a rien à retirer et n'en porte aucun ; toute migration qui la suit y reste soumise.
 - **RLS activée et policies créées dans la même migration** que la table
 - **Toute policy `FOR UPDATE` déclare `WITH CHECK`** en plus de `USING`
@@ -221,19 +221,19 @@ Toute fonction `SECURITY DEFINER` :
 
 **Exception écrite — fonctions d'accueil.** Une fonction que l'architecture ouvre à qui n'est pas
 membre ne compare pas `auth.uid()` à son paramètre : ce qu'elle rend est son contrôle d'accès.
-Deux existent (`docs/architecture.md`) : `org_by_host` (l'organisation d'une adresse,
+Deux existent (`docs/reference/schema-platform.md`) : `org_by_host` (l'organisation d'une adresse,
 exécutable par `anon`) rend `id`, `slug`, `name`, `prefix`, `brand` et `domains`
 (les domaines de travail de `settings`, chaîne libre que cite la description de `context`) ;
 `org_contact` (l'admin le plus ancien, à qui demander d'entrer, exécutable par toute personne
 connectée — donc aussi par un membre d'une autre organisation qui en connaît l'adresse) rend
 `name` et `email`. Une telle fonction rend seulement les colonnes listées ici, jamais une ligne
 entière : une colonne de plus s'inscrit d'abord dans cette liste et dans
-`docs/architecture.md`. Elle garde `search_path` vide et un `GRANT` au rôle le plus étroit.
+`docs/reference/schema-platform.md`. Elle garde `search_path` vide et un `GRANT` au rôle le plus étroit.
 Une fonction que seul un rôle de service exécute (`hook_before_user_created` :
 `supabase_auth_admin`) n'a pas d'`auth.uid()` à comparer : son `GRANT` est son
 contrôle. **Vérifiable :** un `SECURITY DEFINER` exécutable par `anon` ou `authenticated` sans
 contrôle de `auth.uid()` est l'une de ces deux fonctions, qui rend les colonnes listées ici et
-rien d'autre, ou une fonction qu'une section de `docs/architecture.md` ou un ADR ouvre
+rien d'autre, ou une fonction qu'`docs/reference/schema-platform.md` ou un document de `docs/conception/` ouvre
 explicitement ; sinon, défaut HAUTE.
 
 **Exception écrite — fonctions internes.** Une fonction exécutable par aucun rôle (`REVOKE` de

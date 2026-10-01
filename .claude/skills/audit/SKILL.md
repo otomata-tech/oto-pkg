@@ -22,7 +22,7 @@ d'autre peut vérifier ligne par ligne sans faire confiance à l'auditeur.
 
 1. **Pas de citation → pas de gravité.** Tout défaut HAUTE ou MOYENNE pointe une source citable :
    `conventions/<fichier>.md § <section>`, `CLAUDE.md § <section>`,
-   `checklists/code-review.md § <section>`, un ADR de `docs/decisions/`, ou un AC de story.
+   `checklists/code-review.md § <section>`, un document de `docs/conception/`, ou un AC de story.
    Sans source, c'est un avis → BASSE. **Vérifier que la section citée existe** avant de l'écrire.
 2. **Aucune règle citée de mémoire.** Toute règle invoquée a été lue pendant cet audit.
 3. **Chaque finding est reproductible** : `fichier:ligne` + un chemin d'échec concret
@@ -40,8 +40,8 @@ et elles ne sont dans aucune convention générique.
 
 | Source | Ce qu'on y cherche |
 |--------|--------------------|
-| `docs/decisions/` (tous les ADR) | invariants qu'on n'a pas le droit de violer, et **écarts déjà assumés** |
-| `docs/architecture.md` | modèle de données, frontières, où vit l'autorisation réelle |
+| `docs/conception/` (tous les documents) | invariants qu'on n'a pas le droit de violer, et **écarts déjà assumés** (section « Écart avec le code ») |
+| `docs/reference/` | modèle de données, services et portes, frontières, où vit l'autorisation réelle |
 | `eslint.config.mjs` + toute config d'exemption | dette **déclarée** — un fichier exempté n'est pas un défaut |
 | `.method/conventions/tech-stack.md` | versions pinées et la raison du pin |
 | `src/app/globals.css` (ou équivalent) | tokens de design réellement définis |
@@ -135,7 +135,7 @@ Chercher ce qui produit un défaut réel. Ne pas transformer en checklist décor
 
 **A. Sécurité & autorisation** — mutation sans vérification d'identité en tête · rôle contrôlé
 uniquement côté UI sans équivalent serveur · clé de service utilisée hors des cas documentés par
-un ADR · secret journalisé ou renvoyé au client · webhook sans validation de signature ni
+un document de conception · secret journalisé ou renvoyé au client · webhook sans validation de signature ni
 idempotence · endpoint public sans limitation de débit · ressource récupérée par identifiant sans
 vérifier l'appartenance · requête construite par concaténation · `dangerouslySetInnerHTML` sur une
 donnée non maîtrisée · upload sans contrôle de type, de taille ou de chemin.

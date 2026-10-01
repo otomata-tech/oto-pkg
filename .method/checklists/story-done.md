@@ -25,6 +25,6 @@
 - [ ] Section « Post-implémentation » de la story remplie
 - [ ] `docs/changelog.md` à jour
 - [ ] `.method/conventions/component-registry.md` à jour si un composant, hook ou util réutilisable a été créé
-- [ ] ADR créé dans `docs/decisions/` si un invariant d'architecture a été touché
+- [ ] Document de conception du sujet mis à jour (`docs/conception/<sujet>.md`, ligne d'historique) si un invariant d'architecture a été touché ; ce qui doit durer de la story y est passé, et la story est retirée (`CLAUDE.md § Issues et stories`)
 - [ ] `.method/sprint/status.md` : story passée en ✅ Done
 - [ ] (si référence UI ≠ `N/A`) Les écarts avec la référence sont documentés dans la story

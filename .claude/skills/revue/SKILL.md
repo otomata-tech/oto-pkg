@@ -60,10 +60,10 @@ Si aucun tag n'est actif, le dire explicitement — c'est une information, pas u
 
 ## Étape 3 — Contexte de la demande
 
-- **Mode story** : lire la story dans `docs/stories/` — AC, tests attendus, référence UI, scope.
+- **Mode story** : lire l'issue (`gh issue view <n>`) puis la story qu'elle désigne dans `docs/produit/stories/` — AC, tests attendus, référence UI, scope.
 - **Mode libre** (fix/feature/refacto) : reprendre la demande initiale de l'utilisateur telle
   qu'elle a été formulée. C'est elle qui définit le périmètre légitime du diff.
-- Lire `docs/architecture.md` uniquement si le diff touche un invariant.
+- Lire le document de conception du sujet (`docs/conception/`) uniquement si le diff touche un invariant.
 
 ## Étape 4 — Lecture
 

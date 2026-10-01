@@ -1,0 +1,126 @@
+# Base et portabilité
+
+- **Statut** : validé avec JB le 24/09/2026
+- **Dernière révision** : 2026-10-01
+
+## Résumé
+
+L'hôte n'apporte que deux choses : une base Postgres, par une URL, et un émetteur d'identité (ADR-012). Le paquet parle à Postgres en SQL, sous un rôle dédié, dans une transaction par opération qui porte l'appelant vérifié ; il tourne sur Supabase comme sur tout Postgres 16 qui admet `pg_trgm`, `unaccent` et `ltree`, avec des données en France (ADR-005). Les droits se décident dans le service ; la RLS n'isole que les organisations.
+
+## Contexte
+
+Un hôte n'est pas toujours un projet Supabase : un client a déjà son fournisseur d'identité, notre SaaS tourne sur un Postgres managé, un frontal plus riche peut s'écrire sur l'API. Un Postgres managé ne porte pas Supabase (superutilisateur et extensions `pgsodium`, `supabase_vault`, `pg_net` refusés), et certains n'admettent que des extensions sur liste blanche. Sans ports, le paquet dépendait de `auth.uid()` dans les policies, d'`auth.users` comme annuaire, de PostgREST comme transport (et de la RLS comme seule décision des droits), de Supabase Auth comme serveur OAuth, et de `moddatetime`.
+
+## Objectifs et non-objectifs
+
+- Un ERP à identité tierce, le SaaS sur un Postgres managé, un ERP sur Supabase : le cœur s'installe de la même façon, avec une URL de base et un émetteur ; un auditeur lit une seule infrastructure.
+- La logique des droits vit à un seul endroit, lisible et testable sans base ; les policies d'appartenance, les déclencheurs d'invariants et les tests d'isolation restent la preuve d'isolation, sur Supabase comme sur un Postgres nu.
+- Hors objectif : un ORM ; une API REST complète (sans consommateur nommé, le MCP reste la porte HTTP vers les assistants, `/api/platform/*` celle des écrans) ; le Data API de Supabase.
+
+## Conception
+
+### Hébergement (ADR-005)
+
+- Supabase, Cloud en région Paris ou auto-hébergé, est l'hôte par défaut ; les données sont en France (ADR-005).
+- Rien n'est réservé au Cloud de Supabase (ADR-005 § 3) : tout Postgres 16 avec `pg_trgm`, `unaccent` et `ltree` convient.
+- Les réglages d'Auth d'un projet Supabase sont reproductibles, par `pnpm auth:settings`, jamais réglés à la main sans trace (ADR-005 § 4, `scripts/supabase-auth-settings.mjs`).
+
+### Port de base (ADR-012 § 1)
+
+- Le paquet parle à Postgres par `withCallerSession(caller, fn)` (`server/sql.ts`) : une transaction où le rôle est `authenticated` et où `request.jwt.claims` porte l'identifiant interne et l'email, posés en local ; policies, fonctions et déclencheurs lisent `auth.uid()` et `auth.jwt()` comme sur Supabase. `withAnonSession` sert les lectures anonymes ; sans appelant, `db.tx` lève une erreur nommée. Carte des modules : [services et portes](../reference/services-et-portes.md).
+- Pilote `postgres.js`, aucun ORM : le SQL des migrations est la source du schéma ([schéma `platform`](../reference/schema-platform.md)). TLS exigé hors de la machine locale.
+- `PLATFORM_DATABASE_URL` vise le pooler en mode transaction : postgres.js y tourne sans requêtes préparées (`prepare: false`) ; l'outillage, en connexion directe, les garde (E01-S10, HN-E01S10-3).
+- **Rôle dédié `platform_app`** : `login`, `noinherit`, membre d'`authenticated` et d'`anon` seulement, jamais `bypassrls` ; son URL ne vit que côté serveur.
+- Sur un Postgres sans Supabase, `oto-platform db prepare` crée une fois, hors des migrations (ADR-006 § 1), le schéma `auth` réduit à `uid()`, `jwt()` et `role()`, le schéma `extensions` et les rôles `anon`, `authenticated` et `platform_app` ; il suffit d'un administrateur qui a `CREATEROLE` et le droit de créer un schéma, sans `SUPERUSER`.
+- Le schéma `platform` part d'une seule migration de ligne de base, portable sur un Postgres managé (extensions `pg_trgm`, `unaccent`, `ltree` seulement, sans superutilisateur ni `moddatetime`, remplacée par `platform.set_updated_at()`) ; les migrations suivantes s'y ajoutent (D66). Aucune référence au schéma `auth` hors de `uid()`, `jwt()` et `role()`, sauf les deux lectures propres au mode Supabase (§ 5).
+
+#### Transactions et session (E01-S10)
+
+- Une transaction par opération de service, jamais une pour toute la requête ; le journal écrit après la réponse garde la sienne (HN-E01S10-2).
+- Une transaction imbriquée sous la même session reprend celle qui est ouverte (`AsyncLocalStorage`), sans point de sauvegarde : l'échec d'un service appelé annule toute l'opération (HN-E01S10-7).
+- Une opération des règles tient en une transaction, décisions d'`access.ts` et annuaire compris, sans entrée-sortie extérieure pendant elle (HN-E01S10-e1b1-1) ; de même chaque opération des équipes et des membres, lectures de `directory.ts` comprises (HN-E01S10-e1b2-1).
+- L'ouverture du brouillon (`openDraft`) part en tête de la transaction de l'écriture : un refus qui suit ne laisse aucun brouillon ouvert (HN-E01S10-b2-3).
+- Chaque transaction pose en local `statement_timeout` (8 s pour `authenticated`, 3 s pour `anon`), `lock_timeout` et `idle_in_transaction_session_timeout` (8 s), mêmes valeurs sur Postgres nu (HN-E01S10-6). La session pose `TimeZone = 'UTC'` : une date lue par `to_json` sort en `+00:00` quel que soit le fuseau du serveur, et `day()` sert la date UTC (HN-E01S10-b1-8).
+- Aucune ligne là où une est attendue : le service le compte et lève `not_found` lui-même ; `PT409` de `publish_node` est un SQLSTATE rendu tel quel (HN-E01S10-5). Ce que rejette `db.tx` sort par `fromDatabaseError` : une erreur de la base traduite par son code, un `PlatformError` rendu tel quel, une erreur sans code (`PlatformConfigError`, bogue) relancée (HN-E01S10-15).
+- Les faits de droits passent chaque liste en un seul paramètre (`= any($1)`) et chaque lecture rend toutes ses lignes : ni tranches ni pages (HN-E01S10-e1a-3).
+- `childrenOf` lit les enfants `order by id`, un ordre sans rapport avec le chemin ; seul le tri en mémoire (par `position`, puis `comparePaths` par unités de code) range les enfants servis (HN-E01S10-b1-7).
+- `callerName` : `user_metadata.full_name`, sinon `user_metadata.name`, sinon le claim `name` ; l'appelant que l'hôte passe le porte, et `accept_invitations` le recopie dans `members` (HN-E01S10-9).
+- `schema_migrations` n'est pas une table de `platform` : `applied_migrations` lit l'historique réel, et les tests remplacent celui-ci au niveau de `cellStatus` (HN-E01S10-t10b-10).
+
+### Port d'identité, en bref (ADR-012 § 1 et § 2)
+
+- Le paquet ne connaît d'une personne qu'un appelant vérifié (émetteur, sujet, email vérifié, nom), reçu d'une vérification injectée (`makeVerifyToken`, `server/issuer.ts`) ou de la session de l'hôte ; `platform.identities (issuer, subject, user_id)`, écrite par `identity_for_caller()` seule, le traduit en identifiant interne ; les colonnes de personne sont des `uuid` sans clé vers un annuaire ; `platform.members` est l'annuaire du paquet. Le détail : [identité et connexion](identite-et-connexion.md).
+- Le claim `email` d'une session vaut adresse vérifiée : sur Supabase, par « Confirm email » actif et la connexion d'un email non vérifié coupée ; avec un autre émetteur, le serveur ne le pose qu'après `email_verified` (E01-S09, HN-E01S09-3).
+- **Supabase reste un hôte de première classe** (ADR-012 § 2), Cloud Paris ou auto-hébergé (ADR-005) : sa base se joint par l'URL de son pooler, Supabase Auth reste l'émetteur par défaut (sessions web, lien magique et hook d'invitation, Google et Microsoft, serveur OAuth 2.1 à enregistrement dynamique). Un hôte à identité tierce apporte un émetteur OpenID Connect avec JWKS, un serveur OAuth 2.1 que Claude, ChatGPT et Claude Code savent joindre, et ses pages de connexion, sans façade (ADR-004).
+
+### Les droits dans le service, la RLS pour l'isolation (ADR-012 § 3)
+
+- Les droits se décident et se filtrent dans `server/` (`access.ts`, `access-levels.ts`) avant chaque requête ; « aucune ligne rendue » n'est jamais un refus ; la RLS ne garde que l'isolation par organisation et les invariants ; le Data API n'expose pas `platform` (H123, D28). Le calcul des niveaux : [droits d'accès](droits-d-acces.md) ; la règle de revue : `security-patterns.md § Droits dans le service`.
+- Chaque table a la RLS activée et des policies d'appartenance (`member_orgs()`, accès plateforme en cours compris). Dans son organisation, une policy d'écriture n'exige que l'appartenance et les invariants ; rôle, niveau et gestion sont décidés par les services (E01-S08, HN-E01S08-1). Rattacher une adresse, changer le propriétaire d'un compte, poser une règle `manage`, lire le journal, les invitations et les espaces personnels : décidé par les seuls services, la RLS ne le porte pas (HN-E01S08-11).
+- `is_staff()` ne sert que la portée plateforme (`platform_staff`, écriture du journal admin, lecture de `platform_grants` et d'`admin_journal`) ; toute écriture dans une organisation passe par l'appartenance (HN-E01S08-3).
+- Les 19 policies sans droit gardent leur définition d'origine, sauf `nodes_insert_personal`, neutralisée (`false`) ; celles de `blocks`, `node_versions`, `node_aliases` et `links` s'isolent par leur sous-requête sur `nodes` (HN-E01S08-5). Sans `org_id` : `team_members` suit l'équipe, `node_drafts` le nœud, `node_versions`, `node_aliases` et `links` passent par `nodes` ; une ligne d'`admin_journal` sans organisation n'est lue que du staff ; l'invité lit ses invitations (HN-E01S08-6).
+- Aucune sous-requête de policy ne revient sur une table dont Postgres développe déjà les policies (`42P17`) : `nodes_insert_personal` vaut `false`, et `nodes_guard` garde la forme d'un espace personnel (HN-E01S08-14).
+- Restent en base les fonctions et déclencheurs d'atomicité et d'invariants de structure (`publish_node`, `open_draft`, gardes de cycle, de chemin, du nœud Contexte et de l'espace personnel), listés dans le [schéma `platform`](../reference/schema-platform.md) ; un parcours ne s'y ajoute pas sans y être nommé. Restent aussi `node_level_of`, `node_level_for`, `level_rank` et `is_org_admin` : la recherche filtre les droits avant la coupe, la lecture publique compte au niveau de l'auteur du lien, l'annuaire des accès plateforme lit `is_org_admin` ; le test de parité ne porte que sur les nœuds, le niveau d'un compte n'a plus de pendant en base (E01-S12, HN-E01S12c-2).
+- Seule exception au calcul en code : la recherche (`search_content`, `route_candidates`) applique le niveau de lecture en SQL (`node_level_for`) avant de couper sa liste, et le service redécide chaque résultat ; un test de parité tient `node_level_for` égal au calcul du service. Sous l'isolation, `access-facts.ts` lit toute la chaîne d'un nœud et la parité est stricte ; le repli sur `node_owner` couvre un ancêtre supprimé entre deux lectures (HN-E01S08-8). La parité se joue en lots sur O et P de `seedReferenceOrg`, chaque personne par `asCaller` : `nodeDecisions` contre `node_level_for` sur tous les nœuds, en une transaction (HN-E01S10-e1a-10).
+- La cible d'un lien se résout dans l'organisation, sans le niveau de qui publie ; le lecteur est filtré à la lecture (`nodes/link-lines.ts`), la lecture publique au niveau de l'auteur du lien (HN-E01S12c-3).
+
+### Ligne de base portable (E01-S09)
+
+- La ligne de base et les migrations s'appliquent par la CLI Supabase (`supabase db push --db-url`), sur Supabase comme sur Postgres nu ; l'historique est tenu dans `supabase_migrations` (HN-E01S09-2).
+- La ligne de base ne fait précéder d'aucun `drop … if exists` ses policies et déclencheurs, car elle crée le schéma `platform` ; toute migration qui la suit y reste soumise (HN-E01S09-21).
+- La ligne de base n'accorde au hook d'Auth (`supabase_auth_admin`) son droit que si ce rôle existe (Supabase) ; sur un Postgres nu, rien n'est accordé ; aucun droit n'est accordé à `service_role` (HN-E01S09-6). `service_role` n'a aucun privilège sur `platform` ; `supabase_auth_admin` garde le hook d'inscription (E01-S12, HN-E01S12c-4).
+- `platform_access_directory` lit l'email et le nom dans `platform_staff`, sinon dans `members` de l'organisation, sinon dans la copie posée sur l'accès : un consultant retiré reste nommé dans l'historique (HN-E01S09-9). Un ancien membre sans accès plateforme qui a accordé ou révoqué un accès reste sans nom ni email (identifiant seul) ; les copies de `platform_grants` ne se lisent que par `platform_access_directory` (HN-E01S09-22).
+- `forget_user` supprime tout nœud dont la personne est propriétaire effective, avec ce qui est dessous ; un nœud d'un autre propriétaire explicite rangé sous les siens fait refuser l'oubli (`23503`, chemins nommés) (HN-E01S09-14).
+
+### Couplage à Supabase borné (ADR-012 § 4 et § 5)
+
+- Ne changent pas : le schéma `platform` additif, copié et appliqué par l'hôte (ADR-006) ; les six outils (ADR-002) ; l'organisation par l'adresse et l'appartenance revérifiée à chaque appel (ADR-004 § 1 et 2) ; rien de réservé au Cloud de Supabase (ADR-005 § 3) (ADR-012 § 4).
+- Ce qui reste propre à Supabase est nommé et ne grandit pas (ADR-012 § 5) : les sessions `@supabase/ssr` de l'hôte en mode Supabase ; le lien magique de l'invitation (`server/invitations.ts`) ; le hook d'inscription ; la vérification par défaut du jeton sur la JWKS du projet ; dans l'outillage, la lecture des personnes par l'API d'administration de Supabase Auth (`org:export`) et les réglages d'un projet (`auth:settings`, `data-api:close`). Règles et contrôles : `supabase-patterns.md § Couplage à Supabase`.
+- Le paquet lit le schéma `auth` de Supabase par deux fonctions seulement : `oauth_pending_resource` (l'organisation visée par la demande en attente de l'appelant) et `oauth_clients_activity` (activité des clients OAuth, outillage seul) (D10).
+- `platform` est retiré des schémas exposés par le Data API d'un projet Supabase, par `pnpm data-api:close` (API de gestion, différentiel puis `--apply`, relecture), après le déploiement du paquet qui n'y passe plus (D80).
+
+### Tests sur une vraie base (E01-S08, E01-S10)
+
+- Un niveau ou un rôle se prouve par le test du service ; les tests de RLS ne gardent que l'isolation par table, les déclencheurs, les fonctions, les privilèges et les invariants (HN-E01S08-9). Un test statique lit les migrations comme `check:migrations` (dernière définition d'un nom) : une policy qui remet un droit (niveau, rôle) le fait échouer (HN-E01S08-13).
+- Les suites portables se connectent en administration par `PLATFORM_ADMIN_DATABASE_URL`, par la même fabrique que `SUPABASE_DB_URL` ; `asCaller` rend la face SQL seule (HN-E01S10-12).
+- Sur base réelle, ce que la base simulée prouvait sur la requête se prouve sur les lignes : filtre d'organisation par des lignes de P lisibles sous l'isolation, « rien n'est écrit » par des comptes relus (HN-E01S10-t1c2-3).
+- Une lecture en panne ne se provoque pas sur la base partagée : les tests de `context` font rejeter les exports des modules de blocs (`vi.mock`) ; chaque module prouve son propre rejet (HN-E01S10-t1c2-4). Ce que la base ne produit pas à la demande (`57014` de `node_owner`, `22023` d'`update_my_profile`) reste injecté par le test (HN-E01S10-t1e1-3).
+- Dans les tests de `find` et du routage, l'espion (`watchDb`, option `rpc`) rend sans requête les lignes de `search_content` et `route_candidates`, dont le classement a ses propres tests (HN-E01S10-t1e2b2-1). `draftReads` (`tests/helpers/sql.ts`) relève les lectures de `node_drafts` et des blocs `draft` d'une instruction SQL ; un filtre `state` porté par un fragment n'est pas vu (HN-E01S10-t1b-9).
+- La garde « encore ouverte » de l'écriture de `revokeInvitation` n'a pas de preuve propre : la policy `invitations_update_revoke` porte le même invariant ; la décision et la branche du conflit sont prouvées (HN-E01S10-e1b3-9).
+- La spec E2E du tableau calcule ses nombres attendus sur l'en-tête et les blocs `row` lus, juste avant chaque vérification, par la connexion d'administration ; aucun n'est écrit en dur (HN-E01S10-f2e2e-3). Le reste de la stratégie : [tests et données de démo](tests-et-donnees-de-demo.md).
+
+## Décisions et alternatives écartées
+
+- **Fédérer tout fournisseur dans Supabase Auth et refuser le Postgres managé** : Supabase resterait dans la chaîne d'audit, un ERP à identité tierce garderait deux annuaires. Écarté ; la fédération reste une voie pour un ERP existant (ADR-004 § 7).
+- **PostgREST privé chez l'hébergeur, clé serveur sur les policies des hôtes Supabase** : deux mécanismes, un service de plus, aucune transaction entre deux appels. Écarté (ADR-012).
+- **Deux implémentations du port de base** (PostgREST sur Supabase, SQL ailleurs) : chaque fonction écrite et testée deux fois. Écarté (ADR-012).
+- **Port d'identité sans port de base** : PostgREST n'accepte sur le Cloud que quelques fournisseurs nommés. Écarté seul (ADR-012).
+- **ORM à schéma déclaré** (Drizzle, Prisma) : ne modélise ni policies ni fonctions SQL, contraire aux migrations relues (ADR-006). Écarté (ADR-012).
+- **Niveaux en base** (RLS d'isolation et de niveaux) : logique des droits à deux endroits, lectures dépendantes du jeton. Écarté au profit du service (ADR-012 § 3, D28).
+- **`auth.users` comme annuaire, `moddatetime`, Data API de Supabase** : retirés de la ligne de base et du paquet (D66, D80).
+
+## Sécurité et confidentialité
+
+- RLS activée sur toute table de `platform`, sans exception non documentée ; chaque nouvelle table a ses policies dans la même migration.
+- La clé secrète et la connexion d'administration n'entrent jamais dans `server/`, `api/`, `mcp/` ou `ui/`, ni dans l'environnement de l'application déployée. L'application ne porte qu'un secret de base, `PLATFORM_DATABASE_URL`, limité par `platform_app` à ce que peut `authenticated` ; la vérification du jeton avant de poser les claims est la seule garde de l'identité.
+- Tout ce que le modèle envoie est validé comme un formulaire public : Zod, appartenance, niveau d'accès. Aucun outil n'accepte un secret en argument ; aucun état n'est lié à l'IP ou à l'agent utilisateur.
+- Fonctions sensibles en deux temps, jamais proposées en suite d'un autre résultat ([connecteurs et comptes](connecteurs-et-comptes.md)).
+- En-têtes de sécurité dans `next.config.ts` (`X-Frame-Options: DENY`…), à rouvrir par décision le jour où une vue s'intègre en cadre chez un client ; les deux routes HTML isolées en sont exclues et posent leurs propres en-têtes ([contenu HTML isolé](contenu-html-isole.md)).
+- `members.email` est une copie, à jour à la connexion, périmée entre deux connexions si l'annuaire change.
+
+## Écart avec le code
+
+- `prepare: true` sur le pooler en mode transaction n'est pas mesuré ; les quatre lectures de `personInOrg` ne sont pas réunies (M60). `extra_float_digits = 3` n'est pas posé dans `server/sql.ts` (M100).
+- Le serveur OAuth d'un émetteur tiers se mesure encore sur chaque host.
+- Mode sans Supabase de `org:export`, `org:import`, `test:cleanup` et `oauth:clients` absent (M85).
+
+## Questions ouvertes
+
+- Le statut et le texte d'ADR-005 ne sont pas conservés : ce document en reprend ce que citent le code et les conventions (Cloud Paris ou auto-hébergé, § 3, § 4).
+
+## Historique
+
+- 2026-09-24 (au plus tard ; date d'ADR-005 non conservée, ADR-012 du 2026-09-24 la cite) : Supabase, Cloud en région Paris ou auto-hébergé, hébergement par défaut ; rien de réservé au Cloud ; réglages d'Auth reproductibles — décidé par JB (source : ADR-005).
+- 2026-09-24 : deux ports, une base Postgres par URL et un émetteur ; pilote SQL partout ; droits dans le service, RLS d'isolation ; couplage à Supabase borné — décidé par JB (source : ADR-012, fiches D10, D28).
+- 2026-09-29 : 1.0.0 publiée sur une ligne de base portable (D66), `platform` retiré du Data API (D80) — décidé par JB (source : fiches D66, D80, stories E01-S08, E01-S09, E01-S10).
+- 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-005, ADR-012, D10, D28, D66, D80, H123 et les choix d'E01-S08, E01-S09, E01-S10 et E01-S12 — décidé par Alexis, accord de JB.

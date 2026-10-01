@@ -272,11 +272,11 @@ Notre serveur = **resource server** ; Supabase Auth = **authorization server** (
 **Stateful (si le produit l'exige)** : sessions `Mcp-Session-Id` + SSE via `redisUrl` dans la config mcp-handler (Redis Upstash/Vercel KV — y stocke sessions et flux entre invocations serverless). À choisir quand le produit a besoin de : notifications server→client, subscriptions de resources (updates temps réel, `listChanged` poussé), elicitation, état de session côté serveur.
 - Conséquences : coût Redis, plus de scale-to-zero pur, gestion d'invalidation de session, tests plus lourds.
 
-Le choix est **figé par ADR** (`docs/decisions/`) lors du cadrage — en changer = rouvrir l'ADR, pas un simple diff de config.
+Le choix est **figé dans un document de conception** (`docs/conception/`) lors du cadrage — en changer = réviser ce document, pas un simple diff de config.
 
 ## 8. Golden queries — l'éval AX obligatoire
 
-Jeu de prompts versionné dans `docs/mcp-golden-queries.md` (créé depuis `.method/templates/mcp-golden-queries.tmpl.md`), trois catégories :
+Jeu de prompts versionné dans `docs/reference/mcp-golden-queries.md` (créé depuis `.method/templates/mcp-golden-queries.tmpl.md`), trois catégories :
 
 - **Directs** (nomment l'action) — doivent router vers les bons tools, dans le bon ordre ;
 - **Indirects** (décrivent le résultat attendu) — doivent quand même router ;

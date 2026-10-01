@@ -1,0 +1,122 @@
+# Éditeur de blocs
+
+- **Statut** : proposé
+- **Dernière révision** : 2026-10-01
+
+## Résumé
+
+Une page s'édite à l'écran bloc par bloc : un `<textarea>` par bloc écrivable, monté à la demande, qui envoie des opérations structurées par une file unique. La source d'un texte reste visible pendant la frappe et se rend au repos. Plusieurs blocs se sélectionnent, se suppriment, se copient et se déplacent en un geste, avec un seul « Annuler ».
+
+## Contexte
+
+Le contenu est fait de nœuds et de blocs ([pages et blocs](pages-et-blocs.md), ADR-011) ; le texte d'un bloc est du markdown en ligne que lisent `read`, `write`, la publication et les assistants ([lecture et écriture des pages](lecture-et-ecriture-des-pages.md)). L'éditeur est un écran du paquet (`ui/noeud/editeur/`), porté d'oto-frontend dont la référence écrit ses blocs dans un `<textarea>` et refuse `contentEditable` ([écrans et coque](ecrans-et-coque.md)). Les demandes du responsable d'Oto du 2026-09-30 (source jamais visible, sélection de plusieurs blocs) ont été instruites par ADR-021 ; JB n'en a retenu que la sélection de blocs.
+
+## Objectifs et non-objectifs
+
+- Écrire une page sans perdre une frappe : envoi différé, conflit tenu au bloc, aucun markdown fabriqué par l'écran.
+- Le même modèle de blocs que l'assistant : l'écran écrit des blocs structurés, jamais un markdown à réanalyser.
+- Agir sur plusieurs blocs en une écriture et un « Annuler ».
+- Non-objectifs : l'éditeur visuel (source jamais visible, ADR-021, reporté) ; une sélection de texte partielle à travers deux blocs ; garder le lien rendu pendant l'édition d'un bloc (OUT de l'épic E11 : il faudrait un éditeur riche) ; le rectangle de sélection au doigt (HN-E11S16-12 : souris et stylet, le doigt en V2).
+
+## Conception
+
+### Champ d'un bloc et envoi
+
+- D21 : chaque bloc écrivable se lit dans un élément aux classes et à la géométrie de son champ (`ChampAuRepos`, `role="textbox"`, même nom, atteint à la tabulation) ; le `<textarea>` ne se monte que sur le bloc touché (focus, geste de l'éditeur, panneau « Lien ») et sous la souris, reste monté tant qu'il a le focus et se démonte quand le focus quitte sa rangée (un champ par bloc gardait la page entière en champs et coûtait une mise en page par champ). Le texte part à la sortie du champ, sur ⌘S ou après 1 200 ms sans frappe ; un conflit se traite au bloc, les autres champs en lecture seule.
+- HN-E05S02-1 : la structure part aussitôt ; une file unique (éditeur, en-tête, publication) envoie une opération après l'autre et adopte `id`, révision et tampon rendus. HN-E05S08-1 : le texte d'un champ part par `replace_block` ; un texte inchangé n'envoie rien. HN-E05S08-16 : une page quittée par une navigation du client (sans `blur` ni `beforeunload`) envoie au démontage de l'éditeur le texte encore en différé.
+- HN-E05S02-17 : l'écran écrit des blocs structurés (`input` au format de `blockInputSchema`, clé comprise), jamais du markdown : un Texte servi qui commence par « - » reste un Texte.
+- HN-E05S02-6 : `replace_block` et `delete_block` portent la révision lue du bloc, `move_block` aucune ; après un refus, l'écran relit la page et met en conflit le bloc dont la révision a changé ou qui a disparu, sinon c'est un conflit de page. HN-E05S02-18 : le tampon du brouillon vient de `NodeView.draft.draftStamp`, puis de chaque réponse (ou d'une relecture quand rien n'attend) ; il part avec l'en-tête et la publication, jamais avec une opération par bloc, gardée par sa révision.
+- HN-E05S08-3 : le conflit reste au bloc ; tant qu'il n'est pas réglé, les autres champs sont `readOnly`, avec « Réglez d'abord… ». HN-E05S08-17 : pendant un conflit, les gestes de structure (ajouter, déplacer, supprimer, changer de forme, insérer un appel) sont refusés avec « Réglez d'abord le bloc en conflit. », dit aussi au focus d'un champ en lecture seule.
+- HN-E05S02-23 : « Réessayer » suit un refus `too_large`, une panne réseau, une erreur interne ou un 401 (texte copiable) ; un 403 n'offre que « Copier mon texte », `not_found` « Recharger la page » ; `not_member` et `unknown_org` se disent sans relecture.
+- HN-E05S02-22 : la clé de rendu d'un bloc servi est son `id` à sa première lecture, gardée s'il change d'`id` ; un compteur ne sert qu'aux blocs créés dans le navigateur, pour que le rendu du serveur et l'hydratation s'accordent.
+- D153 (porté par [lecture et écriture des pages](lecture-et-ecriture-des-pages.md)) : une écriture de l'écran porte autant d'opérations qu'une page a de blocs.
+
+### Rangée, gouttière, blocs non écrivables
+
+- HN-E05S08-4 : le champ n'a ni fond ni bordure au repos ni au focus, seul le curseur se voit ; la gouttière (« + » et poignée) paraît au survol et au focus, reste dans l'ordre de tabulation, avec l'anneau du design system.
+- HN-E05S08-5 : un bloc non écrivable (`reference`, `embed`, type inconnu, forme hors éditeur) se rend en lecture dans sa rangée, et se déplace, se duplique et se supprime par la poignée.
+- HN-E05S02-4 : un titre de bloc se rend en `<h2>` quel que soit son niveau écrit, sous le `<h1>` du titre du nœud (le niveau rendu à la lecture suit D141, [pages et blocs](pages-et-blocs.md)).
+- HN-E05S02-27 : un tableau, sans éditeur de blocs, reçoit de l'écran la publication et le bandeau du brouillon (titre et résumé au brouillon) ; sa grille vit dans le complément de l'hôte ([écrans d'un contenu](ecrans-d-un-contenu.md)).
+- HN-E05S02-7 : déplacer un nœud change son parent et garde son dernier segment (`POST /api/platform/nodes/move`) ; la nouvelle adresse s'ouvre par `window.location.assign`, sur le préfixe reçu de l'hôte en chaîne. HN-E05S02-8 : l'arbre se range en sections par premier segment du chemin : « Tout le monde », une par équipe (nom lu par `listTeams`), puis « Privé » ; le Contexte ouvre chaque section ; racine, dossiers d'équipe et espace personnel ne sont pas des lignes.
+
+### Saisie, scission, suppression
+
+- HN-E05S02-25 : Entrée en tête d'un bloc non vide ouvre un Texte vide avant lui, le focus dedans ; le bloc garde son `id`, sa forme et sa clé. HN-E05S08-10 : scinder envoie aussitôt le texte d'avant en `replace_block` et celui d'après en `insert_after` s'il n'est pas vide ; le focus va au bloc d'après, sauf si le texte d'avant est refusé, qui garde le focus et son message.
+- HN-E05S08-7 : quand le focus quitte sa rangée, un bloc vidé part en `delete_block` (avec « Annuler ») ; un bloc neuf vide reste sans rien envoyer ; un bloc servi déjà vide reste. HN-E05S02-13 : « Annuler » une suppression réinsère le bloc tel qu'il était (forme, texte, données, clé) sous un nouvel `id` fabriqué par le serveur : un lien `[[chemin#clé]]` le retrouve, un lien à l'ancien `id` non.
+
+### Choisir un bloc : « + » et « / »
+
+- D116 : le « + » et `/` ouvrent un choix en deux groupes : « Texte » (formes de texte et Repli) et « Insérer » (Tableau simple, Séparateur, Image, Fichier) ; un `.html` se joint par « Fichier » (D137, [contenu HTML isolé](contenu-html-isole.md)).
+- HN-E10S06-11 : la liste de « / » garde l'ordre du menu tant que rien ne suit `/`, puis met les meilleures entrées d'abord (`fuzzyScore`), casse et accents retirés par `normalizeTitle`.
+- D144, HN-E10S06-10 : tant que la liste de « / » est ouverte, le Texte attend le choix d'un bloc : le différé de 1 200 ms ne l'écrit pas, et la frappe qui ouvre la liste désarme celui d'une frappe d'avant ; la sortie du champ et ⌘S l'écrivent ; liste fermée (Échap, ou un texte qui ne commence plus par `/`), « /etc » part au différé dès la frappe suivante (`useChoixParBarre`).
+- HN-E10S06-6 : le « + » d'une page vide n'est pas codé : message, bouton de la page vide et `insererEnTete` restent ceux d'avant ; AC-a1 vaut pour le « + » d'un bloc, AC-a2 pour tout Texte vide (décision de JB du 2026-09-29 : la page vide sera remplacée par un premier Texte créé et focalisé).
+- HN-E10S06-5 : les préfixes `# ` et `## ` donnent tous deux le niveau 1 (le raccourci `# ` est gardé, `## ` s'aligne sur le markdown collé ; voir D115, [pages et blocs](pages-et-blocs.md)).
+- HN-E10S06-12 : « Séparateur » choisi par « / » met le focus à sa poignée ; le Texte neuf qui suit un séparateur ne naît que de `---` tapé. HN-E10S06-20 : `---`, `***` ou `___` ne fait un séparateur que si le Texte valait juste avant un début de la marque (vide, `-`, `--`…) : « ---x » raccourci en `---` reste un Texte. HN-E10S06-18 : le menu d'un séparateur n'a ni groupe « Style » ni « Ce bloc se modifie par votre assistant. ».
+
+### Listes
+
+- D143, HN-E10S06-8 : `Tab` et `Maj+Tab` agissent sur la ligne du curseur, les suivantes gardant leur indentation (`elementsLus`) ; `Maj+Tab` au premier niveau ne change rien et annonce « Cette ligne est déjà au premier niveau. » ; `Tab` qui descendrait de deux niveaux sous la ligne d'avant annonce « Rien au-dessus de cette ligne. ».
+- D142, HN-E10S06-7 : les bornes d'un ajout (« 20 colonnes au plus. », « 200 rangées au plus. ») et les refus d'un niveau de liste se disent dans la ligne d'annonce de l'éditeur (`LigneDAnnonce`, `role="status"`), rien n'étant changé ni refusé à l'envoi ; le message sous le champ reste celui du contrôle qui retient un envoi.
+- HN-E11S06-7 : une puce par élément ; les repères sont dessinés au seul premier niveau, un sous-élément garde sa marque écrite. HN-E11S06-8 : la copie des éléments d'une liste précède le champ dans le DOM : au clavier, les cases viennent avant le texte. HN-E11S06-15 : dans une liste, le curseur, la relecture et le clic lisent la ligne de l'élément. HN-E11S06-12 : en couleurs forcées, le champ est muet au repos et la copie reste lisible.
+- HN-E10S06-19 : `Tab` sans Maj sur la poignée d'une liste à puces, d'une liste numérotée ou d'un tableau simple porte le focus au premier élément de la tabulation après la rangée (`tabIndex` positif ou nul, ni désactivé, ni sous `[hidden]` ou `[inert]`, ni non rendu : contenu d'un `<details>` fermé, ou `checkVisibility()` là où le navigateur l'a) ; rien après la rangée : la touche reste au navigateur, et les éléments de la rangée qui suivent la poignée passent à `tabIndex = -1` jusqu'au `setTimeout(0)` suivant, qui rend à chacun son attribut ; `Maj+Tab` et l'ouverture du menu sont inchangés.
+
+### Tableau simple et repli
+
+- HN-E10S06-4 : un tableau simple part en un seul bloc à la sortie du tableau, pas à chaque cellule (un bloc, une opération). HN-E10S06-16 : un tableau aux cellules vides est un bloc vide (`estVide`) : neuf, il ne part qu'avec sa première frappe ; servi puis vidé, il part en `delete_block` avec « Annuler » quand le focus quitte sa rangée ; un geste du menu d'un tableau part comme une frappe ; en conflit, un tableau se compose en texte, une rangée par ligne, une tabulation par cellule.
+- HN-E10S06-13 : dans un tableau, `Entrée` sur la dernière rangée ne fait rien ; `Maj+Tab` dans la première cellule sort du tableau ; la cellule courante du menu est la dernière qui a eu le focus, la première cellule d'en-tête avant tout focus. HN-E10S06-14 : une cellule montre son markdown tel qu'il est gardé (barre verticale échappée) ; à l'envoi, seule une barre verticale qui n'est pas déjà précédée d'une barre oblique inverse est échappée. HN-E10S06-17 : le collage d'un tableur ignore sa fin de ligne finale et lit les fins de ligne CRLF.
+- HN-E10S06-21 : `simpleTableOf` (`schemas/blocks.ts`) est le seul lecteur du `data` d'un tableau simple : ce qui n'est pas un tableau se lit vide, une cellule qui n'est pas une chaîne `""`, un alignement inconnu `null` ; « Convertir en tableau de données » n'est au menu que d'un tableau simple qui a au moins une colonne.
+- HN-E10S06-9 : un repli ne se fond pas plus qu'un tableau (Retour arrière au début d'un bloc, Suppr à la fin du précédent) : le focus va à sa rangée. HN-E10S06-15 : un Texte devenu repli perd les lignes blanches de bord de son corps ; à l'envoi, le résumé perd ses blancs de bord et le corps ses lignes blanches de bord.
+- HN-E10S06-22 : un repli s'ouvre déplié (insertion, conversion, ouverture de la page) ; son chevron, seul, le replie et le déplie à l'écran : l'état n'est ni envoyé ni gardé et se perd quand la rangée se remonte ; la pastille porte le champ du résumé. Au repos, une clôture de code du corps se lit en texte, comme dans un Texte au repos.
+
+### Liens dans un texte
+
+- D107 : hors édition, un lien ou une citation se lit en lien hypertexte dans la phrase (titre d'une page, texte d'une adresse web, ou l'adresse nue coupée au milieu depuis E11-S15 AC-b10, jamais `[[chemin]]`) ; au focus, le texte brut. `perso` devient `private` partout (chemins, fonctions SQL, journal, assistants, adresses), les anciens chemins restant des alias ; l'espace de toute l'entreprise a pour identifiant `all` (« Tout le monde »), ses contenus restent à la racine. « Contenus liés » : « Sous-pages », « Mentionnés », « Mentionné dans ».
+- D152 : pendant la frappe, la source d'un texte reste visible (`[[chemin|Titre]]`, `**gras**`), rendue au repos. HN-E05S02-26 : un `[[…]]` est un lien à l'écran si et seulement si la publication l'extrait : l'écran et `server/nodes/links.ts` lisent liens et code en ligne par `schemas/link-syntax.ts`, en balayages linéaires ; gras et italique se lisent autour.
+- D151 : un clic gauche sur un lien au repos le suit (une page citée dans l'onglet, une adresse web dans un nouvel onglet) ; le panneau « Lien » s'ouvre par le menu contextuel du lien (clic droit, touche Menu, Maj+F10), et pendant la frappe par le curseur dans sa source ou Alt+Entrée. HN-E11S06-11 : Maj+clic sur un lien le suit, comme Ctrl ou ⌘.
+- Panneau « Lien » : HN-E11S06-4, il n'écrit que `https://` (un lien `http://` existant se lit, et se corrige s'il est réappliqué ; `security-patterns.md § XSS Prevention`) ; HN-E11S06-6, la clé `#…` d'un lien de page est gardée si la page ne change pas, perdue sinon (une clé est propre à son tableau) ; HN-E11S06-14, un lien écrit sans libellé montre dans le panneau le titre de la page choisie, et l'écriture garde `[[chemin]]` ; HN-E11S06-9, un lien qui ne se relirait pas tel quel à sa place est refusé : « Ce lien ne se relirait pas tel quel à sa place : changez son libellé ou son adresse. » ; HN-E11S06-10, « Ouvrir » ouvre la destination saisie ; HN-E11S06-13, le panneau n'emploie pas React Hook Form.
+
+### Sélection de blocs (E11-S17 lot a)
+
+- On sélectionne des blocs entiers au-dessus des champs (ADR-021 § 8, seul paragraphe retenu) : glissé sorti de son bloc, second ⌘A, Échap dans un champ, Maj+↑↓, Maj+clic et Ctrl+clic sur les poignées, rectangle tiré depuis la marge. Suppr, copier, couper et déplacer agissent sur le groupe en **une** écriture et **un** « Annuler ». HN-E11S16-6 : un groupe non contigu déplacé se regroupe à la cible, dans l'ordre de la page. HN-E11S16-7 : un bloc en conflit dans un groupe fait refuser tout le geste, comme `write` refuse tout le corps à la première opération refusée.
+- HN-E11S17-a1 : le rectangle prend les blocs qu'il couvre en hauteur, où qu'il soit en largeur ; il se tire depuis la zone des blocs, une rangée ou sa gouttière hors de leurs contrôles, jamais depuis le rendu d'un bloc lu. HN-E11S17-a2 : un bloc sélectionné porte le fond `--oto-bg` et un contour (`outline`) en `--oto-ink`, `Highlight` en couleurs forcées, aucun jeton ajouté.
+- HN-E11S17-a5 : les touches d'une sélection se lisent sur la zone ou une poignée, jamais dans un champ ; sur la poignée d'un bloc sélectionné, ↑, ↓ et Entrée servent la sélection ; hors sélection, ils restent au bouton (↓ et Entrée ouvrent son menu) ; Espace et le clic l'ouvrent toujours ; Échap dans un champ sélectionne son bloc ; ⌘A sur la zone ou une poignée prend toute la page. HN-E11S17-a12 : le second ⌘A se lit dans le champ d'un Texte, titre, citation, liste ou code ; les cellules d'un tableau simple et les champs d'un repli gardent le ⌘A du navigateur (Échap y sélectionne le bloc).
+- HN-E11S17-a7 : Maj+clic étend depuis l'ancre (le dernier bloc pris seul, par Échap, ↑↓ ou Ctrl+clic) ; sans sélection, il prend le bloc seul ; un clic simple sur la poignée d'un bloc hors de la sélection la vide et ouvre le menu ; sur un bloc sélectionné, il ouvre le menu et garde la sélection. HN-E11S17-a8 : au menu d'un bloc sélectionné parmi d'autres, « Supprimer », « Monter » et « Descendre » agissent sur le groupe ; « Dupliquer » et « Style » restent au bloc.
+- HN-E11S17-a10 : un glissé sorti de son bloc garde la sélection du texte sous le navigateur, masquée tant que des blocs sont pris ; revenu au bloc de départ, elle reparaît ; lâché ailleurs, elle se replie et le focus passe à la zone des blocs (pointeur sans touche de modification).
+- HN-E11S17-a3 : après une suppression groupée, le focus va à la poignée du bloc qui précédait le premier retiré, du premier restant sinon ; toute la page retirée, au champ du Texte vide. HN-E11S17-a6 : un bloc neuf jamais envoyé, supprimé dans un groupe, part sans écriture et ne revient pas par « Annuler » ; l'annonce le compte. HN-E11S17-a11 : la copie annonce « N blocs copiés en markdown. » ; un presse-papiers refusé le dit, et ⌘X ne supprime alors rien.
+- HN-E11S17-a4 : ⌘Z sur la zone des blocs ou une poignée annule toute annonce qui porte « Annuler », celle d'un bloc seul comprise ; sans annonce, la touche reste au navigateur ; dans un champ, ⌘Z reste l'annulation de sa frappe.
+- HN-E11S17-a9 : une écriture groupée refusée (révision périmée d'un des blocs) se lit sans bloc visé : la page relue dit le conflit de page ou le message, avec « Réessayer » ; refusée pour elle-même (`invalid_arguments`), elle quitte la file et l'alerte dit de recharger la page, sans « Réessayer » ; les blocs restent retirés ou déplacés à l'écran jusque-là ; un conflit déjà ouvert refuse le geste avant tout envoi et le dit.
+
+## Décisions et alternatives écartées
+
+- **Éditeur visuel, reporté (ADR-021, JB, 2026-09-30 : trop long pour le besoin).** Proposé : un éditeur ProseMirror par champ, toujours monté, chargé par `import()` (ADR-021 § 1 portée : Texte, titre, citation, listes, cellules, repli ; code, appel et en-tête restent des `<textarea>` ; § 2 dépendances ProseMirror en versions exactes, environ 66 Ko gzip ; § 3 modèle en ligne à nous, markdown inchangé en base, invariants de stabilité et de fidélité ; § 4 gestes inchangés, `gestes.saisir` ; § 5 lien en atome indivisible ; § 6 collage et dépôt en `text/plain` seul, aucun `parseDOM` ni `innerHTML` ; § 7 historique de ProseMirror dans un champ, « Annuler » de l'annonce pour les blocs ; § 9 accessibilité du champ). Seul le § 8, la sélection de blocs, est retenu, livré sur le `<textarea>`. Coût jugé : XL, plus de 1 000 lignes sur une API de bas niveau, `contenteditable` à prouver (lecteurs d'écran, IME, touches mortes, Android) hors de `pnpm verify`, écart avec oto-frontend.
+- **Alternatives de l'ADR-021**, écartées avec lui : B, `contenteditable` à la main (XL+, risque sur la frappe même) ; C, `<textarea>` montrant le titre des liens (n'affiche ni gras ni italique) ; D, Lexical (0.x, cassant à chaque mineure) ; E, TipTap 3 (surcouche de 128 Ko pour peu de code évité) ; F, un seul document pour la page, seule à donner une sélection de texte à travers les blocs (environ deux fois A, réécriture de l'éditeur entier ; pas exclue plus tard) ; G, Slate (saisie Android et IME fragiles), BlockNote (son propre modèle de blocs, MPL-2.0).
+- **E11-S15 AC-b8, « la source jamais visible pendant la frappe », écarté** (D152) : D107 « au focus, le texte brut » tient ; HN-E11S06-1 (le champ garde la source `[[…]]` pendant la frappe ; le curseur dans un lien ouvre le panneau, source visible) reste vrai, sauf son clic au repos.
+- **HN-E11S06-2, « un clic simple sur un lien au repos ouvre le panneau et ne le suit plus »**, remplacée par D151 (E11-S15 AC-b9) : le clic suit le lien, le menu contextuel ouvre le panneau.
+- **Champs toujours montés** (titre d'E05-S08 : un `<textarea>` par bloc, comme oto-frontend) : remplacé par D21 dans la 1.1.3, parce qu'une page longue figeait l'éditeur (une mise en page par champ au montage). Les règles d'envoi et de conflit d'E05-S08 tiennent.
+
+## Sécurité et confidentialité
+
+- Le panneau « Lien » n'écrit que des adresses `https://` (HN-E11S06-4) ; une adresse n'est rendue en lien que relue par `schemas/link-syntax.ts`, le seul lecteur des liens.
+- L'écran n'envoie que des blocs validés par `blockInputSchema` ; le service décide le droit d'écrire et la révision ([droits d'accès](droits-d-acces.md)). Un 403 n'offre que la copie du texte saisi.
+
+## Écart avec le code
+
+- L'éditeur visuel (ADR-021, lots 0 et b à f d'E11-S17) n'est pas fait : `docs/produit/stories/editeur-visuel.md`.
+- M80 : un élément racine d'une liste dont le texte commence par deux espaces est relu en sous-élément à la frappe (`elementsLus`, `ui/noeud/editeur/modele.ts`).
+- M84 : `choix-de-bloc.tsx` reprend à refaire `useOptionActive` (`ui/noeud/editeur/citer.tsx`), l'aide commune du clavier d'une liste d'options.
+- M99 : découper `ui/noeud/editeur/modele.ts`, au plafond de 300 lignes ; M102 : quatre copies de « relire les rappels du dernier rendu » dans l'éditeur, à réunir.
+- M69 : après un déplacement par « ⋯ », le focus tombe sur le document au lieu du nœud déplacé.
+- La page vide garde son bouton : le premier Texte créé et focalisé reste à faire (HN-E10S06-6).
+
+## Questions ouvertes
+
+Aucune à ce jour.
+
+## Historique
+
+- 2026-09-29 : V1 publiée (1.0.0) avec l'éditeur de blocs : file d'opérations, envoi différé, conflit au bloc, un champ par bloc comme oto-frontend — décidé par JB (source : stories E05-S02, E05-S08).
+- 2026-09-29 : choix du « + » et de « / », tableau simple, séparateur, repli, niveaux de liste, préfixes de titre — décidé par JB (source : fiches D116, D142, D143, D144, story E10-S06).
+- 2026-09-29 : une puce par élément de liste, panneau « Lien », source gardée pendant la frappe — décidé par JB (source : story E11-S06, HN-E11S06-1 et HN-E11S06-2 validées).
+- 2026-09-30 : un clic suit le lien, le panneau s'ouvre par le menu contextuel ; la source reste visible pendant la frappe ; éditeur visuel reporté, sélection de blocs retenue et livrée en 1.1.2 — décidé par JB (source : fiches D151, D152, ADR-021, story E11-S17 lot a).
+- 2026-09-30 : seul le bloc touché monte son champ, en 1.1.3 — décidé par JB (source : fiche D21).
+- 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-021, les fiches D21, D107, D116, D142 à D144, D151, D152 et les choix des stories E05-S02, E05-S08, E10-S06, E11-S06, E11-S17 — décidé par Alexis, accord de JB.

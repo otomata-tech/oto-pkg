@@ -48,7 +48,7 @@ const RECEIPT = receiptPath()
 const MAX_AGE_MS = 60 * 60 * 1000 // 1 h : au-delà, l'environnement a pu bouger (deps, node)
 
 // Documents de méthode écrits APRÈS les checks, par la finalisation puis par `commit-push` :
-// changelog, sprint status, stories, ADR, registry. Aucun n'influence le type-check, le lint ni
+// changelog, sprint status, stories, documents de conception, registry. Aucun n'influence le type-check, le lint ni
 // les tests. Sans ces exclusions, le reçu serait systématiquement invalidé par les étapes qui le
 // suivent — il ne servirait alors qu'aux changements Micro, c'est-à-dire là où il ne fait rien
 // gagner. Le registry en fait partie : `dev` l'écrit à l'étape 8, après `pnpm verify` (étape 6).
@@ -56,8 +56,8 @@ const MAX_AGE_MS = 60 * 60 * 1000 // 1 h : au-delà, l'environnement a pu bouger
 const EXCLUS = [
   /^docs\/changelog\.md$/,
   /^\.method\/sprint\//,
-  /^docs\/stories\//,
-  /^docs\/decisions\//,
+  /^docs\/produit\/stories\//,
+  /^docs\/conception\//,
   /^\.method\/conventions\/component-registry\.md$/,
 ]
 const estExclu = (path) => EXCLUS.some((r) => r.test(path))

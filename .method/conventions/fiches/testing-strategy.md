@@ -46,7 +46,7 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - La console se lit par `loggedText` (`tests/helpers/logs.ts`), jamais par `JSON.stringify(<espion>.mock.calls)`. § Anti-patterns
 - Une aide de `tests/helpers/` qui enveloppe une face de `PlatformDb` a, dans le même diff, un test de cette face par `then` et par `execute`. § Anti-patterns
 - Un test qui affirme des microsecondes les sème en texte converti dans la requête (`${"…Z"}::text::timestamptz`). § Anti-patterns
-- Démo ne se vide jamais par un script écrit à la main sans `pnpm org:export` avant, tables lues dans `docs/architecture.md § 4` (`org_domains` = adresses), et son adresse vérifiée après. § Base de test
+- Démo ne se vide jamais par un script écrit à la main sans `pnpm org:export` avant, tables lues dans `docs/reference/schema-platform.md` (`org_domains` = adresses), et son adresse vérifiée après. § Base de test
 - Une clause facultative d'un service mesuré par un budget de requêtes passe par un paramètre nul, jamais par un fragment `sql` ; un plafond ne se relève pas pour un fragment. § Anti-patterns
 - Une spec sur l'organisation jetable pose elle-même la précondition d'une partie calculée (contenus récents, nouveautés bornées). § Anti-patterns
 - Un membre inséré sans `profile.handle` (outillage, Démo) reçoit son handle de la base et son espace privé (`ensure_private_space`) : `private/<handle>` et son Contexte existent après l'ajout. § Base de test

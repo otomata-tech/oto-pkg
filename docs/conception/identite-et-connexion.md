@@ -1,0 +1,107 @@
+# Identité et connexion
+
+- **Statut** : validé avec JB le 23/09/2026
+- **Dernière révision** : 2026-10-01
+
+## Résumé
+
+L'organisation vient de l'adresse appelée, jamais du jeton ; l'appartenance est relue en base à chaque appel. Personnes et assistants prouvent qui ils sont auprès d'un seul émetteur par hôte, Supabase Auth par défaut ou un émetteur OpenID Connect (Logto, Keycloak), sans façade devant lui. On entre par invitation, ou par l'inscription libre si l'hôte l'active ([offres de l'hôte](offres-de-l-hote.md)).
+
+## Contexte
+
+Une personne a un compte dans l'annuaire de l'application hôte : il sert aux écrans, aux assistants et, dans un ERP, à l'ERP lui-même. claude.ai et ChatGPT appellent depuis des pools d'adresses tournants : aucun état ne peut s'attacher à une empreinte réseau. Un consultant est membre de plusieurs organisations. Retirer quelqu'un doit couper son accès sans attendre l'expiration de son jeton. L'annuaire par défaut est Supabase Auth, dont le serveur OAuth 2.1 à enregistrement dynamique existe en Cloud et en auto-hébergé ; un hôte sans Supabase apporte son propre émetteur OpenID Connect ([base et portabilité](base-et-portabilite.md), ADR-012).
+
+## Objectifs et non-objectifs
+
+- Un seul compte par personne pour les écrans, les assistants et l'ERP ; un seul connecteur par organisation.
+- Le retrait d'un membre coupe tout de suite ; l'isolation ne dépend pas du jeton.
+- Aucune session côté serveur, aucune empreinte réseau, aucun secret dans une conversation (ADR-004 § 6).
+- Hors objectif : un serveur d'autorisation à nous ; un compte ou un jeton de service en V1 ; la politique de mot de passe et la limitation des connexions, qui sont celles de l'émetteur.
+
+## Conception
+
+### Organisation et appartenance
+
+- **L'organisation vient de l'adresse appelée** (`app.acme.fr/api/mcp`, `acme.<domaine de base>/api/mcp`), jamais du jeton : le jeton dit qui appelle, la base dit s'il est membre (ADR-004 § 1). H10 : `org_domains(host)` range un nom d'hôte en minuscules, sans port, et chaque hôte désigne une seule organisation ; en local, le script Démo pose `localhost` et `demo.localhost`. D14 : seule l'équipe plateforme qui administre une organisation rattache ou retire ses adresses (`org_domains`).
+- **L'appartenance est revérifiée à chaque appel** (ligne `members` de l'organisation de l'adresse) : un membre retiré est coupé dès l'appel suivant, même avec un jeton valide (ADR-004 § 2).
+- H20 : à chaque requête sur `/api/mcp`, l'organisation se lit par `x-forwarded-host`, sinon `host` ; le jeton `Bearer` est vérifié par la JWKS de l'émetteur (`iss`, `exp`, `sub`, `nbf`) ; l'appartenance est relue ; sinon 401 et `WWW-Authenticate` vers les métadonnées.
+- H13 : sur une adresse connue dont la personne n'est pas membre, la page « aucune organisation » nomme l'organisation et le nom et l'email de son administrateur le plus ancien (`org_contact`, toute personne connectée) ; une adresse inconnue se dit telle. E02-S01 N12 : `/no-organization` se calcule depuis l'hôte de la requête, sans paramètre d'URL.
+- E02-S01 N9 : sans session, l'API répond 401 avec le code `forbidden` ; le statut porte la différence.
+- H18 : `members.role` n'admet que `admin` et `member`. E02-S01 N8 : `teams.lead_user_id` est la seule source du responsable d'une équipe ; le rôle d'équipe de l'identité (`lead` ou `member`) en est dérivé (amendé depuis par D128, [droits d'accès](droits-d-acces.md)).
+- D27 : `members.email` et `members.name` sont des copies tenues par l'outillage et par la session ; l'annuaire (`member_directory`) les lit là, jamais dans `auth.users`. HN-M08-5 : sous une session, une ligne `members` qui change de `user_id` perd l'email, le nom et la dernière connexion de la précédente ; si la personne nouvelle est l'appelante, elle reçoit les copies de ses claims.
+- E02-S01 N17 : `unique_handle` translittère aussi les majuscules accentuées avant `lower()` : sous une ctype `C`, `lower()` ne touche que l'ASCII.
+
+### Émetteur : un hôte, un émetteur
+
+- HN-E01S11-1 : `PLATFORM_OIDC_ISSUER` posée choisit un émetteur OpenID Connect ; absente, Supabase Auth, déduit de `NEXT_PUBLIC_SUPABASE_URL`.
+- **Mode Supabase** : `aud` = `authenticated`, non vérifiée (l'appartenance compense) ; session web `@supabase/ssr`. HN-E01S11-4 : sur Supabase Auth, l'identifiant interne d'une personne est son `sub` ; sa ligne `identities` naît au premier passage.
+- **Mode OIDC** (`PLATFORM_OIDC_ISSUER` et `PLATFORM_OIDC_AUDIENCE`) : chaque jeton est vérifié par la JWKS de sa découverte, `iss` exact, `aud` égale à l'audience de l'hôte. L'hôte se connecte chez l'émetteur (`/auth/oidc/*`, oauth4webapi) et garde la session dans un cookie `__Host-` chiffré (`PLATFORM_SESSION_SECRET`, AES-GCM), que le middleware rafraîchit ; les pages propres à Supabase Auth y rendent 404.
+- HN-E01S11-2 : en mode OIDC, l'email vient du jeton, sinon de `userinfo`, et n'entre dans les claims que vérifié (`email_verified`) ; le résultat est gardé jusqu'à l'expiration du jeton.
+- HN-E01S11a1c-4 : découverte en forme OpenID Connect, puis, sur un 404, les métadonnées OAuth (RFC 8414) ; l'`issuer` annoncé doit égaler la variable ; gardée une heure, un échec dix secondes, écrit une fois au log. HN-E01S11a1c-5 : `PLATFORM_OIDC_ISSUER` est une adresse `https` sans requête ni fragment (`http` en local seulement), prise telle quelle et comparée exactement à `iss` ; `jwks_uri` et `userinfo_endpoint` suivent la même règle.
+- HN-E01S11b-12 : `oidcEnabled()` choisit pages et routes : `/auth/oidc/*` rendent 404 en mode Supabase, les pages propres à Supabase en mode OIDC ; en mode OIDC, seul le retour de l'émetteur accepte les invitations.
+- Chaque porte passe l'émetteur et le sujet vérifiés ; la base les traduit en identifiant interne à la première requête (`identity_for_caller()`, [référence du schéma](../reference/schema-platform.md)), et une personne invitée entre à son premier appel.
+- **Équipe plateforme en mode OIDC.** D77 et HN-E01S11-6 : `identity_for_caller()` relie l'email vérifié présent dans `platform_staff.email` à l'identifiant de cette ligne ; `pnpm platform:staff add` crée la ligne par email, sans compte Supabase. HN-E01S11w-13 : `add` crée la ligne par l'email en minuscules sous un identifiant neuf, ou sous `--user` celui qu'`identities` lie déjà ; `remove` retire les lignes de l'email. D93 : `pnpm platform:staff add <email> --user <identifiant>` rajoute en mode OIDC une personne retirée de l'équipe plateforme sous l'identifiant que son sujet garde dans `identities`. L'équipe plateforme entre au MCP admin par l'email vérifié de sa ligne `platform_staff`.
+- **ERP existant avec un autre fournisseur d'identité** : fédérer ce fournisseur dans Supabase Auth, ou le configurer comme émetteur de l'hôte ; jamais une clé d'API au nom d'un utilisateur (ADR-004 § 7).
+
+### Web : invitation et connexion
+
+- **On entre par l'invitation** d'un admin, ou d'un responsable d'équipe au rôle membre (ADR-004 § 4), ou par l'inscription libre si l'hôte l'active (ADR-023). D1 : une personne sans compte entre sur invitation ; en mode Supabase, inscription ouverte filtrée par le hook « Before User Created », l'email étant le lien magique ; aucune clé de service dans le paquet. H11 : ce filtre est `platform.hook_before_user_created` (adresses invitées seules) ; l'invitation est le lien magique (`signInWithOtp`, clé publique) ; `accept_invitations()` crée les appartenances au retour.
+- H12 : une invitation vit 7 jours, en attente tant qu'elle n'est ni acceptée, ni refusée, ni révoquée, ni expirée ; un doublon rend `conflict` ; l'email vérifié de la session doit être celui de l'invitation ; l'acceptation ne rétrograde aucun rôle. E02-S01 N5 : pas de refus d'invitation par l'invité : `declined_at` reste sans policy ni service.
+- D11 : un lien d'invitation ou de connexion s'ouvre sur `/auth/confirm` sans rien consommer ; le jeton n'est vérifié qu'au clic sur « Continuer », pour qu'une passerelle de messagerie qui ouvre le lien ne l'use pas. E02-S01 N1 : le lien d'invitation de Supabase porte `token_hash` (modèles d'email) et n'est vérifié par `verifyOtp` qu'au clic sur `/auth/confirm`, jamais à l'ouverture ; `code` (PKCE) reste pour la réinitialisation et OAuth. E02-S01 N27 : `/auth/confirm` rend le bouton « Continuer » même sans paramètres ; c'est `confirmerLienAction` qui renvoie alors vers `/login?error=auth_callback_error`.
+- E02-S01 N2 : le lien d'invitation ramène à l'adresse d'où l'on invite, pas à `NEXT_PUBLIC_SITE_URL` ; la liste des adresses de retour de Supabase, sans motif attrape-tout, est un contrôle de sécurité et porte chaque adresse d'organisation.
+- E02-S01 N3 : les invitations en attente sont acceptées au retour de connexion (callback) et après `loginAction` ; un échec ne bloque pas la connexion.
+- E02-S01 N4 : la page de connexion propose « Recevoir un lien de connexion » (`signInWithOtp`, même réponse pour toute adresse) : il sert l'invitation dont le lien (1 h) a expiré alors qu'elle vit 7 jours.
+- E02-S01 N41 : Supabase Auth garde « Confirm email » actif (`mailer_autoconfirm: false`, `enable_confirmations` en local) : sans lui, une inscription à une adresse invitée serait confirmée d'office et acceptée.
+- **Mode OIDC.** D54 et HN-E01S11-3 : la plateforme envoie elle-même l'email d'invitation, par le relais SMTP de l'hôte (`nodemailer`, `PLATFORM_SMTP_URL`), sur un modèle en français à la marque de l'organisation ; la personne entre à sa première connexion chez l'émetteur. D79 : la page de connexion est celle de l'émetteur (Logto ou Keycloak), habillée aux couleurs d'Oto par sa propre configuration, sans code dans le paquet.
+- **Google et Microsoft** (mode Supabase, SAML sur exigence d'un client) : boutons des seuls fournisseurs activés, comptes filtrés par le hook d'inscription. HN-E09S03-1 : la page de connexion n'affiche que les boutons des fournisseurs activés, lus dans `GET /auth/v1/settings` (relu au plus toutes les 300 s) ; une panne de lecture masque les deux. HN-E09S03-4 : boutons en texte seul (« Continuer avec Google », « Continuer avec Microsoft »), sans logo de marque. HN-E09S03-5 : ils arrivent en streaming : `fournisseursActives()` est lancée sans être attendue et rendue sous un `<Suspense fallback={null}>` ; titre et formulaire n'attendent pas `GET /auth/v1/settings`. HN-E09S03-7 : au rappel `/auth/callback`, `error_code=otp_expired` (lien email expiré, réinitialisation comprise) mène à `/login?error=auth_callback_error` ; toute autre erreur à `error=oauth`.
+- HN-E02S02-16 : la redirection du middleware prend chemin et requête ; `/login` avec session mène à `redirect` validé par `safeRedirect`, sinon à `/`, sans recopier la requête de `/login`.
+
+### Assistants : OAuth 2.1 auprès de l'émetteur de l'hôte
+
+- **Notre serveur est le serveur de ressource, l'émetteur de l'hôte le serveur d'autorisation** (ADR-004 § 3). L'host lit `/.well-known/oauth-protected-resource`, qui désigne cet émetteur, s'enregistre seul, ouvre la connexion puis le consentement. 401 + `WWW-Authenticate` sur toute requête non authentifiée ; jamais de « mode dégradé anonyme ». Le jeton est vérifié à chaque appel par la JWKS de l'émetteur (`iss` exact, `exp`, `nbf` ; pour un émetteur OIDC, `aud` et email vérifié) ; les services parlent ensuite à la base au nom de cet appelant vérifié (ADR-012 § 1). `service_role` interdit. Règles de détail : `mcp-patterns.md § 6`.
+- Les hosts lisent la forme suffixée des métadonnées (`/.well-known/oauth-protected-resource/api/mcp`) : la racine et les deux formes suffixées (`/api/mcp`, `/api/mcp-admin`) sont servies (ADR-004 § 8).
+- Ils s'enregistrent seuls : Claude en client confidentiel, ChatGPT et Claude Code en clients publics, un client par connecteur et par organisation ; ils consentent, puis rejouent `initialize` et `tools/list`.
+- D3 : les jetons OAuth des assistants durent 3 600 s (`jwt_exp`), rafraîchis en silence par les hosts ; révoquer un assistant ne coupe qu'au rafraîchissement, retirer le membre coupe l'accès tout de suite.
+- **Routines** (ADR-004 § 5, H18) : une routine est une tâche planifiée de l'assistant, qui appelle le MCP sous la connexion OAuth de la personne : mêmes droits, même journal, révoquée avec elle ; ni compte ni jeton de service en V1.
+- **Consentement en mode Supabase** (ADR-004 § 8) : en cellule partagée, le projet n'a qu'une page de consentement, servie par l'hôte sur un domaine commun ; elle ne connaît que le client et `resource`, et c'est `resource` qui dit l'organisation et habille la page. H16 : elle vit à `/oauth/consent` de l'hôte et montre le client et l'organisation visée, lue par `oauth_pending_resource` ; sans organisation déterminée, le consentement reste permis (HN-E02S02-2 : le jeton n'ouvre rien sans appartenance revérifiée à chaque appel).
+- HN-E02S02-9 et HN-E02S02-28 : un non-membre est prévenu, pas bloqué ; l'écran dit la portée du jeton (toute organisation de la personne, le MCP admin pour l'équipe plateforme) et l'invite à refuser ; le MCP admin s'affiche « Administration de la plateforme ». HN-E02S02-8 : les quatre scopes connus ont un libellé français ; un scope inconnu s'affiche tel quel.
+- HN-E02S02-3 : approuver ou refuser passe par une Server Action de l'hôte, pas par `/api/platform` : la décision exige la session à cookies. HN-E02S02-27 : le middleware laisse passer sans session le seul POST de `/oauth/consent` (`CONSENT_PATH`) : la Server Action ramène elle-même à `/login?redirect=<demande>`.
+- HN-E02S02-12 : seuls `consentRequest` et `consentDecision` rendent les clés françaises de l'écran (`DemandeDeConsentement`), que l'hôte passe telles quelles ; noms de fonctions et de types restent anglais. HN-E02S02-20 : une demande OAuth tranchée ailleurs ou expirée répond en erreur à la relecture comme à la décision, et la page dit qu'elle ne peut plus être tranchée ; aucun état « déjà autorisé ». HN-E02S02-21 : l'hôte ne monte pas `ConsentementChargement` sur `/oauth/consent` (ni `loading.tsx`, ni `<Suspense>`) : un consentement déjà donné redirige en 307 ; le composant reste exporté.
+- **Mode OIDC** : l'enregistrement dynamique et le consentement sont ceux de l'émetteur, réglés par la configuration de l'émetteur dans le dépôt de l'hôte SaaS.
+
+### Brancher un assistant et ménage des clients OAuth
+
+- La page `/connect` donne l'adresse du serveur, les noms recommandés, les dernières connexions et des prompts d'exemple ([écrans et coque](ecrans-et-coque.md) pour le guide par onglet). HN-E02S04-1 : nom de connecteur recommandé = `orgs.name` ; nom du serveur pour Claude Code = `orgs.prefix`. HN-E02S04-2 : famille d'assistant tirée de la signature `initialize` : `claude-ai` et `Anthropic/*` → « claude.ai », `claude-code` → « Claude Code », `openai-mcp` → « ChatGPT », `?` → « Client non identifié », sinon la partie avant `@`. HN-E02S04-6 : les guides ne nomment des menus de claude.ai et ChatGPT que ce que les bancs ont mesuré (« Paramètres → Connecteurs », « menu ⋯ », « Actualiser »).
+- Les hosts ne purgent jamais les clients OAuth qu'ils enregistrent (un par connecteur, par organisation et par poste Claude Code). H17 : le ménage est un script d'outillage (`pnpm oauth:clients list | purge --older-than <jours>`) : il liste, puis supprime sur option les clients sans session récente, lue par `oauth_clients_activity()` ; aucun écran. HN-E02S04-4 : `purge` est à blanc sans `--yes` (code 1 tant qu'il reste des candidats) ; seuls les clients `dynamic` créés et sans activité depuis N jours sont supprimés, par l'API d'administration d'Auth. HN-E02S04-5 : l'activité d'un client est la dernière date de ses sessions (création, mise à jour, rafraîchissement), lue par une fonction que seul l'outillage exécute : aucune API d'administration ne la donne.
+
+## Décisions et alternatives écartées
+
+- **L'organisation dans le jeton** (claim `org_id`) : un consultant aurait un jeton par organisation, un retrait attendrait l'expiration, un jeton volé porterait son organisation. Rejetée (ADR-004).
+- **Une façade d'autorisation devant l'émetteur** (enregistrement dynamique émulé, consentement injecté, jetons maison, comme Oto devant Logto) : rejetée, le banc a validé l'émetteur sans façade, et une façade est un critère d'exclusion pour tout émetteur.
+- **Identification par adresse réseau ou empreinte UA + IP** : inutilisable, les hosts changent d'adresse à chaque requête (mesuré au banc).
+- **Compte de service pour les routines** : écarté en V1 ; un jeton de service haché émis dans l'écran admin reste une piste V2.
+- **Refus d'invitation par l'invité** : non construit (E02-S01 N5).
+- **CAPTCHA sur l'inscription ouverte** : D13 accepte que l'API publique de Supabase distingue une adresse invitée d'une autre, sans CAPTCHA, `/login` répondant pareil pour toute adresse.
+
+## Sécurité et confidentialité
+
+- Un membre retiré est coupé à l'appel suivant ; un émetteur peut ajouter des claims au jeton, ils ne remplacent jamais la vérification d'appartenance en base.
+- Aucune clé de service dans le paquet ; `service_role` interdit ; isolation, secrets et connexion d'administration : [base et portabilité](base-et-portabilite.md).
+- La liste des adresses de retour de Supabase, sans motif attrape-tout, est un contrôle de sécurité (E02-S01 N2) ; « Confirm email » reste actif (E02-S01 N41).
+- Le consentement dit à un non-membre que l'assistant aura accès à son compte entier, et nomme le MCP admin.
+
+## Écart avec le code
+
+- Chaque nouvel émetteur se mesure sur les trois hosts avant de servir les assistants ; l'enregistrement dynamique (RFC 7591) et les Client ID Metadata Documents diffèrent d'un émetteur à l'autre. HN-E01S11-5 : les tests du mode OIDC utilisent un émetteur de test servi en mémoire ; l'essai avec Logto, Keycloak et les assistants est fait par JB et le responsable d'Oto.
+- `oauth:clients` n'a pas de mode sans Supabase (M85).
+- Avant le premier client : remettre les limites de débit d'Auth du projet Supabase à leurs valeurs par défaut (action réservée à JB, `.method/sprint/status.md`).
+
+## Questions ouvertes
+
+Aucune à ce jour.
+
+## Historique
+
+- 2026-09-23 : organisation par l'adresse, appartenance revérifiée à chaque appel, OAuth 2.1 auprès de l'émetteur de l'hôte sans façade, routines sous la connexion de la personne — décidé par JB (source : ADR-004 ; fiches D1, D3, D11, D13, D14).
+- 2026-09-24 : émetteur configurable, Supabase Auth ou OpenID Connect (Logto, Keycloak), par la configuration de l'hôte — décidé par JB (source : ADR-012, story E01-S11 ; fiches D54, D77, D79, D93).
+- 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-004, la partie identité de l'architecture, les fiches D1, D3, D11, D13, D14, D27, D54, D77, D79, D93 et les choix H10 à H20, E01-S11, E02-S01, E02-S02, E02-S04, E09-S03 — décidé par Alexis, accord de JB.

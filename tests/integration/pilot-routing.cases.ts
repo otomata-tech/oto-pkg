@@ -1,7 +1,7 @@
 // Phrases du test de routage du pilote (E06-S01, AC2, AC4 ; H43 amendé, P37, NH7, NH11) : les deux
 // formulations que porte le résumé de `ventes/qualifier_prospects`, son titre, les paraphrases, les
 // négatives (hors sujet et demandes proches), les questions de données, les limites mesurées et les
-// golden queries du pilote (`docs/mcp-golden-queries.md`, section du pilote). Jamais stockées dans le
+// golden queries du pilote (`docs/reference/mcp-golden-queries.md`, section du pilote). Jamais stockées dans le
 // module de données ni en base (P37) : seul le résumé porte les formulations ; une paraphrase non
 // servie est rapportée, jamais ajoutée au résumé ; une demande proche servie se corrige par le titre ou
 // le résumé, jamais par le seuil. Repris de la maquette (`mcp-test/tests/integration/proto-routing.cases.ts`

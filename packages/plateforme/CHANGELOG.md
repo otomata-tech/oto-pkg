@@ -17,6 +17,16 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.8 — 2026-10-01
+
+### Assistants
+- `<p>_context` may be called once at the start of a conversation when your user's preferences ask for it; pass `phrase` only for a request about the organisation's work.
+
+### Hosts
+- Install: upgrade to 1.3.8; no migration, no new variable, no import to change.
+- Server: the preference sentence of the connect screen (`preferenceSentence`) now asks the assistant to load the context once per conversation, so that the person's instructions apply to a request that is not work, and to keep the other tools for work. People who pasted the former sentence replace it.
+- Host: a connector is an Auth session of the person. Sign out with `supabase.auth.signOut({ scope: "local" })`: without a scope, Supabase revokes every session of the person and their assistants ask for a new authorisation within the hour. Keep « single session per user » off in the Supabase project (`sessions_single_per_user`); `pnpm auth:settings` now sets it to false.
+
 ## 1.3.7 — 2026-10-01
 
 ### Hosts

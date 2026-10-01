@@ -13,7 +13,7 @@ const ADRESSE: AdresseDeConnexion = {
   url: "https://acme.example.test/api/mcp",
   nom: "Acme Énergies",
   nomCli: "acme",
-  phrase: "Quand une demande concerne mon travail, commence par l'outil de contexte du connecteur « Acme Énergies ».",
+  phrase: "Au début de chaque conversation, appelle une fois l'outil de contexte du connecteur « Acme Énergies » : il porte mes consignes. Utilise ensuite ses autres outils seulement quand la demande concerne mon travail (mes pages, mes procédures, mes données).",
 }
 const ECHEC = "Une erreur est survenue. Réessayez."
 

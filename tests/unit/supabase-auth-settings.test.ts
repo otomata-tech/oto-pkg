@@ -70,6 +70,7 @@ function freshProject(overrides: Config = {}): Config {
     mailer_subjects_magic_link: "Your Magic Link",
     mailer_templates_magic_link_content: "<h2>Magic Link</h2>",
     jwt_exp: 3600,
+    sessions_single_per_user: false,
     oauth_server_enabled: false,
     oauth_server_allow_dynamic_registration: false,
     oauth_server_authorization_path: null,
@@ -129,7 +130,7 @@ async function run(argv: string[], api: ReturnType<typeof managementApi>) {
 
 describe("auth:settings without --apply", () => {
   it("should show every managed setting of the target, current and wanted, and nothing else, without writing", async () => {
-    const target = freshProject({ uri_allow_list: "http://localhost:3000/**,**" })
+    const target = freshProject({ uri_allow_list: "http://localhost:3000/**,**", sessions_single_per_user: true })
     const before = structuredClone(target)
     const api = managementApi({ [TARGET]: target })
 
@@ -143,6 +144,8 @@ describe("auth:settings without --apply", () => {
     expect(shownKeys.filter((key) => /^rate_limit_|^smtp_max_frequency$|secret|_pass$|client_id/.test(key))).toEqual([])
     expect(text).toContain("  à changer   hook_before_user_created_enabled : false → true (fiche D1 B, E02-S01, H11)")
     expect(text).toContain("  déjà réglé  jwt_exp : 3600")
+    // Une seule session par personne débrancherait les assistants à chaque connexion : le réglage est ramené à faux.
+    expect(text).toContain("  à changer   sessions_single_per_user : true → false")
     expect(text).toContain("  déjà réglé  mailer_allow_unverified_email_sign_ins : false")
     expect(text).toContain("  laissé      smtp_host : null (copié de --from seulement)")
     expect(text).toContain(`  à changer   site_url : "http://localhost:3000" → "${SITE}"`)

@@ -10,6 +10,14 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.8 : le Contexte se charge une fois par conversation ; les assistants ne sont plus débranchés par une connexion
+
+**Quoi :** la phrase de préférences de l'écran « Brancher » (`preferenceSentence`) demande de charger le Contexte une fois par conversation et réserve les autres outils au travail ; la description de `<p>_context` et son champ `phrase` l'admettent (borne finale réécrite ; le champ `phrase` dit de l'omettre hors travail). Hôte de référence : `logoutAction` appelle `signOut({ scope: "local" })` ; `pnpm auth:settings` ramène `sessions_single_per_user` à faux. Requêtes de référence P1 à P6 ajoutées.
+**Pourquoi :** décision de JB : les consignes tenues dans le Contexte ne s'appliquaient pas à une demande qui n'est pas du travail. Connecteurs débranchés chez l'hôte SaaS : le réglage « une seule session par utilisateur » y était activé (relevé en production par l'hôte), chaque connexion du navigateur révoquait les sessions des assistants ; la déconnexion sans portée faisait de même.
+**Version :** `version` 1.3.8, aucune migration ; décision de JB : publier, puis mesurer. La description de `context` dit « the rules » sans redire le nom de l'organisation, pour tenir sous 1 000 caractères au pire cas.
+**Hypothèses :** la description n'a pas été rejouée sur les assistants à la livraison (décision de JB : publier, puis rejouer P1 à P6 sur Démo) ; la cause de la déconnexion est établie par le réglage relevé, pas par les journaux d'Auth, que l'API de gestion n'a pas rendus.
+**Fichiers :** `packages/plateforme/mcp/{tools,schemas}.ts`, `packages/plateforme/server/connect.ts`, `src/lib/actions/auth.ts`, `scripts/supabase-auth-settings.mjs`, `tests/unit/{mcp-tools,supabase-auth-settings}.test.ts`, `tests/integration/components/guide-de-branchement.test.tsx`, `.method/conventions/mcp-patterns.md` et sa fiche (§ 2.4, § 6, § 9), `docs/conception/{outils-mcp,identite-et-connexion}.md`, `docs/produit/prd.md`, `docs/exploitation/{guide-installation,installer-un-hote}.md`, `docs/reference/mcp-golden-queries.md`, `packages/plateforme/CHANGELOG.md`.
+
 ## [2026-10-01] — 1.3.7 : plus de lien vers la nouvelle adresse pendant l'attente
 
 **Quoi :** `DepartVersLOrganisation` n'affiche le lien « Ouvrir <adresse> » qu'au retard des deux minutes, avec « Réessayer » ; pendant l'attente, l'adresse reste lisible en texte dans l'étape « Adresse réservée ». `version` 1.3.7, aucune migration.

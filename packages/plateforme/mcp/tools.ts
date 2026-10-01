@@ -58,11 +58,15 @@ export function serverInstructions(org: ToolOrg): string {
   return `${name} workspace: for any request about ${name}'s work, call ${p}_context first, with the user's request as phrase, because every other ${p}_ tool requires the ctx code it returns.`
 }
 
+// La borne finale laisse passer un seul appel hors travail : celui que les préférences de la personne demandent en
+// début de conversation (la phrase de l'écran « Brancher »), sans phrase à router, pour que ses consignes s'appliquent
+// aussi à une demande bénigne. Sans préférence, la borne reste entière : deux organisations branchées ne se chargent pas
+// toutes les deux.
 function contextDescription(org: ToolOrg): string {
   const { name, domains } = displayOrg(org)
   const p = org.prefix
   const scope = domains ? `Loads your work context at ${name} (${domains})` : `Loads your work context at ${name}`
-  return `${scope} and routes the user's request to the right procedure; call it first in every conversation, before any other ${p}_ tool. Pass phrase = the user's request, verbatim. Returns the ctx code that every other ${p}_ tool requires, the steps of the matching procedure when the match is clear, who you work for, the rules of ${name}, what's new, and the useful procedures and documents. When it returns candidates instead of steps, follow the instruction that comes with them. A result starting with "context has changed" gives a new ctx: use it, no retry; since_ctx = your ctx routes another phrase without reloading. Call it only when the request concerns ${name}'s work. Otherwise do not call it.`
+  return `${scope} and routes the user's request to the right procedure; call it once per conversation, before any other ${p}_ tool. Pass phrase = the user's request, verbatim. Returns the ctx code that every other ${p}_ tool requires, the steps of the matching procedure when the match is clear, who you work for, the rules, what's new, and the useful procedures and documents. When it returns candidates instead of steps, follow the instruction that comes with them. A result starting with "context has changed" gives a new ctx: use it, no retry; since_ctx = your ctx routes another phrase without reloading. Call it only for ${name}'s work, or when the user's preferences ask for it. Otherwise do not call it.`
 }
 
 function descriptions(org: ToolOrg, callExamples: string[]): Record<ToolKey, string> {

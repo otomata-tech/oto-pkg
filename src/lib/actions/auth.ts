@@ -189,7 +189,9 @@ export async function logoutAction(): Promise<never> {
     redirect(destination)
   }
   const supabase = await createClient()
-  const { error } = await supabase.auth.signOut()
+  // `local` : seule la session de ce navigateur se ferme. Le défaut de supabase-js (`global`) révoque toutes les
+  // sessions de la personne, celles de ses assistants comprises, qui redemandent alors une autorisation.
+  const { error } = await supabase.auth.signOut({ scope: "local" })
   if (error) console.error("logoutAction: signOut a échoué", error.status)
   revalidatePath("/", "layout")
   redirect("/login")

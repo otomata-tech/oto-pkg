@@ -34,7 +34,7 @@ export function inputSchemas(prefix: string) {
         .max(2000)
         .optional()
         .describe(
-          `The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit only when there is no request yet (default: none).`,
+          `The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit when there is no request yet, or when the request does not concern this workspace's work (default: none).`,
         ),
       // E11-S19 (AC-c1 à AC-c3) : `context` léger, ajouté facultatif (ADR-002 § 1).
       since_ctx: z

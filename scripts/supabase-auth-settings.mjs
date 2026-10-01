@@ -71,6 +71,11 @@ export const MANAGED = [
   { key: 'mailer_subjects_magic_link', value: 'Votre lien de connexion', source: 'E02-S01 (action JB 3)' },
   { key: 'mailer_templates_magic_link_content', value: MAGIC_LINK, source: 'E02-S01 (action JB 3, N1)' },
   { key: 'jwt_exp', value: 3600, source: 'fiche D3 A' },
+  {
+    key: 'sessions_single_per_user',
+    value: false,
+    source: 'une session par navigateur, par adresse et par assistant : activé, chaque connexion révoque les autres, connecteurs compris',
+  },
   { key: 'oauth_server_enabled', value: true, source: 'E02-S02 (action JB 1), ADR-004' },
   { key: 'oauth_server_allow_dynamic_registration', value: true, source: "E02-S02 (action JB 1) : les hosts s'enregistrent seuls" },
   { key: 'oauth_server_authorization_path', value: '/oauth/consent', source: 'E02-S02 (action JB 1), H16' },

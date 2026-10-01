@@ -239,6 +239,8 @@ describe.skipIf(!sqlConfigured)(portable("personal space, screens and tree on a 
           ],
         ],
       ])
-    })
+      // Son premier geste retire le grand jeu du cas précédent (6 000 nœuds) : sous la charge d'une campagne
+      // complète, cela dépasse le délai commun.
+    }, TREE_TIMEOUT)
   })
 })

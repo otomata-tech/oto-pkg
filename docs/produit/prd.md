@@ -145,8 +145,9 @@ consultant membre de deux organisations agit, avec un seul compte, dans celle de
 
 Le nom du connecteur est celui que l'utilisateur saisit, et c'est lui que le modèle voit : le guide
 propose un nom qui aide le routage (« Acme assistant ») et, pour un salarié qui n'a qu'un connecteur
-d'entreprise sur claude.ai, une phrase de préférences : « Quand une demande concerne mon travail,
-commence par l'outil de contexte du connecteur « <Nom> ». » Un consultant branché chez plusieurs
+d'entreprise sur claude.ai, une phrase de préférences : « Au début de chaque conversation, appelle une fois
+l'outil de contexte du connecteur « <Nom> » : il porte mes consignes. Utilise ensuite ses autres outils
+seulement quand la demande concerne mon travail (mes pages, mes procédures, mes données). » Un consultant branché chez plusieurs
 clients ne la pose pas et nomme le client ; ChatGPT et Claude Code n'en ont pas besoin. Guide des
 utilisateurs : `docs/exploitation/guide-installation.md`.
 
@@ -246,7 +247,8 @@ jamais coupée, cède la place à son pointeur. Une question qu'aucun bloc ne co
 
 **Reconnaître la procédure.** Trois niveaux : la phrase de préférences sur claude.ai (§ 5.1) ; la
 description de `context`, calculée par organisation, qui nomme ses domaines de travail et finit par
-la borne « Call it only when the request concerns <org>'s work. Otherwise do not call it. », sans
+la borne « Call it only for <org>'s work, or when the user's preferences ask for it. Otherwise do not
+call it. », sans
 laquelle un host où deux clients sont branchés appelle les deux ; enfin la recherche du serveur, qui
 ne décide jamais seule. Son score, entre 0 et 1, vient du plein texte français et des trigrammes sur
 le titre et le résumé (qui porte les façons de demander la procédure, enrichies des demandes lues au

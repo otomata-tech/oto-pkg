@@ -18,7 +18,7 @@ export type ConnectAddress = {
   name: string
   /** Nom du serveur pour Claude Code : le préfixe, en ASCII (`mcp-patterns.md § 3`). */
   cliName: string
-  /** Phrase des préférences personnelles de claude.ai : `context` appelé en premier, 15 sur 15 (§ 9). */
+  /** Phrase des préférences personnelles de claude.ai : `context` chargé une fois par conversation, pour que les consignes de la personne s'appliquent aussi à une demande qui n'est pas du travail (`mcp-patterns.md § 9`). */
   preferenceSentence: string
 }
 
@@ -38,7 +38,7 @@ export function connectAddress(identity: Identity, origin: string): ConnectAddre
     url: `${origin.replace(/\/+$/, "")}${MCP_RESOURCE_PATH}`,
     name,
     cliName: prefix,
-    preferenceSentence: `Quand une demande concerne mon travail, commence par l'outil de contexte du connecteur « ${name} ».`,
+    preferenceSentence: `Au début de chaque conversation, appelle une fois l'outil de contexte du connecteur « ${name} » : il porte mes consignes. Utilise ensuite ses autres outils seulement quand la demande concerne mon travail (mes pages, mes procédures, mes données).`,
   }
 }
 

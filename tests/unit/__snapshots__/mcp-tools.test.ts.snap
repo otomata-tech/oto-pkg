@@ -7,7 +7,7 @@ exports[`input schemas (AC8) > should keep the JSON Schemas frozen (ADR-002: add
       "additionalProperties": false,
       "properties": {
         "phrase": {
-          "description": "The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit only when there is no request yet (default: none).",
+          "description": "The user's request, verbatim and in their language, e.g. "Relance les devis en attente". Omit when there is no request yet, or when the request does not concern this workspace's work (default: none).",
           "maxLength": 2000,
           "type": "string",
         },

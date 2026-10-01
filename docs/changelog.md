@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.3 : version du paquet (inscription : seul le nom se saisit)
+
+**Quoi :** `version` 1.3.3 et `## 1.3.3 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.
+**Pourquoi :** décision de JB : publier la 1.3.3.
+**Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
+
 ## [2026-10-01] — Inscription : seul le nom de l'organisation se saisit
 
 **Quoi :** `FormulaireDInscription` ne montre plus que le champ du nom ; l'adresse et le préfixe des outils s'en déduisent, l'aperçu de l'adresse reste avant la confirmation. Les deux champs reviennent sur un refus `conflict` ou pour un nom dont on ne tire ni adresse ni préfixe valides (tout en chiffres, caractères non latins).

@@ -119,8 +119,8 @@ export function codeBlock(input: CodeBlockInput): ContextBlock {
   const { prefix, code, phrase, since } = input
   const lines = [
     `ctx: ${code}`,
-    // E11-S19 (AC-d5) : le refus porte le nouveau code et les Contextes changés ; rappeler `context` n'est plus utile.
-    `Pass this ctx to every ${prefix}_ tool. If a tool answers "context has changed", its answer gives a new ctx and the changed contexts: take them into account, then retry that call with the new ctx.`,
+    // Un Contexte changé ne refuse pas l'appel : son résultat commence par l'avis, le nouveau code et les Contextes changés.
+    `Pass this ctx to every ${prefix}_ tool. If a result starts with "context has changed", it gives a new ctx and the changed contexts: read them and use the new ctx from then on; the call itself ran, do not repeat it.`,
     since ? sinceLine(since) : workspaceRules(prefix),
     "## This request",
     phrase

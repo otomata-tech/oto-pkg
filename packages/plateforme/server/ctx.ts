@@ -11,8 +11,9 @@
 // l'appelant de la session.
 //
 // E11-S19 : `acceptOwnContextWrite(db, identity, { ctx, path, revision })` avance la ligne du code de l'auteur d'un
-// Contexte à la révision qu'il vient de publier (appelée par `write`) ; le refus `ctx_stale` porte un nouveau code et
-// les Contextes changés ; `ctxChanges` sert le mode léger de `context` (`since_ctx`).
+// Contexte à la révision qu'il vient de publier (appelée par `write`) ; `ctxChanges` sert le mode léger de `context`
+// (`since_ctx`). Un code périmé ne refuse plus l'appel : la garde émet un nouveau code et rend les Contextes changés,
+// que l'adaptateur dit en tête du résultat (`changedCtxMessage`) ; l'appel court sous le nouveau code.
 import { randomInt } from "node:crypto"
 import { CTX_PATTERN } from "../schemas"
 import { changedContextParts, contextBodies, expectedContextPaths } from "./context/blocks/contexts"
@@ -47,11 +48,12 @@ export function staleCtxMessage(prefix: string, paths: readonly string[] = []): 
 }
 
 /**
- * Le refus d'un code périmé qui porte le changement (E11-S19, AC-b1) : les chemins changés, bornés, le nouveau code et
- * la consigne de rejouer l'appel avec lui, puis `served`, les parties des Contextes changés telles que `context` les sert.
+ * L'avis d'un code périmé, dit en tête du résultat de l'appel, qui a couru : les chemins changés, bornés, le nouveau
+ * code, la consigne de ne pas rejouer l'appel (une création rejouée ferait un doublon), puis `served`, les parties des
+ * Contextes changés telles que `context` les sert.
  */
 export function changedCtxMessage(prefix: string, paths: readonly string[], code: string, served: string): string {
-  return `context has changed (${boundedList(paths)}). New ctx: ${code}: retry this call with it, and pass it to every ${prefix}_ tool from now on. The changed contexts, as served now:\n\n${served}`
+  return `context has changed (${boundedList(paths)}). New ctx: ${code}: pass it to every ${prefix}_ tool from now on. The call below ran with it: do not repeat it because of this notice. The changed contexts, as served now:\n\n${served}`
 }
 
 /** Un Contexte publié à l'un des chemins attendus : son nœud et sa révision (≥ 1). */
@@ -164,8 +166,8 @@ export async function issueCtx(
  * L'auteur d'un Contexte n'est pas refusé par sa propre écriture (E11-S19, AC-a1, HN-E11S19-1) : la ligne du code
  * `ctx` de l'appel passe à `revision` pour `path`, quand ce code est à la personne dans l'organisation, garde ce
  * chemin à la révision précédente (le code avait vu tout ce qui précède l'écriture) et que le Contexte y est publié
- * maintenant. Sinon rien ne change : un autre changement survenu entre-temps reste à lire, par le refus `ctx_stale`
- * qui le porte. Rend `true` quand la ligne a avancé. Appelée par `write` après la publication d'un Contexte ; la
+ * maintenant. Sinon rien ne change : un autre changement survenu entre-temps reste à lire, par l'avis de l'appel
+ * suivant. Rend `true` quand la ligne a avancé. Appelée par `write` après la publication d'un Contexte ; la
  * policy `ctx_update_own` et le privilège sur la seule colonne `contexts` bornent l'écriture en base.
  */
 export async function acceptOwnContextWrite(
@@ -229,42 +231,45 @@ async function changedContextsText(db: PlatformDb, identity: Identity, changed: 
   return renderContext(changedContextParts(identity, bodies, changed), CONTEXT_BUDGET, identity.org.prefix).text
 }
 
+/** Ce que la garde rend d'un code périmé : les Contextes changés et leurs parties, telles que `context` les sert. */
+export type CtxChange = { paths: string[]; served: string }
+
 /**
- * Le refus d'un code périmé qui porte le changement (E11-S19, AC-b1, HN-E11S19-2, ADR-002 § 2 amendé) : un nouveau
- * code, émis pour la personne au host et à l'agent de l'ancien, qui garde les révisions lues par la garde, et les
- * parties des Contextes changés, lues ensuite, hors de la transaction de la garde. Un Contexte republié entre les
- * deux lectures est servi plus récent que la révision gardée : le code est refusé une fois de plus, jamais gardé
- * au-delà de ce qui a été servi. En panne de l'une ou de l'autre, le refus d'E11-S03 (AC-b3) : rappeler `context`.
+ * Le code qui remplace un code périmé (E11-S19, HN-E11S19-2, ADR-002 § 2 amendé) : émis pour la personne au host et
+ * à l'agent de l'ancien, il garde les révisions lues par la garde ; les parties des Contextes changés sont lues
+ * ensuite, hors de la transaction de la garde. Un Contexte republié entre les deux lectures est servi plus récent que
+ * la révision gardée : le nouveau code reçoit l'avis une fois de plus, jamais gardé au-delà de ce qui a été servi.
+ * En panne de l'une ou de l'autre, le refus d'E11-S03 (AC-b3) : rappeler `context`, rien ne dit ce qui a changé.
  */
-async function staleRefusal(db: PlatformDb, identity: Identity, state: CtxState & { changed: string[] }): Promise<PlatformError> {
-  const prefix = identity.org.prefix
+async function renewedCtx(db: PlatformDb, identity: Identity, state: CtxState & { changed: string[] }): Promise<{ code: string; change: CtxChange }> {
   const { row, changed, seen } = state
   try {
     const [code, served] = await Promise.all([
       issueCtx(db, identity, { host: row.host, userAgent: row.user_agent, contexts: seen }),
       changedContextsText(db, identity, changed),
     ])
-    return new PlatformError("ctx_stale", changedCtxMessage(prefix, changed, code, served))
+    return { code, change: { paths: changed, served } }
   } catch (error) {
     console.error("[platform] requireCtx: changed contexts not served", error)
-    return new PlatformError("ctx_stale", staleCtxMessage(prefix, changed))
+    throw new PlatformError("ctx_stale", staleCtxMessage(identity.org.prefix, changed))
   }
 }
 
 /**
- * Garde des cinq outils autres que `context`. Refuse un code absent, mal formé, inconnu, d'une
- * autre personne ou émis sur une autre organisation (`ctx_missing`, N13), ou dont un Contexte gardé a
- * changé de contenu servi depuis l'émission (`ctx_stale`, E11-S03, ADR-002 § 2), sauf `staleAllowed`
- * (`feedback`, HN-E11S03-1 : un retour sur la panne n'exige pas de relire le contexte). Le refus d'un code
- * périmé porte un nouveau code et les Contextes changés (E11-S19, `staleRefusal`). Rend le code
- * normalisé et la signature du host qu'il porte (AC19).
+ * Garde des cinq outils autres que `context`. Refuse un code absent, mal formé, inconnu, d'une autre personne ou
+ * émis sur une autre organisation (`ctx_missing`, N13). Un code dont un Contexte gardé a changé de contenu servi
+ * depuis l'émission ne refuse pas l'appel : la garde rend un nouveau code, sous lequel l'appel court, et `changed`,
+ * que l'adaptateur dit en tête du résultat (`renewedCtx`) ; `staleAllowed` (`feedback`, HN-E11S03-1) ne lit pas les
+ * Contextes. Restent refusés `ctx_stale` : un code émis avant la 1.1.0, qui ne dit pas ce qu'il a servi, et une panne
+ * à l'émission du nouveau code ou à la lecture des Contextes changés. Rend le code normalisé et la signature du host
+ * qu'il porte (AC19).
  */
 export async function requireCtx(
   db: PlatformDb,
   identity: Identity,
   raw: unknown,
   options: { staleAllowed?: boolean } = {},
-): Promise<{ code: string; host: string | null }> {
+): Promise<{ code: string; host: string | null; changed?: CtxChange }> {
   const prefix = identity.org.prefix
   // Forme vérifiée avant la base : un code mal formé, de 100 000 caractères au besoin, ne coûte aucune
   // requête et reçoit la consigne d'appeler context.
@@ -274,8 +279,9 @@ export async function requireCtx(
   if (!state) throw new PlatformError("ctx_missing", missingCtxMessage(prefix))
   const { changed } = state
   if (changed === null) throw new PlatformError("ctx_stale", staleCtxMessage(prefix))
-  if (changed.length > 0) throw await staleRefusal(db, identity, { ...state, changed })
-  return { code, host: state.row.host }
+  if (changed.length === 0) return { code, host: state.row.host }
+  const renewed = await renewedCtx(db, identity, { ...state, changed })
+  return { code: renewed.code, host: state.row.host, changed: renewed.change }
 }
 
 /**

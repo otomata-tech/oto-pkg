@@ -21,7 +21,7 @@ import type { CatalogFunction } from "../server/catalog/define"
 import { runCall, type CallTrace } from "../server/calls"
 import { callExamples, catalogFunctions, findFunction } from "../server/catalog/registry"
 import { buildContext } from "../server/context"
-import { requireCtx } from "../server/ctx"
+import { changedCtxMessage, requireCtx, type CtxChange } from "../server/ctx"
 import type { PlatformDb } from "../server/db"
 import { isPlatformError, PlatformError, type PlatformErrorCode } from "../server/errors"
 import { recordFeedback } from "../server/feedback"
@@ -70,7 +70,19 @@ export type McpDeps = {
 
 /** `trace` : ce qu'un `call` a établi avant d'échouer (équipe, compte), pour sa ligne de journal (E03-S04, AC16). */
 type MemberDeps = McpDeps & { identity: Identity; trace?: CallTrace }
-type ValidCtx = { code: string; host: string | null }
+type ValidCtx = { code: string; host: string | null; changed?: CtxChange }
+
+/** Titre posé entre l'avis d'un Contexte changé et ce que l'appel a rendu. */
+const RESULT_HEADING = "## Result of this call"
+
+/**
+ * `text` précédé de l'avis d'un Contexte changé (`changedCtxMessage`) quand le code de l'appel était périmé : l'appel a
+ * couru sous le nouveau code, et le modèle lit d'abord le code à passer désormais et ce qui a changé.
+ */
+function withCtxNotice(text: string, prefix: string, ctx: ValidCtx | null): string {
+  if (!ctx?.changed) return text
+  return `${changedCtxMessage(prefix, ctx.changed.paths, ctx.code, ctx.changed.served)}\n\n${RESULT_HEADING}\n\n${text}`
+}
 type Service<K extends ToolKey> = (deps: MemberDeps, input: ToolInput<K>, ctx: ValidCtx | null) => Promise<ToolOutput>
 /** Un appel d'outil tel que reçu ; `size` : ses arguments sérialisés, en caractères. */
 type ToolCall = { name: string; args: Record<string, unknown>; size: number }
@@ -173,7 +185,11 @@ async function runTool(
   if (toolKey(deps.org.prefix, name) === "call") entry.target = functionOfArgs(args)
   const validated: { ctx: ValidCtx | null } = { ctx: null }
   try {
-    const output = await serve(member, { name, args, size: opened.args_chars }, validated)
+    const served = await serve(member, { name, args, size: opened.args_chars }, validated)
+    // Un code périmé : l'avis en tête du texte, le nouveau code aussi en champ (`new_ctx`).
+    const output = validated.ctx?.changed
+      ? { ...served, text: withCtxNotice(served.text, deps.org.prefix, validated.ctx), data: { ...served.data, new_ctx: validated.ctx.code } }
+      : served
     const result = formatResult(output, (next) => findFunction(functions, next)?.class === "sensitive")
     Object.assign(entry, {
       ctx: output.ctx ?? validated.ctx?.code ?? entry.ctx,
@@ -189,7 +205,7 @@ async function runTool(
     return result
   } catch (error) {
     const failure = failureOf(error, deps.org.prefix)
-    const result = formatError(failure.message)
+    const result = formatError(withCtxNotice(failure.message, deps.org.prefix, validated.ctx))
     Object.assign(entry, {
       ctx: validated.ctx?.code ?? entry.ctx,
       host: validated.ctx?.host ?? null,

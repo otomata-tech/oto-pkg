@@ -161,24 +161,27 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
 
   // E11-S03, lot a (FB-0005) : le code périme par les Contextes qu'il a servis, et eux seuls.
   describe("requireCtx, the kept Contextes (E11-S03, AC-a2 to AC-a6)", () => {
-    // E11-S19 (AC-b1) : le refus nomme les chemins, puis porte un nouveau code et les Contextes changés.
-    const stale = (paths: string[]) => ({ code: "ctx_stale", message: expect.stringContaining(`context has changed (${paths.join(", ")}). New ctx: `) })
+    // Un Contexte changé ne refuse plus : la garde rend un nouveau code, les chemins changés et leurs parties servies.
+    const changedTo = (paths: string[]) => ({ code: expect.stringMatching(CTX_PATTERN), changed: { paths, served: expect.any(String) } })
     /** Un code de Léa (Ventes) émis maintenant : ce qu'il garde est ce que lit `issueCtx`. */
     const leaCode = () => issueCtx(dbOf("lea"), ref.identityOf("lea"), { host: null, userAgent: null })
     const guard = (code: string) => requireCtx(dbOf("lea"), ref.identityOf("lea"), code)
 
-    it("should refuse a code once everyone's, her team's or her own Contexte is published with another content, naming it", async () => {
+    it("should give another code and the change once everyone's, her team's or her own Contexte is published with another content, naming it", async () => {
       for (const path of ["contexte", "ventes/contexte", "private/lea/contexte"]) {
         const code = await leaCode()
-        await expect(guard(code), path).resolves.toMatchObject({ code })
+        const untouched = await guard(code)
+        expect([untouched.code, untouched.changed], path).toEqual([code, undefined])
         await publishContext(path, snapshot(`Nouveau ${path} ${randomUUID()}`))
-        await expect(guard(code), path).rejects.toMatchObject(stale([path]))
+        const passed = await guard(code)
+        expect(passed, path).toMatchObject(changedTo([path]))
+        expect(passed.code, path).not.toBe(code)
       }
       // Deux changés : dans l'ordre des parties (Tout le monde, Privé, équipes).
       const code = await leaCode()
       await publishContext("ventes/contexte", snapshot(`Encore ${randomUUID()}`))
       await publishContext("contexte", snapshot(`Encore ${randomUUID()}`))
-      await expect(guard(code)).rejects.toMatchObject(stale(["contexte", "ventes/contexte"]))
+      await expect(guard(code)).resolves.toMatchObject(changedTo(["contexte", "ventes/contexte"]))
     })
 
     it("should keep a code valid when another person's Privé or another team's Contexte is published", async () => {
@@ -188,15 +191,16 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
       await expect(guard(code)).resolves.toMatchObject({ code })
     })
 
-    it("should refuse a code when a Contexte kept at 0 is first published, or one kept is no longer published (AC-a3)", async () => {
+    it("should say the change when a Contexte kept at 0 is first published, or one kept is no longer published (AC-a3)", async () => {
       await ref.write({ ctx: [{ code: "FFFF-0001", org_id: ORG.id, user_id: PEOPLE.lea.id, contexts: { "private/lea/contexte": 0 } }] })
-      await expect(guard(ref.id("FFFF-0001"))).rejects.toMatchObject(stale(["private/lea/contexte"]))
+      await expect(guard(ref.id("FFFF-0001"))).resolves.toMatchObject(changedTo(["private/lea/contexte"]))
       const code = await leaCode()
       await seed.admin`update platform.nodes set status = 'draft' where id = ${ref.nodeId("private/lea/contexte")}`
       try {
-        await expect(guard(code)).rejects.toMatchObject(stale(["private/lea/contexte"]))
         // E11-S19 (AC-b1) : un Contexte retiré a son en-tête et la ligne qui le dit.
-        await expect(guard(code)).rejects.toMatchObject({ message: expect.stringContaining(`## Context: you only (private/lea/contexte)\n${CONTEXT_GONE}`) })
+        await expect(guard(code)).resolves.toMatchObject({
+          changed: { paths: ["private/lea/contexte"], served: expect.stringContaining(`## Context: you only (private/lea/contexte)\n${CONTEXT_GONE}`) },
+        })
       } finally {
         await seed.admin`update platform.nodes set status = 'published' where id = ${ref.nodeId("private/lea/contexte")}`
       }
@@ -207,10 +211,10 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
       await publishContext("ventes/contexte", snapshot(text, { key: "ton" }))
       const code = await leaCode()
       await publishContext("ventes/contexte", snapshot(text, { key: "ton", position: 7, revision: 3, provenance: { by: "assistant" } }))
-      await expect(guard(code)).resolves.toMatchObject({ code })
+      expect((await guard(code)).changed).toBeUndefined()
       // La clé seule change : le contenu servi a changé.
       await publishContext("ventes/contexte", snapshot(text, { key: "autre" }))
-      await expect(guard(code)).rejects.toMatchObject(stale(["ventes/contexte"]))
+      await expect(guard(code)).resolves.toMatchObject(changedTo(["ventes/contexte"]))
     })
 
     it("should read the snapshots only for a key whose revision differs (AC-a8)", async () => {
@@ -229,7 +233,7 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
     it("should let feedback through with a known but stale code, never an unknown one (AC-a6)", async () => {
       const code = await leaCode()
       await publishContext("contexte", snapshot(`Pour feedback ${randomUUID()}`))
-      await expect(guard(code)).rejects.toMatchObject({ code: "ctx_stale" })
+      await expect(guard(code)).resolves.toMatchObject(changedTo(["contexte"]))
       await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), code, { staleAllowed: true })).resolves.toEqual({ code, host: null })
       for (const unknown of ["ZZZZ-ZZZZ", await issueCtx(dbOf("claire"), ref.identityOf("claire"), { host: null, userAgent: null })]) {
         await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), unknown, { staleAllowed: true })).rejects.toMatchObject({ code: "ctx_missing" })
@@ -244,21 +248,28 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
       return connectDeps({ db: await dbOf("lea"), org: lea.org, caller: { kind: "member", identity: lea }, userAgent: "vitest", journal: [], activeConnectors: () => Promise.resolve(new Set<string>()), origin: `https://${ref.org.host}` })
     }
 
-    it("should refuse read once a served Contexte is published changed, record feedback on that code, and pass after another person's Privé is published", async () => {
+    it("should serve read once a served Contexte is published changed, under a new ctx said first with the change, record feedback on the old code, and say nothing after another person's Privé is published", async () => {
       const mcp = await session()
       const { code } = await mcp.openContext("Relance les devis")
       const marker = `Par MCP ${randomUUID()}`
       await ref.addBlocks("ventes/contexte", "published", [{ type: "paragraph", text: marker }])
       await publishContext("ventes/contexte", snapshot(marker))
-      const refused = await mcp.call("read", { ctx: code, path: "ventes/devis" })
-      // E11-S19 (AC-b1, AC-b2) : le nouveau code, la consigne, la partie changée seule ; l'appel rejoué avec lui passe.
-      const fresh = /^context has changed \(ventes\/contexte\)\. New ctx: (\S+): retry this call with it/.exec(refused.text)?.[1] ?? ""
-      expect([refused.isError, fresh]).toEqual([true, expect.stringMatching(CTX_PATTERN)])
-      expect(refused.text).toContain(`, as served now:\n\n## Context: team Ventes (ventes/contexte)\n`)
-      expect(refused.text).toContain(marker)
-      expect(refused.text).not.toContain("## Context: everyone")
+      const plain = await mcp.call("read", { ctx: (await mcp.openContext("Relance les devis")).code, path: "ventes/devis" })
+      const served = await mcp.call("read", { ctx: code, path: "ventes/devis" })
+      // L'appel passe : l'avis d'abord (nouveau code, consigne de ne pas rejouer, la partie changée seule), puis le résultat.
+      const fresh = /^context has changed \(ventes\/contexte\)\. New ctx: (\S+): pass it to every \S+ tool from now on\. The call below ran with it: do not repeat it because of this notice\./.exec(served.text)?.[1] ?? ""
+      expect([served.isError, fresh]).toEqual([false, expect.stringMatching(CTX_PATTERN)])
+      expect(fresh).not.toBe(code)
+      expect(served.text).toContain(`, as served now:\n\n## Context: team Ventes (ventes/contexte)\n`)
+      expect(served.text).toContain(marker)
+      expect(served.text).not.toContain("## Context: everyone")
+      expect(served.text.endsWith(`\n\n## Result of this call\n\n${plain.text}`)).toBe(true)
+      expect(served.result.structuredContent).toMatchObject({ new_ctx: fresh, path: "ventes/devis" })
       expect(await ctxRow(fresh)).toMatchObject({ user_id: ref.people.lea.id, host: null, user_agent: "vitest" })
-      expect((await mcp.call("read", { ctx: fresh, path: "ventes/devis" })).isError).toBe(false)
+      // Le nouveau code ne redit rien ; un refus d'un autre ordre garde l'avis devant lui.
+      expect((await mcp.call("read", { ctx: fresh, path: "ventes/devis" })).text).toBe(plain.text)
+      const refused = await mcp.call("read", { ctx: code, path: "ventes/absent_de_la_base" })
+      expect([refused.isError, refused.text.startsWith("context has changed (ventes/contexte). New ctx: "), refused.text.includes("\n\n## Result of this call\n\n")]).toEqual([true, true, true])
       const feedback = await mcp.call("feedback", { ctx: code, type: "gap", text: "Le contexte a changé en cours de route." })
       expect(feedback.isError).toBe(false)
       expect(await seed.admin`select ctx from platform.feedback where org_id = ${ref.org.id} and ctx = ${code}`).toHaveLength(1)
@@ -269,8 +280,8 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
     })
 
     // E11-S19 (HN-E11S19-2) : un Contexte republié entre la garde et la lecture des corps ; le nouveau code garde la
-    // révision vue par la garde, et se fait refuser une fois de plus, jamais l'inverse.
-    it("should issue the new ctx with the revisions the guard read, so a republication meanwhile refuses it once more", async () => {
+    // révision vue par la garde, et reçoit l'avis une fois de plus, jamais l'inverse.
+    it("should issue the new ctx with the revisions the guard read, so a republication meanwhile is said once more", async () => {
       const code = await issueCtx(dbOf("lea"), ref.identityOf("lea"), { host: null, userAgent: null })
       const seen = await publishContext("ventes/contexte", snapshot(`Vu par la garde ${randomUUID()}`))
       // La garde finit par la lecture des instantanés ; toute requête qui la suit (émission, corps) attend la même
@@ -283,10 +294,9 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE : `${SUITE} (${SQL_SKIP_RE
           else if (guarded) return (meanwhile ??= publishContext("ventes/contexte", snapshot(`Entre-temps ${randomUUID()}`)))
         },
       })
-      const refused = await requireCtx(db, ref.identityOf("lea"), code).catch((error: unknown) => error)
-      const fresh = /New ctx: (\S+):/.exec(refused instanceof PlatformError ? refused.message : "")?.[1] ?? ""
+      const { code: fresh } = await requireCtx(db, ref.identityOf("lea"), code)
       expect([await meanwhile, (await ctxRow(fresh)).contexts]).toEqual([seen + 1, expect.objectContaining({ "ventes/contexte": seen })])
-      await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), fresh)).rejects.toMatchObject({ code: "ctx_stale" })
+      await expect(requireCtx(dbOf("lea"), ref.identityOf("lea"), fresh)).resolves.toMatchObject({ changed: { paths: ["ventes/contexte"] } })
     })
 
     // E11-S19 (AC-b3) : l'émission du nouveau code en panne, le refus d'E11-S03, sans code.

@@ -3,6 +3,14 @@
 <!-- Ce fichier est mis à jour à chaque commit via /dev.
      Format de chaque entrée :
 
+## [2026-10-01] — Un Contexte changé avertit l'appel suivant, il ne le refuse plus
+
+**Quoi :** `requireCtx` ne lève plus `ctx_stale` pour un code dont un Contexte servi a changé : il émet un nouveau code et rend les Contextes changés ; l'adaptateur MCP fait courir l'appel sous ce code et écrit en tête du résultat (ou du refus d'un autre ordre) « context has changed (<chemins>). New ctx: <code>… The call below ran with it: do not repeat it because of this notice. », les parties changées, puis « ## Result of this call » ; `new_ctx` en champ. La description de `context`, la ligne du code servie par `context` et la ligne de `write` après la publication d'un Contexte disent la même chose. Restent refusés : un code émis avant la 1.1.0 et une panne à l'émission ou à la lecture du changement.
+**Pourquoi :** décision de JB après le rejeu sur Démo : un Contexte changé ne doit plus coûter d'appel. Ce que le choix abandonne est écrit dans `docs/conception/contexte-servi.md` (l'assistant agit une fois avant d'avoir lu la règle changée).
+**Problèmes :** la description de `<p>_context` change de texte (surface servie aux hosts) : requêtes de référence C2 et C2 bis à rejouer sur les hosts, non rejouées à la livraison.
+**Fichiers :** `packages/plateforme/{server/ctx.ts,mcp/server.ts,mcp/tools.ts,server/context/blocks/code.ts,server/nodes/write-result.ts,CHANGELOG.md}` ; tests `server-ctx` (unit et intégration), `mcp-core`, `mcp-tools`, `context-blocks`, `nodes-publish`, `e11s18-ecriture-assistants` ; `docs/conception/contexte-servi.md`, `docs/produit/prd.md`, `docs/reference/mcp-golden-queries.md`.
+
+
 ## [Date] — [Scope]
 **Quoi :** Ce qui a été fait
 **Pourquoi :** La raison / la story / le bug

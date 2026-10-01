@@ -58,10 +58,10 @@ describe("messages (H27)", () => {
     expect(staleCtxMessage("acme", many)).toContain(", equipe19/contexte, … and 2 more): call acme_context again")
   })
 
-  // E11-S19 (AC-b1) : le refus porte le nouveau code, la consigne de rejouer avec lui, puis les Contextes changés.
-  it("should give the new ctx, the instruction to retry with it, then the changed contexts", () => {
+  // L'avis d'un Contexte changé : le nouveau code, la consigne de ne pas rejouer l'appel, puis les Contextes changés.
+  it("should give the new ctx, the instruction not to repeat the call, then the changed contexts", () => {
     expect(changedCtxMessage("acme", ["ventes/contexte"], "7K3Q-M2XA", "## Context: team Ventes (ventes/contexte)\nTutoie.")).toBe(
-      "context has changed (ventes/contexte). New ctx: 7K3Q-M2XA: retry this call with it, and pass it to every acme_ tool from now on. The changed contexts, as served now:\n\n## Context: team Ventes (ventes/contexte)\nTutoie.",
+      "context has changed (ventes/contexte). New ctx: 7K3Q-M2XA: pass it to every acme_ tool from now on. The call below ran with it: do not repeat it because of this notice. The changed contexts, as served now:\n\n## Context: team Ventes (ventes/contexte)\nTutoie.",
     )
   })
 })

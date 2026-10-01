@@ -103,12 +103,12 @@ type ResultInput = {
 
 /**
  * Ce qu'un Contexte publié change pour les conversations qui l'ont reçu (E11-S03, AC-a7) ; `own` : le `ctx` de l'appel
- * a suivi la publication (E11-S18, AC-14), cette conversation n'a pas à rappeler `context`.
+ * a suivi la publication (E11-S18, AC-14) ; les autres le reçoivent, avec un nouveau code, en tête de leur appel suivant.
  */
 export function contextChangedLine(prefix: string, path: string, own: boolean): string {
   return own
-    ? `Context ${path} changed: every other conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool; this one keeps its ctx.`
-    : `Context ${path} changed: every conversation it was served to must call ${prefix}_context again before any other ${prefix}_ tool, this one included if it was.`
+    ? `Context ${path} changed: every other conversation it was served to gets it, with a new ctx, on its next call; this one keeps its ctx.`
+    : `Context ${path} changed: every conversation it was served to gets it, with a new ctx, on its next call, this one included if it was.`
 }
 
 /**

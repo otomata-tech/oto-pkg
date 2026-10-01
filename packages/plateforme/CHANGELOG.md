@@ -19,6 +19,10 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ### Assistants
 - `node.write_many` refuses an unknown key inside an operation of a page, as `write` does, instead of running the operation without it.
+- A changed context no longer refuses a call: the call runs, and its result starts with « context has changed », the new ctx and the changed contexts.
+
+### Hosts
+- MCP: a stale `ctx` is no longer refused `ctx_stale` when the changed contexts can be said: the call runs under a new ctx, given first in the result text and in `new_ctx`; the description of `context` and the served texts say not to repeat the call. Still refused: a ctx issued before 1.1.0, or a failure while reading the change.
 
 ## 1.3.0 — 2026-10-01
 

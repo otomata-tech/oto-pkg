@@ -113,7 +113,7 @@ Tables et colonnes : `docs/reference/schema-platform.md`.
 | Une procédure publiée ou modifiée | Nouveautés et procédures utiles de `context` ; `find` ; `read` | Conversation suivante, ou tout de suite si elle est relue |
 | Une page ou un tableau | `read` sert la dernière version publiée | Immédiat |
 | Un connecteur activé, une fonction inscrite | `find`, `read`, `call` ; nouveautés de `context` | Immédiat |
-| Un Contexte publié avec un contenu changé (règles, ton, préférences) | Le prochain appel des conversations auxquelles il était servi est refusé : « context has changed (<chemins>): call <préfixe>_context again with the same request, then retry this call. » ; l'assistant rappelle `context` ; les autres conversations continuent | Au prochain appel |
+| Un Contexte publié avec un contenu changé (règles, ton, préférences) | Le prochain appel des conversations auxquelles il était servi court, et son résultat commence par « context has changed (<chemins>). New ctx: <code>… », suivi des Contextes changés ; l'assistant passe le nouveau code ensuite, sans rejouer l'appel ; les autres conversations continuent | Au prochain appel |
 | Un outil ajouté au socle, une description allongée | Geste de l'host : nouvelle session sur Claude Code, « Actualiser » sur claude.ai et ChatGPT ; les anciennes listes continuent de marcher | Au geste |
 
 ## 4. Design system
@@ -271,7 +271,7 @@ demandée.
 | ID | Exigence | Priorité | État |
 |---|---|---|---|
 | FR-TASK-01 | `context` renvoie ses blocs par priorité, coupés par la fin (tableau ci-dessus) : code `ctx`, candidats, procédure reconnue si le score est net, équipe qui portera chaque appel et mode de chaque compte | Must | Livrée (comptes simulés seulement) |
-| FR-TASK-02 | Le code `ctx` lie la personne, l'organisation, la version des règles, le host et l'heure ; les cinq autres outils le refusent absent ou invalide, en nommant `<préfixe>_context` ; après la publication d'un contenu changé d'un Contexte servi à la conversation (Tout le monde, son Privé, ses équipes), le refus dit « context has changed » et nomme lesquels (§ 3.3) | Must | Livrée |
+| FR-TASK-02 | Le code `ctx` lie la personne, l'organisation, la version des règles, le host et l'heure ; les cinq autres outils le refusent absent ou invalide, en nommant `<préfixe>_context` ; après la publication d'un contenu changé d'un Contexte servi à la conversation (Tout le monde, son Privé, ses équipes), le résultat de l'appel suivant commence par « context has changed », nomme lesquels et donne un nouveau code (§ 3.3) | Must | Livrée |
 | FR-TASK-03 | Routage lexical côté serveur (ci-dessus). Une demande d'un seul mot peut servir la seule procédure qui lui répond ; une procédure de l'espace « Privé » n'est candidate que pour sa propriétaire ; les phrases de test d'une organisation se rejouent sans host | Must | Livrée ; le score d'une phrase dans l'éditeur de procédure : V2 |
 | FR-TASK-04 | `call` vérifie la fonction, son activation, le droit de l'équipe et les arguments ; résout le compte ; exécute ; journalise ; renvoie les suites possibles. Un refus cite l'argument fautif et le contrat à lire, ou dit à qui demander (« écriture réservée à l'équipe Ventes, responsable Claire ») ; le compte-rendu d'une fonction sensible liste ce qui est réellement parti et l'équipe qui a porté l'appel | Must | Livrée (comptes simulés ; connecteurs réels : V2) |
 | FR-TASK-05 | Fonctions sensibles en deux temps (ci-dessus), le récapitulatif rappelant le mode du compte ; jamais proposées dans les suites d'un autre résultat | Must | Livrée, sur le `mail` simulé |
@@ -583,4 +583,4 @@ non fonctionnelles (latence, onboarding).
 | Reconnaissance sans host | ≥ 95 % des formulations du résumé servies ; 0 négative | Tests de routage de chaque organisation |
 | Envoi sans accord | 0 | Aucun `confirm: true` avant le tour d'accord |
 | Valeur écrite sans preuve dans un tableau qui l'exige ; décision d'un assistant hors d'un tableau qui l'autorise | 0 | Provenance des cellules ; origine des décisions |
-| Mise à jour sans geste | 100 % des changements de règles repris au prochain appel | Refus « context has changed », puis nouveau `context` |
+| Mise à jour sans geste | 100 % des changements de règles repris au prochain appel | Avis « context has changed » en tête du résultat, avec le nouveau code et les Contextes changés |

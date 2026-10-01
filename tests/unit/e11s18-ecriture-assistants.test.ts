@@ -208,7 +208,7 @@ describe.skipIf(!sqlConfigured)(portable("writing as an assistant (E11-S18)"), {
   })
 
   describe("the author of a Contexte keeps their ctx (AC-14)", () => {
-    it("should advance the ctx of the call to the published revision, and say that only the other conversations call context again", async () => {
+    it("should advance the ctx of the call to the published revision, and say that only the other conversations get the change", async () => {
       const tables = devis()
       addBlocks(tables, "ventes/contexte", "published", [heading("Ton"), paragraph("Tutoyer.")])
       await replaceContent(seed, ref, tables)
@@ -217,7 +217,7 @@ describe.skipIf(!sqlConfigured)(portable("writing as an assistant (E11-S18)"), {
       const code = await issueCtx(db, lea, { host: null, userAgent: null })
       const written = await writeNode(db, lea, { path: "ventes/contexte", base_revision: 1, ops: [{ op: "append", section: "Ton", text: "Signer Léa." }] }, { kind: "agent", ctx: code })
       expect(written.text.split("\n")[1]).toBe(
-        "Context ventes/contexte changed: every other conversation it was served to must call acme_context again before any other acme_ tool; this one keeps its ctx.",
+        "Context ventes/contexte changed: every other conversation it was served to gets it, with a new ctx, on its next call; this one keeps its ctx.",
       )
       await expect(requireCtx(db, lea, code)).resolves.toMatchObject({ code })
     })

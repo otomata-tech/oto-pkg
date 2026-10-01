@@ -197,7 +197,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       await content(tables)
       const ada = await write("ada", { path: "contexte", base_revision: 1, publish: true })
       expect(ada.result?.text).toBe(
-        "Published contexte revision 2 (0 sections, 1 block). Next write: base_revision 2.\nContext contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
+        "Published contexte revision 2 (0 sections, 1 block). Next write: base_revision 2.\nContext contexte changed: every conversation it was served to gets it, with a new ctx, on its next call, this one included if it was.",
       )
       expect(ada.result?.data).toMatchObject({ rules_changed: true })
 
@@ -233,7 +233,7 @@ describe.skipIf(!sqlConfigured)(portable("publishing on a real database"), { tim
       expect(drafted.result?.text.split("\n")[0]).toBe("Draft of ventes/contexte saved on revision 1: appended to « Ton » (+11 → 29 characters).")
       const published = await write("claire", { path: "ventes/contexte", base_revision: 1, publish: true })
       expect(published.result?.text.split("\n")[1]).toBe(
-        "Context ventes/contexte changed: every conversation it was served to must call acme_context again before any other acme_ tool, this one included if it was.",
+        "Context ventes/contexte changed: every conversation it was served to gets it, with a new ctx, on its next call, this one included if it was.",
       )
     })
   })

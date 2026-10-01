@@ -142,7 +142,7 @@ describe.skipIf(!sqlConfigured)(
         expect(opened.text).toMatch(CROCKFORD)
         const opening = [
           `ctx: ${opened.code}`,
-          `Pass this ctx to every ${orgA.prefix}_ tool. If a tool answers "context has changed", its answer gives a new ctx and the changed contexts: take them into account, then retry that call with the new ctx.`,
+          `Pass this ctx to every ${orgA.prefix}_ tool. If a result starts with "context has changed", it gives a new ctx and the changed contexts: read them and use the new ctx from then on; the call itself ran, do not repeat it.`,
           workspaceRules(orgA.prefix),
           "## This request",
           `Request « Relance les devis en attente »: no procedure matches. Say so instead of guessing; ${orgA.prefix}_find can search pages, tables and functions.`,

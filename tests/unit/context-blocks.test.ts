@@ -148,9 +148,9 @@ function routingLineOf(text: string): string {
 
 describe("codeBlock", () => {
   const unmatched = { candidates: [], served: null, kind: "action" as const }
-  /** E11-S19 (AC-d5) : le refus « context has changed » porte le nouveau code et les Contextes changés. */
+  /** Un résultat qui commence par « context has changed » porte le nouveau code et les Contextes changés ; l'appel a couru. */
   const PASS_LINE =
-    'Pass this ctx to every acme_ tool. If a tool answers "context has changed", its answer gives a new ctx and the changed contexts: take them into account, then retry that call with the new ctx.'
+    'Pass this ctx to every acme_ tool. If a result starts with "context has changed", it gives a new ctx and the changed contexts: read them and use the new ctx from then on; the call itself ran, do not repeat it.'
 
   // E05-S12 (AC-9) : les règles de l'espace entre la consigne du code et la ligne du routage.
   it("should give the code, the instruction to pass it, the rules of the workspace, then the request", () => {

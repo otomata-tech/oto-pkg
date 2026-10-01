@@ -54,8 +54,8 @@ function projectOf(value) {
  * Le refus de la campagne, ou `null`. Les tests visent le projet distant dès que
  * `SUPABASE_PROJECT_ID`, `NEXT_PUBLIC_SUPABASE_URL` ou une connexion à une base de Supabase est posée,
  * hors adresse du poste ; alors `PLATFORM_TEST_PROJECT_ID` est exigée, et chacune doit viser ce projet.
- * `PLATFORM_TEST_DB=local` : `vitest.config.ts` a retiré les variables de Supabase et pointé les
- * connexions sur le poste.
+ * `PLATFORM_TEST_DB=local` (le défaut de Vitest, que `vitest.config.ts` pose) : il a retiré les variables de
+ * Supabase et pointé les connexions sur le poste.
  * @param {Record<string, string | undefined>} env  les variables que verront les tests (vide = absente)
  * @returns {string | null}
  */

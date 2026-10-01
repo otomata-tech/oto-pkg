@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Les tests tournent sur la base du poste par défaut
+
+**Quoi :** `vitest.config.ts` vise la base locale du checkout sans variable ; seul `PLATFORM_TEST_DB=env` garde les connexions posées (projet Supabase de test pour les suites propres à Supabase, Postgres du job en CI, que `ci.yml` pose). `.env.example` documente la variable ; `tests/unit/test-db-local.test.ts` contrôle le mode.
+**Pourquoi :** demande de JB. Un `pnpm verify:cached` sans la variable a rejoué toute la campagne sur le projet distant (18 min, 26 échecs).
+**Problèmes :** la garde vit dans `testing-strategy.md § Base de test locale` et `CLAUDE.md § Vérifier, commiter, pousser`. Playwright (e2e) vise toujours l'hôte servi sur le projet de test.
+**Fichiers :** `vitest.config.ts`, `.github/workflows/ci.yml`, `.env.example`, `scripts/test-db-local.mjs`, `scripts/lib/test-db-local.mjs`, `tests/local-db.setup.ts`, `tests/helpers/test-project-guard.mjs`, `tests/unit/test-db-local.test.ts`, `.method/conventions/testing-strategy.md`, `CLAUDE.md`.
+
 ## [2026-10-01] — 1.2.0 : compteurs sans session, inscription OIDC testée à la porte, migrations réunies
 
 **Quoi :** `orgUsage(orgId)` lit sans session les membres et invitations en attente d'une organisation (`org_usage`, accordée à `anon`, ADR-022 § 10) ; un test de la route d'inscription sur un émetteur OIDC de test (forme Logto ou Keycloak : personne inconnue de la base, email non vérifié refusé), à côté de celui de la forme Supabase ; les deux migrations de la version réunies en `20261001090000_v1_2_0.sql` ; `version` 1.2.0 et `## 1.2.0 — 2026-10-01` du CHANGELOG du paquet.

@@ -23,6 +23,12 @@ describe("local test database", () => {
     expect([admin.username, admin.password, admin.searchParams.get("sslmode")]).toEqual(["postgres", "", "disable"])
   })
 
+  it("should run on the local database unless PLATFORM_TEST_DB is env", () => {
+    // `vitest.config.ts` pose le mode : jamais une campagne vers des connexions posées sans `env` demandé.
+    expect(["local", "env"]).toContain(process.env.PLATFORM_TEST_DB)
+    expect(localMode).toBe(process.env.PLATFORM_TEST_DB === "local")
+  })
+
   it.runIf(localMode)("should hide the Supabase variables from the suites in local mode", () => {
     const supabase = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SECRET_KEY", "SUPABASE_DB_URL"]
     expect(supabase.filter((key) => process.env[key])).toEqual([])

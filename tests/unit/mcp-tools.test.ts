@@ -210,6 +210,12 @@ describe("input schemas (AC8)", () => {
       write: create,
       feedback: { ctx: "AAAA-BBBB", type: "gap", text: "Rien." },
     }
+    // Une opération de `write` est stricte aussi : sa clé inconnue est nommée par son rang, avec les clés d'une opération.
+    const ops = [{ op: "append", section: "Notes", text: "x" }, { op: "append", section: "Notes", content: "x" }]
+    expect(parseInput(schemas.write, { ...create, ops })).toEqual({
+      issues: "ops.1: unknown key « content »; keys: op, section, text, find, count, after, block, after_block",
+    })
+    expect(parseInput(schemas.write, { ...create, ops: ops.slice(0, 1) })).toMatchObject({ data: { ops: ops.slice(0, 1) } })
     for (const key of TOOL_KEYS) {
       const refused = parseInput(schemas[key], { ...valid[key], zzz: 1, yyy: 2 })
       expect(refused, key).toMatchObject({ issues: expect.stringMatching(/^unknown keys « zzz », « yyy »; keys: /) })

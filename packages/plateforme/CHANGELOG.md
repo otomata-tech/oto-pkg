@@ -17,6 +17,12 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Assistants
+- `write` refuses an unknown key inside an operation and names it with the accepted ones (« ops.1: unknown key « content » »), instead of running the operation without it.
+
+### Hosts
+- MCP: the operations of `write.ops` are strict at the MCP door, as the served schema says (`additionalProperties: false`); the API body of the screens is unchanged.
+
 ## 1.2.1 — 2026-10-01
 
 ### Assistants

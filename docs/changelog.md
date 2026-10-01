@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Une opération de `write` refuse ses clés inconnues au MCP
+
+**Quoi :** les opérations de `write.ops` passent en objet strict dans les schémas d'entrée du MCP ; `parseInput` nomme la clé par son rang et cite les clés d'une opération (« ops.1: unknown key « content »; keys: op, section, … »). Le JSON Schema servi ne change pas (il disait déjà `additionalProperties: false`), ni le corps de l'API des écrans.
+**Pourquoi :** suite de la 1.2.1 : une clé mal nommée dans une opération était retirée en silence et l'opération partait sans elle. Décision de JB.
+**Problèmes :** `node.write_many` garde ses opérations tolérantes (`writeManyArgsSchema`), non couvert ici.
+**Fichiers :** `packages/plateforme/{mcp/schemas.ts,CHANGELOG.md}` ; `tests/unit/mcp-tools.test.ts` ; `.method/conventions/component-registry.md`.
+
 ## [2026-10-01] — 1.2.1 : version du paquet pour les retours des assistants sur Démo
 
 **Quoi :** `version` 1.2.1 et `## 1.2.1 — 2026-10-01` du CHANGELOG du paquet ; la version porte les corrections de `find` (blocs non montrés comptés), des clés inconnues refusées et de la page sans section, avec la migration `20261001150000_v1_2_1.sql`.

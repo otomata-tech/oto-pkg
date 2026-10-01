@@ -13,7 +13,7 @@
 // `read` et `write` sont composés des entrées partagées avec l'API (`schemas/nodes.ts`, E03-S03) :
 // mêmes champs, même ordre, mêmes descriptions ; seuls les ajouts d'E03-S03 changent leur JSON Schema.
 import * as z from "zod/v4"
-import { feedbackInputSchema, feedbackTypeSchema, readNodeSchema, writeNodeSchema } from "../schemas"
+import { feedbackInputSchema, feedbackTypeSchema, readNodeSchema, writeNodeSchema, writeOpSchema } from "../schemas"
 import { boundedList, issuesText } from "../server/errors"
 import { cut } from "../server/journal"
 import type { ToolKey } from "./tools"
@@ -85,6 +85,9 @@ export function inputSchemas(prefix: string) {
     write: z.object({
       ctx,
       ...writeNodeSchema.shape,
+      // Une opération refuse ses clés inconnues, comme le schéma servi le dit déjà (`additionalProperties: false`) :
+      // retirée en silence, une clé mal nommée (`content` pour `text`) laissait l'opération partir sans elle.
+      ops: z.array(z.strictObject(writeOpSchema.shape)).optional().describe(writeNodeSchema.shape.ops.description ?? ""),
       header: writeNodeSchema.shape.header.describe(`Header of a table; its contract: ${prefix}_read with path write.table (default: unchanged).`),
     }),
     // Les champs de `schemas/feedback.ts` (E03-S05), partagés avec l'administration des retours ;
@@ -115,14 +118,18 @@ export function toInputSchema(schema: z.ZodObject): Record<string, unknown> {
  * premiers seulement, puis leur nombre restant (« … and 980 more », N30) : même formateur que les
  * refus de saisie des services (`issuesText`). Une clé inconnue à la racine est refusée, comme le schéma servi le dit
  * (`additionalProperties: false`), nommée avec les clés de l'outil : retirée en silence, un `text` passé à `write`
- * créait une page vide.
+ * créait une page vide. De même dans une opération de `write` (`ops.<rang>`), nommée avec les clés d'une opération.
  */
 export function parseInput<S extends z.ZodObject>(schema: S, args: unknown): { data: z.output<S> } | { issues: string } {
   const result = schema.strict().safeParse(args)
   // `strict()` ne change que le sort des clés inconnues : la sortie est celle de `schema`, que TypeScript ne relie pas.
   if (result.success) return { data: result.data as z.output<S> }
-  const unknown = result.error.issues.flatMap((issue) => (issue.code === "unrecognized_keys" && issue.path.length === 0 ? issue.keys : []))
-  const known = result.error.issues.filter((issue) => !(issue.code === "unrecognized_keys" && issue.path.length === 0))
-  const keys = unknown.length > 0 ? [`unknown ${unknown.length > 1 ? "keys" : "key"} ${boundedList(unknown.map((key) => `« ${cut(key, MAX_KEY_CHARS)} »`))}; keys: ${Object.keys(schema.shape).join(", ")}`] : []
-  return { issues: [...keys, ...(known.length > 0 ? [issuesText(known)] : [])].join("; ") }
+  const problems = result.error.issues.map((issue) => {
+    if (issue.code !== "unrecognized_keys") return issuesText([issue])
+    // Seuls la racine et les opérations de `write` sont des objets stricts de ces schémas.
+    const accepted = Object.keys(issue.path.length === 0 ? schema.shape : writeOpSchema.shape).join(", ")
+    const where = issue.path.length === 0 ? "" : `${issue.path.map(String).join(".")}: `
+    return `${where}unknown ${issue.keys.length > 1 ? "keys" : "key"} ${boundedList(issue.keys.map((key) => `« ${cut(key, MAX_KEY_CHARS)} »`))}; keys: ${accepted}`
+  })
+  return { issues: boundedList(problems, "; ") }
 }

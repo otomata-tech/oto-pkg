@@ -17,3 +17,4 @@ Texte complet : `.method/conventions/forms-patterns.md`. La fiche suffit pour é
 - Une erreur de champ s'affiche en ligne sous le champ ; l'erreur globale porte `role="alert"`. § Règles
 - Tout champ a un `<label>` associé (`htmlFor` et `id`) ; seul le champ d'un éditeur en place se nomme par `aria-label`, lu dans son test par `getByRole("textbox", { name })`. § Règles
 - Aucun `useState` par champ sous React Hook Form ; les valeurs par défaut vivent dans `defaultValues`, pas dans le JSX. § Règles
+- Un champ, un message ou un bloc qui dépend de la validité d'une saisie se décide à la sortie du champ ou à l'envoi, jamais à chaque frappe ; son test pose une valeur d'un caractère sans quitter le champ et n'attend rien de nouveau à l'écran. § Règles

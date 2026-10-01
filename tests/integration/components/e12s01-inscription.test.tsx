@@ -105,6 +105,26 @@ describe("FormulaireDInscription (AC-12)", () => {
     expect(corps(1)).toEqual({ name: "Atelier", org: "atelier-nord", prefix: "ateliernord", confirm: false })
   })
 
+  it("should not judge the name while it is typed, and say a one-letter name is too short when the field is left or Enter is pressed", () => {
+    render(<FormulaireDInscription />)
+    const nom = screen.getByLabelText("Nom de l'organisation")
+    const TROP_COURT = "Le nom doit compter au moins 2 caractères."
+    fireEvent.change(nom, { target: { value: "o" } })
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+    expect(screen.queryByText(TROP_COURT)).toBeNull()
+    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+
+    fireEvent.keyDown(nom, { key: "Enter" })
+    expect(screen.getByText(TROP_COURT)).toBeInTheDocument()
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+
+    fireEvent.change(nom, { target: { value: "ot" } })
+    expect(screen.queryByText(TROP_COURT)).toBeNull()
+    fireEvent.blur(nom)
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+    expect(screen.getByRole("button", { name: "Continuer" })).toBeEnabled()
+  })
+
   it.each([
     ["all digits", "2026"],
     ["non-Latin characters", "東京"],
@@ -112,6 +132,9 @@ describe("FormulaireDInscription (AC-12)", () => {
     render(<FormulaireDInscription />)
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
     fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: nom } })
+    // Le nom n'est jugé qu'à la sortie du champ.
+    expect(screen.queryByLabelText("Adresse")).toBeNull()
+    fireEvent.blur(screen.getByLabelText("Nom de l'organisation"))
     expect(screen.getByText("Ce nom ne donne pas d'adresse ou de préfixe valide : choisissez-les.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
     fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier" } })

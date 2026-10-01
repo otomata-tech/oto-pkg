@@ -166,3 +166,7 @@ désactivé et affirme qu'aucune requête ne part.
   le nom accessible reste exigé, et son test le lit par `getByRole("textbox", { name })`.
 - **Vérifiable :** aucun `useState` par champ quand React Hook Form est déjà là.
 - Les valeurs par défaut sont dans `defaultValues`, pas dans le JSX.
+- **Vérifiable :** un champ, un message ou un bloc dont l'affichage dépend de la validité d'une saisie se
+  décide à la sortie du champ ou à l'envoi, jamais à chaque frappe : une saisie en cours passe par des
+  valeurs invalides (un caractère), et l'écran clignote. Son test pose une valeur intermédiaire d'un
+  caractère sans quitter le champ et n'attend ni champ ni message nouveau.

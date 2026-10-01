@@ -3,7 +3,9 @@
 // L'inscription d'une organisation (E12-S01, ADR-023) : l'îlot que la page de l'hôte monte dans
 // `EcranDAuthentification`, sous sa `CoquilleOto`, pour une personne connectée qui n'appartient à aucune organisation.
 // Un seul champ, le nom : l'adresse (slug) et le préfixe des outils s'en déduisent sans champ à l'écran, et ne
-// redeviennent saisissables que s'il le faut (adresse ou préfixe déjà pris, nom dont on ne tire rien de valide) ; un
+// redeviennent saisissables que s'il le faut (adresse ou préfixe déjà pris, nom dont on ne tire rien de valide). Le nom
+// se juge à la sortie de son champ ou à Entrée, jamais pendant la frappe : un nom en cours donne une adresse trop
+// courte, et les champs clignoteraient. Un
 // premier envoi montre l'adresse que l'hôte donnera, sans rien écrire ; « Créer l'organisation » confirme (`POST /api/platform/signup`, deux temps), puis
 // la personne part à l'adresse de sa nouvelle organisation. Les champs se contrôlent sur le schéma de l'API
 // (`signupSchema`). Sans lui, l'hôte recréerait le formulaire et ses règles.
@@ -27,6 +29,21 @@ const MESSAGES = {
 
 /** Dit quand le nom ne donne ni adresse ni préfixe valides (nom tout en chiffres, caractères non latins). */
 const A_CHOISIR = "Ce nom ne donne pas d'adresse ou de préfixe valide : choisissez-les."
+
+/** Une adresse compte au moins deux caractères (`orgSlugSchema`) : en dessous, c'est le nom qui est trop court. */
+const NOM_MIN = 2
+const TROP_COURT = `Le nom doit compter au moins ${NOM_MIN} caractères.`
+
+/** Ce que vaut le nom une fois saisi : trop court, sans adresse ni préfixe à en tirer, ou bon (`null`). */
+type Verdict = "court" | "a_choisir" | null
+
+function verdictDuNom(nom: string): Verdict {
+  const saisi = nom.trim()
+  if (saisi === "") return null
+  if (saisi.length < NOM_MIN) return "court"
+  const slug = slugPropose(saisi)
+  return deduits(slug, prefixePropose(slug)) ? null : "a_choisir"
+}
 
 /** L'adresse et le préfixe passent-ils les règles de l'API (`signupSchema`) ? */
 function deduits(slug: string, prefixe: string): boolean {
@@ -73,14 +90,16 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
   const [erreur, setErreur] = useState<string | null>(null)
   const [envoi, setEnvoi] = useState(false)
   const [pris, setPris] = useState(false)
+  const [verdict, setVerdict] = useState<Verdict>(null)
 
   // Tant que la personne ne les touche pas, adresse et préfixe suivent le nom.
   const slugVu = slug ?? slugPropose(nom)
   const prefixeVu = prefixe ?? prefixePropose(slugVu)
-  // Les deux champs ne se montrent que s'il le faut : refus `conflict`, nom dont on ne tire rien de valide, ou champs
-  // déjà repris en main (ils ne disparaissent pas sous la frappe).
-  const inexploitable = nom.trim() !== "" && !deduits(slugPropose(nom), prefixePropose(slugPropose(nom)))
+  // Les deux champs ne se montrent que s'il le faut : refus `conflict`, nom jugé sans rien de valide à en tirer, ou
+  // champs déjà repris en main (ils ne disparaissent pas sous la frappe).
+  const inexploitable = verdict === "a_choisir"
   const aSaisir = pris || inexploitable || slug !== null || prefixe !== null
+  const tropCourt = verdict === "court" && nom.trim().length < NOM_MIN
   const saisie: SignupInput = { name: nom.trim(), org: slugVu, prefix: prefixeVu, ...(conditions ? { accepted_terms: acceptees } : {}) }
   const valide = signupSchema.safeParse(saisie).success && (!conditions || acceptees)
 
@@ -123,8 +142,19 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
     <IlotDAuthentification titre="Créer votre organisation" pied={pied}>
       <form id="inscription" noValidate onSubmit={(evenement) => void envoyer(evenement)} className="flex flex-col gap-3">
         <Field label="Nom de l'organisation">
-          <Input type="text" autoComplete="organization" value={nom} maxLength={80} onChange={(e) => changer(() => setNom(e.target.value))} />
+          <Input
+            type="text"
+            autoComplete="organization"
+            value={nom}
+            maxLength={80}
+            onChange={(e) => changer(() => setNom(e.target.value))}
+            onBlur={() => setVerdict(verdictDuNom(nom))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setVerdict(verdictDuNom(nom))
+            }}
+          />
         </Field>
+        {tropCourt && <p className="text-sm text-ink">{TROP_COURT}</p>}
         {aSaisir && (
           <>
             {inexploitable && !pris && <p className="text-sm text-ink">{A_CHOISIR}</p>}

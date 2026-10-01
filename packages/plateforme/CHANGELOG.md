@@ -17,6 +17,9 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Hosts
+- UI: `FormulaireDInscription` judges the name when its field is left or Enter is pressed, no longer at each keystroke: the address and prefix fields showed at the first character and hid at the second. A one-character name says it is too short. Nothing to change at the host.
+
 ## 1.3.3 — 2026-10-01
 
 ### Hosts

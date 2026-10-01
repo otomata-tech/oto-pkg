@@ -3,6 +3,13 @@
 <!-- Ce fichier est mis à jour à chaque commit via /dev.
      Format de chaque entrée :
 
+## [2026-10-01] — 1.3.1 : version du paquet (lot strict de `node.write_many`, Contexte changé qui avertit)
+
+**Quoi :** `version` 1.3.1 et `## 1.3.1 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.
+**Pourquoi :** décision de JB : publier la 1.3.1.
+**Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
+
+
 ## [2026-10-01] — Un Contexte changé avertit l'appel suivant, il ne le refuse plus
 
 **Quoi :** `requireCtx` ne lève plus `ctx_stale` pour un code dont un Contexte servi a changé : il émet un nouveau code et rend les Contextes changés ; l'adaptateur MCP fait courir l'appel sous ce code et écrit en tête du résultat (ou du refus d'un autre ordre) « context has changed (<chemins>). New ctx: <code>… The call below ran with it: do not repeat it because of this notice. », les parties changées, puis « ## Result of this call » ; `new_ctx` en champ. La description de `context`, la ligne du code servie par `context` et la ligne de `write` après la publication d'un Contexte disent la même chose. Restent refusés : un code émis avant la 1.1.0 et une panne à l'émission ou à la lecture du changement.

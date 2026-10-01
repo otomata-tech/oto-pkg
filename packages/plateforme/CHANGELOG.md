@@ -17,6 +17,13 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.5 — 2026-10-01
+
+### Hosts
+- Install: upgrade to 1.3.5; no migration, no new variable, no import to change.
+- UI: `FormulaireDInscription` shows the future address under the name after a pause of typing, and has one button, « Créer l'organisation », that creates at the first click. The preview is the existing call of `POST /api/platform/signup` without `confirm`: it runs `admit` at each pause, with `acceptedTerms` as the box stands; a refusal there stays silent, except an address or prefix already taken.
+- UI: after the creation, the form stays, says the organisation is created and leaves for its address once it answers (probed every three seconds, two minutes at most), with a link to it; a new subdomain whose certificate is not issued yet no longer ends on a browser error. A host whose `connect-src` forbids the organisation's address keeps the link only.
+
 ## 1.3.4 — 2026-10-01
 
 ### Hosts

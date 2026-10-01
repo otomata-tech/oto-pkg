@@ -393,8 +393,11 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
   email, request, acceptedTerms })` son contrôle d'abus (captcha, débit par IP, domaines jetables) : un texte refuse
   l'inscription avec ce texte, `null` l'admet.
 - **Écran** : la page de l'hôte monte `FormulaireDInscription` dans `EcranDAuthentification` ; il
-  appelle `POST /api/platform/signup` en deux temps (l'adresse d'abord, puis la création) et mène à
-  l'adresse de la nouvelle organisation, où la personne se reconnecte (la session est liée à l'adresse).
+  appelle `POST /api/platform/signup` en deux temps : l'aperçu, sans `confirm`, part seul après une pause de
+  frappe et donne l'adresse lue sous le nom (il passe par `admit` à chaque pause) ; le bouton « Créer
+  l'organisation » crée au premier clic. La personne part ensuite à l'adresse de la nouvelle organisation dès
+  qu'elle répond (sonde bornée à deux minutes, lien toujours affiché), où elle se reconnecte (la session est
+  liée à l'adresse).
   La personne ne saisit que le nom : l'adresse et le préfixe des outils s'en déduisent, et leurs champs ne
   s'affichent que sur un refus `conflict` ou pour un nom dont on ne tire rien de valide. Le nom se juge à la
   sortie de son champ ou à Entrée, jamais pendant la frappe.

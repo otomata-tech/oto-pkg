@@ -98,6 +98,20 @@ export async function lireUnFichier(adresse: string): Promise<ArrayBuffer | null
   }
 }
 
+/**
+ * Une adresse d'une autre origine répond-elle (l'adresse d'une organisation qui vient d'être créée, dont le nom ou le
+ * certificat peut ne pas être encore servi) ? `no-cors` : la réponse est opaque, seule compte la connexion ; sans
+ * session ni cache. `false` : la connexion a échoué.
+ */
+export async function adresseRepond(adresse: string): Promise<boolean> {
+  try {
+    await fetch(adresse, { mode: "no-cors", credentials: "omit", cache: "no-store" })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Les refus qui disent un fichier indisponible : illisible ou absent (`not_found`), stockage retiré (`not_enabled`). */
 const INDISPONIBLE = ["not_found", "not_enabled"]
 

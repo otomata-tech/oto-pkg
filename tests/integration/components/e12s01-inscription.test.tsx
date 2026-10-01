@@ -4,23 +4,53 @@ import { FormulaireDInscription } from "@otomata_tech/oto_platform/ui"
 import { prefixePropose, slugPropose } from "../../../packages/plateforme/ui/inscription/formulaire-d-inscription"
 
 // Le formulaire d'inscription (E12-S01, AC-12) : un seul champ, le nom, dont se déduisent l'adresse et le préfixe (leurs
-// champs ne reviennent que sur un conflit ou un nom inexploitable) ; un premier envoi qui montre
-// l'adresse sans rien créer, la confirmation, puis le départ vers l'adresse de la nouvelle organisation ; les refus dits
-// en français, sauf le texte du contrôle d'abus de l'hôte, dit tel quel. `fetch` simulé pour l'API.
+// champs ne reviennent que sur un conflit ou un nom inexploitable) ; l'adresse lue sous le champ après une pause de
+// frappe, par l'aperçu qui n'écrit rien ; un seul bouton, qui crée au premier clic ; puis le départ vers l'adresse de la
+// nouvelle organisation, dès qu'elle répond ; les refus dits en français, sauf le texte du contrôle d'abus de l'hôte,
+// dit tel quel. `fetch` simulé pour l'API et pour la sonde de l'adresse.
 
-const fetchMock = vi.fn<typeof fetch>()
 const assign = vi.fn()
 
 function reponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 }
 
-const corps = (rang: number) => JSON.parse(String(fetchMock.mock.calls[rang][1]?.body))
+const apercuDe = (hote: string) => () => reponse(200, { data: { created: false, org: {}, addresses: { hosts: [hote], added: [hote] } } })
+const creee = (hote: string) => () => reponse(201, { data: { created: true, org: {}, hosts: [hote], setup: [] } })
+const conflit = () => reponse(409, { error: { code: "conflict", message: "Slug atelier is already taken. Pick another slug." } })
+
+/** Les corps reçus par l'API, dans l'ordre : aperçus (`confirm: false`) et créations (`confirm: true`). */
+let recus: Record<string, unknown>[] = []
+let sondes: string[] = []
+
+/** L'API simulée : ce que rend un aperçu, ce que rendent les créations dans l'ordre, et si l'adresse sondée répond. */
+function api({ apercu = apercuDe("atelier.oto.test"), creations = [], repond = true }: { apercu?: () => Response; creations?: (() => Response)[]; repond?: boolean }) {
+  const suite = [...creations]
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (adresse, init) => {
+      if (!String(adresse).startsWith("/api/platform/")) {
+        sondes.push(String(adresse))
+        if (!repond) throw new TypeError("Failed to fetch")
+        return new Response(null)
+      }
+      const corps = JSON.parse(String(init?.body)) as Record<string, unknown>
+      recus.push(corps)
+      if (corps.confirm !== true) return apercu()
+      const rendre = suite.shift()
+      if (!rendre) throw new Error("unexpected creation")
+      return rendre()
+    }),
+  )
+}
+
+const creer = () => screen.getByRole("button", { name: "Créer l'organisation" })
+const nomme = (valeur: string) => fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: valeur } })
 
 beforeEach(() => {
-  fetchMock.mockReset()
+  recus = []
+  sondes = []
   assign.mockReset()
-  vi.stubGlobal("fetch", fetchMock)
   vi.stubGlobal("location", { ...window.location, protocol: "https:", assign })
 })
 
@@ -38,48 +68,69 @@ describe("slugPropose, prefixePropose", () => {
 })
 
 describe("FormulaireDInscription (AC-12)", () => {
-  it("should preview the address, then create the organisation and leave for its address", async () => {
-    fetchMock
-      .mockResolvedValueOnce(reponse(200, { data: { created: false, org: {}, addresses: { hosts: ["atelier.oto.test"], added: ["atelier.oto.test"] } } }))
-      .mockResolvedValueOnce(reponse(201, { data: { created: true, org: {}, hosts: ["atelier.oto.test"], setup: [] } }))
+  it("should show the address after a pause of typing, create at the first click and leave for the address once it answers", async () => {
+    api({ creations: [creee("atelier.oto.test")] })
     render(<FormulaireDInscription />)
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
+    nomme("Atelier")
     // Un seul champ à l'écran : l'adresse et le préfixe se déduisent du nom, sans champ.
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
     expect(screen.queryByLabelText("Adresse")).toBeNull()
     expect(screen.queryByLabelText("Préfixe des outils")).toBeNull()
 
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    // Sans clic : l'aperçu part seul, et n'écrit rien.
     expect(await screen.findByText("Votre organisation sera servie à atelier.oto.test.")).toBeInTheDocument()
-    expect(corps(0)).toEqual({ name: "Atelier", org: "atelier", prefix: "atelier", confirm: false })
+    expect(recus).toEqual([{ name: "Atelier", org: "atelier", prefix: "atelier", confirm: false }])
 
-    fireEvent.click(screen.getByRole("button", { name: "Créer l'organisation" }))
+    fireEvent.click(creer())
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://atelier.oto.test/"))
-    expect(corps(1)).toMatchObject({ confirm: true })
+    expect(recus[1]).toEqual({ name: "Atelier", org: "atelier", prefix: "atelier", confirm: true })
+    expect(sondes).toEqual(["https://atelier.oto.test/"])
   })
 
-  it("should say a refusal in French, and the host's abuse check in its own words", async () => {
-    fetchMock
-      .mockResolvedValueOnce(reponse(403, { error: { code: "forbidden", message: "…", details: { reason: "email_required" } } }))
-      .mockResolvedValueOnce(reponse(403, { error: { code: "forbidden", message: "…", details: { reason: "signup_refused", text: "Captcha invalide." } } }))
+  it("should create at a click that comes before the preview, without sending the preview", async () => {
+    api({ creations: [creee("atelier.oto.test")] })
     render(<FormulaireDInscription />)
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    nomme("Atelier")
+    fireEvent.click(creer())
+    await waitFor(() => expect(assign).toHaveBeenCalled())
+    expect(recus).toEqual([{ name: "Atelier", org: "atelier", prefix: "atelier", confirm: true }])
+  })
+
+  it("should stay on the page, with a link, while the new address does not answer", async () => {
+    api({ creations: [creee("atelier.oto.test")], repond: false })
+    render(<FormulaireDInscription />)
+    nomme("Atelier")
+    fireEvent.click(creer())
+    expect(await screen.findByText("Votre organisation est créée.")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "atelier.oto.test" })).toHaveAttribute("href", "https://atelier.oto.test/")
+    await waitFor(() => expect(sondes).toHaveLength(1))
+    expect(assign).not.toHaveBeenCalled()
+  })
+
+  it("should keep a refusal of the preview silent, and say a refusal of the creation in French, the host's abuse check in its own words", async () => {
+    const refus = (details: Record<string, unknown>) => () => reponse(403, { error: { code: "forbidden", message: "…", details } })
+    api({ apercu: refus({ reason: "signup_refused", text: "Acceptez les conditions." }), creations: [refus({ reason: "email_required" }), refus({ reason: "signup_refused", text: "Captcha invalide." })] })
+    render(<FormulaireDInscription />)
+    nomme("Atelier")
+    await waitFor(() => expect(recus).toHaveLength(1))
+    expect(screen.queryByRole("alert")).toBeNull()
+
+    fireEvent.click(creer())
     expect(await screen.findByRole("alert")).toHaveTextContent("L'inscription demande une adresse email vérifiée.")
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    fireEvent.click(creer())
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Captcha invalide."))
   })
 
   it("should ask the host's terms when it gives them, and send them accepted (P5)", async () => {
-    fetchMock.mockResolvedValueOnce(reponse(200, { data: { created: false, org: {}, addresses: { hosts: ["atelier.oto.test"], added: ["atelier.oto.test"] } } }))
+    api({ creations: [creee("atelier.oto.test")] })
     render(<FormulaireDInscription conditions={{ libelle: "conditions générales", url: "https://oto.test/cgu" }} />)
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+    nomme("Atelier")
+    expect(creer()).toBeDisabled()
     expect(screen.getByRole("link", { name: "conditions générales" })).toHaveAttribute("href", "https://oto.test/cgu")
     fireEvent.click(screen.getByRole("checkbox"))
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
-    await screen.findByText("Votre organisation sera servie à atelier.oto.test.")
-    expect(corps(0)).toMatchObject({ accepted_terms: true, confirm: false })
+    fireEvent.click(creer())
+    await waitFor(() => expect(assign).toHaveBeenCalled())
+    expect(recus).toEqual([{ name: "Atelier", org: "atelier", prefix: "atelier", accepted_terms: true, confirm: true }])
   })
 
   it("should show no box and send no acceptance without the host's terms", () => {
@@ -87,58 +138,70 @@ describe("FormulaireDInscription (AC-12)", () => {
     expect(screen.queryByRole("checkbox")).toBeNull()
   })
 
-  it("should give back the address and prefix fields on a conflict, filled with the deduced values, and resend what is typed", async () => {
-    fetchMock
-      .mockResolvedValueOnce(reponse(409, { error: { code: "conflict", message: "Slug atelier is already taken. Pick another slug." } }))
-      .mockResolvedValueOnce(reponse(200, { data: { created: false, org: {}, addresses: { hosts: ["atelier-nord.oto.test"], added: ["atelier-nord.oto.test"] } } }))
+  it("should give back the address and prefix fields on a conflict at creation, filled with the deduced values, and preview what is typed", async () => {
+    api({ creations: [conflit] })
     render(<FormulaireDInscription />)
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    nomme("Atelier")
+    fireEvent.click(creer())
     expect(await screen.findByRole("alert")).toHaveTextContent("Cette adresse ou ce préfixe est déjà pris : choisissez-en un autre.")
     expect(screen.getByLabelText("Adresse")).toHaveValue("atelier")
     expect(screen.getByLabelText("Préfixe des outils")).toHaveValue("atelier")
 
+    api({ apercu: apercuDe("atelier-nord.oto.test") })
     fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier-nord" } })
-    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
     await screen.findByText("Votre organisation sera servie à atelier-nord.oto.test.")
     // Le préfixe, non touché, suit l'adresse saisie : un préfixe pris se libère du même geste.
-    expect(corps(1)).toEqual({ name: "Atelier", org: "atelier-nord", prefix: "ateliernord", confirm: false })
+    expect(recus.at(-1)).toEqual({ name: "Atelier", org: "atelier-nord", prefix: "ateliernord", confirm: false })
+  })
+
+  it("should say a conflict seen by the preview, and give the fields back only when the name field is left", async () => {
+    api({ apercu: conflit })
+    render(<FormulaireDInscription />)
+    const nom = screen.getByLabelText("Nom de l'organisation")
+    fireEvent.focus(nom)
+    nomme("Atelier")
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cette adresse ou ce préfixe est déjà pris : choisissez-en un autre.")
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+    fireEvent.blur(nom)
+    expect(screen.getByLabelText("Adresse")).toHaveValue("atelier")
   })
 
   it("should not judge the name while it is typed, and say a one-letter name is too short when the field is left or Enter is pressed", () => {
+    api({})
     render(<FormulaireDInscription />)
     const nom = screen.getByLabelText("Nom de l'organisation")
     const TROP_COURT = "Le nom doit compter au moins 2 caractères."
-    fireEvent.change(nom, { target: { value: "o" } })
+    nomme("o")
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
     expect(screen.queryByText(TROP_COURT)).toBeNull()
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+    expect(creer()).toBeDisabled()
 
     fireEvent.keyDown(nom, { key: "Enter" })
     expect(screen.getByText(TROP_COURT)).toBeInTheDocument()
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
 
-    fireEvent.change(nom, { target: { value: "ot" } })
+    nomme("ot")
     expect(screen.queryByText(TROP_COURT)).toBeNull()
     fireEvent.blur(nom)
     expect(screen.getAllByRole("textbox")).toHaveLength(1)
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeEnabled()
+    expect(creer()).toBeEnabled()
   })
 
   it.each([
     ["all digits", "2026"],
     ["non-Latin characters", "東京"],
   ])("should ask for the address and the prefix when nothing valid comes out of a name of %s", (_what, nom) => {
+    api({})
     render(<FormulaireDInscription />)
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: nom } })
+    expect(creer()).toBeDisabled()
+    nomme(nom)
     // Le nom n'est jugé qu'à la sortie du champ.
     expect(screen.queryByLabelText("Adresse")).toBeNull()
     fireEvent.blur(screen.getByLabelText("Nom de l'organisation"))
     expect(screen.getByText("Ce nom ne donne pas d'adresse ou de préfixe valide : choisissez-les.")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+    expect(creer()).toBeDisabled()
     fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier" } })
     fireEvent.change(screen.getByLabelText("Préfixe des outils"), { target: { value: "atelier" } })
-    expect(screen.getByRole("button", { name: "Continuer" })).toBeEnabled()
+    expect(creer()).toBeEnabled()
   })
 })

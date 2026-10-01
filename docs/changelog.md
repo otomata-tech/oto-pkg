@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.5 : inscription en un clic, adresse lue pendant la frappe, départ quand l'adresse répond
+
+**Quoi :** `FormulaireDInscription` appelle l'aperçu de `POST /api/platform/signup` après une pause de frappe (400 ms) et écrit l'adresse sous le nom ; un seul bouton, « Créer l'organisation », envoie `confirm: true`. Un refus de l'aperçu se tait, sauf un conflit, dont les champs ne viennent qu'à la sortie du champ du nom. Après la création, l'écran dit l'organisation créée, sonde son adresse (`adresseRepond`, `ui/api/client.ts`) toutes les trois secondes, deux minutes au plus, et y conduit dès qu'elle répond ; le lien reste affiché. `version` 1.3.5, aucune migration.
+**Pourquoi :** retours de JB en production : deux clics sur un bouton qui changeait de nom, et une erreur du navigateur à l'arrivée sur un sous-domaine dont le certificat n'était pas encore émis.
+**Hypothèses :** aperçu par l'appel existant plutôt qu'une prop de domaine passée par l'hôte (aucune surface nouvelle, et le conflit se sait avant le clic) ; `admit` reste appelé à l'aperçu : avec des conditions exigées, l'adresse ne se lit qu'une fois la case cochée.
+**Fichiers :** `packages/plateforme/ui/inscription/formulaire-d-inscription.tsx`, `packages/plateforme/ui/api/client.ts`, `tests/integration/components/e12s01-inscription.test.tsx`, `packages/plateforme/{package.json,CHANGELOG.md,README.md}`, `docs/conception/offres-de-l-hote.md`, `.method/conventions/component-registry.md`.
+
 ## [2026-10-01] — 1.3.4 : version du paquet (inscription : le nom n'est plus jugé pendant la frappe)
 
 **Quoi :** `version` 1.3.4 et `## 1.3.4 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.

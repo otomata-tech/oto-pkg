@@ -5,13 +5,15 @@
 // Un seul champ, le nom : l'adresse (slug) et le préfixe des outils s'en déduisent sans champ à l'écran, et ne
 // redeviennent saisissables que s'il le faut (adresse ou préfixe déjà pris, nom dont on ne tire rien de valide). Le nom
 // se juge à la sortie de son champ ou à Entrée, jamais pendant la frappe : un nom en cours donne une adresse trop
-// courte, et les champs clignoteraient. Un
-// premier envoi montre l'adresse que l'hôte donnera, sans rien écrire ; « Créer l'organisation » confirme (`POST /api/platform/signup`, deux temps), puis
-// la personne part à l'adresse de sa nouvelle organisation. Les champs se contrôlent sur le schéma de l'API
+// courte, et les champs clignoteraient. L'adresse
+// que l'hôte donnera se lit sous le champ au fil de la frappe : après une pause, l'aperçu de `POST /api/platform/signup`
+// (sans `confirm`, rien n'est écrit) la rend, ou dit qu'elle est prise ; un seul bouton, « Créer l'organisation », envoie
+// la confirmation, puis la personne part à l'adresse de sa nouvelle organisation dès que celle-ci répond (un
+// sous-domaine neuf attend son certificat : y partir aussitôt mène à une erreur du navigateur). Les champs se contrôlent sur le schéma de l'API
 // (`signupSchema`). Sans lui, l'hôte recréerait le formulaire et ses règles.
-import { useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 import { signupSchema, type SignupInput } from "../../schemas"
-import { appelerPlateforme, type ErreurPlateforme } from "../api/client"
+import { adresseRepond, appelerPlateforme, type ErreurPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
 import { IlotDAuthentification } from "../authentification/ilot-d-authentification"
 import { Checkbox } from "../ds/react/checkbox"
@@ -32,6 +34,13 @@ const A_CHOISIR = "Ce nom ne donne pas d'adresse ou de préfixe valide : choisis
 
 /** Une adresse compte au moins deux caractères (`orgSlugSchema`) : en dessous, c'est le nom qui est trop court. */
 const NOM_MIN = 2
+
+/** L'aperçu de l'adresse part après une courte pause de frappe (`forms-patterns.md § Validation asynchrone`). */
+const PAUSE_MS = 400
+
+/** L'adresse d'une organisation créée est sondée toutes les trois secondes, deux minutes au plus ; le lien reste. */
+const SONDE_MS = 3000
+const SONDES_MAX = 40
 const TROP_COURT = `Le nom doit compter au moins ${NOM_MIN} caractères.`
 
 /** Ce que vaut le nom une fois saisi : trop court, sans adresse ni préfixe à en tirer, ou bon (`null`). */
@@ -75,6 +84,39 @@ function refusDit(erreur: ErreurPlateforme): string {
   return messageDErreur(erreur, MESSAGES)
 }
 
+/** L'organisation est créée : la personne part à son adresse dès qu'elle répond ; le lien y mène sans attendre. */
+function DepartVersLOrganisation({ adresse }: { adresse: string }) {
+  useEffect(() => {
+    let sondes = 0
+    let minuteur: ReturnType<typeof setTimeout> | undefined
+    let quitte = false
+    async function sonder() {
+      sondes += 1
+      const repond = await adresseRepond(adresse)
+      if (quitte) return
+      if (repond) return window.location.assign(adresse)
+      if (sondes < SONDES_MAX) minuteur = setTimeout(() => void sonder(), SONDE_MS)
+    }
+    void sonder()
+    return () => {
+      quitte = true
+      clearTimeout(minuteur)
+    }
+  }, [adresse])
+
+  return (
+    <IlotDAuthentification titre="Créer votre organisation" statut="Votre organisation est créée.">
+      <p className="text-sm text-ink">
+        {"Son adresse se prépare, ce qui peut demander une à deux minutes : vous y serez conduit dès qu'elle répond. Vous pouvez aussi ouvrir "}
+        <a href={adresse} className="text-ink underline underline-offset-2">
+          {new URL(adresse).host}
+        </a>
+        {"."}
+      </p>
+    </IlotDAuthentification>
+  )
+}
+
 /**
  * `conditions` : les conditions de l'hôte (libellé et adresse) ; posées, une case obligatoire, cochée avant tout envoi,
  * part en `accepted_terms` vers `admit`, qui en garde la preuve. Sans elles, aucune case.
@@ -91,6 +133,13 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
   const [envoi, setEnvoi] = useState(false)
   const [pris, setPris] = useState(false)
   const [verdict, setVerdict] = useState<Verdict>(null)
+  // Un conflit dit par l'aperçu pendant que le nom se tape : les champs ne viennent qu'à la sortie du champ.
+  const [conflitVu, setConflitVu] = useState(false)
+  const [creee, setCreee] = useState<string | null>(null)
+  const nomActif = useRef(false)
+  const minuterie = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // Le rang de la dernière demande : la réponse d'un aperçu dépassé (frappe ou envoi depuis) est ignorée.
+  const demande = useRef(0)
 
   // Tant que la personne ne les touche pas, adresse et préfixe suivent le nom.
   const slugVu = slug ?? slugPropose(nom)
@@ -101,40 +150,68 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
   const aSaisir = pris || inexploitable || slug !== null || prefixe !== null
   const tropCourt = verdict === "court" && nom.trim().length < NOM_MIN
   const saisie: SignupInput = { name: nom.trim(), org: slugVu, prefix: prefixeVu, ...(conditions ? { accepted_terms: acceptees } : {}) }
-  const valide = signupSchema.safeParse(saisie).success && (!conditions || acceptees)
+  const apercevable = signupSchema.safeParse(saisie).success
+  const valide = apercevable && (!conditions || acceptees)
+  const cle = JSON.stringify(saisie)
+
+  // L'aperçu : rien n'est écrit. Un conflit se dit ; tout autre refus se tait ici et se dira à l'envoi (le contrôle
+  // d'abus de l'hôte peut refuser tant que ses conditions ne sont pas cochées).
+  useEffect(() => {
+    if (!apercevable) return
+    const rang = ++demande.current
+    minuterie.current = setTimeout(() => {
+      void appelerPlateforme<Apercu | Creee>({ methode: "POST", ressource: "signup", corps: { ...JSON.parse(cle), confirm: false } }).then((reponse) => {
+        if (demande.current !== rang) return
+        if (reponse.erreur) {
+          if (reponse.erreur.code !== "conflict") return
+          setErreur(refusDit(reponse.erreur))
+          if (nomActif.current) setConflitVu(true)
+          else setPris(true)
+          return
+        }
+        if (!reponse.data.created) setAdresse(reponse.data.addresses.hosts[0] ?? null)
+      })
+    }, PAUSE_MS)
+    return () => clearTimeout(minuterie.current)
+  }, [cle, apercevable])
 
   function changer(action: () => void) {
     action()
     setAdresse(null)
     setErreur(null)
+    setConflitVu(false)
+  }
+
+  function quitterLeNom() {
+    nomActif.current = false
+    setVerdict(verdictDuNom(nom))
+    if (conflitVu) setPris(true)
   }
 
   async function envoyer(evenement: FormEvent) {
     evenement.preventDefault()
     if (!valide || envoi) return
+    // L'envoi dépasse tout aperçu en attente ou en route.
+    clearTimeout(minuterie.current)
+    demande.current += 1
     setEnvoi(true)
     setErreur(null)
-    try {
-      const reponse = await appelerPlateforme<Apercu | Creee>({ methode: "POST", ressource: "signup", corps: { ...saisie, confirm: adresse !== null } })
-      if (reponse.erreur) {
-        if (reponse.erreur.code === "conflict") setPris(true)
-        setErreur(refusDit(reponse.erreur))
-        return
-      }
-      if (!reponse.data.created) {
-        setAdresse(reponse.data.addresses.hosts[0] ?? null)
-        return
-      }
-      const hote = reponse.data.hosts[0]
-      if (hote) window.location.assign(`${window.location.protocol}//${hote}/`)
-    } finally {
-      setEnvoi(false)
+    const reponse = await appelerPlateforme<Apercu | Creee>({ methode: "POST", ressource: "signup", corps: { ...saisie, confirm: true } })
+    if (reponse.erreur) {
+      if (reponse.erreur.code === "conflict") setPris(true)
+      setErreur(refusDit(reponse.erreur))
+      return void setEnvoi(false)
     }
+    const hote = reponse.data.created ? reponse.data.hosts[0] : undefined
+    if (hote) setCreee(`${window.location.protocol}//${hote}/`)
+    else setEnvoi(false)
   }
+
+  if (creee) return <DepartVersLOrganisation adresse={creee} />
 
   const pied = (
     <Button type="submit" form="inscription" variant="primary" block disabled={!valide || envoi} aria-busy={envoi}>
-      {envoi ? "Envoi…" : adresse ? "Créer l'organisation" : "Continuer"}
+      {envoi ? "Envoi…" : "Créer l'organisation"}
     </Button>
   )
 
@@ -148,7 +225,10 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
             value={nom}
             maxLength={80}
             onChange={(e) => changer(() => setNom(e.target.value))}
-            onBlur={() => setVerdict(verdictDuNom(nom))}
+            onFocus={() => {
+              nomActif.current = true
+            }}
+            onBlur={quitterLeNom}
             onKeyDown={(e) => {
               if (e.key === "Enter") setVerdict(verdictDuNom(nom))
             }}
@@ -184,7 +264,9 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
             }
           />
         )}
-        {adresse && <p className="text-sm text-ink">{`Votre organisation sera servie à ${adresse}.`}</p>}
+        <p aria-live="polite" className="text-sm text-ink">
+          {adresse ? `Votre organisation sera servie à ${adresse}.` : ""}
+        </p>
         {erreur && (
           <p role="alert" className="text-sm text-ink">
             {erreur}

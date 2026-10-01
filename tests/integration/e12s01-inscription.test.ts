@@ -99,7 +99,9 @@ describe.skipIf(!sqlConfigured || pending)(pending ? `${suite} (${pendingReason(
       message: "Captcha invalide.",
       details: { reason: "signup_refused", text: "Captcha invalide." },
     })
-    expect(admit).toHaveBeenCalledWith({ email: user.email, request })
+    expect(admit).toHaveBeenCalledWith({ email: user.email, request, acceptedTerms: false })
+    await refusal(signUp(db, user, { ...draft(), accepted_terms: true }, { signup: { ...SIGNUP, admit }, request }))
+    expect(admit).toHaveBeenLastCalledWith({ email: user.email, request, acceptedTerms: true })
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined)
     const failing: SignupOptions = {
       ...SIGNUP,

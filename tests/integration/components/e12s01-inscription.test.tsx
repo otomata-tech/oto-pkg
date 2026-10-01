@@ -67,6 +67,23 @@ describe("FormulaireDInscription (AC-12)", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Captcha invalide."))
   })
 
+  it("should ask the host's terms when it gives them, and send them accepted (P5)", async () => {
+    fetchMock.mockResolvedValueOnce(reponse(200, { data: { created: false, org: {}, addresses: { hosts: ["atelier.oto.test"], added: ["atelier.oto.test"] } } }))
+    render(<FormulaireDInscription conditions={{ libelle: "conditions générales", url: "https://oto.test/cgu" }} />)
+    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
+    expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+    expect(screen.getByRole("link", { name: "conditions générales" })).toHaveAttribute("href", "https://oto.test/cgu")
+    fireEvent.click(screen.getByRole("checkbox"))
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    await screen.findByText("Votre organisation sera servie à atelier.oto.test.")
+    expect(corps(0)).toMatchObject({ accepted_terms: true, confirm: false })
+  })
+
+  it("should show no box and send no acceptance without the host's terms", () => {
+    render(<FormulaireDInscription />)
+    expect(screen.queryByRole("checkbox")).toBeNull()
+  })
+
   it("should keep the button disabled while the fields do not pass the schema", () => {
     render(<FormulaireDInscription />)
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()

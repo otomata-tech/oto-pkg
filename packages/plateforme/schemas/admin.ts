@@ -116,12 +116,14 @@ export type OrgView = {
 
 /**
  * L'inscription d'une organisation (E12-S01, ADR-023) : nom, slug et préfixe, contrôlés comme par `orgCreateSchema`, sans
- * adresse (celles de l'hôte, `OrgCreationHook`) ; deux temps.
+ * adresse (celles de l'hôte, `OrgCreationHook`) ; deux temps. `accepted_terms` : la case des conditions de l'hôte, cochée
+ * (`FormulaireDInscription` avec `conditions`), transmise à son `admit`, qui en garde la preuve.
  */
 export const signupSchema = z.strictObject({
   name: orgNameSchema,
   org: orgSlugSchema,
   prefix: toolPrefixSchema,
+  accepted_terms: z.boolean().optional(),
   confirm: z.boolean().optional(),
 })
 

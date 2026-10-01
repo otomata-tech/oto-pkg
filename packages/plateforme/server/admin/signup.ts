@@ -13,11 +13,12 @@ import { applicationAddresses, setupAddresses, type AddressSetup, type CreationA
 /**
  * Ce que l'hôte passe pour activer l'inscription : son point de création (les adresses de la nouvelle organisation), et
  * `admit`, son contrôle d'abus (captcha, débit, domaines jetables) : un texte refuse l'inscription avec ce texte, `null`
- * l'admet ; une exception devient une panne sans son message.
+ * l'admet ; une exception devient une panne sans son message. `acceptedTerms` : la case des conditions de l'hôte cochée
+ * (`accepted_terms`), qu'il exige et dont il garde la preuve ; le paquet ne la juge pas.
  */
 export type SignupOptions = {
   orgCreation: OrgCreationHook
-  admit?(input: { email: string; request: Request }): string | null | undefined | Promise<string | null | undefined>
+  admit?(input: { email: string; request: Request; acceptedTerms: boolean }): string | null | undefined | Promise<string | null | undefined>
 }
 
 export type SignupResult =
@@ -31,11 +32,11 @@ function alreadyMember(): PlatformError {
 }
 
 /** Le contrôle d'abus de l'hôte ; son exception, ni servie ni journalisée avec son message. */
-async function admitted(signup: SignupOptions, email: string, request: Request): Promise<void> {
+async function admitted(signup: SignupOptions, input: { email: string; request: Request; acceptedTerms: boolean }): Promise<void> {
   if (!signup.admit) return
   let refused: string | null | undefined
   try {
-    refused = await signup.admit({ email, request })
+    refused = await signup.admit(input)
   } catch {
     console.error("[platform] signUp: the host's admit check failed")
     throw new PlatformError("internal", "Internal error.")
@@ -63,7 +64,7 @@ export async function signUp(
   // Le filtre est dans la requête : l'appelant lit ses propres lignes `members`, sans identifiant il n'en a aucune.
   const [member] = await inTransaction(db, "signUp: members", (sql) => sql`select 1 from platform.members m where m.user_id = (select auth.uid()) limit 1`)
   if (member) throw alreadyMember()
-  await admitted(signup, email, request)
+  await admitted(signup, { email, request, acceptedTerms: parsed.data.accepted_terms === true })
 
   const { org: slug, name, prefix, confirm } = parsed.data
   const draft: OrgDraft = { slug, name, prefix, host: null }

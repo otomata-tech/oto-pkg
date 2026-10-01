@@ -387,11 +387,13 @@ Une personne connectée, membre d'aucune organisation, crée la sienne et en dev
 
 - **Activer** : `handlePlateforme(request, { …, signup: { orgCreation, admit? } })`. `orgCreation` est le
   point de création de l'hôte (`OrgCreationHook`, les adresses de la nouvelle organisation) ; `admit({
-  email, request })` son contrôle d'abus (captcha, débit par IP, domaines jetables) : un texte refuse
+  email, request, acceptedTerms })` son contrôle d'abus (captcha, débit par IP, domaines jetables) : un texte refuse
   l'inscription avec ce texte, `null` l'admet.
 - **Écran** : la page de l'hôte monte `FormulaireDInscription` dans `EcranDAuthentification` ; il
   appelle `POST /api/platform/signup` en deux temps (l'adresse d'abord, puis la création) et mène à
   l'adresse de la nouvelle organisation, où la personne se reconnecte (la session est liée à l'adresse).
+  `conditions={{ libelle, url }}` y ajoute une case obligatoire vers les conditions de l'hôte ; le corps porte
+  alors `accepted_terms: true`, qu'`admit` reçoit (`acceptedTerms`) pour refuser sans elle et en garder la preuve.
 - **Comptes** : en mode OIDC, l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
   crée l'identité de la personne. En mode Supabase, `hook_before_user_created` refuse tout compte sans
   invitation : l'hôte qui ouvre l'inscription retire ce hook de ses réglages d'Auth.

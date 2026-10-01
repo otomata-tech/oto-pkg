@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Case des conditions de l'hôte à l'inscription (E12-S01), pour la 1.2.0
+
+**Quoi :** `FormulaireDInscription` accepte `conditions={{ libelle, url }}` : une case obligatoire vers les conditions de l'hôte, cochée avant tout envoi ; `signupSchema` porte `accepted_terms` (facultatif) ; `admit` reçoit `acceptedTerms`. Sans `conditions`, aucune case.
+**Pourquoi :** demande de l'hôte SaaS : les conditions s'acceptent dès l'inscription gratuite, avec une preuve que l'hôte garde ; le paquet ne juge pas la case.
+**Fichiers :** `packages/plateforme/{schemas/admin.ts,server/admin/signup.ts,ui/inscription/formulaire-d-inscription.tsx,CHANGELOG.md,README.md}` ; tests `e12s01-inscription` (intégration et écran) ; `docs/stories/E12-S01-inscription-libre.md`.
+
 ## [2026-10-01] — Inscription libre et capacités par organisation (E12-S01, E12-S02), pour la 1.2.0
 
 **Quoi :** capacités par organisation (ADR-022) : registre `orgLimitsSchema` (`members_max`, `teams_max`, `connectors_max`, `storage_bytes`, `account_owner_kinds`, `accounts_per_owner_max`), valeurs lues chez l'hôte par `registerOrgLimits`, refus au plafond dans `inviteMember`, `createTeam`, `activateConnector` et le quota de fichiers (`forbidden`/`limit`, `too_large`/`quota`, verrou 7601), gestes grisés sur Équipes et Connecteurs (`orgLimitsView`, `LimiteAtteinte`, lien `<raiseUrl>?capacity=`). Inscription libre (ADR-023) : option `signup` de `handlePlateforme`, `POST /api/platform/signup` en deux temps, `signup_org` (identité OIDC créée, premier membre admin, sans équipe), `create_org` réécrite sur `org_skeleton`, `FormulaireDInscription`. Pour l'hôte SaaS : `AdressesDuRail.abonnement` et les primitives du design system exportées par `/ui`. Rien de publié.

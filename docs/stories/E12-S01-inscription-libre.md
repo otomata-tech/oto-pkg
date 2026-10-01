@@ -196,4 +196,7 @@ Service `signUp`, route `POST /api/platform/signup` servie sans organisation (co
   premier a traduit l'identité avant que `signup_org` la crée (mode OIDC).
 - **HN-E12S01-6** : les conflits de slug et de préfixe gardent le texte de `createConflict` ; l'écran les dit par une
   phrase commune (« adresse ou préfixe déjà pris »), sans raison nouvelle.
-- Tests : `tests/integration/e12s01-inscription.test.ts` (9 cas, base locale), `tests/integration/components/e12s01-inscription.test.tsx` (4).
+- Ajout à la demande de l'hôte SaaS, avant la publication : `conditions` de `FormulaireDInscription` (case obligatoire
+  vers les conditions de l'hôte), `accepted_terms` de `signupSchema`, `acceptedTerms` passé à `admit` ; le paquet ne
+  juge pas la case, l'hôte refuse sans elle et garde la preuve.
+- Tests : `tests/integration/e12s01-inscription.test.ts` (9 cas, base locale), `tests/integration/components/e12s01-inscription.test.tsx` (6).

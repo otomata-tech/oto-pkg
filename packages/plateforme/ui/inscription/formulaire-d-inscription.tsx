@@ -11,6 +11,7 @@ import { signupSchema, type SignupInput } from "../../schemas"
 import { appelerPlateforme, type ErreurPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
 import { IlotDAuthentification } from "../authentification/ilot-d-authentification"
+import { Checkbox } from "../ds/react/checkbox"
 import { Field, Input } from "../ds/react/forms"
 import { Button } from "../ds/react/primitives"
 
@@ -48,8 +49,15 @@ function refusDit(erreur: ErreurPlateforme): string {
   return messageDErreur(erreur, MESSAGES)
 }
 
-export function FormulaireDInscription() {
+/**
+ * `conditions` : les conditions de l'hôte (libellé et adresse) ; posées, une case obligatoire, cochée avant tout envoi,
+ * part en `accepted_terms` vers `admit`, qui en garde la preuve. Sans elles, aucune case.
+ */
+export type FormulaireDInscriptionProps = { conditions?: { libelle: string; url: string } }
+
+export function FormulaireDInscription({ conditions }: FormulaireDInscriptionProps = {}) {
   const [nom, setNom] = useState("")
+  const [acceptees, setAcceptees] = useState(false)
   const [slug, setSlug] = useState<string | null>(null)
   const [prefixe, setPrefixe] = useState<string | null>(null)
   const [adresse, setAdresse] = useState<string | null>(null)
@@ -59,8 +67,8 @@ export function FormulaireDInscription() {
   // Tant que la personne ne les touche pas, adresse et préfixe suivent le nom.
   const slugVu = slug ?? slugPropose(nom)
   const prefixeVu = prefixe ?? prefixePropose(slugVu)
-  const saisie: SignupInput = { name: nom.trim(), org: slugVu, prefix: prefixeVu }
-  const valide = signupSchema.safeParse(saisie).success
+  const saisie: SignupInput = { name: nom.trim(), org: slugVu, prefix: prefixeVu, ...(conditions ? { accepted_terms: acceptees } : {}) }
+  const valide = signupSchema.safeParse(saisie).success && (!conditions || acceptees)
 
   function changer(action: () => void) {
     action()
@@ -108,6 +116,24 @@ export function FormulaireDInscription() {
         <Field label="Préfixe des outils" hint="Il nomme les outils de vos assistants (préfixe_context…) et ne changera plus.">
           <Input type="text" autoComplete="off" value={prefixeVu} maxLength={12} onChange={(e) => changer(() => setPrefixe(e.target.value.toLowerCase()))} />
         </Field>
+        {conditions && (
+          <Checkbox
+            required
+            checked={acceptees}
+            onChange={(e) => {
+              setAcceptees(e.target.checked)
+              setErreur(null)
+            }}
+            label={
+              <>
+                {"J'accepte les "}
+                <a href={conditions.url} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
+                  {conditions.libelle}
+                </a>
+              </>
+            }
+          />
+        )}
         {adresse && <p className="text-sm text-ink">{`Votre organisation sera servie à ${adresse}.`}</p>}
         {erreur && (
           <p role="alert" className="text-sm text-ink">

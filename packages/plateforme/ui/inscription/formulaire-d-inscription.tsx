@@ -2,8 +2,9 @@
 
 // L'inscription d'une organisation (E12-S01, ADR-023) : l'îlot que la page de l'hôte monte dans
 // `EcranDAuthentification`, sous sa `CoquilleOto`, pour une personne connectée qui n'appartient à aucune organisation.
-// Un nom, dont se proposent l'adresse (slug) et le préfixe des outils, modifiables ; un premier envoi montre l'adresse
-// que l'hôte donnera, sans rien écrire ; « Créer l'organisation » confirme (`POST /api/platform/signup`, deux temps), puis
+// Un seul champ, le nom : l'adresse (slug) et le préfixe des outils s'en déduisent sans champ à l'écran, et ne
+// redeviennent saisissables que s'il le faut (adresse ou préfixe déjà pris, nom dont on ne tire rien de valide) ; un
+// premier envoi montre l'adresse que l'hôte donnera, sans rien écrire ; « Créer l'organisation » confirme (`POST /api/platform/signup`, deux temps), puis
 // la personne part à l'adresse de sa nouvelle organisation. Les champs se contrôlent sur le schéma de l'API
 // (`signupSchema`). Sans lui, l'hôte recréerait le formulaire et ses règles.
 import { useState, type FormEvent } from "react"
@@ -23,6 +24,14 @@ const MESSAGES = {
   conflict: "Cette adresse ou ce préfixe est déjà pris : choisissez-en un autre.",
   invalid_arguments: "Vérifiez le nom, l'adresse et le préfixe.",
 } as const
+
+/** Dit quand le nom ne donne ni adresse ni préfixe valides (nom tout en chiffres, caractères non latins). */
+const A_CHOISIR = "Ce nom ne donne pas d'adresse ou de préfixe valide : choisissez-les."
+
+/** L'adresse et le préfixe passent-ils les règles de l'API (`signupSchema`) ? */
+function deduits(slug: string, prefixe: string): boolean {
+  return signupSchema.shape.org.safeParse(slug).success && signupSchema.shape.prefix.safeParse(prefixe).success
+}
 
 /** Le nom réduit en étiquette d'adresse : minuscules sans accents, tirets, 40 caractères, comme `orgSlugSchema`. */
 export function slugPropose(nom: string): string {
@@ -63,10 +72,15 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
   const [adresse, setAdresse] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [envoi, setEnvoi] = useState(false)
+  const [pris, setPris] = useState(false)
 
   // Tant que la personne ne les touche pas, adresse et préfixe suivent le nom.
   const slugVu = slug ?? slugPropose(nom)
   const prefixeVu = prefixe ?? prefixePropose(slugVu)
+  // Les deux champs ne se montrent que s'il le faut : refus `conflict`, nom dont on ne tire rien de valide, ou champs
+  // déjà repris en main (ils ne disparaissent pas sous la frappe).
+  const inexploitable = nom.trim() !== "" && !deduits(slugPropose(nom), prefixePropose(slugPropose(nom)))
+  const aSaisir = pris || inexploitable || slug !== null || prefixe !== null
   const saisie: SignupInput = { name: nom.trim(), org: slugVu, prefix: prefixeVu, ...(conditions ? { accepted_terms: acceptees } : {}) }
   const valide = signupSchema.safeParse(saisie).success && (!conditions || acceptees)
 
@@ -84,6 +98,7 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
     try {
       const reponse = await appelerPlateforme<Apercu | Creee>({ methode: "POST", ressource: "signup", corps: { ...saisie, confirm: adresse !== null } })
       if (reponse.erreur) {
+        if (reponse.erreur.code === "conflict") setPris(true)
         setErreur(refusDit(reponse.erreur))
         return
       }
@@ -110,12 +125,17 @@ export function FormulaireDInscription({ conditions }: FormulaireDInscriptionPro
         <Field label="Nom de l'organisation">
           <Input type="text" autoComplete="organization" value={nom} maxLength={80} onChange={(e) => changer(() => setNom(e.target.value))} />
         </Field>
-        <Field label="Adresse" hint="Lettres minuscules, chiffres et tirets.">
-          <Input type="text" autoComplete="off" value={slugVu} maxLength={40} onChange={(e) => changer(() => setSlug(e.target.value.toLowerCase()))} />
-        </Field>
-        <Field label="Préfixe des outils" hint="Il nomme les outils de vos assistants (préfixe_context…) et ne changera plus.">
-          <Input type="text" autoComplete="off" value={prefixeVu} maxLength={12} onChange={(e) => changer(() => setPrefixe(e.target.value.toLowerCase()))} />
-        </Field>
+        {aSaisir && (
+          <>
+            {inexploitable && !pris && <p className="text-sm text-ink">{A_CHOISIR}</p>}
+            <Field label="Adresse" hint="Lettres minuscules, chiffres et tirets.">
+              <Input type="text" autoComplete="off" value={slugVu} maxLength={40} onChange={(e) => changer(() => setSlug(e.target.value.toLowerCase()))} />
+            </Field>
+            <Field label="Préfixe des outils" hint="Il nomme les outils de vos assistants (préfixe_context…) et ne changera plus.">
+              <Input type="text" autoComplete="off" value={prefixeVu} maxLength={12} onChange={(e) => changer(() => setPrefixe(e.target.value.toLowerCase()))} />
+            </Field>
+          </>
+        )}
         {conditions && (
           <Checkbox
             required

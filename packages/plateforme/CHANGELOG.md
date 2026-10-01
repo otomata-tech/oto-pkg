@@ -17,6 +17,9 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Hosts
+- UI: `FormulaireDInscription` asks for the organisation name only. The address (slug) and the tool prefix are derived from it without a field on screen; the address preview before confirmation stays. The two fields come back only when needed: address or prefix already taken (`conflict`), or a name that yields no valid address or prefix (all digits, non-Latin characters). Nothing to change at the host.
+
 ## 1.3.2 — 2026-10-01
 
 ### Assistants

@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Inscription : seul le nom de l'organisation se saisit
+
+**Quoi :** `FormulaireDInscription` ne montre plus que le champ du nom ; l'adresse et le préfixe des outils s'en déduisent, l'aperçu de l'adresse reste avant la confirmation. Les deux champs reviennent sur un refus `conflict` ou pour un nom dont on ne tire ni adresse ni préfixe valides (tout en chiffres, caractères non latins).
+**Pourquoi :** demande de l'hôte SaaS pour JB : trois champs à l'inscription pour une information que le nom donne déjà.
+**Fichiers :** `packages/plateforme/ui/inscription/formulaire-d-inscription.tsx`, `tests/integration/components/e12s01-inscription.test.tsx`, `packages/plateforme/{CHANGELOG.md,README.md}`, `docs/conception/offres-de-l-hote.md`.
+
 ## [2026-10-01] — 1.3.2 : version du paquet (messages des refus de saisie chez un hôte en production)
 
 **Quoi :** `version` 1.3.2 et `## 1.3.2 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.

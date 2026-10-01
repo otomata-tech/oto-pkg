@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { FormulaireDInscription } from "@otomata_tech/oto_platform/ui"
 import { prefixePropose, slugPropose } from "../../../packages/plateforme/ui/inscription/formulaire-d-inscription"
 
-// Le formulaire d'inscription (E12-S01, AC-12) : slug et préfixe proposés depuis le nom, un premier envoi qui montre
+// Le formulaire d'inscription (E12-S01, AC-12) : un seul champ, le nom, dont se déduisent l'adresse et le préfixe (leurs
+// champs ne reviennent que sur un conflit ou un nom inexploitable) ; un premier envoi qui montre
 // l'adresse sans rien créer, la confirmation, puis le départ vers l'adresse de la nouvelle organisation ; les refus dits
 // en français, sauf le texte du contrôle d'abus de l'hôte, dit tel quel. `fetch` simulé pour l'API.
 
@@ -43,8 +44,10 @@ describe("FormulaireDInscription (AC-12)", () => {
       .mockResolvedValueOnce(reponse(201, { data: { created: true, org: {}, hosts: ["atelier.oto.test"], setup: [] } }))
     render(<FormulaireDInscription />)
     fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
-    expect(screen.getByLabelText("Adresse")).toHaveValue("atelier")
-    expect(screen.getByLabelText("Préfixe des outils")).toHaveValue("atelier")
+    // Un seul champ à l'écran : l'adresse et le préfixe se déduisent du nom, sans champ.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1)
+    expect(screen.queryByLabelText("Adresse")).toBeNull()
+    expect(screen.queryByLabelText("Préfixe des outils")).toBeNull()
 
     fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
     expect(await screen.findByText("Votre organisation sera servie à atelier.oto.test.")).toBeInTheDocument()
@@ -84,11 +87,35 @@ describe("FormulaireDInscription (AC-12)", () => {
     expect(screen.queryByRole("checkbox")).toBeNull()
   })
 
-  it("should keep the button disabled while the fields do not pass the schema", () => {
+  it("should give back the address and prefix fields on a conflict, filled with the deduced values, and resend what is typed", async () => {
+    fetchMock
+      .mockResolvedValueOnce(reponse(409, { error: { code: "conflict", message: "Slug atelier is already taken. Pick another slug." } }))
+      .mockResolvedValueOnce(reponse(200, { data: { created: false, org: {}, addresses: { hosts: ["atelier-nord.oto.test"], added: ["atelier-nord.oto.test"] } } }))
+    render(<FormulaireDInscription />)
+    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cette adresse ou ce préfixe est déjà pris : choisissez-en un autre.")
+    expect(screen.getByLabelText("Adresse")).toHaveValue("atelier")
+    expect(screen.getByLabelText("Préfixe des outils")).toHaveValue("atelier")
+
+    fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier-nord" } })
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+    await screen.findByText("Votre organisation sera servie à atelier-nord.oto.test.")
+    // Le préfixe, non touché, suit l'adresse saisie : un préfixe pris se libère du même geste.
+    expect(corps(1)).toEqual({ name: "Atelier", org: "atelier-nord", prefix: "ateliernord", confirm: false })
+  })
+
+  it.each([
+    ["all digits", "2026"],
+    ["non-Latin characters", "東京"],
+  ])("should ask for the address and the prefix when nothing valid comes out of a name of %s", (_what, nom) => {
     render(<FormulaireDInscription />)
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
-    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: "Atelier" } })
-    fireEvent.change(screen.getByLabelText("Préfixe des outils"), { target: { value: "1x" } })
+    fireEvent.change(screen.getByLabelText("Nom de l'organisation"), { target: { value: nom } })
+    expect(screen.getByText("Ce nom ne donne pas d'adresse ou de préfixe valide : choisissez-les.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Continuer" })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier" } })
+    fireEvent.change(screen.getByLabelText("Préfixe des outils"), { target: { value: "atelier" } })
+    expect(screen.getByRole("button", { name: "Continuer" })).toBeEnabled()
   })
 })

@@ -395,6 +395,8 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
 - **Écran** : la page de l'hôte monte `FormulaireDInscription` dans `EcranDAuthentification` ; il
   appelle `POST /api/platform/signup` en deux temps (l'adresse d'abord, puis la création) et mène à
   l'adresse de la nouvelle organisation, où la personne se reconnecte (la session est liée à l'adresse).
+  La personne ne saisit que le nom : l'adresse et le préfixe des outils s'en déduisent, et leurs champs ne
+  s'affichent que sur un refus `conflict` ou pour un nom dont on ne tire rien de valide.
   `conditions={{ libelle, url }}` y ajoute une case obligatoire vers les conditions de l'hôte ; le corps porte
   alors `accepted_terms: true`, qu'`admit` reçoit (`acceptedTerms`) pour refuser sans elle et en garder la preuve.
 - **Comptes** : l'inscription marche dans les deux modes d'émetteur. En mode OIDC (Logto, Keycloak), l'inscription chez l'émetteur est la sienne, et l'inscription au paquet

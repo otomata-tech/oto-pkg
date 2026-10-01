@@ -339,8 +339,9 @@ describe.skipIf(!sqlConfigured)(
     // pendant que `forget_user` tourne sur sa propre connexion, rendues déterministes par un verrou que
     // l'autre transaction tient jusqu'à ce que `forget_user` l'attende :
     // - un dossier d'équipe rangé sous l'espace après la lecture qui nomme les chemins (la transaction
-    //   qui le déplace tient `platform.nodes` en mode `share`, quelques centaines de millisecondes : la
-    //   lecture passe, la suppression attend, le déplacement est validé avant qu'elle ne reprenne) ;
+    //   qui le déplace tient la ligne de l'espace, `for update` : la lecture passe, la suppression attend
+    //   cette ligne, le déplacement est validé avant qu'elle ne reprenne). La seule ligne, jamais la table :
+    //   un verrou `share` sur `platform.nodes` attend toutes les écritures des autres suites de la campagne ;
     // - un sous-dossier de l'espace cédé à l'équipe pendant que la suppression attend sa ligne.
     // La troisième, l'espace lui-même cédé à l'équipe pendant que `forget_user` attend son verrou, part
     // avec M26 : `nodes_guard` refuse tout autre propriétaire pour `private/<handle>` (M18b,
@@ -366,10 +367,7 @@ describe.skipIf(!sqlConfigured)(
       const moved = await forgetDuring(
         sql,
         mover.id,
-        async (tx) => {
-          await tx.unsafe("set local lock_timeout = '5s'")
-          await tx.unsafe("lock table platform.nodes in share mode")
-        },
+        (tx) => tx`select id from platform.nodes where id = ${mover.space} for update`,
         (tx) => tx`update platform.nodes set parent_id = ${mover.space}, path = ${`private/${mover.handle}/${segment}`} where id = ${folder}`,
       )
       const ceded = await forgetDuring(sql, ceder.id, (tx) => tx`update platform.nodes set owner_kind = 'team', owner_team_id = ${team.id} where id = ${prive}`)

@@ -63,7 +63,7 @@ export type {
 // `setNodeRuleSchema` et `setAccountRuleSchema` les lisent (E05-S03, E08-S06).
 export { ACCESS_LEVEL_NAMES, setNodeRuleSchema } from "./rules"
 export type { AccessLevelName, NodeRulesView, RuledNodeView, RuleSubject } from "./rules"
-export { BLOCK_OPS, NODE_KINDS, nodeKindSchema, readNodeSchema, SECTION_OPS, writeNodeSchema, writeOpSchema } from "./nodes"
+export { BLOCK_OPS, NODE_KINDS, nodeKindSchema, readNodeSchema, SECTION_OPS, strictWriteOpsSchema, writeNodeSchema, writeOpSchema } from "./nodes"
 export type { BlockView, NodeKind, NodeView, ReadNodeInput, TreeNode, WriteNodeInput, WriteOp } from "./nodes"
 export { writeNodeBodySchema } from "./node-body"
 export type { WriteNodeBody, WriteOpBody } from "./node-body"

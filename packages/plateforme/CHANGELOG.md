@@ -17,6 +17,9 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Assistants
+- `node.write_many` refuses an unknown key inside an operation of a page, as `write` does, instead of running the operation without it.
+
 ## 1.3.0 — 2026-10-01
 
 ### Assistants

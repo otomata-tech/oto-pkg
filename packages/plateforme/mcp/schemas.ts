@@ -13,7 +13,7 @@
 // `read` et `write` sont composés des entrées partagées avec l'API (`schemas/nodes.ts`, E03-S03) :
 // mêmes champs, même ordre, mêmes descriptions ; seuls les ajouts d'E03-S03 changent leur JSON Schema.
 import * as z from "zod/v4"
-import { feedbackInputSchema, feedbackTypeSchema, readNodeSchema, writeNodeSchema, writeOpSchema } from "../schemas"
+import { feedbackInputSchema, feedbackTypeSchema, readNodeSchema, strictWriteOpsSchema, writeNodeSchema, writeOpSchema } from "../schemas"
 import { boundedList, issuesText } from "../server/errors"
 import { cut } from "../server/journal"
 import type { ToolKey } from "./tools"
@@ -85,9 +85,7 @@ export function inputSchemas(prefix: string) {
     write: z.object({
       ctx,
       ...writeNodeSchema.shape,
-      // Une opération refuse ses clés inconnues, comme le schéma servi le dit déjà (`additionalProperties: false`) :
-      // retirée en silence, une clé mal nommée (`content` pour `text`) laissait l'opération partir sans elle.
-      ops: z.array(z.strictObject(writeOpSchema.shape)).optional().describe(writeNodeSchema.shape.ops.description ?? ""),
+      ops: strictWriteOpsSchema,
       header: writeNodeSchema.shape.header.describe(`Header of a table; its contract: ${prefix}_read with path write.table (default: unchanged).`),
     }),
     // Les champs de `schemas/feedback.ts` (E03-S05), partagés avec l'administration des retours ;

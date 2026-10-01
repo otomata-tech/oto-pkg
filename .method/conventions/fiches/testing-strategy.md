@@ -20,6 +20,7 @@ Texte complet : `.method/conventions/testing-strategy.md`. La fiche suffit pour 
 - « Objet vide » s'affirme par `toEqual({})`, jamais par `{}` dans `toMatchObject` ou `objectContaining`. § Anti-patterns
 - Dans une spec qui garde l'hydratation, toute capture porte `caret: "initial"` ; une attente d'animations ne garde que celles de `document.timeline`. § Anti-patterns
 - Une course sur base réelle retient les écritures jusqu'à ce qu'elles partent ensemble (`crossing`) ou joue l'écriture concurrente dans le crochet `before` de `spyDb`, jamais le seul `Promise.all`. § Anti-patterns
+- Un test ne verrouille jamais une table entière (`lock table`) : il verrouille la ligne que l'autre transaction doit attendre, les autres suites écrivant dans la même base. § Anti-patterns
 - Plusieurs remises en état se jouent toutes avant de lever leurs échecs (`undoAll`). § Anti-patterns
 - Une campagne de mutations passe par un script qui garde une copie du fichier et le rend dans un `finally`, empreinte comparée ; jamais à la main. § Anti-patterns
 - Une lecture sans `order by` triée par le service se prouve sur un jeu écrit hors de l'ordre attendu. § Anti-patterns

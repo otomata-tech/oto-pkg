@@ -244,6 +244,16 @@ export const writeNodeSchema = z.object({
 
 export type WriteNodeInput = z.infer<typeof writeNodeSchema>
 
+/**
+ * `ops` d'une écriture d'assistant (`write` au MCP, `node.write_many`) : chaque opération refuse ses clés inconnues,
+ * comme son JSON Schema le dit (`additionalProperties: false`). Retirée en silence, une clé mal nommée (`content`
+ * pour `text`) laissait l'opération partir sans elle. Même description que `writeNodeSchema.ops`.
+ */
+export const strictWriteOpsSchema = z
+  .array(z.strictObject(writeOpSchema.shape))
+  .optional()
+  .describe(writeNodeSchema.shape.ops.description ?? "")
+
 /** Pages au plus d'une écriture par lot (`node.write_many`, E11-S18, AC-12). */
 export const WRITE_MANY_MAX = 50
 
@@ -253,7 +263,7 @@ export const WRITE_MANY_MAX = 50
  */
 export const writeManyArgsSchema = z.strictObject({
   pages: z
-    .array(z.strictObject(writeNodeSchema.shape))
+    .array(z.strictObject({ ...writeNodeSchema.shape, ops: strictWriteOpsSchema }))
     .min(1)
     .max(WRITE_MANY_MAX)
     .describe(

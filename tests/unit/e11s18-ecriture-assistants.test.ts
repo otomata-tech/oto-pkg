@@ -6,6 +6,7 @@
 // relit par la connexion d'administration ce que le service a écrit. En suite portable (`sqlConfigured`).
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import type { BlockInput } from "../../packages/plateforme/schemas"
+import { writeManyArgsSchema } from "../../packages/plateforme/schemas/nodes"
 import type { FunctionContext } from "../../packages/plateforme/server/catalog/define"
 import { issueCtx, requireCtx } from "../../packages/plateforme/server/ctx"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
@@ -195,6 +196,14 @@ describe.skipIf(!sqlConfigured)(portable("writing as an assistant (E11-S18)"), {
         { path: "ventes/fiches/garantie", status: "published", revision: 1 },
       ])
       expect(await publishedTexts("ventes/fiches/garantie")).toEqual(["Durée", "Deux ans."])
+    })
+
+    // Comme `write` : une clé mal nommée dans une opération est refusée, l'opération ne part pas sans elle.
+    it("should refuse an unknown key inside an operation of a page, naming where it is", () => {
+      const page = { path: "ventes/fiches", ops: [{ op: "append", section: "Notes", content: "x" }] }
+      const refused = writeManyArgsSchema.safeParse({ pages: [page] })
+      expect(refused.success ? [] : refused.error.issues.map((issue) => [issue.code, issue.path.join(".")])).toEqual([["unrecognized_keys", "pages.0.ops.0"]])
+      expect(writeManyArgsSchema.safeParse({ pages: [{ path: "ventes/fiches", ops: [{ op: "append", section: "Notes", text: "x" }] }] }).success).toBe(true)
     })
   })
 

@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — `node.write_many` strict sur ses opérations, test de course sans verrou de table
+
+**Quoi :** `strictWriteOpsSchema` (`schemas/nodes.ts`) : les opérations d'une écriture d'assistant refusent leurs clés inconnues, pour `write` au MCP (déjà en 1.3.0) et désormais pour `node.write_many`. Le test de course de `forget_user` (`portabilite-schema`, AC6) tient la ligne de l'espace (`for update`) au lieu d'un verrou `share` sur `platform.nodes`.
+**Pourquoi :** une clé mal nommée dans une opération d'un lot partait sans elle ; le verrou de table attendait toutes les écritures des autres suites et tombait sur « lock timeout » sous la campagne complète (deux fois le 2026-10-01).
+**Fichiers :** `packages/plateforme/{schemas/nodes.ts,schemas/index.ts,mcp/schemas.ts,CHANGELOG.md}` ; `tests/unit/e11s18-ecriture-assistants.test.ts`, `tests/integration/portabilite-schema.test.ts` ; `.method/conventions/testing-strategy.md` (§ Anti-patterns) et sa fiche, `component-registry.md`.
+
 ## [2026-10-01] — 1.3.0 : migration préalable qui charge pg_trgm (M93), garde de check:migrations, version
 
 **Quoi :** `20260928090000_platform_pg_trgm.sql`, datée avant la ligne de base, charge la bibliothèque de `pg_trgm` dans la session de `supabase db push` : un hôte neuf sur Supabase installe toutes les migrations sans geste manuel ; un hôte installé la pousse une fois avec `--include-all` (`scripts/lib/test-db-local.mjs` le fait pour la base locale). `check:migrations` refuse une fonction qui pose un paramètre de `pg_trgm` avant le chargement (`pg-trgm-parameter-before-load`), les deux fichiers publiés exemptés. `version` 1.3.0 et `## 1.3.0 — 2026-10-01` du CHANGELOG du paquet.

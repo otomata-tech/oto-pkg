@@ -133,8 +133,9 @@ export async function prepareLocalDatabase(root, { reset = false, print }) {
   if (code !== 0) throw new Error('db prepare : échec (message ci-dessus)')
 
   // La CLI Supabase ignore `sslmode=disable` dans l'URL et refuse un Postgres sans TLS : `PGSSLMODE` l'y
-  // fait passer (même contournement que le job `bare-postgres`).
-  const push = run('supabase', ['db', 'push', '--db-url', admin, '--yes'], { cwd: root, env: { ...process.env, PGSSLMODE: 'disable' } })
+  // fait passer (même contournement que le job `bare-postgres`). `--include-all` : une base déjà migrée reçoit
+  // aussi la migration datée avant la ligne de base (`20260928090000`), que la CLI refuse sans lui.
+  const push = run('supabase', ['db', 'push', '--db-url', admin, '--yes', '--include-all'], { cwd: root, env: { ...process.env, PGSSLMODE: 'disable' } })
   if (push.status !== 0) throw new Error(`supabase db push : ${push.stderr || push.stdout}`)
   print(`base ${database} : migrations à jour`)
 }

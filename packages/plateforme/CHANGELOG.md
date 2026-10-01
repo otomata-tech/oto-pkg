@@ -17,12 +17,16 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.0 — 2026-10-01
+
 ### Assistants
 - `write` refuses an unknown key inside an operation and names it with the accepted ones (« ops.1: unknown key « content » »), instead of running the operation without it.
 
 ### Hosts
+- Install: upgrade to 1.3.0, a minor version to review by hand; two migrations, one of them dated before the baseline; no new variable. A host that passes neither `organisations` nor `inscription` to the rail sees no new screen.
+- Migrations: copy `20260928090000_platform_pg_trgm.sql` and `20261001180000_v1_3_0.sql` (`oto-platform migrations sync`, then `migrations check`). The first is dated before the baseline: an installed host applies both once with `supabase db push --include-all` (without it the CLI refuses a file older than its history); it changes nothing there. It loads the `pg_trgm` library in the session, so a new host on Supabase installs every migration with `supabase db push` alone, over a direct or session-mode connection. The second: `signup_org` no longer refuses a person who already belongs to an organisation.
+- CLI: `migrations check` refuses a migration that creates a function setting a `pg_trgm` parameter before a statement of the same file loads the library (`pg-trgm-parameter-before-load`); start such a file with `DO $$ begin perform extensions.similarity('a', 'a'); end $$;`.
 - MCP: the operations of `write.ops` are strict at the MCP door, as the served schema says (`additionalProperties: false`); the API body of the screens is unchanged.
-- Migrations: copy `20261001180000_v1_3_0.sql` and apply it: `signup_org` no longer refuses a person who already belongs to an organisation.
 - API: `POST /api/platform/signup` no longer answers `already_member`: a person creates as many organisations as they want. The package sets no bound; a host that wants one (one free organisation per account) refuses in its `admit`, counting on its side.
 - Server: `listMyOrganisations(db, identity)` gives the organisations the person is a member of, by name: `{ id, name, host, current }` (`PersonOrganisation`; `host`: one address of the organisation, `null` without any).
 - UI: `RailApplication` takes `organisations?` (that list): from two reachable organisations, the company menu at the top of the rail carries the switcher; choosing one leaves for its address, where the session resumes. The reference host's dashboard layout passes it. `AdressesDuRail.inscription?` (a path of the host, the page that mounts `FormulaireDInscription`) adds « Créer une organisation » under the switcher, for everyone; absent, nothing shows.

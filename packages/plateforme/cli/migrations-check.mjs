@@ -7,12 +7,13 @@
  * type) dans une base qui porte aussi les données de l'hôte ; qu'une fonction de `platform`
  * garde l'`EXECUTE` par défaut de `public`, donc d'`anon`, qui a l'usage du schéma (E02-S01) ; et
  * qu'une migration remette une dépendance à Supabase ou à une extension que l'hôte refuse (E01-S09) :
- * clé ou lecture vers `auth.users`, extension hors de `pg_trgm`, `unaccent` et `ltree`.
+ * clé ou lecture vers `auth.users`, extension hors de `pg_trgm`, `unaccent` et `ltree` ; et qu'une
+ * fonction pose un paramètre de `pg_trgm` avant que la session ait chargé sa bibliothèque.
  *
  * Sortie : `fichier:ligne règle` par erreur, code 1 s'il y en a une.
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, isAbsolute, relative, resolve, sep } from 'node:path'
 
 const IDENT = String.raw`(?:"[^"]+"|[a-z_][a-z0-9_$]*)`
 const QUALIFIED = new RegExp(String.raw`^(${IDENT})(?:\s*\.\s*(${IDENT}))?`, 'i')
@@ -233,7 +234,34 @@ function portabilityErrors(stmt, report) {
   if (!SUPABASE_ONLY_FUNCTIONS.includes(name)) report(stmt.offset, 'auth-users-read')
 }
 
-function checkSql(sql) {
+/**
+ * Les deux fichiers publiés avant cette règle, figés : la migration préalable `20260928090000` charge la
+ * bibliothèque dans la session qui les applique sur un hôte neuf.
+ */
+const PG_TRGM_LOADED_BEFORE = ['20260928100000_platform_base_v1.sql', '20260930100000_v1_1_0.sql']
+const SETS_PG_TRGM = /\bset\s+"?pg_trgm\./i
+const LOADS_PG_TRGM = /^\s*do\b[\s\S]*\bperform\s+extensions\s*\.\s*similarity\s*\(/i
+
+/**
+ * Une fonction dont l'en-tête pose un paramètre de `pg_trgm` (`set "pg_trgm.similarity_threshold"`) vient après
+ * une instruction du même fichier qui charge la bibliothèque (`do $$ begin perform extensions.similarity('a', 'a');
+ * end $$`) : un rôle non superutilisateur ne pose le paramètre d'une bibliothèque que si la session l'a chargée,
+ * et `create extension if not exists` ne la charge pas. Sans elle, `supabase db push` s'arrête sur 42501.
+ */
+function pgTrgmErrors(statements, report) {
+  let loaded = false
+  for (const stmt of statements) {
+    if (LOADS_PG_TRGM.test(stmt.body)) loaded = true
+    const create = stmt.body.match(/^(\s*)create\s+(?:or\s+replace\s+)?function\s+/i)
+    if (!create || loaded) continue
+    // L'en-tête seul : le corps `$…$` peut nommer le paramètre sans le poser à la création.
+    const body = stmt.body.search(/\$[a-z_]*\$/i)
+    const header = body === -1 ? stmt.body : stmt.body.slice(0, body)
+    if (SETS_PG_TRGM.test(header)) report(stmt.offset + create[1].length, 'pg-trgm-parameter-before-load')
+  }
+}
+
+function checkSql(sql, { pgTrgmLoadedBefore = false } = {}) {
   const { text, dollarRanges } = clean(sql)
   const errors = []
   const report = (offset, rule) => errors.push({ line: text.slice(0, offset).split('\n').length, rule })
@@ -247,6 +275,7 @@ function checkSql(sql) {
     portabilityErrors(trimmed, report)
   })
   executeErrors(statements, report)
+  if (!pgTrgmLoadedBefore) pgTrgmErrors(statements, report)
   return errors.sort((a, b) => a.line - b.line)
 }
 
@@ -266,7 +295,8 @@ export function checkMigrations({ files }) {
   }
   let failures = 0
   for (const file of files) {
-    for (const { line, rule } of checkSql(readFileSync(file, 'utf8'))) {
+    const pgTrgmLoadedBefore = PG_TRGM_LOADED_BEFORE.includes(basename(file))
+    for (const { line, rule } of checkSql(readFileSync(file, 'utf8'), { pgTrgmLoadedBefore })) {
       console.log(`${shown(file)}:${line} ${rule}`)
       failures++
     }

@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.0 : migration préalable qui charge pg_trgm (M93), garde de check:migrations, version
+
+**Quoi :** `20260928090000_platform_pg_trgm.sql`, datée avant la ligne de base, charge la bibliothèque de `pg_trgm` dans la session de `supabase db push` : un hôte neuf sur Supabase installe toutes les migrations sans geste manuel ; un hôte installé la pousse une fois avec `--include-all` (`scripts/lib/test-db-local.mjs` le fait pour la base locale). `check:migrations` refuse une fonction qui pose un paramètre de `pg_trgm` avant le chargement (`pg-trgm-parameter-before-load`), les deux fichiers publiés exemptés. `version` 1.3.0 et `## 1.3.0 — 2026-10-01` du CHANGELOG du paquet.
+**Pourquoi :** M93 ; la 1.2.1 avait buté sur le même refus à son premier push. Décisions de JB : migration préalable plutôt qu'une nouvelle ligne de base, garde, publication de la 1.3.0.
+**Problèmes :** prouvé sur une base jetable du Postgres 16 du poste, poussée par un rôle non superutilisateur avec la CLI 2.108.0 (script de session, hors dépôt) : sans le fichier, `db push` échoue sur 42501 ; avec, il passe ; sur une base déjà migrée, il refuse sans `--include-all` et passe avec. Non joué sur un projet Supabase neuf ; le job `bare-postgres` pousse en superutilisateur et ne voit pas le défaut.
+**Fichiers :** `packages/plateforme/{migrations/20260928090000_platform_pg_trgm.sql,migrations/README.md,cli/migrations-check.mjs,package.json,CHANGELOG.md}` ; `supabase/migrations/20260928090000_platform_pg_trgm.sql` ; `scripts/lib/test-db-local.mjs` ; `tests/unit/migrations-guard.test.ts` ; `.method/conventions/database-patterns.md` (§ Règles) et sa fiche ; `docs/conception/distribution-du-paquet.md` ; `.method/sprint/status.md` (M93).
+
 ## [2026-10-01] — Plusieurs organisations par personne, bascule d'organisation, limites passées par l'équipe plateforme (pour la 1.3.0)
 
 **Quoi :** l'inscription ne refuse plus une personne déjà membre d'une organisation (`already_member` retiré du service et de `signup_org`, migration `20261001180000_v1_3_0.sql`) ; `listMyOrganisations` rend les organisations de la personne avec leur adresse, et le menu de l'entreprise du rail porte la bascule à partir de deux (`RailApplication`, `organisations`) ; l'équipe plateforme, avec un accès en cours, passe les limites comptées, une ligne du journal de l'organisation le dit (`limit passed`), et `orgLimitsView` ne grise rien pour elle. Conception mise à jour sur place (`docs/conception/offres-de-l-hote.md`), exigences passées à « Livrée (1.2.0) ».

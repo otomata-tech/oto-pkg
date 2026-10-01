@@ -7,6 +7,15 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
 
 ## Fichiers
 
+- `20260928090000_platform_pg_trgm.sql` (version 1.3.0) : avant la ligne de base, la bibliothèque de `pg_trgm`
+  chargée dans la session qui applique les migrations (`create extension if not exists`, puis un appel à
+  `extensions.similarity`). La ligne de base et la 1.1.0 créent des fonctions dont l'en-tête pose
+  `set "pg_trgm.similarity_threshold"`, ce qu'un rôle non superutilisateur ne peut faire que si la session a chargé
+  la bibliothèque : sans ce fichier, `supabase db push` s'arrêtait à la ligne de base sur un projet Supabase
+  (42501). La CLI applique tous les fichiers en attente sur une seule session : joué le premier, il la charge pour
+  eux. Seule migration datée avant la ligne de base, ces deux fichiers étant publiés, donc figés. Un hôte déjà
+  installé la reçoit par `supabase db push --include-all`, une fois (« Hôtes déjà installés : la migration
+  préalable de la 1.3.0 »). Aucune table, colonne, fonction ni index.
 - `20260928100000_platform_base_v1.sql` (E01-S12, partie d ; fiche D102 ; ADR-012 § 1) : la ligne de base
   de la V1, tout le schéma `platform` en un fichier. Elle replie la ligne de base d'E01-S09
   (`20260925230100_platform_base.sql`, qui remplaçait la chaîne de vingt migrations d'E01-S02 à E01-S09)
@@ -33,7 +42,7 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   écrit en deux comparaisons et que Postgres relirait aplaties. Elle ne porte aucune donnée : les mises
   à jour de données des migrations repliées (lexique rempli, espaces renommés « Privé », clés de profil
   retirées) n'ont rien à changer sur une installation neuve. Toute migration nouvelle vient après elle,
-  horodatage postérieur, et ne fait qu'ajouter (`pnpm check:migrations`).
+  horodatage postérieur, et ne fait qu'ajouter (`pnpm check:migrations`) ; seule `20260928090000` la précède.
 - `20260928110000_platform_profil.sql` (E05-S11, lot a ; page « Profil ») : `update_my_profile`
   re-versionnée avec sa signature et ses privilèges. La fiche d'une personne prend, en plus du nom et de la
   langue, son prénom (`first_name`) et son nom de famille (`last_name`), 80 caractères chacun, et sa couleur
@@ -170,13 +179,24 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
 2. `pnpm exec oto-platform migrations sync --to supabase/migrations`, puis le workflow de
    migrations de l'hôte, ou `supabase db push --db-url '<url>?sslmode=require'`.
 
-   **Défaut connu** : sur un projet Supabase où `pg_trgm` existe déjà avant la ligne de base,
-   `supabase db push` s'arrête sur `permission denied to set parameter "pg_trgm.similarity_threshold"`
-   (42501) : `create extension if not exists` ne charge pas la bibliothèque dans la session, et un
-   rôle non superutilisateur ne pose pas le paramètre d'une bibliothèque non chargée. Contournement :
-   appliquer les fichiers de `supabase/migrations/` dans l'ordre, chacun en une transaction, sur une
-   connexion qui a d'abord lu `select extensions.similarity('a', 'a')`, puis inscrire l'historique
-   par `supabase migration repair --status applied <versions> --db-url <url>`.
+   La connexion est directe ou en mode session, jamais un pooler en mode transaction : la première
+   migration (`20260928090000`) charge la bibliothèque de `pg_trgm` pour les fichiers suivants, ce qui
+   ne vaut que sur une même session.
+
+## Hôtes déjà installés : la migration préalable de la 1.3.0
+
+`20260928090000_platform_pg_trgm.sql` est datée avant la ligne de base. Sur un hôte qui porte déjà des
+migrations du paquet, `supabase db push` la refuse (« Found local migration files to be inserted before
+the last migration on remote database ») : la pousser une fois avec `--include-all`.
+
+```bash
+npx supabase db push --db-url "$DB_URL" --include-all --dry-run   # la migration préalable, et celles de la version
+npx supabase db push --db-url "$DB_URL" --include-all
+```
+
+Elle n'y change rien (l'extension existe déjà). Les migrations écrites après elle qui posent un paramètre
+de `pg_trgm` chargent la bibliothèque elles-mêmes (`pnpm check:migrations` le contrôle) : un hôte déjà
+installé n'en dépend pas.
 
 ## Hôtes déjà installés : marquer la ligne de base V1 appliquée
 

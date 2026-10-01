@@ -183,6 +183,34 @@ describe("check-migrations", () => {
     ])
   })
 
+  // Un rôle non superutilisateur ne pose le paramètre d'une bibliothèque que si elle est chargée dans la session :
+  // sans l'appel qui la charge, `supabase db push` refuse la fonction sur un projet Supabase (42501).
+  it("should refuse a function that sets a pg_trgm parameter before any statement loads the library, and accept it after one", () => {
+    const fn = [
+      "create function platform.near(p text) returns text language sql",
+      `  set search_path to '' set "pg_trgm.similarity_threshold" to '0.3'`,
+      "  as $$ select p $$;",
+      "revoke execute on function platform.near(text) from public;",
+      "",
+    ].join("\n")
+    const load = "do $$ begin perform extensions.similarity('a', 'a'); end $$;\n"
+    const refused = check(fn)
+    expect(refused.status).toBe(1)
+    expect(refused.stdout).toMatch(/\.sql:1 pg-trgm-parameter-before-load/)
+    expect(check(load + fn).status).toBe(0)
+    // L'appel placé après la fonction arrive trop tard.
+    expect(check(fn + load).stdout).toMatch(/\.sql:1 pg-trgm-parameter-before-load/)
+  })
+
+  // Les deux fichiers publiés qui posent le paramètre sans charger la bibliothèque sont exemptés de la règle : la
+  // CLI applique tous les fichiers en attente sur une session, et le premier d'entre eux la charge pour eux.
+  it("should ship, before every other migration, one that loads the pg_trgm library", () => {
+    const migrations = path.resolve(__dirname, "../../packages/plateforme/migrations")
+    const [first] = fs.readdirSync(migrations).filter((file) => /^\d{14}_.*\.sql$/.test(file)).sort()
+    expect(first).toBe("20260928090000_platform_pg_trgm.sql")
+    expect(fs.readFileSync(path.join(migrations, first), "utf8")).toMatch(/^DO \$\$ begin perform extensions\.similarity\('a', 'a'\); end \$\$;$/m)
+  })
+
   it("should accept every migration shipped by the package", () => {
     const stdout = execFileSync(process.execPath, [script], { encoding: "utf8", stdio: "pipe" })
     expect(stdout).toContain("conforme(s)")

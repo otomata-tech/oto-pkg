@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.4 : version du paquet (inscription : le nom n'est plus jugé pendant la frappe)
+
+**Quoi :** `version` 1.3.4 et `## 1.3.4 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.
+**Pourquoi :** décision de JB : publier la 1.3.4.
+**Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
+
 ## [2026-10-01] — Inscription : le nom n'est plus jugé pendant la frappe
 
 **Quoi :** `FormulaireDInscription` juge le nom à la sortie de son champ ou à Entrée. Un nom d'un caractère dit qu'il est trop court ; les champs Adresse et Préfixe ne viennent que pour un nom d'au moins deux caractères dont on ne tire rien de valide. Garde : `forms-patterns.md § Règles` (ce qui dépend de la validité d'une saisie se décide à la sortie du champ ou à l'envoi, et son test pose une valeur d'un caractère).

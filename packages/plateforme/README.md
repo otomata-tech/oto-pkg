@@ -396,8 +396,9 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
   appelle `POST /api/platform/signup` en deux temps : l'aperçu, sans `confirm`, part seul après une pause de
   frappe et donne l'adresse lue sous le nom (il passe par `admit` à chaque pause) ; le bouton « Créer
   l'organisation » crée au premier clic. La personne part ensuite à l'adresse de la nouvelle organisation dès
-  qu'elle répond (sonde bornée à deux minutes, lien toujours affiché), où elle se reconnecte (la session est
-  liée à l'adresse).
+  qu'elle répond, où elle se reconnecte (la session est liée à l'adresse) ; d'ici là, l'écran « Votre espace
+  se prépare » dit les étapes, avance une barre et laisse le lien ; au bout de deux minutes sans réponse, il
+  le dit et propose « Réessayer ».
   La personne ne saisit que le nom : l'adresse et le préfixe des outils s'en déduisent, et leurs champs ne
   s'affichent que sur un refus `conflict` ou pour un nom dont on ne tire rien de valide. Le nom se juge à la
   sortie de son champ ou à Entrée, jamais pendant la frappe.
@@ -406,7 +407,7 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
 - **Comptes** : l'inscription marche dans les deux modes d'émetteur. En mode OIDC (Logto, Keycloak), l'inscription chez l'émetteur est la sienne, et l'inscription au paquet
   crée l'identité de la personne. En mode Supabase, `hook_before_user_created` refuse tout compte sans
   invitation : l'hôte qui ouvre l'inscription retire ce hook de ses réglages d'Auth.
-- **Plusieurs organisations** : la page passe `listMyOrganisations(db, identity)` à `RailApplication`
+- **Plusieurs organisations** : la page passe `listMyOrganisations(db, identity, requestHost)` à `RailApplication`
   (`organisations`) : à partir de deux, le menu de l'entreprise porte la bascule, qui mène à l'adresse de
   l'organisation choisie. `AdressesDuRail.inscription` (le chemin de la page d'inscription) y ajoute « Créer une
   organisation ».

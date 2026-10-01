@@ -69,7 +69,7 @@ export default async function DashboardLayout({
         // part pas dans chaque page rendue.
         resultatDe(lireLesEquipes(lu.session.db, lu.identity).then((lues) => lues.map(({ slug, name }) => ({ slug, name })))),
         // Les organisations de la personne, pour la bascule du menu de l'entreprise ; leur panne ne montre pas de bascule.
-        listMyOrganisations(lu.session.db, lu.identity).catch(() => undefined),
+        listMyOrganisations(lu.session.db, lu.identity, lu.session.host).catch(() => undefined),
       ])
     : [ECHEC, ECHEC, undefined]
 

@@ -8,17 +8,18 @@
 // courte, et les champs clignoteraient. L'adresse
 // que l'hôte donnera se lit sous le champ au fil de la frappe : après une pause, l'aperçu de `POST /api/platform/signup`
 // (sans `confirm`, rien n'est écrit) la rend, ou dit qu'elle est prise ; un seul bouton, « Créer l'organisation », envoie
-// la confirmation, puis la personne part à l'adresse de sa nouvelle organisation dès que celle-ci répond (un
-// sous-domaine neuf attend son certificat : y partir aussitôt mène à une erreur du navigateur). Les champs se contrôlent sur le schéma de l'API
+// la confirmation, puis la personne part à l'adresse de sa nouvelle organisation dès que celle-ci répond
+// (`DepartVersLOrganisation`). Les champs se contrôlent sur le schéma de l'API
 // (`signupSchema`). Sans lui, l'hôte recréerait le formulaire et ses règles.
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { signupSchema, type SignupInput } from "../../schemas"
-import { adresseRepond, appelerPlateforme, type ErreurPlateforme } from "../api/client"
+import { appelerPlateforme, type ErreurPlateforme } from "../api/client"
 import { messageDErreur } from "../api/messages"
 import { IlotDAuthentification } from "../authentification/ilot-d-authentification"
 import { Checkbox } from "../ds/react/checkbox"
 import { Field, Input } from "../ds/react/forms"
 import { Button } from "../ds/react/primitives"
+import { DepartVersLOrganisation } from "./depart-vers-l-organisation"
 
 /** Ce que rend la route : l'aperçu (adresses), ou l'organisation créée et ses adresses. */
 type Apercu = { created: false; addresses: { hosts: string[] } }
@@ -34,14 +35,10 @@ const A_CHOISIR = "Ce nom ne donne pas d'adresse ou de préfixe valide : choisis
 
 /** Une adresse compte au moins deux caractères (`orgSlugSchema`) : en dessous, c'est le nom qui est trop court. */
 const NOM_MIN = 2
+const TROP_COURT = `Le nom doit compter au moins ${NOM_MIN} caractères.`
 
 /** L'aperçu de l'adresse part après une courte pause de frappe (`forms-patterns.md § Validation asynchrone`). */
 const PAUSE_MS = 400
-
-/** L'adresse d'une organisation créée est sondée toutes les trois secondes, deux minutes au plus ; le lien reste. */
-const SONDE_MS = 3000
-const SONDES_MAX = 40
-const TROP_COURT = `Le nom doit compter au moins ${NOM_MIN} caractères.`
 
 /** Ce que vaut le nom une fois saisi : trop court, sans adresse ni préfixe à en tirer, ou bon (`null`). */
 type Verdict = "court" | "a_choisir" | null
@@ -82,39 +79,6 @@ function refusDit(erreur: ErreurPlateforme): string {
   const texteDeLHote = erreur.details?.text
   if (erreur.raison === "signup_refused" && typeof texteDeLHote === "string") return texteDeLHote
   return messageDErreur(erreur, MESSAGES)
-}
-
-/** L'organisation est créée : la personne part à son adresse dès qu'elle répond ; le lien y mène sans attendre. */
-function DepartVersLOrganisation({ adresse }: { adresse: string }) {
-  useEffect(() => {
-    let sondes = 0
-    let minuteur: ReturnType<typeof setTimeout> | undefined
-    let quitte = false
-    async function sonder() {
-      sondes += 1
-      const repond = await adresseRepond(adresse)
-      if (quitte) return
-      if (repond) return window.location.assign(adresse)
-      if (sondes < SONDES_MAX) minuteur = setTimeout(() => void sonder(), SONDE_MS)
-    }
-    void sonder()
-    return () => {
-      quitte = true
-      clearTimeout(minuteur)
-    }
-  }, [adresse])
-
-  return (
-    <IlotDAuthentification titre="Créer votre organisation" statut="Votre organisation est créée.">
-      <p className="text-sm text-ink">
-        {"Son adresse se prépare, ce qui peut demander une à deux minutes : vous y serez conduit dès qu'elle répond. Vous pouvez aussi ouvrir "}
-        <a href={adresse} className="text-ink underline underline-offset-2">
-          {new URL(adresse).host}
-        </a>
-        {"."}
-      </p>
-    </IlotDAuthentification>
-  )
 }
 
 /**

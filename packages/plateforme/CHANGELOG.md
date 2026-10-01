@@ -17,6 +17,13 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.6 — 2026-10-01
+
+### Hosts
+- Install: upgrade to 1.3.6; no migration, no new variable. One line to change: pass the request's host to `listMyOrganisations`.
+- Server: `listMyOrganisations(db, identity, requestHost?)` takes the address of the request and gives, for an organisation with several addresses, the one the person can reach from there: the closest to the request's (same parent domain), then one that is not a development address (`localhost`, `*.localhost`), then alphabetical order. It gave the first by alphabetical order, so the switcher could lead to `demo.localhost` from a public address. Pass the request's host from your layout (the reference host passes `session.host`); without it, a development address still comes last.
+- UI: after the creation, `FormulaireDInscription` shows « Votre espace se prépare »: three steps (organisation created, address reserved, secure go-live in progress), a bar that only completes when the address answers, a short text that changes every seven seconds about what the person will find, then « C'est prêt » and the departure. After two minutes without an answer it says so and offers « Réessayer »; the link to the address stays throughout. Reduced motion: the bar stands still and the texts do not rotate. Nothing to change at the host.
+
 ## 1.3.5 — 2026-10-01
 
 ### Hosts

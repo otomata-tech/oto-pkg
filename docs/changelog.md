@@ -10,6 +10,14 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.6 : écran d'attente après la création d'une organisation ; la bascule mène à une adresse joignable
+
+**Quoi :** `DepartVersLOrganisation` (nouveau fichier, sorti de `FormulaireDInscription`) : titre « Votre espace se prépare », trois étapes (classes `oto-stepper` du design system), barre `oto-progress` qui ne finit qu'à la réponse de l'adresse, texte qui change toutes les sept secondes, « C'est prêt » puis départ ; au bout de deux minutes, le retard est dit, avec « Réessayer ». `listMyOrganisations(db, identity, requestHost?)` choisit par `reachableHost` l'adresse la plus proche de celle de la requête, puis une adresse hors `localhost`, puis l'ordre alphabétique ; le layout de référence passe `session.host`.
+**Pourquoi :** retours de JB en production : une attente de une à deux minutes sans rien qui l'explique, et la bascule vers une organisation à plusieurs adresses qui ouvrait `demo.localhost`.
+**Version :** `version` 1.3.6 et son titre au CHANGELOG du paquet, aucune migration ; décision de JB : publier.
+**Surfaces nouvelles :** le fichier `depart-vers-l-organisation.tsx` (sans lui, le formulaire porte la sonde, ses minuteurs et l'écran d'attente : plus de 300 lignes) ; l'argument `requestHost` (sans lui, le service ne sait pas d'où vient la personne ; option plus simple écartée : écarter seulement `localhost`, qui laissait le choix alphabétique entre deux adresses publiques de domaines différents).
+**Fichiers :** `packages/plateforme/ui/inscription/{depart-vers-l-organisation,formulaire-d-inscription}.tsx`, `packages/plateforme/server/organisations.ts`, `src/app/(dashboard)/layout.tsx`, `tests/integration/components/e12s01-inscription.test.tsx`, `tests/unit/organisations-reachable-host.test.ts`, `packages/plateforme/{CHANGELOG.md,README.md}`, `docs/conception/offres-de-l-hote.md`, `docs/reference/services-et-portes.md`, `.method/conventions/component-registry.md`.
+
 ## [2026-10-01] — 1.3.5 : inscription en un clic, adresse lue pendant la frappe, départ quand l'adresse répond
 
 **Quoi :** `FormulaireDInscription` appelle l'aperçu de `POST /api/platform/signup` après une pause de frappe (400 ms) et écrit l'adresse sous le nom ; un seul bouton, « Créer l'organisation », envoie `confirm: true`. Un refus de l'aperçu se tait, sauf un conflit, dont les champs ne viennent qu'à la sortie du champ du nom. Après la création, l'écran dit l'organisation créée, sonde son adresse (`adresseRepond`, `ui/api/client.ts`) toutes les trois secondes, deux minutes au plus, et y conduit dès qu'elle répond ; le lien reste affiché. `version` 1.3.5, aucune migration.

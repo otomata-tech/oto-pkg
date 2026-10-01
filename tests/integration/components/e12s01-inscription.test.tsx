@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { FormulaireDInscription } from "@otomata_tech/oto_platform/ui"
+import { DepartVersLOrganisation } from "../../../packages/plateforme/ui/inscription/depart-vers-l-organisation"
 import { prefixePropose, slugPropose } from "../../../packages/plateforme/ui/inscription/formulaire-d-inscription"
 
 // Le formulaire d'inscription (E12-S01, AC-12) : un seul champ, le nom, dont se déduisent l'adresse et le préfixe (leurs
@@ -56,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -96,13 +98,20 @@ describe("FormulaireDInscription (AC-12)", () => {
     expect(recus).toEqual([{ name: "Atelier", org: "atelier", prefix: "atelier", confirm: true }])
   })
 
-  it("should stay on the page, with a link, while the new address does not answer", async () => {
+  it("should stay on the page, with its steps and a link, while the new address does not answer", async () => {
     api({ creations: [creee("atelier.oto.test")], repond: false })
     render(<FormulaireDInscription />)
     nomme("Atelier")
     fireEvent.click(creer())
     expect(await screen.findByText("Votre organisation est créée.")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "atelier.oto.test" })).toHaveAttribute("href", "https://atelier.oto.test/")
+    expect(screen.getByRole("heading", { name: "Votre espace se prépare" })).toHaveFocus()
+    expect(screen.getAllByRole("listitem").map((etape) => etape.textContent)).toEqual([
+      "Organisation créée (fait)",
+      "Adresse réservée (fait)atelier.oto.test",
+      "Mise en ligne sécurisée (en cours)Le certificat de votre adresse s'installe.",
+    ])
+    expect(screen.getByRole("progressbar", { name: "Mise en ligne de votre espace" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Ouvrir atelier.oto.test" })).toHaveAttribute("href", "https://atelier.oto.test/")
     await waitFor(() => expect(sondes).toHaveLength(1))
     expect(assign).not.toHaveBeenCalled()
   })
@@ -203,5 +212,32 @@ describe("FormulaireDInscription (AC-12)", () => {
     fireEvent.change(screen.getByLabelText("Adresse"), { target: { value: "atelier" } })
     fireEvent.change(screen.getByLabelText("Préfixe des outils"), { target: { value: "atelier" } })
     expect(creer()).toBeEnabled()
+  })
+})
+
+describe("DepartVersLOrganisation", () => {
+  it("should say the last step done and leave once the address answers", async () => {
+    api({})
+    render(<DepartVersLOrganisation adresse="https://atelier.oto.test/" />)
+    expect(await screen.findByText("C'est prêt : ouverture de votre espace.")).toBeInTheDocument()
+    expect(screen.getAllByRole("listitem")[2]).toHaveTextContent("Mise en ligne sécurisée (fait)")
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://atelier.oto.test/"))
+  })
+
+  it("should stop after two minutes without an answer, say so, and probe again on « Réessayer »", async () => {
+    vi.useFakeTimers()
+    api({ repond: false })
+    render(<DepartVersLOrganisation adresse="https://atelier.oto.test/" />)
+    await act(() => vi.advanceTimersByTimeAsync(121_000))
+    expect(sondes).toHaveLength(40)
+    expect(screen.getByText("La mise en ligne prend plus de temps que prévu. Votre organisation est bien créée.")).toBeInTheDocument()
+    expect(screen.queryByRole("progressbar")).toBeNull()
+    expect(screen.getByRole("link", { name: "Ouvrir atelier.oto.test" })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Réessayer" }))
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    expect(sondes).toHaveLength(41)
+    expect(screen.getByRole("progressbar")).toBeInTheDocument()
+    expect(assign).not.toHaveBeenCalled()
   })
 })

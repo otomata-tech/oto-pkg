@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.2.1 : version du paquet pour les retours des assistants sur Démo
+
+**Quoi :** `version` 1.2.1 et `## 1.2.1 — 2026-10-01` du CHANGELOG du paquet ; la version porte les corrections de `find` (blocs non montrés comptés), des clés inconnues refusées et de la page sans section, avec la migration `20261001150000_v1_2_1.sql`.
+**Pourquoi :** décision de JB : publier la 1.2.1.
+**Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
+
 ## [2026-10-01] — Retour au projet de test par défaut pour les tests
 
 **Quoi :** le passage « base du poste par défaut » (commit 123c69f) est annulé : sans `PLATFORM_TEST_DB=local`, Vitest vise de nouveau le projet Supabase de test ; `vitest.config.ts`, `ci.yml`, `.env.example`, `CLAUDE.md`, `testing-strategy.md` et les fichiers de la base locale reviennent à leur état de la 1.2.0.

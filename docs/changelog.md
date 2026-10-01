@@ -3,12 +3,18 @@
 <!-- Ce fichier est mis à jour à chaque commit via /dev.
      Format de chaque entrée :
 
+## [Date] — [Scope]
+**Quoi :** Ce qui a été fait
+**Pourquoi :** La raison / la story / le bug
+**Problèmes :** Ce qui a bloqué et comment c'a été résolu (si applicable)
+**Fichiers :** Liste des fichiers créés/modifiés
+-->
+
 ## [2026-10-01] — 1.3.1 : version du paquet (lot strict de `node.write_many`, Contexte changé qui avertit)
 
 **Quoi :** `version` 1.3.1 et `## 1.3.1 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.
 **Pourquoi :** décision de JB : publier la 1.3.1.
 **Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
-
 
 ## [2026-10-01] — Un Contexte changé avertit l'appel suivant, il ne le refuse plus
 
@@ -17,13 +23,11 @@
 **Problèmes :** la description de `<p>_context` change de texte (surface servie aux hosts) : requêtes de référence C2 et C2 bis à rejouer sur les hosts, non rejouées à la livraison.
 **Fichiers :** `packages/plateforme/{server/ctx.ts,mcp/server.ts,mcp/tools.ts,server/context/blocks/code.ts,server/nodes/write-result.ts,CHANGELOG.md}` ; tests `server-ctx` (unit et intégration), `mcp-core`, `mcp-tools`, `context-blocks`, `nodes-publish`, `e11s18-ecriture-assistants` ; `docs/conception/contexte-servi.md`, `docs/produit/prd.md`, `docs/reference/mcp-golden-queries.md`.
 
+## [2026-10-01] — Le backlog passe en issues ; `status.md` ne garde que les gestes de JB
 
-## [Date] — [Scope]
-**Quoi :** Ce qui a été fait
-**Pourquoi :** La raison / la story / le bug
-**Problèmes :** Ce qui a bloqué et comment c'a été résolu (si applicable)
-**Fichiers :** Liste des fichiers créés/modifiés
--->
+**Quoi :** les tâches de suite `M…` de `.method/sprint/status.md` sont dans quatre issues groupées par domaine (outillage et tests, serveur, écrans et éditeur, fichiers et installation), chaque ligne avec son identifiant ; les deux stories V2 sans issue (pilote V2, registre central des versions) en ont une, sous leur épic. `status.md` ne garde que les gestes réservés à JB. La méthode suit : `CLAUDE.md` (§ Projet, § Échelle du changement, § Workflow), skills `dev`, `plan`, `revue`, `wrap-up`, checklists `story-done`, `story-ready`, `prd-evolution`, `sprint/vagues.md` parlent de l'issue du chantier, plus du sprint status.
+**Pourquoi :** décision de JB après la revue des issues du 2026-10-01 : « ce qui reste ouvert » vivait à deux endroits, contre la règle d'un seul endroit par nature d'information.
+**Fichiers :** `.method/sprint/status.md`, `.method/sprint/vagues.md`, `.method/checklists/{story-done,story-ready,prd-evolution}.md`, `.claude/skills/{dev,plan,revue,wrap-up}/SKILL.md`, `CLAUDE.md`.
 
 ## [2026-10-01] — `node.write_many` strict sur ses opérations, test de course sans verrou de table
 

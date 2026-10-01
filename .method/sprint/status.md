@@ -1,109 +1,11 @@
 # Sprint Status
 
-<!-- Ce qui reste ouvert après la V1, et seulement cela : une ligne sort quand elle est livrée (le
-     changelog la reprend). L'état livré de chaque exigence est dans `docs/produit/prd.md`. -->
-
-Statuts : ⚪ Backlog · 🟢 Ready · 🔵 In progress · 🔴 Bloquée · 🟣 V2
-
-## En cours
-
-| ID | Titre | Statut |
-|----|-------|--------|
-| E01-S12 | Clôture de la V1 : dépôt propre, cohérent, sans nom réel | ✅ `@otomata_tech/oto_platform` 1.0.0 publié avec provenance (2026-09-29) ; oto-pkg public, oto-saas privé |
-| E05-S13 | Retours du soir de JB : Contexte à l'écran en français, administration simplifiée, Équipes & accès sans Règles ni Accès plateforme, plusieurs responsables, équipe par défaut retirée, bout en bout sur organisation jetable | ✅ fusionné, bout en bout vert, Démo vidée |
-| E11-S15 | Retours sur la 1.1.1 : écrans d'un contenu, éditeur et blocs, version corrective 1.1.2 | ✅ livrée dans la 1.1.2 (verify vert : 368 fichiers, 3 870 tests ; suites Supabase sur le projet de test : 155/155) |
-| E11-S16 | `context` à l'échelle : trois candidates par titre et résumé, l'assistant arbitre (ADR-003 § 2 amendé), une nouveauté par contenu, procédures utiles au-delà de 15 par titre | ✅ livrée dans la 1.1.2 |
-| E11-S17 | Sélection de blocs dans l'éditeur (lot a) ; éditeur visuel (lots 0, b à f) | ✅ lot a livré dans la 1.1.2 (sélection de blocs) ; lots 0, b à f reportés avec ADR-021 |
-| E11-S20 | Le rail à jour : son arbre relu seul (`GET nodes/tree`) à la navigation, au retour sur l'onglet et après chaque geste | ✅ livrée pour la 1.1.5, non publiée, non commitée (aucune migration ; changelog du 2026-09-30, HN-E11S20-1 à 6) ; tests isolés verts (`api-rail`, `rail-application`) ; e2e `rail.spec.ts` écrit, non lancé ; verify de la version au pilote |
-| E11-S21 | L'image de partage d'une adresse : aperçu Open Graph aux couleurs de l'organisation (lien public : titre et résumé ; toute autre adresse : l'organisation seule) | ✅ livrée pour la 1.1.5, non publiée, non commitée (aucune migration ; changelog du 2026-09-30, HN-E11S21-1 à 9) ; tests isolés verts (`share-image`, `image-de-partage` avec rendu PNG réel, `e05s10d-page-publique`, `middleware`, `ecrans-d-authentification`) ; `pnpm build` vert ; aperçu réel à contrôler (actions de JB) |
-| E11-S19 | `ctx`, `context`, lecture et recherche : l'auteur d'un Contexte continue, le refus porte le changement, `context` léger (`since_ctx`), routage expliqué, `read functions`, `find` avec section et ligne d'édition, `table.rows` `match: any` | ✅ livrée pour la 1.1.3, non publiée, non commitée (lot B de la version ; migration `20260930150000_v1_1_3.sql`, partie 1 ; changelog du 2026-09-30, HN-E11S19-1 à 11, ADR-002 § 2 amendé) ; golden queries à rejouer (ligne « 1.1.3 publiée » des actions de JB) |
-| E11-S18 | L'écriture côté assistants : rien d'écrit sur un refus, réponse publiée en une ligne, `node.move`, `node.write_many`, `set_markdown`, `replace_text` sur la page ou un bloc avec `count`, chemin coupé au mot, FB-0015, frontmatter YAML, l'auteur d'un Contexte garde son `ctx` | ✅ livrée pour la 1.1.3, non publiée, non commitée (lot A de la version ; aucune migration ; changelog du 2026-09-30, HN-E11S18-1 à 13, P12 amendée, ADR-011 § 3 amendé) ; cas AC-1/3, AC-5, AC-12, AC-14 d'`e11s18-ecriture-assistants` et textes « the draft saved before this call stays » non relancés depuis leur dernière retouche (au verify de la version) ; golden queries à rejouer (ligne « 1.1.3 publiée » des actions de JB) |
-| E12-S01 | Inscription libre : une personne vérifiée crée son organisation, si l'hôte l'active (ADR-023) | ✅ livrée dans la 1.2.0 (migration `20261001090000_v1_2_0.sql`, partie 1) |
-| E12-S02 | Capacités par organisation : refus décidés par le paquet, valeurs fournies par l'hôte (ADR-022) | ✅ livrée dans la 1.2.0, compteurs sans session compris (`orgUsage`, migration partie 2) |
-| FB-0012 à FB-0014 | Retours du test réel d'`upload.link` sur claude.ai (hôte en 1.1.2) et clé de dates d'un CSV | ✅ traités pour la 1.1.3, non commités (changelog du 2026-09-30, HN-E10S01-29, HN-E10S02-115 à 123) : cause dite par cas quand le stockage échoue, page d'un `create` en échec retirée, `.md` en HTML refusé, `forbidden` hors `POST`, repli sans `curl` dans la description, dates comme clé. Décidés par JB : pas de base64, pas de contrôle des octets. Reste : la cause de l'échec de `.md`, `.txt` et `.svg` sur oto-steel (ligne « 1.1.3 publiée » des actions de JB) |
-
-## Contenus riches et retours de la démo (epics E10 et E11) : 1.1.0 publiée, 1.1.1 corrective
-
-Fiches D111 à D124, D131 à D150, ADR-016 à ADR-018, ADR-020. Livrées et fusionnées sur `main` (commits
-`3a2cc5c` à `b0f6e04`, changelog des 2026-09-29 et 2026-09-30) : les quatre stories d'E10 (S04, S01, S06,
-S02) et les neuf d'E11 (S04, S09, S03, S10, S01, S02, S05, S06, S07), avec le harnais de test sans Supabase
-(E11-S14). Version 1.1.0 préparée (changelog du 2026-09-30) : `version` 1.1.0 du paquet,
-`## 1.1.0 — 2026-09-30` de son `CHANGELOG.md`, et les six migrations de la vague (E11-S04, E11-S10, E10-S04,
-E11-S03, E11-S02, E10-S02) réunies en `20260930100000_v1_1_0.sql` au contenu identique (D124, D145).
-Version mineure, cassante sur les adresses (ADR-020, D131) : sa PR Renovate se relit à la main chez
-l'hôte (D121) : `renovate/preset.json` ne fusionne seules que les correctives, une mineure attend
-une revue sous le label `oto-platform-minor`. 1.1.0 publiée, mais ne se construit pas chez un hôte ;
-1.1.1 corrective en cours (changelog du 2026-09-30), tag et suites aux actions de JB ci-dessous ; 1.1.2
-corrective (E11-S15, E11-S16, E11-S17 lot a) publiée ; restes sans urgence : M86 à M88, M90 à M96.
-
-## Stories V2 (marquées, non planifiées)
-
-| ID | Titre | Remplace ou prolonge |
-|----|-------|----------------------|
-| E04-S02 | Client du service connecteurs et Sellsy réel | — |
-| E04-S03 | Connecteur mail réel | le `mail` simulé de la V1 |
-| E04-S05 | Comptes tiers et coffre (AES-GCM, OAuth ou clé du tiers, santé) | — |
-| E05-S06 | Écran Connecteurs | — |
-| E05-S11 g | Traduction des écrans (fiche D105) | les écrans en français de la V1 |
-| E06-S03 | Pilote V2 : relance des devis réelle (Sellsy, mail) | — |
-| E08-S08 | Sondes de santé et alertes des comptes | — |
-| E08-S10 | Registre central des versions de plusieurs applications | — |
-
-## Tâches de suite ouvertes
-
-Sans story, sans urgence sauf mention. L'identifiant reste celui que citent les commentaires du code.
-
-| ID | Tâche |
-|----|-------|
-| M11c | Élagage des tests au minimum vital (`testing-strategy.md § Budget de tests`), même grille que les passes précédentes : les fichiers postérieurs au dernier élagage et les tests que la suite d'isolation rend redondants ; un agent classe chaque fichier (garder, fusionner, retirer), JB valide la liste avant toute suppression. |
-| M13 | Suites de revue sans urgence : formes de commande qui passent encore le gate sans marqueur (`Git push`, `git.exe push`, `$r = (git push)`, `{git push}`) et faux positifs (`*>&1`, `Out-File` d'un objet contenant `vitest`, heredoc de markdown qui écrit « (git push ») ; gate ouvert si `scripts/verify-receipt.mjs` ne se charge pas ; lectures sans borne (`teamRoster`, équipes de `checkName`, `listPrompts`) ; conflits écrits en ligne à passer par `changedMeanwhile` ; lectures par pages communes (`readPages`, `readIn`) ; doublons entre la porte MCP et le MCP admin. |
-| M15b | Suites de revue sans urgence : commentaires de `server/` que l'isolation par organisation a rendus faux ; une aide « lignes d'une organisation dans une table de la carte » à côté de `TABLES` ; `positionBetween` sans appelant ; garde `isJsonObject` en double ; un seul mécanisme de concurrence dans la base simulée ; aides de test recopiées ; rapport Playwright en `line` (le rapport HTML garde les saisies). |
-| M18b | Curseur pour les listes au-delà de 200 éléments (décision à prendre) ; upsert et vue du sujet des règles (`server/rules.ts`) ; curseur (instant, id) commun à `server/feedback.ts`, `server/usage.ts` et `server/admin/journal.ts`. |
-| M20b | `DirectoryEntry.email` et `StaffEntry` en `string \| null` avec leurs vues ; les textes qui impriment « null » pour un email absent ; `server/admin/grants.ts` sur `sameEmail` ; le libellé `user <sub>` partagé avec `memberDirectory`. |
-| M24 | `lockWaitOf` commun aux tests ; le chemin des migrations du paquet exporté une fois ; `tests/integration/sql-session.test.ts` passe `${JSON.stringify(…)}` dans un gabarit, contre `database-patterns.md § Paramètres des requêtes (postgres.js)`. |
-| M25 | Aides de la base de test : `seed.cleanup` qui réunit ses deux erreurs, `valuesOf` qui lève sur une colonne inconnue, `ref.write` qui refuse `admin_journal` hors de la base admin, le nom de l'appelant passé aussi sur Postgres nu par `personDb`. |
-| M51 | Avant un déploiement hors de Vercel : l'image du conteneur (`output: "standalone"`, `Dockerfile`), dans le dépôt du SaaS. |
-| M52 | Restes de la reprise des écrans : export de `recentDocuments` par `./server` (contenus récents de l'accueil), `connexionsDe` en double entre `/` et `/connect`, lien d'évitement `#main-content` qui vise le `<main>` du contenu, `/auth/confirmer` au `Button` du design system, aides des specs e2e à factoriser. |
-| M56 | Deux `table.write` qui prennent les mêmes lignes dans des ordres contraires peuvent s'interbloquer : écrire les lignes d'un appel dans un ordre commun. |
-| M57 | `check:framework` refuse tout caractère invisible ou combinant écrit tel quel (catégories Cf, Co, Zl, Zp, marques combinantes isolées) dans `packages/`, `src/`, `tests/`, `scripts/`, avec son test. |
-| M60 | Mesurer `prepare: true` de `server/sql.ts` sur Supavisor en mode transaction (40 → 22 ms par requête mesurés sur le pooler) ; les quatre lectures de `personInOrg` (`server/identity.ts`) en une instruction ; `lireLesEquipes` au lieu de `listTeams` dans `equipes`, `journal`, `admin/usage`, `admin/connecteurs`. |
-| M61 | Une seule copie d'`aplatir` (`ui/arbre/depuis-l-arbre.ts`, `ui/noeud/sous-pages.tsx`) ; code mort `AIDE_DU_RESUME` et prop `aideDuResume` ; `ProcedureDuNoeud` et `ApercuDUnePhrase` sans appelant ; commentaire de `tests/e2e/e05s10b.spec.ts` (Démo n'a qu'un membre). |
-| M62 | Suites de la base de test locale : ménage des bases `test_agent_*` du Postgres du poste. |
-| M65 | Retirer `RailThemePicker`, les écrans Marque, Drapeaux et Accès plateforme et leurs clés d'adresse (HN-E05S11-15). |
-| M66 | `ContenusLies` (`ui/noeud/sous-pages.tsx`) recopie les sous-pages dans son repli pendant le flux (`portage-ecrans.md § 2`). |
-| M69 | Après un déplacement par « ⋯ », le focus tombe sur le document (le « ⋯ » disparaît) : le rendre au nœud déplacé ou à sa ligne. |
-| M70 | Fiche D125 pour toute création : une création titrée d'un assistant sur un chemin tenu par un nœud invisible ou à la corbeille refuse encore (`conflict`) au lieu de prendre le premier chemin libre ; branche `context` inatteignable de `createsElsewhere` (`write.ts`) à retirer ou dire défensive. |
-| M72 | Vue « Contexte » de l'accueil : pour un Contexte écrivable, la ligne « Not loaded: … » (échec de lecture des Contextes) est masquée par l'éditeur, comme l'étaient les listes avant M71. |
-| M73 | Suites d'E05-S13 : `default_team_id` et `lead_user_id` vidés, à retirer en 1.1 ; services et API des règles d'accès et des accès plateforme sans écran client ; `EcranUsage` et `usageSummary` sans page ; `Onglets.titre` mort ; lignes de faits et de connecteurs du Contexte en anglais à l'écran (traduction : ADR-015). |
-| M74 | `oto-platform migrations sync` compare les copies de l'hôte octet pour octet : sur un checkout Windows (autocrlf), les copies en CRLF diffèrent toutes du paquet (LF) et la commande refuse d'écrire. Comparer sans les retours chariot, et dire dans le README des migrations d'ajouter `supabase/migrations/*.sql text eol=lf` au `.gitattributes` de l'hôte (fait dans oto-saas). |
-| M76 | `tests/unit/hooks.test.ts` (verify-receipt, `git add` d'un fichier de `src/lib/utils`) et `tests/unit/ui-boundary.test.ts` (délai de 30 s sur le premier `lintText`) échouent quand d'autres sessions travaillent dans le même checkout ou que la RAM manque : isoler le fichier de brouillon hors de l'arbre suivi et relever le délai ou charger la config une fois. |
-| M77 | E10-S01 : une panne de la relecture du propriétaire que `writeNode` fait après `publish_node` (`finish`, `server/nodes/write.ts`) fait sortir `createTable` (`server/tables/import.ts`) sans `details.created`, le tableau déjà publié (HN-E10S01-21). |
-| M78 | E10-S01 : les 5 000 lignes d'un `table.import` s'écrivent une requête à la fois ; mesurer un import complet contre `maxDuration`. |
-| M80 | E10-S04 : dans l'éditeur, un élément racine d'une liste dont le texte commence par deux espaces est relu en sous-élément à la frappe (`elementsLus`, `ui/noeud/editeur/modele.ts`). |
-| M81 | E10-S04 : le littéral `.max(500)` des éléments d'une `list` (`schemas/blocks.ts`) est redondant : la borne `LIST_ITEMS_MAX`, du même fichier, compte déjà tous les éléments, sous-éléments compris. |
-| M82 | E10-S04 : `beforeOpenFence` (`server/context/engine.ts` depuis E11-S03) lit ses clôtures par `openingFence` et `closesFence` (`schemas/link-syntax.ts`) ; sans cela, la coupe d'un Contexte ne reconnaît que les clôtures d'accents graves sans retrait ; coût : un test de `context` sur une clôture `~~~` coupée. |
-| M83 | ✅ Traité pour la 1.1.3 : les textes hostiles de `tests/unit/nodes-parse-tolerant.test.ts` prouvent le temps linéaire par le rapport des temps du texte et de son quart (`readingRatio`), plus par une borne en millisecondes (`testing-strategy.md § Anti-patterns`). Reste : les 15 autres fichiers qui importent `TEMPS_LINEAIRE_MS`, à passer au rapport quand l'un d'eux vacille. |
-| M84 | `choix-de-bloc.tsx` (E10-S06) l. 52, 57, 76-84 : reprendre `useOptionActive` d'E11-S06 (`ui/noeud/editeur/citer.tsx`), l'aide commune du clavier d'une liste d'options. |
-| M85 | Un mode sans Supabase pour `org:export`, `org:import`, `test:cleanup` et `oauth:clients` (hors périmètre d'E11-S14) : leurs suites restent gardées par le projet (`tests/unit/gardes-supabase.test.ts`). Avec lui, E11-S14 lot c : deux lancements de `scripts/demo-seed.mjs` ne verrouillent pas encore le mode Supabase par `PLATFORM_OIDC_ISSUER: ""` (`tests/unit/demo-seed.test.ts`, cas « missing variables » ; `tests/integration/org-transfer.test.ts` l. 280) : cette variable posée dans `.env.local`, ils passeraient en mode OIDC. |
-| M86 | E10-S02 : les objets du stockage qui perdent leur ligne `files` sans passer par la purge restent orphelins dans le bucket : nœuds supprimés par `forget_user`, organisation supprimée en SQL (la cascade emporte les lignes), `pnpm test:cleanup` et `pnpm demo:seed` ; les supprimer par préfixe `<org_id>/` (ou lire les clés avant la suppression). |
-| M87 | E10-S02 : `pnpm org:export --force` vide `<fichier>.files/` avant d'écrire les objets (HN-E10S02-112), et une panne du stockage en cours lève avant le JSON (HN-E10S02-87) : l'ancien JSON reste à côté d'objets en partie réécrits. Écrire dans un dossier temporaire, puis remplacer JSON et dossier ensemble. |
-| M88 | E10-S02 : CI du paquet : un service MinIO dans le job d'intégration, pour l'adaptateur S3 réel (SigV4, `copy`, URL signées ; les tests n'ont que l'adaptateur en mémoire) ; la spec d'isolation du HTML (`tests/e2e/e10s02-voir.spec.ts`, F1 à F16, O1 à O7) en Playwright, qui se saute sans stockage. |
-| M90 | E11-S02 : `server/tables/import.ts:188` : reprendre `heldByOther` de `row-store.ts` (troisième copie du prédicat). |
-| M91 | E11-S02 : `ui/noeud/en-tete-modifiable.tsx` l. 10-11 : le commentaire dit encore qu'un nœud neuf est « jamais publié » ; `FileDOperations` : `brouillon` et `ecrit` de l'instantané sans lecteur ; `EN_TETE.enregistre`, `EN_TETE.aRenvoyer` morts. |
-| M92 | Cycles d'imports hors de la garde de `tests/unit/import-cycles.test.ts` (`coding-standards.md § Imports`) : `ui/noeud/editeur/actions.ts` ↔ `gestes-des-fichiers.ts` et ↔ `gestes-du-menu.ts`, `server/files/store.ts` ↔ `s3.ts`. Aucun ne lit de valeur au chargement aujourd'hui ; les casser, puis ajouter `ui` et `server` à `GUARDED_FACES`. |
-| M93 | La ligne de base V1 ne s'installe pas par `supabase db push` sur un projet Supabase où `pg_trgm` existe déjà (`permission denied to set parameter "pg_trgm.similarity_threshold"`, 42501 : la bibliothèque n'est pas chargée dans la session) ; contournement écrit dans `packages/plateforme/migrations/README.md` (Installer sur un hôte neuf). Corrigé en 1.3.0 par la migration préalable `20260928090000_platform_pg_trgm.sql` et la garde `pg-trgm-parameter-before-load` de `check:migrations`, prouvé sur un Postgres 16 du poste sous un rôle non superutilisateur. Reste : le jouer sur un projet Supabase neuf, et faire pousser le job `bare-postgres` sous un rôle non superutilisateur pour que la CI le voie. |
-| M94 | E11-S15 (HN-E11S15-a6) : le résumé que la base pose sur un Contexte d'équipe ou de Tout le monde (déclencheur de `20260928100000_platform_base_v1.sql`, `20260929090000_platform_e05s13.sql`, script `scripts/demo/30-arbre.mjs`) dit encore « Ce que les assistants… » : le passer à « Ce que votre Claude/ChatGPT/Mistral… » par une migration (et la reprise des résumés posés), dans une 1.2.0. |
-| M95 | E11-S15 (AC-b3) : une image garde ses proportions par `h-auto` et `object-contain`, sans `height` ; la cause de l'étirement observé en 1.1.1 n'est établie que dans le code : la confirmer à la campagne visuelle (M96), à chaque largeur (`small`, `medium`, `full`), et la reprendre si l'image s'étire encore. |
-| M96 | E11-S15 : campagne visuelle, dans les deux thèmes, d'AC-a3 (zoom 110, 125 et 150 % : page centrée, sans défilement horizontal), AC-a4 (« Partager sur le web » ancré, entier, borné à 70 %), AC-a5 (filet entre les étapes de `/connect` et de « Brancher »), AC-a8 (explication de la vue « Contexte ») et AC-b7 (aucun soulignement rouge en éditant un lien) ; les causes d'a3, a4 et b7 n'y sont établies que dans le code. |
-| M97 | Garde `tests/unit/frontiere-client-serveur.test.ts` (1.1.3) : limites connues, sans usage aujourd'hui : un espace de noms (`import * as`, `export * as`) d'un module sans directive qui réexporte du client n'est pas suivi ; une fonction client passée à un composant serveur qui l'appelle, `import()` et `next/dynamic` ne sont pas vus ; la règle refuse aussi une référence client rangée dans un objet puis rendue, légitime en RSC. Et `uneLigne` (fonction pure d'un module `"use client"`, `ui/noeud/en-tete-modifiable.tsx`) à déplacer dans `ui/noeud/en-ligne.ts`. |
-| M98 | `tests/integration/e10s02-uploads.test.ts` (« should give the address, the expiry… ») : l'expiration lue de la base (`now()` de Postgres + 15 min) comparée à `Date.now()` de Node dépasse 900 000 ms d'une milliseconde quand l'horloge de la base avance sur celle du poste (vu une fois sur la base locale) : borner par l'heure de la base, ou tolérer l'écart d'horloge. |
-| M99 | Refacto proposé, non fait : découper `ui/noeud/editeur/modele.ts`, au plafond de 300 lignes (`max-lines`) depuis la forme « Diagramme » (1.1.3) ; sans lui, la prochaine forme écrite ne s'y ajoute pas sans en sortir une partie. |
-| M100 | Poser `extra_float_digits = 3` dans `server/sql.ts`, avec les autres réglages de session, pour que toute position relue soit exacte (`order.ts`, rangement des frères, en lit aussi) — suggestion du lot A d'E11-S18, non faite. |
-| M101 | `TableCell` (`ui/ds/react/table.tsx`) lit par cellule, dans un effet de mise en page au montage, `getComputedStyle`, `scrollWidth` et `clientWidth` (troncature du texte) : une mise en page forcée par cellule, contraire à `portage-ecrans.md § 7` ; passer à une passe groupée (ou au CSS), avec le test qui compte une passe par image. |
-| M102 | Refacto proposé, non fait : quatre copies de « relire les rappels du dernier rendu » dans l'éditeur (`useGestesStables` de `gestes.ts`, `lus` de `useGlisser` dans `glisser.ts` et de `usePointeurDeLaSelection` dans `pointeur-de-la-selection.ts`, `gestesLus` de `use-editeur.ts`) ; une seule aide les remplacerait. Sans elle, chaque nouveau geste différé en refait une. |
-| M103 | À 375 px, l’en-tête de la visionneuse d’un fichier (« Télécharger » + « Ouvrir la page … ») ne passe pas à la ligne et fait défiler la zone de contenu en largeur (`.oto-screen-header`, `product.css`), composant partagé par tous les écrans ; constaté pendant la correction des tableaux larges (1.1.5), non corrigé |
-| M104 | ✅ Traité pour la 1.1.7, non commité : `optimizePackageImports: ["@otomata_tech/oto_platform/ui"]` dans `next.config.ts` (le sous-chemin exact ; le nom du paquet seul, essayé en 1.1.6, ne couvre pas `/ui`). JS d'une route, page et layouts : `/login` 337 → 151 kB, `/` 323 → 234, `/n/<chemin>` 323 → 303 (l'éditeur y reste), `/p/<jeton>` 318 → 211, `/admin` 322 → 219. Budgets de `/login` (170 kB) et `/admin` (240 kB) dans `packed-host-build` (HN-E11S21-12). |
-| M105 | `src/app/layout.tsx` de l’hôte de référence : l’import `@otomata_tech/oto_platform/share` est placé après les imports `@/…`, ordre que le lint d’oto-pkg accepte mais qu’un hôte avec `import/order` (oto-saas) refuse ; le remonter avant les `@/…` et aligner la règle `import/order` d’oto-pkg sur celle des hôtes, pour que la référence se recopie telle quelle |
+<!-- Seulement les gestes réservés à JB (service extérieur, vrai secret, publication, campagne sur un hôte réel) :
+     une ligne sort quand le geste est fait. Tout le reste de ce qui s'ouvre et se ferme vit en issue GitHub
+     (`CLAUDE.md § Documentation : où vit chaque information`) : épics et chantiers V2, tâches de suite. Les tâches
+     de suite gardent l'identifiant `M…` que citent les commentaires du code : il se retrouve par une recherche
+     dans les issues. L'état livré de chaque exigence est dans `docs/produit/prd.md`, ce qui a changé dans
+     `docs/changelog.md`. -->
 
 ## Actions réservées à JB
 

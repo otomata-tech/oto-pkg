@@ -50,4 +50,4 @@
 - [ ] La conception (`docs/conception/`) et la référence (`docs/reference/`) sont mises à jour si impactées
 - [ ] Les stories impactées sont mises à jour ou créées
 - [ ] Le changelog est mis à jour
-- [ ] Le sprint status reflète les changements
+- [ ] Les issues (épics et chantiers) reflètent les changements

@@ -30,7 +30,7 @@ Ignorer ce qui est déjà évident à la lecture du code ou du changelog.
 | Gotcha / config / commande projet-spécifique | `CLAUDE.md` |
 | Composant / hook / util réutilisable créé | `.method/conventions/component-registry.md` |
 | Nouveau domaine technique récurrent | Nouveau tag : une ligne dans `_index.md` (avec ses **globs**) + le fichier de conventions. Rien d'autre. |
-| Besoin, bug ou question découvert en chemin | Une issue GitHub, avec l'accord de JB (`CLAUDE.md § Issues et stories`), ou `.method/sprint/status.md` |
+| Besoin, bug ou question découvert en chemin | Une issue GitHub, avec l'accord de JB (`CLAUDE.md § Issues et stories`) ; un geste réservé à JB : `.method/sprint/status.md` |
 
 Règles de sélection :
 - **Une seule occurrence = pas un pattern.** Attendre 2+ avant de promouvoir en convention.

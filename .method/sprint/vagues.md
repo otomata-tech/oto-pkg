@@ -95,7 +95,7 @@ Quand JB demande d'avancer sans lui, un pilote lance un agent par story 🟢 Rea
 - **Revues** : la première est complète ; après une correction, elle est ciblée (chaque constat
   bloquant corrigé, la vérification, le code que la correction a changé ; un constat nouveau ailleurs
   est BASSE). Deux corrections au plus : ensuite, une MOYENNE qui n'est ni de sécurité, ni de droits,
-  ni d'AC devient une tâche de suite dans `status.md`, et la story fusionne ; une HAUTE, ou une
+  ni d'AC devient une tâche de suite en issue GitHub, et la story fusionne ; une HAUTE, ou une
   MOYENNE de sécurité, de droits ou d'AC, la bloque. Une tâche sans story reçoit en revue les
   hypothèses et les écarts de son rapport : un reste qu'il ne source pas est un critère non livré.
 - **Fusion** : le diff de la branche s'applique sur `main` (le gate bloque `git merge` et

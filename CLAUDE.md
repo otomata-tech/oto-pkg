@@ -11,8 +11,8 @@ base — frontière appliquée par ESLint).
 
 Docs qui font foi : la carte `docs/README.md` mène au produit (`docs/produit/prd.md`), à la
 conception (`docs/conception/`, un document vivant par sujet), à la référence (`docs/reference/`) et
-à l'exploitation (`docs/exploitation/`) ; ce qui reste ouvert : les issues GitHub et
-`.method/sprint/status.md` (§ Documentation : où vit chaque information). Aucune création ni
+à l'exploitation (`docs/exploitation/`) ; ce qui reste ouvert : les issues GitHub, tâches de suite comprises ;
+`.method/sprint/status.md` ne garde que les gestes réservés à JB (§ Documentation : où vit chaque information). Aucune création ni
 modification de service extérieur (GitHub, Supabase, Vercel, npm), ni vrai secret, sans l'accord de JB.
 
 **Effet produit — les systèmes de ce projet** (remplace la liste générique de « Rayon d'impact ») :
@@ -155,12 +155,12 @@ demande. En cas de doute entre deux échelles, prendre la plus haute et le dire.
 |---------|----------------|---------|
 | **Micro** | 1-2 fichiers, aucune nouvelle surface | conventions → implémentation → type-check → **review inline** |
 | **Standard** | 3-5 fichiers, ou création d'une fonction / composant / action | + tests → skill `revue` → changelog |
-| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → sprint status |
+| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → issue du chantier fermée |
 
 Micro retire le cérémonial (rapport de review, changelog d'un changement invisible), pas la
 vérification. En Module, la story se **propose** : seul endroit où les AC précèdent le code, donc
 seul moyen pour la review de statuer « AC non livré ». Refusée, on **reste en Module sans story** :
-registry, document de conception et changelog restent dus ; seuls post-implémentation et sprint status tombent.
+registry, document de conception et changelog restent dus ; seule la post-implémentation tombe.
 
 ### Garde-fous conditionnels
 
@@ -282,7 +282,7 @@ Hôte de référence : violet corporate, dark mode class-based (next-themes), In
 2. Issue : la lire (`gh issue view <n>`), puis la story qu'elle désigne, entièrement ; passer `.method/checklists/story-ready.md`, lire la référence UI si ≠ `N/A`. Sinon : critères vérifiables et, dès Standard, plan proposé avant d'éditer.
 3. Implémenter : migration DB → schemas Zod → Server Actions + tests → composants + tests → page + tests d'intégration ; garde-fous conditionnels ; `pnpm verify`.
 4. Review — inline en Micro, skill `revue` dès Standard. Tout problème HAUTE ou MOYENNE **cite sa source** (`conventions/<fichier>.md § <section>`, `CLAUDE.md § <section>`, `checklists/code-review.md § <section>`, ou un AC). Sans source : BASSE, non bloquant.
-5. Finaliser selon l'échelle (changelog · registry · post-implémentation · sprint status · document de conception), puis `commit-push`.
+5. Finaliser selon l'échelle (changelog · registry · post-implémentation · issue du chantier fermée · document de conception), puis `commit-push`.
 
 ## Quand le PRD évolue
 

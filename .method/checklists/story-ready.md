@@ -30,7 +30,7 @@
 - [ ] **Migrations prévues** écrites (tables, colonnes, index, RLS), additives ; ou « Aucune » avec la raison
 - [ ] **Schémas Zod partagés** nommés, avec leur fichier
 - [ ] Tests attendus par niveau : unitaires, intégration et RLS (données jetables), MCP par `InMemoryTransport` si un outil est touché, golden queries, contrôle visuel pour un écran
-- [ ] **Dépend de** (IDs exacts) et **Porteuse de migration** renseignés dans Meta, cohérents avec `.method/sprint/status.md`
+- [ ] **Dépend de** (IDs exacts) et **Porteuse de migration** renseignés dans Meta, cohérents avec les issues dont la story dépend
 - [ ] Section **Actions JB** présente : gestes réservés (service extérieur, vrai secret, publication), ou « Aucune »
 - [ ] Estimation S, M ou L — jamais XL : sinon découper
 

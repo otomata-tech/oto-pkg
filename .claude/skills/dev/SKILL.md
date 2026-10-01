@@ -48,7 +48,7 @@ En cas de doute entre deux échelles, prendre la plus haute et le dire.
 |---------|----------------|---------|
 | **Micro** | 1-2 fichiers, aucune nouvelle surface (pas de route, table, Server Action ou dépendance nouvelle) | conventions → implémentation → type-check → **review inline** (pas de rapport) |
 | **Standard** | 3-5 fichiers, ou création d'une fonction / composant / action | + tests écrits avec le code → **review complète** (skill `revue`) → changelog |
-| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → sprint status |
+| **Module** | nouvelle surface (route, table, parcours), changement DB, ou ≥ 6 fichiers | **proposer une story avant de coder** → tout le Standard → registry → document de conception si invariant → issue du chantier fermée |
 
 **Micro** ne veut pas dire « sans garantie » : les conventions sont chargées et le type-check
 tourne. Ce qui disparaît, c'est le cérémonial (rapport de review, entrée de changelog pour un
@@ -61,8 +61,8 @@ changement invisible), pas la vérification.
 
 Si l'utilisateur refuse : **rester en Module sans story**, ne pas rétrograder en Standard.
 L'échelle est déterminée par ce que le changement touche, pas par la réponse à une question.
-Ce qui disparaît avec la story, ce sont les seules obligations qui en dépendent :
-post-implémentation et sprint status. **Registry, document de conception et changelog restent dus.**
+Ce qui disparaît avec la story, c'est la seule obligation qui en dépend :
+la post-implémentation. **Registry, document de conception et changelog restent dus.**
 
 La review perd alors ses AC : elle ne peut plus statuer « AC non livré ». Le dire à ce
 moment-là, pas après.
@@ -81,7 +81,7 @@ relecture (§ 6). Le registry n'a pas de fiche : il se consulte tel quel.
 Le registry (`registry`) et la stack (`stack`) sont routés comme les autres : ils se chargent
 quand le diff touche ce qu'ils couvrent, pas à chaque changement d'une ligne.
 
-**Si une issue pilote le travail** (`#<n>`, ou `next` → `.method/sprint/status.md`) — la lire
+**Si une issue pilote le travail** (`#<n>`, ou `next` → la première issue ouverte assignée) — la lire
 (`gh issue view <n>`, commentaires compris) ; si son corps désigne une story
 (`docs/produit/stories/<sujet>.md`), lire la story, vérifier `.method/checklists/story-ready.md`,
 ajouter les tags de son champ `Conventions` (union avec les globs), lire sa référence UI **si elle
@@ -165,7 +165,7 @@ Au-delà de 2 cycles sans converger → s'arrêter et remonter à l'utilisateur.
 | `docs/changelog.md` | si comportement visible | oui | oui |
 | `component-registry.md` | — | si composant réutilisable | oui |
 | Story post-implémentation | — | si story | si story |
-| `.method/sprint/status.md` | — | si story | si story |
+| Issue du chantier fermée, avec ce qui est livré | — | si issue | si issue |
 | Document de conception `docs/conception/<sujet>.md` | — | si invariant touché | si invariant touché |
 
 En mode story, passer `.method/checklists/story-done.md` avant de clore l'issue : ce qui doit durer

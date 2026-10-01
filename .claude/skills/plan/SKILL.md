@@ -146,8 +146,8 @@ la liste des six outils est figée, ajout seulement (ADR-002).
 Passer `.method/checklists/readiness-gate.md` (+ `prd-evolution.md` en Évolution). Vérifier la
 cohérence PRD ↔ conception ↔ design ↔ issues et stories. Si KO, corriger avant de clore.
 
-Initialiser ou mettre à jour `.method/sprint/status.md` : dates, epic focus, stories
-sélectionnées. Puis résumer : ce qui a été produit, ce qui a été volontairement laissé de côté,
+Ouvrir ou mettre à jour les issues du cadrage, avec l'accord de JB : l'épic en issue parente, ses chantiers en
+sous-issues, chacune pointant sa story s'il y en a une. Puis résumer : ce qui a été produit, ce qui a été volontairement laissé de côté,
 et la première story à implémenter.
 
 **Rendre la main explicitement.** Un cadrage ne se termine pas sur un document : il se termine

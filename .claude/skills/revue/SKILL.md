@@ -145,6 +145,6 @@ findings pour justifier la review, et ne pas produire de résumé décoratif par
 - **❌ CHANGES REQUESTED** → appliquer les fix HAUTE et MOYENNE, relancer `pnpm verify`, puis
   relancer cette review. Les BASSE sont mentionnées à l'utilisateur, jamais appliquées sans son
   accord.
-- **✅ APPROVED** → continuer vers la finalisation (changelog, registry, story, sprint status).
+- **✅ APPROVED** → continuer vers la finalisation (changelog, registry, story, issue du chantier).
 
 Plus de 2 cycles de review sans converger → s'arrêter et remonter le blocage à l'utilisateur.

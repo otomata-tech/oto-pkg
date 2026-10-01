@@ -109,6 +109,12 @@ describe("section operations on blocks (AC22)", () => {
     const withExamples = [...devis(), ...doc([heading("Exemple", 1), paragraph("a"), heading("Exemple", 1)], 20)]
     const cases: [Op[], string, DocBlock[]?][] = [
       [[{ op: "append", section: "Budget", text: "x" }], "Op 1 (append « Budget »): unknown section « Budget ». Sections: « Objet », « Étapes », « Cas particulier », « Règles »."],
+      // Une page sans section : le refus dit par quoi commencer, `append` n'y a rien à prolonger.
+      [
+        [{ op: "append", section: "Budget", text: "x" }],
+        "Op 1 (append « Budget »): unknown section « Budget ». Sections: none; create one with add_section (no after), or write the whole body with set_markdown.",
+        [],
+      ],
       [
         [{ op: "append", section: "exemple", text: "x" }],
         `Op 1 (append « exemple »): section « exemple » is ambiguous: 2 headings have this title (refs ${ref(blockUuid(20))}, ${ref(blockUuid(22))}); use block operations with one of these refs.`,

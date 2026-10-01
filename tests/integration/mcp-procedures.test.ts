@@ -66,7 +66,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
     async function session(person: Person, userAgent: string) {
       const connected = await connectMcp({ host: ref.host }, { id: ref.people[person].id, email: ref.people[person].email, accessToken: tokens[person] }, userAgent)
       const { code } = await connected.openContext("Écris une procédure de relance")
-      const call = (tool: string, args: Record<string, unknown>) => connected.call(tool, { ctx: code, ...args })
+      const call = (tool: string, args: Record<string, unknown>) => connected.call(tool, tool === "context" ? args : { ctx: code, ...args })
       return { ...connected, call }
     }
 

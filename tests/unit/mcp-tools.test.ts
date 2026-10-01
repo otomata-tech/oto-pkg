@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest"
 import pkg from "../../packages/plateforme/package.json"
 import { serverOptions } from "../../packages/plateforme/mcp/server"
-import { buildTools, displayOrg, prerequisite, serverInstructions, toolKey } from "../../packages/plateforme/mcp/tools"
+import { inputSchemas, parseInput } from "../../packages/plateforme/mcp/schemas"
+import { buildTools, displayOrg, prerequisite, serverInstructions, TOOL_KEYS, toolKey } from "../../packages/plateforme/mcp/tools"
 
 const ACME = { prefix: "acme", name: "Acme Énergies", domains: "sales, customer support, energy consulting" }
 const DELTA = { prefix: "delta", name: "Delta Logistique", domains: null }
@@ -190,6 +191,29 @@ describe("input schemas (AC8)", () => {
 
   it("should keep the JSON Schemas frozen (ADR-002: add, never modify)", () => {
     expect(tools.map(({ name, inputSchema }) => ({ name, inputSchema }))).toMatchSnapshot()
+  })
+
+  // Le schéma servi dit `additionalProperties: false` : une clé inconnue est refusée, jamais retirée en silence
+  // (un `text` à la racine de `write` créait une page vide).
+  it("should refuse an unknown top-level key on the six tools, naming it and the keys of the tool", () => {
+    const schemas = inputSchemas("acme")
+    const create = { ctx: "AAAA-BBBB", path: "ventes/x9", title: "T", summary: "S" }
+    expect(parseInput(schemas.write, { ...create, text: "Le corps." })).toEqual({
+      issues: "unknown key « text »; keys: ctx, path, base_revision, title, summary, kind, ops, header, publish",
+    })
+    expect(parseInput(schemas.write, create)).toMatchObject({ data: create })
+    const valid: Record<string, Record<string, unknown>> = {
+      context: {},
+      find: { ctx: "AAAA-BBBB", query: "devis" },
+      read: { ctx: "AAAA-BBBB", path: "ventes/x9" },
+      call: { ctx: "AAAA-BBBB", function: "table.rows" },
+      write: create,
+      feedback: { ctx: "AAAA-BBBB", type: "gap", text: "Rien." },
+    }
+    for (const key of TOOL_KEYS) {
+      const refused = parseInput(schemas[key], { ...valid[key], zzz: 1, yyy: 2 })
+      expect(refused, key).toMatchObject({ issues: expect.stringMatching(/^unknown keys « zzz », « yyy »; keys: /) })
+    }
   })
 })
 

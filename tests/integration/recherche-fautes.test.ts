@@ -76,6 +76,7 @@ type Hit = {
   column_name: string | null
   snippet: string
   rank: number
+  block_total?: number | null
 }
 
 const paths = (hits: Hit[]) => [...new Set(hits.map((hit) => hit.path))]
@@ -88,7 +89,10 @@ const blockSnippet = (hits: Hit[], path: string) => hits.find((hit) => hit.path 
  * jusqu'à la fin du bloc (AC-b10, fiche D43 B), redevient celui de `before` : le reste se compare tel quel.
  */
 function withoutExtensions(after: Hit[], before: Hit[]): Hit[] {
-  return after.map((hit, index) => {
+  // `block_total` (1.2.1), que la fonction d'avant ne rend pas, est retiré de la comparaison.
+  return after.map((full, index) => {
+    const hit = { ...full }
+    delete hit.block_total
     const former = before[index]
     if (!former || hit.match !== "block" || !hit.snippet.startsWith(former.snippet)) return hit
     const words = hit.snippet.slice(former.snippet.length).split(/\s+/).filter(Boolean).length

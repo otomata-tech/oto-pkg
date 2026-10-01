@@ -217,11 +217,11 @@ describe.skipIf(!sqlConfigured)(portable("table.import and POST tables/import on
     expect((await rowsOf(PROSPECTS.path)).some((row) => row.key === "Scierie Neuve")).toBe(false)
   })
 
-  it("should keep write strict through MCP, tolerant ignored, and read tolerant from the body of the API (AC-a2)", async () => {
+  it("should keep write strict through MCP, tolerant refused as an unknown key, and read tolerant from the body of the API (AC-a2)", async () => {
     const claire = await session("claire")
     const text = "# Titre\n\n```call\nx {\n```"
     const strict = await claire.call("write", { ctx: ref.id(CTX.claire), path: "ventes/cr_strict", title: "CR", summary: "Un compte rendu.", ops: [{ op: "insert_after", text }], tolerant: true })
-    expect([strict.isError, strict.text]).toEqual([true, "Op 1 (insert_after): line 1 « # Titre » is the level of the page title; headings start at ##. Nothing was written."])
+    expect([strict.isError, strict.text]).toEqual([true, "Invalid arguments for acme_write: unknown key « tolerant »; keys: ctx, path, base_revision, title, summary, kind, ops, header, publish"])
     const screen = await writeNode(await ref.db("claire"), acmeIdentity(ref, "claire"), { path: "ventes/cr_ecran", title: "CR", summary: "Un compte rendu.", ops: [{ op: "insert_after", text }], tolerant: true }, { kind: "human" })
     expect(screen.data).toMatchObject({ kept_as_text: 1 })
   })

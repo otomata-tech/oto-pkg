@@ -32,7 +32,7 @@ type Candidate = Database["platform"]["Functions"]["route_candidates"]["Returns"
 type Who = "lea" | "paul" | "claire" | "marc" | "outsider"
 
 const COLUMNS = ["ref", "entreprise", "contact", "email", "ville", "statut"]
-const CONTRACT_COLUMNS = ["node_id", "path", "title", "summary", "kind", "match", "block_id", "block_type", "block_key", "column_name", "snippet", "rank"]
+const CONTRACT_COLUMNS = ["node_id", "path", "title", "summary", "kind", "match", "block_id", "block_type", "block_key", "column_name", "snippet", "rank", "block_total"]
 
 // ------------------------------------------------------------ Jeu de M06 (classement par couverture)
 // Données de la forme d'Acme (maquette `scripts/lib/proto-data.mjs` du banc : procédures
@@ -348,7 +348,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
     describe("form and rank (AC22)", () => {
       // Les bornes de chaque tranche sont prouvées sur toutes les lignes par le test des tranches du jeu
       // de M06 ; l'extrait, réuni ici (M11b).
-      it("should rank the title, then the summary, then the blocks, with the twelve columns of the contract, the terms framed with ** in a snippet of 300 characters at most", async () => {
+      it("should rank the title, then the summary, then the blocks, with the thirteen columns of the contract, the terms framed with ** in a snippet of 300 characters at most", async () => {
         const hits = await search("lea", "zorglub")
         expect(hits.map(at)).toEqual([
           ["ventes/a_titre", "title", null, null],
@@ -367,9 +367,11 @@ describe.skipIf(!sqlConfigured || privatePending)(
         }
       })
 
-      it("should return three blocks of a node at most", async () => {
+      it("should return three blocks of a node at most, each with the number of blocks found in the node, null on a title or a summary", async () => {
         const hits = await search("lea", "quokka")
         expect(hits.map(at)).toEqual(Array.from({ length: 3 }, () => ["ventes/d_quatre", "block", "paragraph", null]))
+        expect(hits.map((hit) => hit.block_total)).toEqual([4, 4, 4])
+        expect((await search("lea", "zorglub")).map((hit) => hit.block_total)).toEqual([null, null, 3, 3, 3])
       })
 
       it("should bound p_limit to 1..50, 20 by default", async () => {

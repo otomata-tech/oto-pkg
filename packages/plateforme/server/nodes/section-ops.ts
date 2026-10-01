@@ -38,7 +38,8 @@ export function locate(state: OpState, title: string, role: "section" | "after")
   const found = findSections(state.blocks, title)
   if (found.length === 0) {
     const titles = headingTitles(state.blocks)
-    const sections = titles.length > 0 ? quotedList(titles) : "none"
+    // Une page sans section : le refus dit par quoi commencer, aucune opération par section n'y a de cible.
+    const sections = titles.length > 0 ? quotedList(titles) : "none; create one with add_section (no after), or write the whole body with set_markdown"
     throw new OpProblem("invalid_arguments", `unknown section « ${title} »${role === "after" ? " for after" : ""}. Sections: ${sections}.`)
   }
   if (found.length > 1) {

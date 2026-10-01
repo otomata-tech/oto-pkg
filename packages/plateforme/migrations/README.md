@@ -141,6 +141,13 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
      supprimée puis recréée avec la liste d'avant plus `functions`), comme `journal` : `read` y liste les
      fonctions. Une équipe dont le slug est déjà `functions` fait échouer cette partie : lui donner un autre
      slug dans la base (`update platform.teams set slug = …`) avant d'appliquer. Aucune table, colonne ni index.
+- `20261001150000_v1_2_1.sql` (version 1.2.1) : `search_content` rend une colonne de plus, `block_total`, le nombre
+  de blocs publiés du nœud que la recherche trouve, avant sa coupe à trois blocs par nœud (`null` sur une ligne
+  de titre ou de résumé) : `find` dit les blocs qu'il ne montre pas. Le type rendu change : la fonction est
+  retirée puis recréée aussitôt, mêmes arguments, mêmes privilèges, le reste à l'identique de 20260930100000.
+  Elle commence par un appel à `extensions.similarity`, qui charge la bibliothèque de `pg_trgm` dans la session :
+  sans lui, `supabase db push` refuse la clause `set "pg_trgm.similarity_threshold"` de la fonction sur un projet
+  Supabase (42501). Aucune table, colonne ni index.
 
 ## Installer sur un hôte neuf
 

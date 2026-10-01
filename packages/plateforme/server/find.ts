@@ -50,6 +50,8 @@ type SearchRow = {
   column_name: string | null
   snippet: string | null
   rank: number
+  /** Les blocs trouvés du nœud, avant la coupe à trois de `search_content` ; nul sur un titre ou un résumé. */
+  block_total: number | null
 }
 
 /**
@@ -61,9 +63,10 @@ type Place = { match: string; block: string | null; block_type: string | null; c
 
 /**
  * Un nœud trouvé ; `revision` (E11-S19, AC-e5) : sa révision publiée, lue pour un nœud dont des blocs de page sont
- * montrés ; `editable` : la personne l'écrit. `nodeId` et `editable` ne sont jamais servis en données.
+ * montrés ; `editable` : la personne l'écrit. `nodeId` et `editable` ne sont jamais servis en données. `blocksTotal` :
+ * les blocs que la recherche trouve dans le nœud, montrés ou non (`block_total`), absent d'un nœud trouvé sans bloc.
  */
-type NodeMatch = { nodeId: string; path: string; kind: string; title: string; summary: string; score: number; places: Place[]; revision?: number; editable?: boolean }
+type NodeMatch = { nodeId: string; path: string; kind: string; title: string; summary: string; score: number; places: Place[]; revision?: number; editable?: boolean; blocksTotal?: number }
 
 type FunctionMatch = { fn: CatalogFunction; score: number }
 
@@ -92,6 +95,7 @@ function groupMatches(rows: readonly SearchRow[]): { nodes: NodeMatch[]; moreNod
     const node = found ?? { nodeId: row.node_id, path: row.path, kind: row.kind, title: row.title, summary: row.summary, score: 0, places: [] }
     node.score = Math.max(node.score, Math.min(1, row.rank / RANK_SPAN))
     node.places.push(placeOf(row))
+    if (row.block_total != null) node.blocksTotal = row.block_total
     if (!found) byNode.set(row.node_id, node)
   }
   const nodes = [...byNode.values()]
@@ -158,11 +162,16 @@ function nodeLines(node: NodeMatch, index: number, prefix: string): string[] {
   const title = node.places.find((place) => place.match === "title")?.snippet ?? oneLine(node.title)
   const summary = node.places.find((place) => place.match === "summary")?.snippet ?? oneLine(node.summary)
   const blocks = node.places.filter((place) => place.match === "block").map(blockLine)
+  // Les blocs de page que la coupe à trois ne montre pas, comptés ; les lignes d'un tableau ont leur consigne (`renderFind`).
+  const hidden =
+    node.kind !== "table" && node.blocksTotal !== undefined && node.blocksTotal > blocks.length && blocks.length > 0
+      ? [`   ${blocks.length} of ${node.blocksTotal} matching blocks shown: read the page for the others, or search more exact words.`]
+      : []
   const edit =
     node.editable && node.revision !== undefined
       ? [`   To edit: ${prefix}_write {"path": "${node.path}", "base_revision": ${node.revision}, "ops": [...]}.`]
       : []
-  return [`${index + 1}. ${node.path} (${node.kind}, score ${formatScore(node.score)}): ${title}. ${summary}`, ...blocks, ...edit]
+  return [`${index + 1}. ${node.path} (${node.kind}, score ${formatScore(node.score)}): ${title}. ${summary}`, ...blocks, ...hidden, ...edit]
 }
 
 /**
@@ -213,7 +222,7 @@ async function readableRows(db: PlatformDb, identity: Identity, query: string, t
   const rows = await inTransaction(db, "find: search_content", (sql) => {
     const kinds = type === undefined ? sql`` : sql`p_kinds => ${KINDS[type]}, `
     return sql<SearchRow[]>`
-      select s.node_id, s.path, s.title, s.summary, s.kind, s.match, s.block_id, s.block_type, s.block_key, s.column_name, s.snippet, s.rank
+      select s.node_id, s.path, s.title, s.summary, s.kind, s.match, s.block_id, s.block_type, s.block_key, s.column_name, s.snippet, s.rank, s.block_total
         from platform.search_content(p_org => ${identity.org.id}, p_query => ${query}, ${kinds}p_limit => ${SEARCH_ROWS}) s`
   })
   const levels = await nodeLevels(db, identity, [...new Set(rows.map((row) => row.node_id))])
@@ -265,7 +274,8 @@ function matchData(node: NodeMatch) {
     ...(place.section === undefined ? {} : { section: place.section }),
   }))
   const revision = node.revision === undefined ? {} : { revision: node.revision }
-  return { path: node.path, kind: node.kind, title: node.title, summary: node.summary, score: roundScore(node.score), places, ...revision }
+  const blocksTotal = node.blocksTotal === undefined ? {} : { blocks_total: node.blocksTotal }
+  return { path: node.path, kind: node.kind, title: node.title, summary: node.summary, score: roundScore(node.score), places, ...revision, ...blocksTotal }
 }
 
 /**

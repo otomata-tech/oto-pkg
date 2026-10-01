@@ -23,7 +23,7 @@ export const writeNodeBodySchema = writeNodeSchema.extend({
   // lui-même servi serait refusé.
   draft_stamp: z.iso.datetime({ offset: true }).optional(),
   // E10-S01 (AC-a2) : le mode tolérant de l'analyse, pour un collage ou un fichier importé par l'écran ; absent de
-  // `writeNodeSchema`, qui retire les clés inconnues : `write` reste strict.
+  // `writeNodeSchema`, dont `parseInput` refuse les clés inconnues : `write` reste strict.
   tolerant: z.literal(true).optional(),
 })
 

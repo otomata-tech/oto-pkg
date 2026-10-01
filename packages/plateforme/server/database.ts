@@ -1586,6 +1586,7 @@ export type Database = {
         Returns: {
           block_id: string
           block_key: string
+          block_total: number
           block_type: string
           column_name: string
           kind: string

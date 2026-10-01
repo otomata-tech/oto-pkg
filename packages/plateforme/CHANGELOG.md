@@ -17,6 +17,15 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Assistants
+- `find` says how many blocks of a page match when it shows only three of them (« 3 of 4 matching blocks shown »), and gives `blocks_total` in its data.
+- A tool refuses an unknown top-level argument and names the accepted ones, instead of ignoring it: `text` passed to `write` no longer creates an empty page.
+- A section operation on a page without section says where to start: `add_section`, or `set_markdown` for the whole body.
+
+### Hosts
+- Migrations: copy `20261001150000_v1_2_1.sql` (`oto-platform migrations sync`, then `migrations check`) and apply it: `search_content` dropped and recreated with one more returned column, `block_total`; same arguments and grants; no table, no column.
+- MCP: `parseInput` refuses an unknown top-level key on the six tools, as the served schemas say (`additionalProperties: false`); a host or a client that sent extra keys now gets `invalid_arguments`.
+
 ## 1.2.0 — 2026-10-01
 
 ### Hosts

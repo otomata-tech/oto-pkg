@@ -14,8 +14,12 @@
 // mêmes champs, même ordre, mêmes descriptions ; seuls les ajouts d'E03-S03 changent leur JSON Schema.
 import * as z from "zod/v4"
 import { feedbackInputSchema, feedbackTypeSchema, readNodeSchema, writeNodeSchema } from "../schemas"
-import { issuesText } from "../server/errors"
+import { boundedList, issuesText } from "../server/errors"
+import { cut } from "../server/journal"
 import type { ToolKey } from "./tools"
+
+/** Une clé inconnue redite dans un refus : son nom vient de l'appelant, sans borne propre. */
+const MAX_KEY_CHARS = 60
 
 function ctxField(prefix: string) {
   return z.string().describe(`ctx code returned by ${prefix}_context, e.g. 7K3Q-M2XA. Required: call ${prefix}_context first.`)
@@ -109,10 +113,16 @@ export function toInputSchema(schema: z.ZodObject): Record<string, unknown> {
 /**
  * Lecture des arguments ; les problèmes sont rendus au modèle, chemin par chemin (AC14), les 20
  * premiers seulement, puis leur nombre restant (« … and 980 more », N30) : même formateur que les
- * refus de saisie des services (`issuesText`).
+ * refus de saisie des services (`issuesText`). Une clé inconnue à la racine est refusée, comme le schéma servi le dit
+ * (`additionalProperties: false`), nommée avec les clés de l'outil : retirée en silence, un `text` passé à `write`
+ * créait une page vide.
  */
 export function parseInput<S extends z.ZodObject>(schema: S, args: unknown): { data: z.output<S> } | { issues: string } {
-  const result = schema.safeParse(args)
-  if (result.success) return { data: result.data }
-  return { issues: issuesText(result.error.issues) }
+  const result = schema.strict().safeParse(args)
+  // `strict()` ne change que le sort des clés inconnues : la sortie est celle de `schema`, que TypeScript ne relie pas.
+  if (result.success) return { data: result.data as z.output<S> }
+  const unknown = result.error.issues.flatMap((issue) => (issue.code === "unrecognized_keys" && issue.path.length === 0 ? issue.keys : []))
+  const known = result.error.issues.filter((issue) => !(issue.code === "unrecognized_keys" && issue.path.length === 0))
+  const keys = unknown.length > 0 ? [`unknown ${unknown.length > 1 ? "keys" : "key"} ${boundedList(unknown.map((key) => `« ${cut(key, MAX_KEY_CHARS)} »`))}; keys: ${Object.keys(schema.shape).join(", ")}`] : []
+  return { issues: [...keys, ...(known.length > 0 ? [issuesText(known)] : [])].join("; ") }
 }

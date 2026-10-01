@@ -213,10 +213,10 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
       const found = [
         zorglubRow("ventes/a_titre", { snippet: "Le **zorglub**", rank: 2.9 }),
         zorglubRow("ventes/b_resume", { match: "summary", snippet: "Le **zorglub** est dans le résumé.", rank: 1.08 }),
-        zorglubRow("ventes/c_bloc", inBlock(0xc001, "paragraph", { snippet: "Le **zorglub** est ici dans un bloc.", rank: 0.09 })),
+        zorglubRow("ventes/c_bloc", inBlock(0xc001, "paragraph", { snippet: "Le **zorglub** est ici dans un bloc.", rank: 0.09, block_total: 5 })),
         zorglubRow("ventes/d_bloc", inBlock(0xd001, "paragraph", { snippet: "Le **zorglub** est ici dans un bloc.", rank: 0.09 })),
-        zorglubRow("ventes/c_bloc", inBlock(0xc002, "checklist", { snippet: "Vérifier le **zorglub**", rank: 0.08 })),
-        zorglubRow("ventes/c_bloc", inBlock(0xc003, "callout", { snippet: "Attention au **zorglub**.", rank: 0.07 })),
+        zorglubRow("ventes/c_bloc", inBlock(0xc002, "checklist", { snippet: "Vérifier le **zorglub**", rank: 0.08, block_total: 5 })),
+        zorglubRow("ventes/c_bloc", inBlock(0xc003, "callout", { snippet: "Attention au **zorglub**.", rank: 0.07, block_total: 5 })),
       ]
       const { db } = await searchDb({ zorglub: found, "zorglub seul": found.filter((row) => row.path !== "ventes/d_bloc") })
       const ada = ref.identityOf("ada")
@@ -232,13 +232,15 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
           "   - block 0000c001 (paragraph): Le **zorglub** est ici dans un bloc.",
           "   - block 0000c002 (checklist): Vérifier le **zorglub**",
           "   - block 0000c003 (callout): Attention au **zorglub**.",
+          // `search_content` ne rend que trois blocs par nœud : les autres blocs trouvés sont comptés, jamais tus.
+          "   3 of 5 matching blocks shown: read the page for the others, or search more exact words.",
           // E11-S19 (AC-e5) : Ada, administratrice, écrit la page ; ses blocs simulés n'ont pas de section en base.
           `   To edit: ${ref.org.prefix}_write {"path": "ventes/c_bloc", "base_revision": ${cRevision}, "ops": [...]}.`,
           "More nodes match (at least 1): add words or set type to narrow the search.",
           readLine(ref.org.prefix),
         ].join("\n"),
       )
-      expect(result.data).toMatchObject({ more_nodes: 1 })
+      expect(result.data).toMatchObject({ more_nodes: 1, matches: [{}, {}, { path: "ventes/c_bloc", blocks_total: 5 }] })
       const whole = await find(db, ada, { query: "zorglub seul" }, NO_CATALOG)
       expect(whole.text).not.toContain("More nodes match")
       expect(whole.data).toMatchObject({ more_nodes: 0 })
@@ -255,8 +257,8 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
         { type: "paragraph", text: "Le zorglub coûte trois euros." },
       ])
       const found = [
-        zorglubRow(path, { match: "block", block_id: inTarifs, block_type: "paragraph", snippet: "Le **zorglub** coûte trois euros.", rank: 0.09 }),
-        zorglubRow(path, { match: "block", block_id: before, block_type: "paragraph", snippet: "Le **zorglub** avant tout titre.", rank: 0.08 }),
+        zorglubRow(path, { match: "block", block_id: inTarifs, block_type: "paragraph", snippet: "Le **zorglub** coûte trois euros.", rank: 0.09, block_total: 2 }),
+        zorglubRow(path, { match: "block", block_id: before, block_type: "paragraph", snippet: "Le **zorglub** avant tout titre.", rank: 0.08, block_total: 2 }),
       ]
       const [{ revision }] = await seed.admin<{ revision: number }[]>`select revision from platform.nodes where id = ${ref.nodeId(path)}`
       const blockLines = [
@@ -268,6 +270,8 @@ describe.skipIf(!sqlConfigured)(portable("find on the real database, Acme on O")
       expect(written.data).toMatchObject({
         matches: [{ path, revision, places: [{ block: inTarifs.slice(0, 8), section: "Tarifs" }, { block: before.slice(0, 8), section: null }] }],
       })
+      // Les deux blocs trouvés sont montrés : aucune ligne de décompte.
+      expect(written.text).not.toContain("matching blocks shown")
       // Marc lit la page sans l'écrire : les sections, sans l'appel qui édite.
       await ref.addRules([{ node: path, user: "marc", level: "read" }])
       const marc = await ref.db("marc")

@@ -280,10 +280,10 @@ describe.skipIf(!sqlConfigured)(
         expect(rows?.map((row) => [row.method, row.tool, row.ctx, row.is_error, row.error])).toEqual([
           ["tools/list", null, null, false, null],
           ["tools/call", `${orgA.prefix}_context`, code, false, null],
-          ["tools/call", feedbackTool, code, false, null],
+          // Une clé inconnue est refusée (`parseInput`) : la ligne est journalisée, sa valeur masquée (plus bas).
+          ["tools/call", feedbackTool, code, true, `invalid_arguments: Invalid arguments for ${feedbackTool}: unknown key « api_key »; keys: ctx, type, text, target`],
           ["tools/call", feedbackTool, null, true, `ctx_missing: Missing or unknown ctx. Call ${orgA.prefix}_context first and pass its ctx code.`],
         ])
-        expect(rows?.[2].target).toMatch(/^FB-\d{4,}$/)
         for (const row of rows ?? []) {
           expect(row).toMatchObject({ org_id: orgA.id, user_id: people.claire.id, user_agent: userAgent })
           expect(row.duration_ms).toBeGreaterThanOrEqual(0)

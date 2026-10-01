@@ -382,7 +382,7 @@
 | N12 | `find` de `type: "page"` cherche les pages et les Contextes (`p_kinds` = `page`, `context`) : l'énumération figée de `find` n'a pas de valeur `context`. |
 | N13 | `find` sert trois nœuds avec leurs emplacements et trois fonctions au plus, sous sa description figée ; le score d'un nœud est son meilleur rang divisé par 3, dans [0, 1] comme celui des fonctions. |
 | N14 | `find` ne dit pas « The best match is weak » : le rang de `search_content` classe des emplacements sans mesurer une confiance ; le seuil de l'organisation ne sert que le routage de `context`. |
-| N15 | Une liste coupée de `find` le dit : « More nodes match (at least <n>) … » quand d'autres nœuds ont été vus, « At most 3 rows per table are shown … » quand une ligne de tableau est montrée. |
+| N15 | Une liste coupée de `find` le dit : « More nodes match (at least <n>) … » quand d'autres nœuds ont été vus, « At most 3 rows per table are shown … » quand une ligne de tableau est montrée, « <n> of <total> matching blocks shown … » quand une page a plus de blocs trouvés que les trois montrés. |
 | N16 | Un extrait de `find` tient sur une ligne (blancs et sauts de ligne réduits à une espace) ; titre et résumé sont remplacés par leur extrait quand la correspondance y est. |
 | N17 | Pannes : `search_content` en erreur → `internal` pour `find` ; dans `context`, routage en panne → aucune étape et « no procedure could be matched right now », réglage illisible → défauts, bonus illisible → aucun ; `context` répond. |
 | N18 | `rankCandidates` ne route que les procédures (`p_kind: "procedure"` de `route_candidates`), sans genre en paramètre. |

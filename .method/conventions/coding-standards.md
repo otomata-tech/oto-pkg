@@ -91,6 +91,13 @@ encore initialisée. Une fonction dont l'import fermerait un cycle descend dans 
 ses lecteurs importent sans cycle. **Vérifiable :** `tests/unit/import-cycles.test.ts` (graphe des imports de ces faces) et
 `tests/unit/schemas-load-order.test.ts` (chaque module de `schemas/` chargé en premier, Node natif).
 
+Aucune initialisation ne repose sur l'effet de bord d'un import, ni du paquet ni d'une dépendance
+déclarée `"sideEffects": false` : le bundler d'un hôte en production saute le module qui ne fait
+que cela, sans erreur. Elle passe par une fonction appelée dans du code servi (`ensureZodMessages`,
+`schemas/zod-messages.ts`, à l'entrée de chaque porte : sans elle, tout refus de saisie de Zod dit
+« Invalid input »). **Vérifiable :** aucun `import "<module>"` sans nom dans `packages/plateforme/`
+hors feuilles de style (`rg -n '^import "' packages/plateforme`).
+
 ## Error Handling
 
 - Jamais de catch vide

@@ -10,6 +10,13 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — Les refus de saisie redisent ce qui cloche chez un hôte en production (« Invalid input »)
+
+**Quoi :** `ensureZodMessages` (`schemas/zod-messages.ts`) installe les messages anglais de Zod ; les trois portes l'appellent à l'entrée d'une requête (`handlePlateforme`, `handleMcpPost`, `handleAdminMcp`).
+**Pourquoi :** rejeu de la 1.3.1 sur Démo : `node.write_many` refusait une clé inconnue par « pages.0.ops.0: Invalid input », sans la nommer ; un assistant avait déjà relevé « Invalid input » sur une opération inconnue de `write`. `zod` se déclare `sideEffects: false` et n'installe ses messages que par une instruction de `zod/v4` : le bundle de production d'un hôte saute ce module. Reproduit hors dépôt en empaquetant un schéma par le webpack de Next en mode production (script de session) : « Invalid input » deux fois, puis les messages complets après `z.config(z.locales.en())`. Les tests du dépôt, non empaquetés, ne pouvaient pas le voir.
+**Problèmes :** la règle est écrite dans `coding-standards.md § Imports`. Les formulaires des écrans (`ui/`), validés dans le navigateur, ne passent pas par les portes : non traités ici.
+**Fichiers :** `packages/plateforme/{schemas/zod-messages.ts,api/handler.ts,mcp/handler.ts,mcp/admin/handler.ts,CHANGELOG.md}` ; `tests/unit/schemas/zod-messages.test.ts` ; `.method/conventions/coding-standards.md` et sa fiche, `component-registry.md`.
+
 ## [2026-10-01] — 1.3.1 : version du paquet (lot strict de `node.write_many`, Contexte changé qui avertit)
 
 **Quoi :** `version` 1.3.1 et `## 1.3.1 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.

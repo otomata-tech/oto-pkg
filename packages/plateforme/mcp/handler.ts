@@ -7,6 +7,7 @@
 // par requête, corps illisible refusé avant mcp-handler, 405. Retiré : l'organisation résolue
 // avant le jeton par une clé de service (N1) et les lignes de refus au journal (N2, AC2).
 import { createMcpHandler, getPublicOrigin, withMcpAuth } from "mcp-handler"
+import { ensureZodMessages } from "../schemas/zod-messages"
 import { loadActiveConnectors } from "../server/connectors/activations"
 import { createPlatformDb } from "../server/db"
 import { isPlatformError } from "../server/errors"
@@ -143,6 +144,8 @@ async function serveAuthenticated(request: Request, context: RequestContext): Pr
  * Sans jeton valide : 401 ; adresse sans organisation : 404 ; base injoignable : 503.
  */
 export async function handleMcpPost(request: Request, options: { verifyToken: VerifyToken; defer: Defer }): Promise<Response> {
+  // Avant toute validation : chez un hôte empaqueté, Zod n'a pas ses messages (`schemas/zod-messages.ts`).
+  ensureZodMessages()
   const context: RequestContext = {
     body: await request.clone().text(),
     host: requestHost(request.headers),

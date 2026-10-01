@@ -5,6 +5,7 @@
 import type { VerifyToken } from "../mcp/auth"
 import type { SignupOptions } from "../server/admin/signup"
 import { PLATFORM_API_PREFIX } from "../schemas/api"
+import { ensureZodMessages } from "../schemas/zod-messages"
 import type { Json } from "../server/database"
 import type { PlatformDb } from "../server/db"
 import { PlatformError } from "../server/errors"
@@ -257,6 +258,8 @@ function journalLine(served: Served, request: { method: string; tool: string; id
  * la réponse. Sans `defer`, la promesse n'est pas attendue ; son échec part au log serveur.
  */
 export async function handlePlateforme(request: Request, options: PlatformRequestOptions): Promise<Response> {
+  // Avant toute validation : chez un hôte empaqueté, Zod n'a pas ses messages (`schemas/zod-messages.ts`).
+  ensureZodMessages()
   const started = Date.now()
   try {
     // La lecture d'un lien public (E05-S10 partie d, ADR-013 § 4) : hors session, avant le jeton, sans journal.

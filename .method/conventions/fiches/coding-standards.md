@@ -13,6 +13,7 @@ Texte complet : `.method/conventions/coding-standards.md`. La fiche suffit pour 
 - Toute surface nouvelle porte ce qui casse sans elle aujourd'hui ; sans justification au présent, la retirer au lieu de la documenter. § DRY
 - Les imports de l'hôte passent par l'alias `@/` vers `src/`. § Imports
 - Aucun cycle d'imports évalués entre les modules de `schemas/`, `api/` et `mcp/` du paquet : chez un hôte, n'importe quel module d'une face peut se charger en premier ; `tests/unit/import-cycles.test.ts` le vérifie. § Imports
+- Aucune initialisation par l'effet de bord d'un import (le paquet et `zod` sont `sideEffects: false`, le bundler d'un hôte saute le module) : une fonction appelée à l'entrée d'une porte, comme `ensureZodMessages`. § Imports
 - Une Server Action rend `{ data }` ou `{ error }`, jamais une exception vers le client. § Error Handling
 - Tout composant d'interface gère chargement, erreur et vide. § Error Handling
 - Toute réponse Supabase : lire son `.error` et le traiter. § Error Handling

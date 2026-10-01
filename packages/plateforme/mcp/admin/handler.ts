@@ -8,6 +8,7 @@
 // suffixé, 401 sans motif au client ; (`src/app/api/proto/u/[user]/[transport]/route.ts` l. 49-59) :
 // handler par requête, `disableSse`, journal dans `after()` ; retiré : l'identité par segment d'URL.
 import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { ensureZodMessages } from "../../schemas/zod-messages"
 import { adminJournalEntry, flushAdminJournal, requireStaff, type AdminJournalEntry } from "../../server/admin/context"
 import type { OrgCreationHook } from "../../server/admin/org-creation"
 import { createPlatformDb } from "../../server/db"
@@ -108,6 +109,8 @@ export async function handleAdminMcp(
   request: Request,
   options: { verifyToken: VerifyToken; defer: Defer; orgCreation?: OrgCreationHook },
 ): Promise<Response> {
+  // Avant toute validation : chez un hôte empaqueté, Zod n'a pas ses messages (`schemas/zod-messages.ts`).
+  ensureZodMessages()
   const context: RequestContext = {
     body: await request.clone().text(),
     userAgent: request.headers.get("user-agent"),

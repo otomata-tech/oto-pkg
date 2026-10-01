@@ -3,8 +3,8 @@
 // L'attente après la création d'une organisation (E12-S01) : son adresse est neuve, et un sous-domaine attend son
 // certificat une à deux minutes ; y partir aussitôt mène à une erreur du navigateur. L'écran dit ce qui est fait et ce
 // qui reste (trois étapes), avance une barre qui ne finit qu'avec la sonde, apprend à la personne ce qu'elle va trouver,
-// puis la conduit à l'adresse dès qu'elle répond. Au bout de deux minutes sans réponse, il le dit et laisse le lien et
-// « Réessayer ». Sans lui, `FormulaireDInscription` porterait la sonde, ses minuteurs et cet écran.
+// puis la conduit à l'adresse dès qu'elle répond. Au bout de deux minutes sans réponse, il le dit et donne alors le lien et
+// « Réessayer » (jamais avant : l'adresse ne répond pas encore). Sans lui, `FormulaireDInscription` porterait la sonde, ses minuteurs et cet écran.
 import { useEffect, useState, type CSSProperties } from "react"
 import { Check } from "@phosphor-icons/react/dist/csr/Check"
 import { CircleNotch } from "@phosphor-icons/react/dist/csr/CircleNotch"
@@ -126,9 +126,12 @@ export function DepartVersLOrganisation({ adresse }: { adresse: string }) {
         <p role="status" className="text-sm text-ink">
           {etat === "retard" ? "La mise en ligne prend plus de temps que prévu. Votre organisation est bien créée." : ""}
         </p>
-        <a href={adresse} className="text-sm text-ink underline underline-offset-2">
-          {`Ouvrir ${hote}`}
-        </a>
+        {/* Le lien seulement au retard : avant, l'adresse ne répond pas, et il mènerait à l'erreur du navigateur. */}
+        {etat === "retard" && (
+          <a href={adresse} className="text-sm text-ink underline underline-offset-2">
+            {`Ouvrir ${hote}`}
+          </a>
+        )}
       </div>
     </IlotDAuthentification>
   )

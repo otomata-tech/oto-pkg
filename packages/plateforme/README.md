@@ -397,8 +397,8 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
   frappe et donne l'adresse lue sous le nom (il passe par `admit` à chaque pause) ; le bouton « Créer
   l'organisation » crée au premier clic. La personne part ensuite à l'adresse de la nouvelle organisation dès
   qu'elle répond, où elle se reconnecte (la session est liée à l'adresse) ; d'ici là, l'écran « Votre espace
-  se prépare » dit les étapes, avance une barre et laisse le lien ; au bout de deux minutes sans réponse, il
-  le dit et propose « Réessayer ».
+  se prépare » dit les étapes et avance une barre, sans lien vers l'adresse ; au bout de deux minutes sans
+  réponse, il le dit, donne le lien et propose « Réessayer ».
   La personne ne saisit que le nom : l'adresse et le préfixe des outils s'en déduisent, et leurs champs ne
   s'affichent que sur un refus `conflict` ou pour un nom dont on ne tire rien de valide. Le nom se juge à la
   sortie de son champ ou à Entrée, jamais pendant la frappe.

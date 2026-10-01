@@ -111,7 +111,8 @@ describe("FormulaireDInscription (AC-12)", () => {
       "Mise en ligne sécurisée (en cours)Le certificat de votre adresse s'installe.",
     ])
     expect(screen.getByRole("progressbar", { name: "Mise en ligne de votre espace" })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Ouvrir atelier.oto.test" })).toHaveAttribute("href", "https://atelier.oto.test/")
+    // Aucun lien vers l'adresse tant qu'elle ne répond pas : il mènerait à l'erreur du navigateur.
+    expect(screen.queryByRole("link")).toBeNull()
     await waitFor(() => expect(sondes).toHaveLength(1))
     expect(assign).not.toHaveBeenCalled()
   })
@@ -232,7 +233,7 @@ describe("DepartVersLOrganisation", () => {
     expect(sondes).toHaveLength(40)
     expect(screen.getByText("La mise en ligne prend plus de temps que prévu. Votre organisation est bien créée.")).toBeInTheDocument()
     expect(screen.queryByRole("progressbar")).toBeNull()
-    expect(screen.getByRole("link", { name: "Ouvrir atelier.oto.test" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Ouvrir atelier.oto.test" })).toHaveAttribute("href", "https://atelier.oto.test/")
 
     fireEvent.click(screen.getByRole("button", { name: "Réessayer" }))
     await act(() => vi.advanceTimersByTimeAsync(100))

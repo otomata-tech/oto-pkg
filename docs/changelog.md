@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.7 : plus de lien vers la nouvelle adresse pendant l'attente
+
+**Quoi :** `DepartVersLOrganisation` n'affiche le lien « Ouvrir <adresse> » qu'au retard des deux minutes, avec « Réessayer » ; pendant l'attente, l'adresse reste lisible en texte dans l'étape « Adresse réservée ». `version` 1.3.7, aucune migration.
+**Pourquoi :** retour de JB après une création rejouée en production : le lien, cliqué pendant l'attente, mène à l'erreur du navigateur que l'écran évite, le certificat n'étant pas encore émis.
+**Fichiers :** `packages/plateforme/ui/inscription/depart-vers-l-organisation.tsx`, `tests/integration/components/e12s01-inscription.test.tsx`, `packages/plateforme/{package.json,CHANGELOG.md,README.md}`, `docs/conception/offres-de-l-hote.md`.
+
 ## [2026-10-01] — 1.3.6 : écran d'attente après la création d'une organisation ; la bascule mène à une adresse joignable
 
 **Quoi :** `DepartVersLOrganisation` (nouveau fichier, sorti de `FormulaireDInscription`) : titre « Votre espace se prépare », trois étapes (classes `oto-stepper` du design system), barre `oto-progress` qui ne finit qu'à la réponse de l'adresse, texte qui change toutes les sept secondes, « C'est prêt » puis départ ; au bout de deux minutes, le retard est dit, avec « Réessayer ». `listMyOrganisations(db, identity, requestHost?)` choisit par `reachableHost` l'adresse la plus proche de celle de la requête, puis une adresse hors `localhost`, puis l'ordre alphabétique ; le layout de référence passe `session.host`.

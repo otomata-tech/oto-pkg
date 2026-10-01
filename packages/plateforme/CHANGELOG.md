@@ -17,6 +17,12 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.7 — 2026-10-01
+
+### Hosts
+- Install: upgrade to 1.3.7; no migration, no new variable, no import to change.
+- UI: the waiting screen after a signup no longer shows the link to the new address while it waits: the address does not answer yet, and the link led to the browser error the screen avoids. The link comes with « Réessayer », after two minutes without an answer; the address stays readable as text in its step.
+
 ## 1.3.6 — 2026-10-01
 
 ### Hosts

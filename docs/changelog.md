@@ -10,6 +10,12 @@
 **Fichiers :** Liste des fichiers créés/modifiés
 -->
 
+## [2026-10-01] — 1.3.2 : version du paquet (messages des refus de saisie chez un hôte en production)
+
+**Quoi :** `version` 1.3.2 et `## 1.3.2 — 2026-10-01` du CHANGELOG du paquet ; aucune migration.
+**Pourquoi :** décision de JB : publier la 1.3.2.
+**Fichiers :** `packages/plateforme/{package.json,CHANGELOG.md}`.
+
 ## [2026-10-01] — Les refus de saisie redisent ce qui cloche chez un hôte en production (« Invalid input »)
 
 **Quoi :** `ensureZodMessages` (`schemas/zod-messages.ts`) installe les messages anglais de Zod ; les trois portes l'appellent à l'entrée d'une requête (`handlePlateforme`, `handleMcpPost`, `handleAdminMcp`).

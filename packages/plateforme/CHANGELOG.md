@@ -17,10 +17,13 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.3.2 — 2026-10-01
+
 ### Assistants
 - A refusal of invalid arguments says what was wrong again (the allowed values, the unknown key, the expected type), instead of « Invalid input ».
 
 ### Hosts
+- Install: upgrade to 1.3.2; no migration, no new variable, no import to change.
 - Server: the three doors (`handlePlateforme`, `handleMcpPost`, `handleAdminMcp`) install Zod's English messages at each request. A host's production bundle dropped them (`zod` declares `sideEffects: false`), so every refusal from Zod read « Invalid input », at the API and at the MCP alike. Nothing to change in the host.
 
 ## 1.3.1 — 2026-10-01

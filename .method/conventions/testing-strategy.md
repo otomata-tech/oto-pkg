@@ -114,15 +114,13 @@ permutation de plus sans nommer la faille qu'elle révélerait.
 
 Sur le poste, `pnpm verify` tourne sur un **Postgres 16 natif**, pas sur le projet Supabase, comme
 le job `bare-postgres` de la CI : le paquet ne suppose pas Supabase, et le projet distant ne sert plus
-que les suites propres à Supabase, lancées avec `PLATFORM_TEST_DB=env`.
+que les suites propres à Supabase, lancées sans la variable.
 
-- **Mode local, le défaut** : sans variable (ou `PLATFORM_TEST_DB=local`), `vitest.config.ts`
-  pointe `PLATFORM_DATABASE_URL` et `PLATFORM_ADMIN_DATABASE_URL` sur la base du checkout et
+- **Mode local** : `PLATFORM_TEST_DB=local` dans `.env.local` (ou l'environnement). `vitest.config.ts`
+  pointe alors `PLATFORM_DATABASE_URL` et `PLATFORM_ADMIN_DATABASE_URL` sur la base du checkout et
   retire les variables de Supabase : les suites Auth, `auth.users`, hook d'inscription et Data API se
   sautent (`supabaseConfigured`, `adminSqlConfigured`), les suites portables (`sqlConfigured`) passent.
-  `PLATFORM_TEST_DB=env` seul garde les connexions posées (`.env.local`, environnement) : le projet de test
-  pour les suites propres à Supabase, le Postgres du job en CI (`ci.yml` la pose). Raison : une variable oubliée
-  faisait partir toute la campagne vers le projet distant. **Vérifiable :** `tests/unit/test-db-local.test.ts`.
+  Sans la variable, rien ne change : le projet reste la base, la CI aussi.
 - **Les tests ne visent jamais la production** : `PLATFORM_TEST_PROJECT_ID` déclare le projet de test,
   et la mise en place de Vitest (`vitest.config.ts`) et de Playwright (`playwright.config.ts`) arrête
   la campagne avant toute suite si elle vise le projet distant (`SUPABASE_PROJECT_ID`, l'URL de l'API

@@ -158,6 +158,23 @@ pnpm dev                     # l'application de base sur http://localhost:3000
 La CI (`.github/workflows/ci.yml`) contrôle les migrations, construit l'application de base et fait
 tourner la suite sur un Postgres nu.
 
+### Poste d'un nouveau développeur
+
+Les tests tournent sur une vraie base. `.env.local` n'est jamais commité : chaque poste a le sien.
+
+- **Sans aucun secret** : Postgres 16 installé, `pnpm db:local`, puis `PLATFORM_TEST_DB=local pnpm verify`.
+  Toute la suite y tourne, sauf les suites propres à Supabase (Auth, serveur OAuth, Data API, outillage à
+  comptes).
+- **Sur le projet Supabase de test** (le défaut, sans `PLATFORM_TEST_DB`) : le responsable du dépôt invite la
+  personne sur le projet et lui transmet les valeurs hors du dépôt (gestionnaire de secrets, jamais un mail ni
+  un commit). Les noms des variables sont ceux de `.env.example` ; `PLATFORM_TEST_PROJECT_ID` égale
+  `SUPABASE_PROJECT_ID`, sinon la garde arrête la campagne avant la première suite. Chacun crée son propre
+  `SUPABASE_ACCESS_TOKEN` ; un jeton personnel ne se partage pas.
+- **Le projet est partagé** : les données de test sont jetables (`pnpm test:cleanup` retire les restes), et une
+  seule migration non fusionnée y est appliquée à la fois : prévenir avant un `supabase db push`.
+
+Détail : `.method/conventions/testing-strategy.md § Base de test locale`.
+
 ## Publier une version
 
 Un changement se fait ici (retours produit compris), se commite sur `main`, puis sort par une version.

@@ -1,6 +1,6 @@
 /**
  * La base de test locale (M62) : un Postgres 16 natif du poste, à la place du projet Supabase, pour les
- * suites portables de Vitest (le défaut de `vitest.config.ts`, hors `PLATFORM_TEST_DB=env`). Ce que ça empêche : un
+ * suites portables de Vitest (`PLATFORM_TEST_DB=local`, `vitest.config.ts`). Ce que ça empêche : un
  * `pnpm verify` de ~20 min, fait surtout d'allers-retours vers le projet distant ; et, une base par
  * checkout, qu'une migration d'un worktree change la base des autres.
  *

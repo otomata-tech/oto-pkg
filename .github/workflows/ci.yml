@@ -123,6 +123,4 @@ jobs:
         env:
           PLATFORM_DATABASE_URL: postgresql://platform_app@localhost:5432/postgres
           PLATFORM_ADMIN_DATABASE_URL: ${{ env.DB_URL }}
-          # Les connexions du job telles quelles : sans elle, Vitest vise la base du poste (`vitest.config.ts`).
-          PLATFORM_TEST_DB: env
         run: pnpm exec vitest run tests/integration tests/unit

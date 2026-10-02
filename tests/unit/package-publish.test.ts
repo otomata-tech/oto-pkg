@@ -45,7 +45,7 @@ describe("package manifest (AC1)", () => {
       directory: "packages/plateforme",
     })
     expect(pkg.publishConfig).toEqual({ access: "public", provenance: true })
-    expect(pkg.files).toEqual(["ui", "schemas", "mcp", "api", "server", "migrations", "cli", "CHANGELOG.md", "README.md", "LICENSE"])
+    expect(pkg.files).toEqual(["ui", "schemas", "mcp", "api", "server", "migrations", "cli", "widgets", "CHANGELOG.md", "README.md", "LICENSE"])
 
     expect(pkg.bin).toEqual({ "oto-platform": "./cli/bin.mjs" })
     expect(published(pkg.bin["oto-platform"], pkg.files)).toBe(true)

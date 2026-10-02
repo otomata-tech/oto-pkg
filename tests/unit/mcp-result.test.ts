@@ -77,6 +77,14 @@ describe("formatResult (AC20)", () => {
     expect(result.structuredContent).toEqual({ data_omitted: true, text: "big", next_actions: [] })
     expect(log).toHaveBeenCalledOnce()
   })
+
+  // Story widgets-dans-la-conversation : la vue vit avec les données qu'elle rend.
+  it("should serve the widget's view beside the data, and drop it with data over 20,000 characters", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    const view = { kind: "table" as const, theme: "lagune" as const, call: "acme_call" }
+    expect(formatResult({ text: "rows", data: { rows: [] } }, notSensitive, view).structuredContent).toEqual({ rows: [], view, text: "rows", next_actions: [] })
+    expect(formatResult({ text: "big", data: { rows: "z".repeat(MAX_DATA_CHARS) } }, notSensitive, view).structuredContent).toEqual({ data_omitted: true, text: "big", next_actions: [] })
+  })
 })
 
 describe("formatError (AC20)", () => {

@@ -13,7 +13,9 @@ import {
   ErrorCode,
   GetPromptRequestSchema,
   ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js"
 import pkg from "../package.json"
 import { CTX_PATTERN } from "../schemas"
@@ -29,6 +31,7 @@ import { find } from "../server/find"
 import type { Identity, IdentityOrg } from "../server/identity"
 import { clip, journalError, loggedArgs, type JournalEntry } from "../server/journal"
 import { isJsonObject } from "../server/json"
+import { preferredTheme } from "../server/language"
 import { readNode } from "../server/nodes/read"
 import { writeNode } from "../server/nodes/write"
 import { getPrompt, listPrompts, type ProcedurePrompt, unknownPromptMessage } from "../server/prompts"
@@ -36,6 +39,7 @@ import type { ToolOutput } from "../server/tool-output"
 import { formatError, formatResult, type ToolResult } from "./result"
 import { inputSchemas, parseInput, type ToolInput } from "./schemas"
 import { buildTools, displayOrg, serverInstructions, toolKey, type ToolKey, type ToolOrg } from "./tools"
+import { readWidgetResource, widgetResources } from "./widget-meta"
 
 /** Version du contrat servi : aucun host ne la montre, elle date le journal (mcp-patterns.md § 2). */
 export const PLATFORM_MCP_VERSION = pkg.version
@@ -66,6 +70,11 @@ export type McpDeps = {
   origin: string
   /** Jeton vérifié de la requête : une fonction ERP s'exécute sous lui (E08-S05, NH4) ; sans lui, aucune ne court. */
   accessToken?: string
+  /**
+   * Le widget routeur est allumé (`handleMcpPost`, story widgets-dans-la-conversation) : méta de `call` et `read`,
+   * resources du bundle, vue des résultats. Éteint (défaut), le serveur sert le texte seul d'avant.
+   */
+  widgets?: boolean
 }
 
 /** `trace` : ce qu'un `call` a établi avant d'échouer (équipe, compte), pour sa ligne de journal (E03-S04, AC16). */
@@ -102,7 +111,7 @@ const SERVICES: { [K in ToolKey]: Service<K> } = {
   context: ({ db, identity, userAgent }, input) => buildContext(db, identity, input, { userAgent }),
   find: async ({ db, identity, activeConnectors }, input) => find(db, identity, input, { functions: catalogFunctions(), activeConnectors: await activeConnectors() }),
   // L'origine de la requête rend absolue l'adresse d'un fichier joint (E10-S02, AC-d1).
-  read: ({ db, identity, origin }, input) => readNode(db, identity, input, { origin }),
+  read: ({ db, identity, origin, widgets }, input) => readNode(db, identity, input, { origin, views: widgets }),
   call: ({ db, identity, origin, activeConnectors, trace, accessToken }, input, ctx) =>
     runCall({ db, identity, ctxCode: ctx?.code ?? null, ctxHost: ctx?.host ?? null, origin, activeConnectors, trace, accessToken }, input),
   // La provenance d'un bloc écrit par un assistant porte le code `ctx` de la conversation (AC28).
@@ -111,11 +120,12 @@ const SERVICES: { [K in ToolKey]: Service<K> } = {
   feedback: ({ db, identity }, input, ctx) => recordFeedback(db, identity, input, ctx?.code ?? null),
 }
 
-export function serverOptions(org: ToolOrg) {
+export function serverOptions(org: ToolOrg, options: { widgets?: boolean } = {}) {
   return {
     serverInfo: { name: "oto-platform", title: displayOrg(org).name, version: PLATFORM_MCP_VERSION },
     instructions: serverInstructions(org),
-    capabilities: { tools: {}, prompts: {} },
+    // `resources` : les deux variantes du bundle du widget, déclarées seulement quand il est allumé.
+    capabilities: { tools: {}, prompts: {}, ...(options.widgets ? { resources: {} } : {}) },
   }
 }
 
@@ -190,7 +200,10 @@ async function runTool(
     const output = validated.ctx?.changed
       ? { ...served, text: withCtxNotice(served.text, deps.org.prefix, validated.ctx), data: { ...served.data, new_ctx: validated.ctx.code } }
       : served
-    const result = formatResult(output, (next) => findFunction(functions, next)?.class === "sensitive")
+    // La vue du widget, au thème de la personne sinon de l'organisation, comme ses écrans (ADR-008 § 3).
+    // `call` : l'outil que le widget appelle (page suivante, vue de l'ERP), sous le préfixe de l'organisation.
+    const view = deps.widgets && output.view ? { kind: output.view, theme: preferredTheme(member.identity), call: `${deps.org.prefix}_call` } : undefined
+    const result = formatResult(output, (next) => findFunction(functions, next)?.class === "sensitive", view)
     Object.assign(entry, {
       ctx: output.ctx ?? validated.ctx?.code ?? entry.ctx,
       host: output.host ?? validated.ctx?.host ?? null,
@@ -286,7 +299,7 @@ export function installPlatformMcp(server: McpServer, deps: McpDeps): void {
   // Servie à tout jeton valide, membre ou non (banc E03) : la connexion passe, les appels sont refusés.
   server.server.setRequestHandler(ListToolsRequestSchema, async (request) => {
     const started = Date.now()
-    const tools = buildTools(deps.org, callExamples(functions, await exampleConnectors(deps)))
+    const tools = buildTools(deps.org, callExamples(functions, await exampleConnectors(deps)), { widgets: deps.widgets })
     record(deps, { method: "tools/list", params: request.params, started }, { result_chars: JSON.stringify(tools).length })
     return { tools }
   })
@@ -294,6 +307,8 @@ export function installPlatformMcp(server: McpServer, deps: McpDeps): void {
   server.server.setRequestHandler(CallToolRequestSchema, (request) =>
     runTool(deps, functions, request.params.name, request.params.arguments ?? {}),
   )
+
+  if (deps.widgets) installWidgetResources(server, deps)
 
   // Les procédures publiées lisibles (P37, E03-S05) : Claude Code lit `prompts/list` à chaque session.
   server.server.setRequestHandler(ListPromptsRequestSchema, async (request) => {
@@ -317,5 +332,33 @@ export function installPlatformMcp(server: McpServer, deps: McpDeps): void {
     } catch (error) {
       throw promptFailure(deps, handled, error, { target: name })
     }
+  })
+}
+
+/** Adresse inconnue de `resources/read` : erreur JSON-RPC « resource not found » de la spécification MCP. */
+const RESOURCE_NOT_FOUND = -32002
+
+/**
+ * Le bundle du widget (story widgets-dans-la-conversation) : servi à tout jeton valide, comme la liste d'outils ;
+ * il ne porte aucune donnée, seulement le code qui rend un résultat déjà servi.
+ */
+function installWidgetResources(server: McpServer, deps: McpDeps): void {
+  server.server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
+    const resources = widgetResources()
+    record(deps, { method: "resources/list", params: request.params, started: Date.now() }, { result_chars: JSON.stringify(resources).length })
+    return { resources }
+  })
+
+  server.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const handled = { method: "resources/read", params: request.params, started: Date.now() }
+    const uri = clip(request.params.uri, MAX_NAME_CHARS)
+    const resource = readWidgetResource(request.params.uri)
+    if (!resource) {
+      const message = `Unknown resource ${uri}.`
+      record(deps, handled, { target: uri, is_error: true, error: journalError("not_found", message), result_chars: message.length })
+      throw new JsonRpcError(RESOURCE_NOT_FOUND, message)
+    }
+    record(deps, handled, { target: uri, result_chars: resource.contents[0].text.length })
+    return resource
   })
 }

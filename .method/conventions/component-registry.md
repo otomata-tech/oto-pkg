@@ -118,6 +118,7 @@ FR-INST-03) : vérifier ce tableau avant de créer un composant dans `ui/`, et l
 | useConfirmationEnLigne | `packages/plateforme/ui/components/confirmation-en-ligne.tsx` | { question, libelleConfirmer, confirmer, envoi? } → { ouverte, rendu, depart, demander, refermer, revenir } | Client ; confirmation en ligne commune à `ActionPlateforme`, « Abandonner mon texte » et la publication d'un Contexte vide ; un îlot ne reçoit jamais de fonction en prop (E05-S04) |
 | Choix, optionsDe | `packages/plateforme/ui/components/choix.tsx` | id, nom, libelle, tous, options, valeur, ici, Lien | Server ; liste d'un filtre GET, échec dit à sa place avec « Réessayer » ; déplacé du journal (E05-S05) par E05-S04 |
 | genreDuNoeud | `packages/plateforme/ui/noeud/libelles.ts` | vue | Genre montré (celui du brouillon s'il en change) (E05-S04) |
+| Widget, DELAI_MS ; VueDuResultat, VueDeChargement, RegionDAlerte, ActionsDuWidget, LIBELLES ; sourceDeLHost, SourceDuResultat ; ErpView, ErpViewProps | `packages/plateforme/widgets/{widget,vues}.tsx`, `bridge.ts`, `index.ts` | source, vuesErp ; resultat (`structuredContent`), actions | Widget routeur dans la conversation (story widgets-dans-la-conversation), hors d'`ui/` : bundle Vite single-file (`widgets/build.mjs`, `oto-platform widgets build` chez l'hôte) ; vues `table` (`Table` du DS, « Lignes suivantes »), `record`, `page` (`RenduDUnBloc`), `erp:<nom>` (vue de l'hôte, `call` sans `confirm`), suites en message, rien sans vue connue ; chargement borné à 12 s ; une région d'alerte montée vide ; pont MCP Apps (`ext-apps`) et `window.openai`, seul accès à l'host |
 
 ## Hooks
 
@@ -359,8 +360,7 @@ FR-INST-03) : vérifier ce tableau avant de créer un composant dans `ui/`, et l
 
 ## Outillage (`scripts/`)
 
-Scripts à clé service, jamais importés par le paquet ni par l'hôte (garde
-`tests/unit/cle-service-hors-paquet.test.ts`).
+Scripts à clé service, jamais importés par le paquet ni par l'hôte (garde `tests/unit/cle-service-hors-paquet.test.ts`).
 
 | Util | Path | Usage |
 |------|------|-------|

@@ -14,6 +14,9 @@
   "bin": {
     "oto-platform": "./cli/bin.mjs"
   },
+  "scripts": {
+    "prepack": "node widgets/build.mjs"
+  },
   "files": [
     "ui",
     "schemas",
@@ -22,6 +25,7 @@
     "server",
     "migrations",
     "cli",
+    "widgets",
     "CHANGELOG.md",
     "README.md",
     "LICENSE"
@@ -36,6 +40,7 @@
     "./api": "./api/index.ts",
     "./server": "./server/index.ts",
     "./migrations/*": "./migrations/*",
+    "./widgets": "./widgets/index.ts",
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -55,6 +60,28 @@
     "@phosphor-icons/react": "^2",
     "zod": "^3.25",
     "react-hook-form": "^7.55",
-    "@hookform/resolvers": "^5"
+    "@hookform/resolvers": "^5",
+    "vite": "^7",
+    "@vitejs/plugin-react": "^4",
+    "vite-plugin-singlefile": "^2.3",
+    "@tailwindcss/postcss": "^4",
+    "tailwindcss": "^4",
+    "@modelcontextprotocol/ext-apps": "^1.7"
+  },
+  "peerDependenciesMeta": {
+    "vite": { "optional": true },
+    "@vitejs/plugin-react": { "optional": true },
+    "vite-plugin-singlefile": { "optional": true },
+    "@tailwindcss/postcss": { "optional": true },
+    "tailwindcss": { "optional": true },
+    "@modelcontextprotocol/ext-apps": { "optional": true }
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@tailwindcss/postcss": "4.2.1",
+    "@vitejs/plugin-react": "4.7.0",
+    "tailwindcss": "4.2.1",
+    "vite": "7.3.1",
+    "vite-plugin-singlefile": "2.3.3"
   }
 }

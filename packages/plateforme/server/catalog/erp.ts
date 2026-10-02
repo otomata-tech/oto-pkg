@@ -13,9 +13,10 @@
 import * as z from "zod/v4"
 import { isRecord } from "../../schemas/tables"
 import { isPlatformError, issuesText, PlatformError } from "../errors"
+import { VIEW_NAME_PATTERN } from "../../schemas/views"
 import { contractNames } from "./contracts"
 import { defineFunction, type CatalogFunction, type FunctionClass, type FunctionContext, type FunctionOutput, type FunctionSummary } from "./define"
-import { replaceErpFunctions } from "./erp-source"
+import { erpWidgetBundle, replaceErpFunctions, replaceErpWidgetBundle, type ErpWidgetBundle } from "./erp-source"
 import { catalogFunctions, looksLikeFunction } from "./registry"
 
 /** Une fonction de l'ERP : une fonction du catalogue d'origine `erp` (H80), de connecteur son espace de noms. */
@@ -39,6 +40,8 @@ type ErpFunctionInput<S extends Schema> = {
   examples: z.input<S>[]
   refusals?: string[]
   next?: string[]
+  /** La vue de l'hôte qui rend `data` dans la conversation, inscrite par `registerWidgetViews` (story widgets-dans-la-conversation). */
+  view?: string
   run: (context: ErpFunctionContext, args: z.output<S>) => Promise<FunctionOutput>
   summarize?: (context: ErpFunctionContext, args: z.output<S>) => Promise<FunctionSummary>
 }
@@ -178,7 +181,38 @@ function functionProblem(fn: ErpFunction, reserved: ReadonlySet<string>): string
   const examples = examplesProblem(fn)
   if (examples) return examples
   if (fn.class === "sensitive" && typeof fn.summarize !== "function") return `${name}: a sensitive function needs summarize (two-step confirmation).`
-  return null
+  return viewProblem(fn)
+}
+
+/** La vue déclarée est dans le bundle inscrit : sinon le widget recevrait un nom qu'il ne sait pas rendre. */
+function viewProblem(fn: ErpFunction): string | null {
+  if (fn.view === undefined) return null
+  if (typeof fn.view !== "string" || !VIEW_NAME_PATTERN.test(fn.view)) return `${fn.name}: view must be lowercase ASCII letters, digits and _, 64 characters at most.`
+  if (erpWidgetBundle()?.views.includes(fn.view)) return null
+  return `${fn.name}: view ${fn.view} is not in the widget bundle; build it with oto-platform widgets build and pass it to registerWidgetViews before registerFunctions.`
+}
+
+/** Le premier problème d'un bundle de l'hôte ; `null` : aucun. */
+function bundleProblem(bundle: ErpWidgetBundle): string | null {
+  if (typeof bundle?.html !== "string" || !bundle.html.trimStart().toLowerCase().startsWith("<!doctype html>")) {
+    return "registerWidgetViews: html must be the HTML document built by oto-platform widgets build."
+  }
+  if (!Array.isArray(bundle.views)) return "registerWidgetViews: views must list the view names of the bundle."
+  const invalid = bundle.views.find((view) => typeof view !== "string" || !VIEW_NAME_PATTERN.test(view))
+  if (invalid !== undefined) return `registerWidgetViews: invalid view name ${JSON.stringify(String(invalid))}.`
+  const duplicate = bundle.views.find((view, index) => bundle.views.indexOf(view) !== index)
+  return duplicate === undefined ? null : `registerWidgetViews: duplicate view ${duplicate}.`
+}
+
+/**
+ * Inscrit le bundle du widget construit par l'hôte (`oto-platform widgets build`), qui porte les vues du paquet et
+ * celles de l'ERP : le MCP le sert à la place de celui du paquet. À appeler avant `registerFunctions`, qui refuse une
+ * fonction dont la vue n'y est pas. Au premier problème, `CatalogRegistrationError` et le bundle servi ne change pas.
+ */
+export function registerWidgetViews(bundle: ErpWidgetBundle): void {
+  const problem = bundleProblem(bundle)
+  if (problem) throw new CatalogRegistrationError(problem)
+  replaceErpWidgetBundle(bundle)
 }
 
 /**

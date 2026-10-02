@@ -35,7 +35,7 @@ déduits des globs — c'est le seul moyen d'activer les tags marqués **non rou
 | `nextjs` | `nextjs-patterns.md` | `src/app/**/page.tsx`, `src/app/**/layout.tsx`, `src/app/**/loading.tsx`, `src/app/**/error.tsx`, `src/app/**/not-found.tsx`, `src/app/**/template.tsx`, `src/app/**/global-error.tsx`, `src/app/**/unauthorized.tsx`, `src/app/**/forbidden.tsx`, `src/app/**/route.ts`, `next.config.ts` | App Router, fichiers spéciaux, frontières d'autorisation |
 | `state` | `state-management.md` | `src/components/**/*provider*.tsx`, `src/components/**/*filter*.tsx`, `src/app/**/page.tsx` | URL state, contexte, hiérarchie de state |
 | `feedback` | `feedback-patterns.md` | oto-saas : `src/components/**/*dialog*.tsx`, `src/components/**/*confirm*.tsx`, `src/components/**/*delete*.tsx`, `src/components/**/*toast*.tsx`, `src/components/ui/sonner.tsx` | Toasts, dialogs, confirmations, empty states |
-| `a11y` | `accessibility-patterns.md` | `src/components/**/*.tsx`, `src/app/**/*.tsx`, `src/app/globals.css`, `packages/plateforme/ui/**/*.tsx` | WCAG, ARIA, clavier, focus, contraste |
+| `a11y` | `accessibility-patterns.md` | `src/components/**/*.tsx`, `src/app/**/*.tsx`, `src/app/globals.css`, `packages/plateforme/ui/**/*.tsx`, `packages/plateforme/widgets/**/*.tsx` | WCAG, ARIA, clavier, focus, contraste |
 | `performance` | `performance-patterns.md` | `next.config.ts`, `src/app/**/loading.tsx`, `src/app/**/page.tsx`, `src/components/**/*chart*.tsx`, `src/components/**/*editor*.tsx` | Code splitting, Web Vitals, images, fonts |
 | `typescript` | `typescript-patterns.md` | `src/types/**`, `tsconfig.json` | Utility types, unions, branded types, type guards |
 | `portage` | `portage-ecrans.md` | `packages/plateforme/ui/**` | Écrans portés d'oto-frontend : navigation par props, tokens Oto, quatre états |
@@ -48,7 +48,7 @@ déduits des globs — c'est le seul moyen d'activer les tags marqués **non rou
 | `datetime` | `datetime-patterns.md` | `src/lib/utils/*date*.ts`, `src/lib/utils/*format*.ts`, `src/lib/utils/*currency*.ts` | Dates, timezones, formatage, devises |
 | `i18n` | `i18n-patterns.md` | `messages/**`, `src/i18n/**`, `src/middleware.ts` | Traductions, pluriels, locale, RTL |
 | `flags` | `feature-flags-patterns.md` | `src/lib/flags/**`, `src/lib/*flag*.ts` | Feature flags, A/B testing, rollouts |
-| `mcp` | `mcp-patterns.md` | `packages/plateforme/mcp/**`, `src/app/api/mcp/**`, `src/app/api/mcp-admin/**`, `src/app/.well-known/**`, `src/app/oauth/**`, `widgets/**` | Tools MCP, AX et découverte par les hosts, résultats, widgets dual-host, OAuth, transport, golden queries |
+| `mcp` | `mcp-patterns.md` | `packages/plateforme/mcp/**`, `src/app/api/mcp/**`, `src/app/api/mcp-admin/**`, `src/app/.well-known/**`, `src/app/oauth/**`, `packages/plateforme/widgets/**` | Tools MCP, AX et découverte par les hosts, résultats, widgets dual-host, OAuth, transport, golden queries |
 
 ### Tags non routables par chemin
 

@@ -176,7 +176,9 @@ async function claimRows(context: FunctionContext, validated: TableClaimArgs): P
     `Left in the queue: ${left} row(s) to process.`,
     ...quota,
   ]
-  return tableResult(table, { text: text.join("\n"), data: { table: path, worker, until, claimed: rows, left } }, teamId)
+  // Une ligne réservée se lit comme une fiche (widget, story widgets-dans-la-conversation) ; plusieurs, en texte.
+  const view = rows.length === 1 ? { view: "record" as const } : {}
+  return tableResult(table, { text: text.join("\n"), data: { table: path, worker, until, claimed: rows, left }, ...view }, teamId)
 }
 
 export const tableClaim = defineFunction({

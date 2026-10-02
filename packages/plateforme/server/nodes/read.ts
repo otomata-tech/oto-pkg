@@ -27,6 +27,7 @@ import { serveBody, type Served } from "./read-body"
 import { readNodeFile } from "./read-file"
 import { headerLines, outlineOf, type PendingDraft, type Version } from "./read-format"
 import { checkCursor, paginate } from "./read-pages"
+import { withPageView } from "./read-view"
 import { readReference, referenceLines, resolveReferences, type ResolvedReference } from "./references"
 import { draftSavedAt, loadBlocks, loadDraft, snapshotBlocks, type DraftRow } from "./store"
 import { familyOf, kindOf, memberNames, ownerOf, ownerTexts, ownerView, statusOf, teamOf, type Family } from "./view"
@@ -145,9 +146,10 @@ function pendingOf(draft: Context["draft"]): PendingDraft | null {
  * (E05-S05) ; `functions`, toutes les fonctions actives (E11-S19) ; un chemin sert l'en-tête du nœud et ses blocs rendus selon le mode demandé, coupés en
  * parties au-delà de 45 000 caractères. Un nœud invisible répond comme un chemin inconnu (H68).
  * `origin` (E10-S02, AC-d1) : l'origine de la requête MCP, qui rend absolue l'adresse d'un fichier joint ;
- * `file` (AC-d2) : le texte d'un fichier joint au nœud.
+ * `file` (AC-d2) : le texte d'un fichier joint au nœud. `views` : les widgets sont allumés, une page servie
+ * entière porte ses blocs et la vue `page` (`withPageView`).
  */
-export async function readNode(db: PlatformDb, identity: Identity, input: ReadNodeInput, options: { origin?: string } = {}): Promise<ToolOutput> {
+export async function readNode(db: PlatformDb, identity: Identity, input: ReadNodeInput, options: { origin?: string; views?: boolean } = {}): Promise<ToolOutput> {
   const prefix = identity.org.prefix
   const path = input.path.trim()
   if (looksLikeFunction(path)) return readFunction(db, identity, path)
@@ -190,7 +192,9 @@ export async function readNode(db: PlatformDb, identity: Identity, input: ReadNo
   const served = await servedOf(db, identity, { input, context, prefix, draftMode, fileRoute: fileRouteOf(options.origin) })
   const data = dataOf(context, served, input)
   const nextActions = context.level >= ACCESS_LEVELS.write ? [`${prefix}_write`] : []
-  return paginate({ input, node: context.node, prefix, header: header.join("\n"), served, data, nextActions, teamId: context.owner.teamId })
+  const output = paginate({ input, node: context.node, prefix, header: header.join("\n"), served, data, nextActions, teamId: context.owner.teamId })
+  // Un tableau sert sa description, sans bloc : `served.blocks` est vide, aucune vue.
+  return options.views ? withPageView(output, served, input) : output
 }
 
 type Body = Served & { references: ResolvedReference[] }

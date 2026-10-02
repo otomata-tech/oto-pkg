@@ -107,7 +107,7 @@ function initializeEntries(deps: McpDeps, body: string): JournalEntry[] {
   }))
 }
 
-type RequestContext = { body: string; host: string | null; origin: string; userAgent: string | null; defer: Defer }
+type RequestContext = { body: string; host: string | null; origin: string; userAgent: string | null; defer: Defer; widgets: boolean }
 
 async function serveAuthenticated(request: Request, context: RequestContext): Promise<Response> {
   // mcp-handler lit le corps sans attendre son échec : il ne répondrait jamais (banc E03).
@@ -125,8 +125,8 @@ async function serveAuthenticated(request: Request, context: RequestContext): Pr
   }
   if (resolved.kind === "unknown_org") return rpcError(404, -32001, resolved.message)
 
-  const { deps } = resolved
-  const mcp = createMcpHandler((server) => installPlatformMcp(server, deps), serverOptions(resolved.org), {
+  const deps: McpDeps = { ...resolved.deps, widgets: context.widgets }
+  const mcp = createMcpHandler((server) => installPlatformMcp(server, deps), serverOptions(resolved.org, { widgets: context.widgets }), {
     basePath: "/api", // → /api/mcp
     maxDuration: 60,
     disableSse: true,
@@ -140,10 +140,11 @@ async function serveAuthenticated(request: Request, context: RequestContext): Pr
 }
 
 /**
- * `POST /api/mcp`. `verifyToken` : `makeVerifyToken()` de `./auth` ; `defer` : `after` de Next.
+ * `POST /api/mcp`. `verifyToken` : `makeVerifyToken()` de `./auth` ; `defer` : `after` de Next ; `widgets` : le
+ * widget routeur sur `call` et `read` (éteint par défaut : texte seul, story widgets-dans-la-conversation).
  * Sans jeton valide : 401 ; adresse sans organisation : 404 ; base injoignable : 503.
  */
-export async function handleMcpPost(request: Request, options: { verifyToken: VerifyToken; defer: Defer }): Promise<Response> {
+export async function handleMcpPost(request: Request, options: { verifyToken: VerifyToken; defer: Defer; widgets?: boolean }): Promise<Response> {
   // Avant toute validation : chez un hôte empaqueté, Zod n'a pas ses messages (`schemas/zod-messages.ts`).
   ensureZodMessages()
   const context: RequestContext = {
@@ -152,6 +153,7 @@ export async function handleMcpPost(request: Request, options: { verifyToken: Ve
     origin: getPublicOrigin(request),
     userAgent: request.headers.get("user-agent"),
     defer: options.defer,
+    widgets: options.widgets === true,
   }
   const authenticated = withMcpAuth((authorized) => serveAuthenticated(authorized, context), options.verifyToken, {
     required: true,

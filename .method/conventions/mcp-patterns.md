@@ -201,7 +201,7 @@ Règle : **aucun fichier hors `widget-meta.ts` ne manipule ces clés**. Quand Ch
 
 ### 5.2 Bridge — un seul module, deux dialectes
 
-- `widgets/shared/bridge.ts` expose une API interne unique : `getToolOutput()`, `callTool(name, args)`, `sendFollowupMessage(text)`, `openExternal(url)`, `getTheme()`.
+- `packages/plateforme/widgets/bridge.ts` est le seul module qui parle à l'host : il livre le résultat de l'outil, ses arguments et le jour ou la nuit (`sourceDeLHost.ecouter`), appelle un outil (`appeler`) et écrit un message dans la conversation (`envoyerMessage`) ; un appel du widget ne porte jamais `confirm`, et une suite (`next_actions`, sans arguments) part en message, jamais en appel.
 - **Protocole GA : utiliser le SDK OFFICIEL `@modelcontextprotocol/ext-apps` (entrée
   `app-with-deps`, autonome) — ne JAMAIS réimplémenter le handshake à la main.** Deux pièges
   vécus (= widget vide, sans erreur) : (1) le host n'envoie RIEN avant `ui/notifications/initialized` ;
@@ -220,7 +220,7 @@ Règle : **aucun fichier hors `widget-meta.ts` ne manipule ces clés**. Quand Ch
 - Exception possible : un widget peut POST sur NOTRE API (même produit) avec un token court fourni par le tool — **l'URL doit être ABSOLUE** (le widget tourne dans l'iframe sandbox du host : une URL relative se résout contre la mauvaise origine et le POST échoue silencieusement sur les deux hosts). Vérifier que l'origine est autorisée par la CSP du host ; sinon prévoir un fallback texte (le tool le propose).
 - **Les deep links du widget pointent les ROUTES RÉELLES de l'app** — attention aux route groups Next.js : `(dashboard)/cvs/[id]` s'atteint via `/cvs/[id]`, pas `/dashboard/cvs/[id]`. Tester chaque lien.
 - Poids cible < 300 Ko par bundle ; **jusqu'à ~600 Ko / gzip < 150 Ko assumé** quand le SDK `ext-apps` + des polices embarquées s'ajoutent (mesure réelle cv-preview : ~527 Ko). Si un rendu existe côté web (composant React), le widget importe **le même composant**, pas une copie.
-- Bundles **inlinés dans un module généré** (`packages/plateforme/mcp/widgets/generated.ts` en V2, produit par `widgets/build.mjs`) : servis en mémoire par le serveur — zéro lecture fs à runtime, zéro config de tracing Vercel.
+- Bundles **inlinés dans un module généré** (`packages/plateforme/mcp/widgets/generated.ts`, produit par `packages/plateforme/widgets/build.mjs`, ignoré par git) : servis en mémoire par le serveur — zéro lecture fs à runtime, zéro config de tracing Vercel.
 - Thème : lire clair/sombre via le bridge, styler les deux. **4 états obligatoires : loading / data / vide / erreur — et le loader n'est JAMAIS un état terminal** : timeout (~12 s) qui bascule vers une erreur actionnable disant QUOI demander dans le chat (« demandez le PDF / réessayez »). Un « Chargement… » infini alors que le backend a réussi est le pire ressenti possible. A11y : zones cliquables focusables au clavier (`role="button"` + `tabIndex` + `onKeyDown`), `aria-label` sur les icônes.
 - **Dégradation** : tout tool doit être pleinement utilisable sans widget (le `content` texte suffit). Le widget est un bonus d'ergonomie, jamais le seul canal d'information.
 

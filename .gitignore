@@ -61,3 +61,7 @@ tsconfig.tsbuildinfo
 
 # Export d'une organisation (`pnpm org:export`, E09-S04) : emails et contenu d'un client, jamais commités
 *.org-export.json
+
+# Bundle du widget routeur, construit par packages/plateforme/widgets/build.mjs (type-check s'il manque,
+# build, CI et npm pack), livré dans le paquet publié, jamais commité
+packages/plateforme/mcp/widgets/generated.ts

@@ -1,7 +1,7 @@
 # Outils MCP
 
 - **Statut** : validé avec JB le 23/09/2026
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-02 (ADR-009 § 3 révisé au statut proposé, en attente de la mesure du banc)
 
 ## Résumé
 
@@ -19,7 +19,8 @@ Le banc a aussi mesuré qu'aucune affinité réseau n'est possible (claude.ai et
 - Aucun geste demandé dans Claude ou ChatGPT pour une procédure, un connecteur ou une règle.
 - Un routage qui ne dépend plus du nombre d'outils ; un contexte relu à chaque conversation ([contexte servi](contexte-servi.md)).
 - Une porte simple, sans état, qui passe à zéro instance.
-- Hors objectif : un outil par famille d'objets ; les widgets MCP Apps et les resources `ui://` ; toute notification du serveur vers le client.
+- Un résultat rendu dans la conversation (tableau, fiche, page, vue d'un ERP) quand l'hôte l'allume, sans outil de plus.
+- Hors objectif : un outil par famille d'objets ; un widget par vue ou par outil ; toute notification du serveur vers le client.
 
 ## Conception
 
@@ -47,7 +48,12 @@ Le banc a aussi mesuré qu'aucune affinité réseau n'est possible (claude.ai et
 
 - Transport sans état (ADR-009 § 1) : Streamable HTTP, pas de `Mcp-Session-Id` persisté, pas de Redis, chaque requête reconstruit le serveur (`disableSse: true`). Tout l'état métier est en Postgres ; l'état conversationnel appartient à l'host ; le code `ctx` regroupe les appels.
 - Pas de notification du serveur vers le client hors requête, pas d'abonnement aux resources (ADR-009 § 2). Une opération longue tient dans la requête (`maxDuration` sur la route) ; au-delà de 60 s, motif « job + fonction de statut » derrière `call`.
-- Texte seul dans la conversation (ADR-009 § 3) : aucun widget, aucune resource `ui://` ; tout résultat reste pleinement utilisable en texte (`mcp-patterns.md` § 5.3 « Dégradation »).
+- **ADR-009 § 3, révisé (proposé le 02/10/2026, mesure du banc à reporter)** : texte seul par défaut ; un widget routeur unique quand l'hôte passe `widgets: true` à `handleMcpPost` (story `docs/produit/stories/widgets-dans-la-conversation.md`). Tout résultat reste pleinement utilisable en texte (`mcp-patterns.md` § 5.3 « Dégradation ») :
+  - Interrupteur éteint : liste d'outils, capacités et `structuredContent` sont ceux du texte seul, octet pour octet.
+  - Allumé : `call` et `read` portent la triple méta du widget (`mcp/widget-meta.ts`), les quatre autres outils non ; le serveur déclare `resources` et sert un seul bundle sous deux adresses, `ui://oto/view.html` (`text/html;profile=mcp-app`) et `ui://oto/view-skybridge.html` (`text/html+skybridge`), en mémoire, sans lecture de fichier.
+  - Un résultat porte `structuredContent.view = { kind, theme, call }` : la vue (`table`, `record`, `page`, ou `erp:<nom>` d'une fonction de l'ERP qui déclare `view`), le thème de la personne sinon de l'organisation, et le nom de l'outil `call` que le widget appelle. Les données de la vue sont celles du résultat, sans copie ; seule la vue `page` ajoute les blocs servis, sous `MAX_DATA_CHARS`. Au-delà, ni données ni vue.
+  - Le bundle du paquet porte ses vues ; un hôte qui déclare des vues de l'ERP construit un bundle unique (`oto-platform widgets build`) et l'inscrit par `registerWidgetViews`, qui remplace celui du paquet.
+  - Le widget appelle `call` par l'host (page suivante d'un tableau, appels d'une vue de l'ERP) sous le `ctx` de la conversation, jamais avec `confirm` ; une suite (`next_actions`) part en message à l'assistant.
 - H21 : le serveur installe des handlers bas niveau du SDK, pas `registerTool`, pour que la garde du `ctx` rende son propre message ; les schémas d'entrée sont en `zod/v4` et servis par `z.toJSONSchema`.
 - E03-S01 N12 : les schémas que le MCP compose (`mcp/schemas.ts`, `schemas/nodes.ts`, `schemas/ctx.ts`…) s'écrivent en `zod/v4` : un schéma v3 ne s'imbrique pas dans un objet v4, et `z.toJSONSchema` n'existe qu'en v4.
 - E03-S01 N10 : aucun module de `mcp/` ne lit l'environnement à l'import : JWKS et émetteur se lisent à la première vérification.
@@ -101,7 +107,11 @@ Le détail des opérations vit dans [lecture et écriture des pages](lecture-et-
 - **Un outil par capacité** (le modèle d'Oto) : une centaine d'outils listés, routage par l'host, geste de chaque utilisateur à chaque évolution. Contredit par le banc.
 - **Un readme et un accusé de lecture, sans code par conversation** : le levier mesuré 9 fois sur 9 est le champ requis ; l'accusé seul prouve l'appel, pas la lecture.
 - **Transport avec état** (sessions et SSE par Redis) : coût de Redis, fin du passage à zéro instance, invalidation de session, tests plus lourds ; le seul gain (`listChanged` poussé) n'est vu que par Claude Code. Rejeté (ADR-009).
-- **Widgets dans la conversation** : build Vite en un fichier, triple méta, matrice de hosts à maintenir, sans demande d'utilisateur. Reportés jusqu'au retour des premiers utilisateurs ; les composants d'`ui/` y serviront (ADR-009 § 3).
+- **Widgets reportés** (ADR-009 § 3 d'origine) : build Vite en un fichier, triple méta, matrice de hosts à maintenir, sans demande d'utilisateur. Rouvert par la demande d'un ERP construit sur le paquet ; remplacé par le widget routeur derrière un interrupteur (proposé).
+- **Un widget par vue, ou un outil par vue** : contredit ADR-002 § 6 (pas d'outil par famille d'objets) et multiplie les cadres ; écarté pour un widget routeur sur `call` et `read`. Repli si le banc montre un cadre vide sur un résultat sans vue : un outil `view` dédié, ajout permis par ADR-002.
+- **Copier les données dans `view.data`** : doublait `structuredContent`, lu en entier par Claude Code, et atteignait `MAX_DATA_CHARS` deux fois plus tôt ; écarté pour une vue qui ne porte que son nom.
+- **Deux bundles (paquet, ERP)** : deux widgets, donc un choix d'outil par fonction ; écarté sans mesure. **Vite en dépendance du paquet** : chaque hôte l'aurait téléchargé, même sans vue de l'ERP ; écarté pour des dépendances paires facultatives.
+- **Suite appelée par le widget** : une suite n'a pas d'arguments, l'appel serait refusé ; écartée pour un message à l'assistant, qui garde aussi la confirmation en deux temps.
 - **Exceptions au gel, sans client** (stade R&D) : en 1.1.0, les descriptions de `write` et des fonctions de tableau ont été réécrites en place et non seulement allongées, les hosts rafraîchissant la liste à la mise à jour (fiche D131, stories E11-S01, E11-S03) ; le défaut de `publish` de `write` est passé de `false` à `true`, `publish: false` gardant le sens d'avant (fiche D135, story E11-S02). Toute exception future demande la même absence de client.
 - Coût accepté : tout passe par six schémas génériques (la qualité des descriptions de fonctions servies par `read` devient critique), et le préfixe est irréversible (une erreur de nommage se paie par une nouvelle organisation). Aucun push : une nouveauté n'atteint le modèle qu'à la conversation suivante ou au prochain appel.
 
@@ -111,14 +121,18 @@ Le détail des opérations vit dans [lecture et écriture des pages](lecture-et-
 - Le journal masque les clés de secret (E03-S01 N5, N29), ne garde pas les refus d'un non-membre (E03-S01 N2), et coupe sans casser l'Unicode (E03-S01 N31).
 - `next_actions` ne propose jamais de fonction sensible (H26) ; les fonctions sensibles se font en deux temps ([connecteurs et comptes](connecteurs-et-comptes.md)).
 - Le détail d'une panne reste au log serveur (E03-S01 N23).
+- Widget : bundle sans ressource externe (CSP des hosts), rendu par React sans `dangerouslySetInnerHTML` ; il ne montre que le résultat déjà servi au modèle. Il appelle `call` par l'host, que le serveur ne distingue pas d'un appel du modèle (mêmes gardes, même journal) ; il n'envoie jamais `confirm`, une fonction sensible ne rend donc que son récapitulatif. Le bundle se sert à tout jeton valide : il ne porte aucune donnée.
 
 ## Écart avec le code
 
-- Aucun écart connu entre ce document et le code ; les cas de test du contrat figé et du routage sont dans [les requêtes de référence](../reference/mcp-golden-queries.md).
+- ADR-009 § 3 révisé au statut proposé : le code le suit, l'interrupteur reste éteint par défaut jusqu'à la mesure du banc (lignes W1 à W6 de [les requêtes de référence](../reference/mcp-golden-queries.md)). L'hôte de référence l'allume par `PLATFORM_MCP_WIDGETS=on`.
+- Bundle de 997 Ko, 307 Ko compressé (sortie de `pnpm widgets:build`), au-delà de la cible de `mcp-patterns.md § 5.3` ; accepté pour le banc.
+- Les cas de test du contrat figé et du routage sont dans [les requêtes de référence](../reference/mcp-golden-queries.md).
 
 ## Questions ouvertes
 
-- Ce qui rouvrirait ADR-009 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT), ou le retour des premiers utilisateurs pour les widgets. Une demande est arrivée d'un ERP construit sur le paquet : un widget routeur déclaré sur `call` et `read`, qui choisit sa vue d'après le résultat, les six outils restant figés ; conception proposée dans la story `docs/produit/stories/widgets-dans-la-conversation.md`, ADR-009 § 3 à réviser après mesure sur le banc.
+- Ce qui rouvrirait ADR-009 § 1 et § 2 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT).
+- ADR-009 § 3 (proposé) : un résultat sans vue ouvre-t-il un cadre visible sur Claude et ChatGPT ? Oui : repli sur un outil `view` dédié. Non : l'interrupteur peut passer à vrai par défaut. À trancher par JB après le banc, avec le poids du bundle.
 
 ## Historique
 
@@ -126,4 +140,5 @@ Le détail des opérations vit dans [lecture et écriture des pages](lecture-et-
 - 2026-09-29 : descriptions de `write` et des fonctions de tableau réécrites en place pour la 1.1.0, sans client ; `publish` de `write` vrai par défaut ; textes de `append`, `move_block` et du plan — décidé par JB et le responsable d'Oto (source : fiches D131, D135, stories E11-S01, E11-S02, E11-S03).
 - 2026-09-30 : routage expliqué (`wordsInCommon`, seuil dit), genre `edit`, chemin réservé `functions`, plan retiré des données d'une section, ligne « To edit » de `find`, `match: "any"` — décidé par le pilote (source : story E11-S19).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-002 (§ 1, § 3 à § 7), ADR-009, D8, H21 à H23, H25, H26, H29, les choix d'E03-S01 et ceux d'E11-S03 et E11-S19 sur les textes servis — décidé par Alexis, accord de JB.
+- 2026-10-02 : ADR-009 § 3 révisé au statut proposé — widget routeur sur `call` et `read` derrière l'interrupteur `widgets`, vues du paquet et de l'ERP, appels du widget sans `confirm` ; mesure du banc à reporter — proposé par la session de la story widgets-dans-la-conversation, à valider par JB.
 - 2026-10-01 : `context` se charge une fois par conversation quand les préférences de la personne le demandent, les autres outils restent réservés au travail ; la borne de la description et le champ `phrase` le disent, mesure sur les assistants après publication — décidé par JB (source : demande du responsable d'Oto).

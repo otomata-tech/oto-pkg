@@ -12,6 +12,7 @@ import { UPLOAD_RULE } from "../schemas/uploads"
 import { workDomains } from "../server/context/blocks/org"
 import { cut } from "../server/journal"
 import { inputSchemas, toInputSchema } from "./schemas"
+import { widgetMeta } from "./widget-meta"
 
 export const TOOL_KEYS = ["context", "find", "read", "call", "write", "feedback"] as const
 export type ToolKey = (typeof TOOL_KEYS)[number]
@@ -26,8 +27,11 @@ export type ToolDefinition = {
   description: string
   inputSchema: Record<string, unknown>
   annotations: Annotations
-  _meta: { securitySchemes: { type: "oauth2" }[] }
+  _meta: { securitySchemes: { type: "oauth2" }[] } & Partial<ReturnType<typeof widgetMeta>>
 }
+
+/** Les deux outils dont le résultat nourrit le widget (`mcp-patterns.md § 5.3 bis`) : tout le métier passe par eux. */
+const WIDGET_TOOLS: readonly ToolKey[] = ["call", "read"]
 
 /** Bornes du nom et des domaines dans les descriptions, pour tenir sous 1 000 caractères (N14). */
 const MAX_NAME_CHARS = 60
@@ -104,7 +108,8 @@ const ANNOTATIONS: Record<ToolKey, Annotations> = {
   feedback: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
 }
 
-export function buildTools(org: ToolOrg, callExamples: string[]): ToolDefinition[] {
+/** `widgets` : le widget routeur est allumé (`handleMcpPost`) ; éteint, la liste est celle d'avant, à l'octet. */
+export function buildTools(org: ToolOrg, callExamples: string[], options: { widgets?: boolean } = {}): ToolDefinition[] {
   const schemas = inputSchemas(org.prefix)
   const text = descriptions(org, callExamples)
   const { name } = displayOrg(org)
@@ -115,7 +120,7 @@ export function buildTools(org: ToolOrg, callExamples: string[]): ToolDefinition
     inputSchema: toInputSchema(schemas[key]),
     annotations: ANNOTATIONS[key],
     // Sans cette déclaration, ChatGPT n'affiche jamais « Se connecter » (mcp-patterns.md § 3).
-    _meta: { securitySchemes: [{ type: "oauth2" }] },
+    _meta: { securitySchemes: [{ type: "oauth2" }], ...(options.widgets && WIDGET_TOOLS.includes(key) ? widgetMeta() : {}) },
   }))
 }
 

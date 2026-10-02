@@ -1,9 +1,10 @@
 /**
  * oto-platform — la ligne de commande du paquet, pour l'application hôte qui l'installe : copie
- * et contrôle des migrations du schéma `platform` (ADR-006), préparation d'une base (ADR-012 § 1).
+ * et contrôle des migrations du schéma `platform` (ADR-006), préparation d'une base (ADR-012 § 1),
+ * bundle du widget avec les vues de l'ERP (story widgets-dans-la-conversation).
  *
- * `run(argv)` rend le code de sortie : 0 succès, 1 copie ou migration refusée, préparation en échec,
- * 2 usage incorrect. Appelée par `bin.mjs` (le `bin` du paquet) et par les scripts `migrations:sync`
+ * `run(argv)` rend le code de sortie : 0 succès, 1 copie ou migration refusée, préparation ou build en
+ * échec, 2 usage incorrect. Appelée par `bin.mjs` (le `bin` du paquet) et par les scripts `migrations:sync`
  * et `check:migrations` du dépôt.
  */
 import { join } from 'node:path'
@@ -17,6 +18,7 @@ const PACKAGE_MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.u
 
 const USAGE = `Usage : oto-platform migrations <sync|check> [options]
         oto-platform db prepare --db-url <url>
+        oto-platform widgets build --views <dossier> --out <fichier>
 
   migrations sync [--from <dossier>] [--to <dossier>]
     Copie les migrations du paquet dans celles de l'application hôte. Une copie qui diffère
@@ -40,21 +42,33 @@ const USAGE = `Usage : oto-platform migrations <sync|check> [options]
     --db-url  URL de connexion d'un rôle d'administration de la base ; TLS exigé, sauf sslmode
               écrit dans l'URL (?sslmode=disable pour un Postgres local sans TLS)
 
+  widgets build --views <dossier> --out <fichier>
+    Construit le bundle du widget de la conversation : les vues du paquet et les vues de l'ERP,
+    un fichier .tsx par vue (devis.tsx : la vue devis de defineErpFunction). Écrit un module qui
+    exporte WIDGET_BUNDLE, à passer à registerWidgetViews avant registerFunctions. Demande, en
+    devDependencies de l'hôte : vite, @vitejs/plugin-react, vite-plugin-singlefile,
+    @tailwindcss/postcss, tailwindcss et @modelcontextprotocol/ext-apps.
+    --views  dossier des vues de l'ERP
+    --out    module TypeScript à écrire (ex. src/lib/widgets.generated.ts)
+
   -h, --help  cette aide
 
-Codes de sortie : 0 succès, 1 copie, migration ou préparation refusée, 2 usage incorrect.`
+Codes de sortie : 0 succès, 1 copie, migration, préparation ou build refusé, 2 usage incorrect.`
 
 const OPTIONS = {
   from: { type: 'string' },
   to: { type: 'string' },
   file: { type: 'string' },
   'db-url': { type: 'string' },
+  views: { type: 'string' },
+  out: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 }
 // Options de chaque sous-commande : celle d'une autre y est une option inconnue.
 const COMMANDS = {
   migrations: { sync: ['from', 'to'], check: ['file'] },
   db: { prepare: ['db-url'] },
+  widgets: { build: ['views', 'out'] },
 }
 
 /** Usage incorrect : le problème nommé sur stderr, puis l'usage, code 2. */
@@ -97,6 +111,7 @@ function parse(argv) {
     if (value === '') throw new UsageError(`l'option « --${name} » attend une valeur`)
   }
   if (command === 'db' && !values['db-url']) throw new UsageError("« db prepare » attend --db-url <url>")
+  if (command === 'widgets' && (!values.views || !values.out)) throw new UsageError('« widgets build » attend --views <dossier> et --out <fichier>')
   return { command, subcommand, ...values }
 }
 
@@ -122,6 +137,10 @@ export async function run(argv) {
       print: (line) => console.log(line),
       printError: (line) => console.error(line),
     })
+  }
+  if (options.command === 'widgets') {
+    const { buildWidgets } = await import('./widgets.mjs')
+    return buildWidgets({ views: options.views, out: options.out, print: (line) => console.log(line), printError: (line) => console.error(line) })
   }
   if (options.subcommand === 'sync') {
     return syncMigrations({ from: options.from ?? PACKAGE_MIGRATIONS, to: options.to ?? 'supabase/migrations' })

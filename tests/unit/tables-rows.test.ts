@@ -8,6 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { formatResult } from "../../packages/plateforme/mcp/result"
 import { isRecord, tableRowReadSchema } from "../../packages/plateforme/schemas/tables"
+import type { ViewKind } from "../../packages/plateforme/schemas/views"
 import type { PlatformError } from "../../packages/plateforme/server/errors"
 import type { RowBlock } from "../../packages/plateforme/server/tables/meta"
 import { tableRows } from "../../packages/plateforme/server/tables/rows"
@@ -20,7 +21,7 @@ import { seedTableFixture } from "../factories/table-fixture-sql"
 import { CASE_TIMEOUT, clientOf, fixtureRows, SEED_TIMEOUT, type FixtureRows } from "../factories/table-rows-sql"
 
 type ServedRow = { key: string | number; revision: number; set: Record<string, unknown>; verified_empty?: unknown; provenance?: Record<string, unknown>; claim?: unknown }
-type Page = { text: string; data: { table: string; total: number; offset: number; rows: ServedRow[]; next_cursor?: string } }
+type Page = { text: string; data: { table: string; total: number; offset: number; rows: ServedRow[]; next_cursor?: string }; view?: ViewKind }
 
 const keys = (page: Page) => page.data.rows.map((row) => row.key)
 
@@ -101,6 +102,12 @@ describe.skipIf(!sqlConfigured)(portable("table.rows on a real database"), { tim
       expect([long.data.rows.length, long.data.total, long.text.split("\n")[0]]).toEqual([20, 25, "ventes/suivi_prospects: 25 row(s) match; rows 1-20."])
       const none = await rows({ filter: { ville: "Paris" } })
       expect([none.text, none.data]).toEqual(["ventes/suivi_prospects: 0 row match.", { table: PROSPECTS.path, total: 0, offset: 0, rows: [] }])
+    })
+
+    // Story widgets-dans-la-conversation : une ligne seule se lit comme une fiche, plusieurs ou aucune comme un tableau.
+    it("should name the widget's view: record for one row, table for several or none", async () => {
+      const views = await Promise.all([{}, { filter: { ville: "Paris" } }, { limit: 1 }].map(async (args) => (await rows(args)).view))
+      expect(views).toEqual(["table", "table", "record"])
     })
 
     it("should serve each row in the form of the write, with the declared columns that have a value and never a null (AC7)", async () => {

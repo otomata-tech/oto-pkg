@@ -18,7 +18,7 @@ function firstText(content: unknown): string {
 
 /** Client MCP connecté à l'adaptateur installé sur `deps` ; `call` préfixe le nom de l'outil. */
 export async function connectDeps(deps: McpDeps) {
-  const { serverInfo, ...options } = serverOptions(deps.org)
+  const { serverInfo, ...options } = serverOptions(deps.org, { widgets: deps.widgets })
   const server = new McpServer(serverInfo, options)
   installPlatformMcp(server, deps)
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()

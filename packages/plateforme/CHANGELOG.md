@@ -17,6 +17,13 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Hosts
+- MCP: `handleMcpPost(request, { verifyToken, defer, widgets: true })` turns on a result widget in Claude and ChatGPT on `call` and `read` (a table, a record, a page read whole). Without `widgets`, the MCP serves exactly what it served before. Off by default until the hosts are measured.
+- Install: the package ships its widget bundle, generated (`mcp/widgets/generated.ts`, about 1 MB); nothing to build, no variable.
+- Server: `registerWidgetViews(WIDGET_BUNDLE)` registers the host's widget bundle, served instead of the package's; `defineErpFunction({ view: "<name>" })` renders the function's result with that host view. Call it before `registerFunctions`, which refuses a view missing from the bundle (`CatalogRegistrationError`).
+- CLI: `oto-platform widgets build --views <folder> --out <file>` builds one bundle, the package's views and the host's (one `.tsx` per view, default export an `ErpView` from `@otomata_tech/oto_platform/widgets`). It needs `vite`, `@vitejs/plugin-react`, `vite-plugin-singlefile`, `@tailwindcss/postcss`, `tailwindcss` and `@modelcontextprotocol/ext-apps` in the host's devDependencies, optional peers of the package; a host without ERP view installs none of them.
+- MCP: with widgets on, a table offers its next rows and a view of the ERP may call a function of the catalog, through the host, under the conversation's `ctx`, never with `confirm`; a suggested next function is sent to the assistant as a message.
+
 ## 1.3.8 — 2026-10-01
 
 ### Assistants

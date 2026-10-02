@@ -17,6 +17,10 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Hosts
+- MCP: `handleMcpPost(request, { verifyToken, defer, widgets: true })` turns on a result widget in Claude and ChatGPT on `call` and `read` (a table, a record, a page read whole). Without `widgets`, the MCP serves exactly what it served before. Off by default until the hosts are measured.
+- Install: the package ships its widget bundle, generated (`mcp/widgets/generated.ts`, about 1 MB); nothing to build, no variable.
+
 ## 1.3.8 — 2026-10-01
 
 ### Assistants

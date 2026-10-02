@@ -91,6 +91,7 @@ Ce document répond à : d'où viennent les écrans du paquet, et comment l'hôt
 
 ## Écart avec le code
 
+- ADR-008 § 5 : le widget routeur dans la conversation (`packages/plateforme/widgets/`, lot 1 de la story `widgets-dans-la-conversation`) rend déjà `Table`, `RenduDUnBloc`, `EmptyState`, `Skeleton` et `Alert` du design system, sous `.oto` au thème de la personne sinon de l'organisation, derrière l'interrupteur `widgets` du MCP (éteint par défaut).
 - M65 : retirer `RailThemePicker`, les écrans Marque, Drapeaux et Accès plateforme et leurs clés d'adresse.
 - M52 : restes de la reprise des écrans (export de `recentDocuments` par `./server`, `connexionsDe` en double entre `/` et `/connect`, lien d'évitement `#main-content`, `/auth/confirmer` au `Button` du design system, aides des specs e2e).
 - M69 : après un déplacement par « ⋯ », le focus tombe sur le document au lieu du nœud déplacé.

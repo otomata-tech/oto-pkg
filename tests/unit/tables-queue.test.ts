@@ -134,6 +134,13 @@ describe.skipIf(!sqlConfigured)(portable("work queue on a real database"), { tim
       expect(paul).toMatchObject({ code: "invalid_arguments", message: "Table support/tickets has no work queue (no lifecycle): table.claim does not apply." })
     })
 
+    // Story widgets-dans-la-conversation : une ligne réservée se lit comme une fiche ; plusieurs, en texte seul.
+    it("should name the record view for one claimed row only", async () => {
+      const one = await call(tableClaim, CLAIRE, { worker: "claude-claire", limit: 1 }, await fixture.database(prospects({})))
+      const two = await call(tableClaim, CLAIRE, { worker: "claude-claire", limit: 2 }, await fixture.database(prospects({})))
+      expect([claimed(one).length, one.view, claimed(two).length, two.view]).toEqual([1, "record", 2, undefined])
+    })
+
     it("should reach with a filter a waiting row beyond the first page of candidates, and refuse a filter on more than 5,000 rows (AC20, N14)", { timeout: BIG_TABLE_TIMEOUT }, async () => {
       // `count` prospects « à traiter » ; le dernier dans l'ordre de la file, seul à Port-Lise.
       const waiting = (count: number): RowBlock[] =>

@@ -114,11 +114,12 @@ Le détail des opérations vit dans [lecture et écriture des pages](lecture-et-
 
 ## Écart avec le code
 
-- Aucun écart connu entre ce document et le code ; les cas de test du contrat figé et du routage sont dans [les requêtes de référence](../reference/mcp-golden-queries.md).
+- Widget routeur (story `docs/produit/stories/widgets-dans-la-conversation.md`, lot 1) : derrière l'interrupteur `widgets` de `handleMcpPost`, éteint par défaut, `call` et `read` portent la triple méta, le serveur déclare `resources` et sert le bundle `ui://oto/view.html` (et sa variante skybridge), et un résultat de `table.rows`, `table.claim` ou d'une page lue entière porte `structuredContent.view` (`{ kind, theme }`). Éteint, le serveur sert le texte seul que décrit ADR-009 § 3, octet pour octet ; la révision d'ADR-009 § 3 attend la mesure sur le banc (lot 3). L'hôte de référence l'allume par `PLATFORM_MCP_WIDGETS=on`.
+- Les cas de test du contrat figé et du routage sont dans [les requêtes de référence](../reference/mcp-golden-queries.md).
 
 ## Questions ouvertes
 
-- Ce qui rouvrirait ADR-009 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT), ou le retour des premiers utilisateurs pour les widgets. Une demande est arrivée d'un ERP construit sur le paquet : un widget routeur déclaré sur `call` et `read`, qui choisit sa vue d'après le résultat, les six outils restant figés ; conception proposée dans la story `docs/produit/stories/widgets-dans-la-conversation.md`, ADR-009 § 3 à réviser après mesure sur le banc.
+- Ce qui rouvrirait ADR-009 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT), ou le retour des premiers utilisateurs pour les widgets. Une demande est arrivée d'un ERP construit sur le paquet : un widget routeur déclaré sur `call` et `read`, qui choisit sa vue d'après le résultat, les six outils restant figés ; lot 1 livré derrière un interrupteur éteint (« Écart avec le code ») ; ADR-009 § 3 à réviser après la mesure sur le banc : un résultat sans vue ouvre-t-il un cadre visible sur Claude et ChatGPT ?
 
 ## Historique
 

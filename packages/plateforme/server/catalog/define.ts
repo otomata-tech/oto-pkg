@@ -5,6 +5,7 @@
 // Repris de la maquette (`mcp-test/src/proto/functions/define.ts` l. 8-45) : classe, contrat,
 // exemples, refus, `strictObject`. Ajouté : l'origine (H80) et la suite proposée (`next`, H87).
 import type * as z from "zod/v4"
+import type { ViewKind } from "../../schemas/views"
 import type { ResolvedAccount } from "../connectors/resolution"
 import type { PlatformDb } from "../db"
 import type { Identity } from "../identity"
@@ -44,6 +45,8 @@ export type FunctionOutput = {
    * l'accueil le relit (E11-S02, AC-h2, HN-E11S02-16) ; `table.delete_rows` seule le pose.
    */
   outcome?: Record<string, number>
+  /** La vue du widget qui rend `data` (`table`, `record`) ; `runCall` la recopie au résultat de `call`. */
+  view?: ViewKind
 }
 
 /** Un schéma d'arguments strict : une clé inconnue (« filters » pour « filter ») est refusée. */

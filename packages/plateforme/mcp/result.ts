@@ -5,6 +5,7 @@
 //
 // Repris de la maquette (`mcp-test/src/proto/result.ts` l. 6-23) : la frontière entre refus
 // actionnable (texte lu par le modèle) et panne (cachée). Retiré : `structuredContent: { text }` seul.
+import type { ServedView } from "../schemas/views"
 import { MAX_DATA_CHARS, MAX_RESULT_CHARS, serializedLength, type ToolOutput } from "../server/tool-output"
 
 // Définis dans `server/tool-output.ts`, que `read` lit pour paginer : server/ n'importe pas mcp/
@@ -48,21 +49,25 @@ function cutText(text: string, budget: number): string {
   return head
 }
 
-function dataFields(data: Record<string, unknown> | undefined): Record<string, unknown> {
+/** Les données en champs, ou `null` quand elles dépassent `MAX_DATA_CHARS` et sont omises. */
+function dataFields(data: Record<string, unknown> | undefined): Record<string, unknown> | null {
   if (!data) return {}
   const size = JSON.stringify(data).length
   if (size <= MAX_DATA_CHARS) return data
   console.error(`[platform] mcp: result data omitted (${size} characters, max ${MAX_DATA_CHARS})`)
-  return { data_omitted: true }
+  return null
 }
 
 /**
- * `content` = `[{ type: "text", text }]` et `structuredContent` = `{ ...data, text, next_actions }`,
+ * `content` = `[{ type: "text", text }]` et `structuredContent` = `{ ...data, view, text, next_actions }`,
  * le même texte dans les deux. `next_actions` ne propose jamais une fonction sensible. Au-delà de
- * 45 000 caractères sérialisés, le texte est coupé à la ligne et dit comment lire la suite.
+ * 45 000 caractères sérialisés, le texte est coupé à la ligne et dit comment lire la suite. `view` : la vue
+ * du widget, posée par la porte quand les widgets sont allumés ; elle part avec les données omises, qu'elle
+ * rendrait.
  */
-export function formatResult(output: ToolOutput, isSensitive: (name: string) => boolean): ToolResult {
-  const data = dataFields(output.data)
+export function formatResult(output: ToolOutput, isSensitive: (name: string) => boolean, view?: ServedView): ToolResult {
+  const fields = dataFields(output.data)
+  const data = fields === null ? { data_omitted: true } : { ...fields, ...(view ? { view } : {}) }
   const nextActions = (output.nextActions ?? []).filter((name) => !isSensitive(name))
   const whole = { ...data, text: output.text, next_actions: nextActions }
   if (JSON.stringify(whole).length <= MAX_RESULT_CHARS) {

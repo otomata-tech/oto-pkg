@@ -13,7 +13,9 @@ export const dynamic = "force-dynamic"
 const verifyToken = makeVerifyToken()
 
 export function POST(request: Request): Promise<Response> {
-  return handleMcpPost(request, { verifyToken, defer: (task) => after(task) })
+  // Le widget routeur dans la conversation, allumé pour le banc des hosts : texte seul sans la variable.
+  const widgets = process.env.PLATFORM_MCP_WIDGETS === "on"
+  return handleMcpPost(request, { verifyToken, defer: (task) => after(task), widgets })
 }
 
 export function GET(): Response {

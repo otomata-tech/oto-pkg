@@ -89,9 +89,9 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
   const who = (person: Person) => ref.identityOf(person, { org: identityOf(person).org })
   const content = (tables: Tables) => replaceContent(seed, ref, tables)
 
-  async function read(person: Person, input: ReadNodeInput) {
+  async function read(person: Person, input: ReadNodeInput, options: { views?: boolean } = {}) {
     const spied = spyDb(await ref.db(person))
-    const output = await readNode(spied.db, who(person), input)
+    const output = await readNode(spied.db, who(person), input, options)
     return { ...output, calls: spied.calls }
   }
 
@@ -304,6 +304,21 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       expect(() => applyOps(docBlocks, [{ op: "replace_section", section: "Niveau 4", text: "##### Autre" }], { path: "conseil/niveaux" })).toThrow(
         "line 1 « ##### Autre » is a heading at the level of « Niveau 4 » or above; add a new section with add_section, or use ###### for a sub-section.",
       )
+    })
+
+    // Story widgets-dans-la-conversation : la vue `page` porte les blocs d'une page servie entière, rien d'autre.
+    it("should add the served blocks and the page view to a page served whole, widgets on only", async () => {
+      await content(modele())
+      const whole = await read("lea", { path: MODELE.path }, { views: true })
+      expect(whole.view).toBe("page")
+      expect(whole.data?.blocks).toEqual(MODELE_BLOCKS.map(({ type, text, data }) => ({ type, text, data })))
+      const off = await read("lea", { path: MODELE.path })
+      expect([off.view, off.data?.blocks]).toEqual([undefined, undefined])
+      const modes: ReadNodeInput[] = [{ path: MODELE.path, section: "Corps" }, { path: MODELE.path, outline: true }, { path: MODELE.path, since_revision: 0 }]
+      for (const input of modes) {
+        const partial = await read("lea", input, { views: true })
+        expect([partial.view, partial.data?.blocks], JSON.stringify(input)).toEqual([undefined, undefined])
+      }
     })
 
     it("should refuse two modes at once (AC10)", async () => {

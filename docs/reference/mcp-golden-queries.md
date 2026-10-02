@@ -360,3 +360,18 @@ L'attendu se lit dans `admin_journal`.
 | T8 | Relis la ligne de l'Atelier 2 et renvoie-la sans rien changer. | `table.rows` puis `table.write` avec les valeurs lues telles quelles : « unchanged », aucune écriture, aucun refus |
 
 N-T2 : aucun `table.write` ni `table.release` qui pose « qualifié » ne réussit (refus : décision réservée à la revue, jamais « new value without its proof »). À rejouer sur les trois hôtes : QP-D1, QP-D2, QP-I1, QP-I5, T6 à T8, N-T2.
+
+## Widget routeur (story widgets-dans-la-conversation, banc du lot 1)
+
+Organisation au contenu d'Acme, hôte déployé avec `PLATFORM_MCP_WIDGETS=on`, liste d'outils rafraîchie (§ 8 de
+`mcp-patterns.md`). Sur claude.ai et ChatGPT, l'attendu se lit à l'écran et au journal ; sur Claude Code, aucun
+widget, texte et routage inchangés. Le routage de chaque ligne est celui des lignes citées : seul le rendu change.
+
+| ID | Prompt | Attendu |
+|----|--------|---------|
+| W1 | Combien de prospects avons-nous à Valbrune, et lesquels ? | Routage d'I3 ; `acme_call table.rows` rend `view.kind = "table"` : les lignes rendues en tableau dans la conversation, au thème de l'organisation, de nuit si l'host l'est |
+| W2 | Montre-moi la fiche du prospect Mairie de Coudray. | `acme_call table.rows` filtré sur une ligne : `view.kind = "record"`, la fiche rendue |
+| W3 | Montre-moi le modèle d'email de relance. | `acme_read ventes/modele_relance` : `view.kind = "page"`, la page rendue |
+| W4 | Combien de prospects par ville ? | `acme_call table.aggregate` : aucune vue. **Mesure** : un cadre vide est-il visible ? Elle décide du lot 2 (outil `view` dédié sinon) |
+| W5 | Lis-moi la section Dimensionnement de la méthode d'étude. | Routage de RW2 : aucune vue ; même mesure que W4 |
+| W6 | Qu'est-ce que je peux te demander ici ? | Routage de C1 : `acme_context` seul, aucun cadre (le widget n'est déclaré que sur `call` et `read`) |

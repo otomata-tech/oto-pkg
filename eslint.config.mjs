@@ -47,6 +47,8 @@ const eslintConfig = [
       "playwright-report/**",
       "test-results/**",
       "next-env.d.ts",
+      // Bundle minifié du widget, généré par packages/plateforme/widgets/build.mjs.
+      "packages/plateforme/mcp/widgets/generated.ts",
       // Worktrees des vagues d'exécution autonome (copies du dépôt, avec leurs builds) : chacun
       // passe son propre `pnpm verify` ; le lint du checkout principal ne les relit pas.
       ".claude/worktrees/**",
@@ -101,6 +103,23 @@ const eslintConfig = [
       "no-restricted-imports": [
         "error",
         { patterns: [{ group: ["@/*"], message: "Le paquet n'importe jamais l'application hôte (alias @/)." }] },
+      ],
+    },
+  },
+  {
+    // Frontière widgets/ : le bundle du widget part dans le navigateur de l'host (iframe), il ne rend que le résultat
+    // déjà servi ; server/, api/, mcp/ ou migrations/ y mettraient le code du serveur. Il lit ui/ et schemas/.
+    files: ["packages/plateforme/widgets/**/*.{ts,tsx}"],
+    rules: {
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: ["server", "api", "mcp", "migrations"].map((face) => ({
+            target: "./packages/plateforme/widgets",
+            from: `./packages/plateforme/${face}`,
+            message: `widgets/ n'importe jamais ${face}/ : le bundle ne rend que le résultat servi, avec ui/ et schemas/.`,
+          })),
+        },
       ],
     },
   },

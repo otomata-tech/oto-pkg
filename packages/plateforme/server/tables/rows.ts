@@ -297,7 +297,8 @@ async function servedPage(request: PageRequest, selection: Selection & { fast: b
     ...(next ? [`next_cursor: ${next}`] : []),
   ].join("\n")
   const data = { table: path, total: selection.total, offset: cursor.offset, rows: rows.slice(0, served), ...(next ? { next_cursor: next } : {}) }
-  return { text, data }
+  // Une ligne seule se lit comme une fiche, plusieurs ou aucune comme un tableau (widget, story widgets-dans-la-conversation).
+  return { text, data, view: served === 1 ? "record" : "table" }
 }
 
 async function readRows(context: FunctionContext, args: TableRowsArgs): Promise<FunctionOutput> {

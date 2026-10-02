@@ -57,6 +57,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 │   ├── server/                                 # Services : la seule porte d'écriture dans platform
 │   ├── migrations/                             # Ligne de base du schéma platform et migrations additives suivantes
 │   ├── cli/                                    # `oto-platform` : `db prepare`, `migrations sync`, `migrations check`
+│   ├── widgets/                                # Widget routeur dans la conversation (Vite single-file) ; construit dans mcp/widgets/generated.ts, non publié
 │   └── CHANGELOG.md                            # Notes de version (format testé)
 ├── supabase/                                   # Projet Supabase de l'hôte : configuration, copies des migrations du paquet
 ├── renovate/preset.json                        # Preset Renovate des applications hôtes
@@ -66,6 +67,7 @@ Versions exactes et règles de montée : `.method/conventions/tech-stack.md`.
 
 Dépendances entre faces :
 - `ui/` → `schemas/` seulement ; il reçoit ses données par props et appelle `api/` par HTTP ;
+- `widgets/` → `ui/` et `schemas/` seulement ; son bundle est servi par `mcp/` depuis le module généré ;
 - `api/` et `mcp/` → `server/` et `schemas/` ;
 - `server/` → la base, et en V2 les API des tiers (`server/connectors/`) ; `server/` n'importe ni `mcp/` ni `api/` :
   ce qu'ils partagent vit dans `schemas/` ou `server/` ;

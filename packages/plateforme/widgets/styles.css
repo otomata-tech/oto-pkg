@@ -1,0 +1,8 @@
+/* Le style du widget : Tailwind sur les classes des vues et des composants d'ui/, puis le jeu de tokens
+ * `.oto` des écrans (huit thèmes, nuit sous `.dark`), comme l'hôte de référence (`src/app/globals.css`). Sources
+ * explicites : la détection automatique lirait tout le dépôt depuis le répertoire du build. */
+@import "tailwindcss" source(none);
+@import "../ui/styles.css";
+@source "../ui/ds";
+@source "../ui/noeud";
+@source "./";

@@ -117,6 +117,10 @@ jobs:
       - name: Smoke
         run: docker exec -i ${{ job.services.postgres.id }} psql -U postgres -v ON_ERROR_STOP=1 < scripts/ci/bare-postgres-smoke.sql
 
+      # Le serveur importe le bundle du widget, généré et jamais commité (`mcp/widget-meta.ts`).
+      - name: Widget bundle
+        run: pnpm widgets:build
+
       # Le serveur par `platform_app`, l'administration des tests par `postgres` ; tous deux sans mot de
       # passe (`trust`), sur la machine du job : le pool du paquet s'y passe de TLS.
       - name: Portable tests

@@ -185,5 +185,7 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
     teamId: output.teamId === undefined ? journal.teamId : journalTeam(identity, output.teamId),
     // Ce que la fonction a fait, pour sa ligne de journal (E11-S02, AC-h2).
     ...(output.outcome ? { outcome: output.outcome } : {}),
+    // La vue du widget, dont les données sont déjà en `result` (story widgets-dans-la-conversation).
+    ...(output.view ? { view: output.view } : {}),
   }
 }

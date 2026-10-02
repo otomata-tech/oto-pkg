@@ -118,7 +118,7 @@ Le détail des opérations vit dans [lecture et écriture des pages](lecture-et-
 
 ## Questions ouvertes
 
-- Ce qui rouvrirait ADR-009 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT), ou le retour des premiers utilisateurs pour les widgets. Aucune demande à ce jour.
+- Ce qui rouvrirait ADR-009 : un besoin de notification du serveur vers le client (inopérant de toute façon sur claude.ai et ChatGPT), ou le retour des premiers utilisateurs pour les widgets. Une demande est arrivée d'un ERP construit sur le paquet : un widget routeur déclaré sur `call` et `read`, qui choisit sa vue d'après le résultat, les six outils restant figés ; conception proposée dans la story `docs/produit/stories/widgets-dans-la-conversation.md`, ADR-009 § 3 à réviser après mesure sur le banc.
 
 ## Historique
 

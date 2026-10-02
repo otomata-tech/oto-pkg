@@ -12,6 +12,7 @@
 // H84) et `teams.connectors`. Repris d'Oto (`oto_mcp\middleware\error_envelope.py` l. 24-66) : un code
 // stable, le même sur toutes les faces (H04) ; retiré : `retryable`, `hint` et l'enveloppe `data.oto`,
 // comme le `confirm=<N>` et l'envoi d'essai d'`oto_mcp\capabilities\outreach.py` (H86).
+import { ERP_VIEW_PREFIX } from "../schemas/views"
 import { administratorNames } from "./access"
 import type { CatalogFunction, FunctionContext } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive, NATIVE_CONNECTOR } from "./catalog/registry"
@@ -185,7 +186,8 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
     teamId: output.teamId === undefined ? journal.teamId : journalTeam(identity, output.teamId),
     // Ce que la fonction a fait, pour sa ligne de journal (E11-S02, AC-h2).
     ...(output.outcome ? { outcome: output.outcome } : {}),
-    // La vue du widget, dont les données sont déjà en `result` (story widgets-dans-la-conversation).
-    ...(output.view ? { view: output.view } : {}),
+    // La vue du widget, dont les données sont déjà en `result` : celle que rend la fonction, sinon la vue de l'ERP
+    // qu'elle déclare (story widgets-dans-la-conversation).
+    ...(output.view ? { view: output.view } : fn.view ? { view: `${ERP_VIEW_PREFIX}${fn.view}` as const } : {}),
   }
 }

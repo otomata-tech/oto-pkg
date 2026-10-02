@@ -201,7 +201,7 @@ Règle : **aucun fichier hors `widget-meta.ts` ne manipule ces clés**. Quand Ch
 
 ### 5.2 Bridge — un seul module, deux dialectes
 
-- `packages/plateforme/widgets/bridge.ts` est le seul module qui parle à l'host : il livre le résultat de l'outil et le jour ou la nuit (`sourceDeLHost.ecouter`) ; un appel d'outil ou l'ouverture d'un lien s'y ajoute, jamais ailleurs.
+- `packages/plateforme/widgets/bridge.ts` est le seul module qui parle à l'host : il livre le résultat de l'outil, ses arguments et le jour ou la nuit (`sourceDeLHost.ecouter`), appelle un outil (`appeler`) et écrit un message dans la conversation (`envoyerMessage`) ; un appel du widget ne porte jamais `confirm`, et une suite (`next_actions`, sans arguments) part en message, jamais en appel.
 - **Protocole GA : utiliser le SDK OFFICIEL `@modelcontextprotocol/ext-apps` (entrée
   `app-with-deps`, autonome) — ne JAMAIS réimplémenter le handshake à la main.** Deux pièges
   vécus (= widget vide, sans erreur) : (1) le host n'envoie RIEN avant `ui/notifications/initialized` ;

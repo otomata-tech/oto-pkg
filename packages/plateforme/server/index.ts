@@ -105,7 +105,7 @@ export { handlesFeedback } from "./feedback"
 // d'une désactivation et comptes de l'organisation.
 export { activateConnector, deactivateConnector, deactivationImpact, listConnectorsForOrg } from "./connectors/activations"
 export { createAccount, disableAccount, listOrgAccounts } from "./connectors/accounts"
-export { CatalogRegistrationError, defineErpFunction, registerFunctions } from "./catalog/erp"
+export { CatalogRegistrationError, defineErpFunction, registerFunctions, registerWidgetViews } from "./catalog/erp"
 export type { ErpFunction, ErpFunctionContext } from "./catalog/erp"
 // E07-S03 : la grille, son résumé et la file de revue d'un tableau, la décision de la revue, les blocs
 // `reference` rendus en place.

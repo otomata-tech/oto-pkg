@@ -129,15 +129,15 @@ describe("widgets on", () => {
 
   it("should serve a result's view under the person's theme, else the organisation's, its data unchanged", async () => {
     const byOrg = await callRows(await connectDeps(deps({ widgets: true })))
-    expect(byOrg).toEqual({ ...ROWS, view: { kind: "record", theme: "lagune" }, text: "ventes/prospects: 1 row(s) match; rows 1-1.", next_actions: [] })
+    expect(byOrg).toEqual({ ...ROWS, view: { kind: "record", theme: "lagune", call: "acme_call" }, text: "ventes/prospects: 1 row(s) match; rows 1-1.", next_actions: [] })
     const chosen = { ...IDENTITY, member: { role: "member" as const, profile: { theme: "cobalt" } } }
-    expect(await callRows(await connectDeps(deps({ widgets: true, identity: chosen })))).toMatchObject({ view: { kind: "record", theme: "cobalt" } })
+    expect(await callRows(await connectDeps(deps({ widgets: true, identity: chosen })))).toMatchObject({ view: { kind: "record", theme: "cobalt", call: "acme_call" } })
   })
 })
 
 describe("runCall: the view of a function", () => {
-  it("should copy the view the function returns, and pose none when it returns none", async () => {
-    const reader = (view?: "table"): CatalogFunction => ({
+  it("should copy the view the function returns, else pose erp:<name> for the view it declares, else none", async () => {
+    const reader = (view?: "table", erpView?: string): CatalogFunction => ({
       name: "test.rows",
       connector: "test",
       class: "read",
@@ -146,6 +146,7 @@ describe("runCall: the view of a function", () => {
       schema: z.strictObject({ table: z.string() }),
       examples: [],
       refusals: [],
+      ...(erpView ? { view: erpView } : {}),
       run: async () => ({ text: "rows", data: { rows: [] }, ...(view ? { view } : {}) }),
     })
     const actual = await vi.importActual<typeof import("../../packages/plateforme/server/calls")>("../../packages/plateforme/server/calls")
@@ -156,5 +157,8 @@ describe("runCall: the view of a function", () => {
       )
     expect((await run(reader("table"))).view).toBe("table")
     expect((await run(reader())).view).toBeUndefined()
+    // Une fonction qui déclare une vue de l'hôte la reçoit, sauf si elle rend elle-même une vue du paquet.
+    expect((await run(reader(undefined, "devis"))).view).toBe("erp:devis")
+    expect((await run(reader("table", "devis"))).view).toBe("table")
   })
 })

@@ -3,6 +3,7 @@
 // HTML) : Claude ne lit que le standard MCP Apps (`text/html;profile=mcp-app`, un `text/html` nu est rejeté),
 // ChatGPT l'alias Apps SDK (`text/html+skybridge`). Le jour où ChatGPT ne lit plus que le standard, la variante
 // skybridge part d'ici seulement.
+import { erpWidgetBundle } from "../server/catalog/erp-source"
 import { VIEW_HTML } from "./widgets/generated"
 
 const VIEW_URI = "ui://oto/view.html"
@@ -27,8 +28,12 @@ export function widgetResources() {
   return RESOURCES.map(({ uri, mimeType }) => ({ uri, name: "oto-view", title: "Result view", mimeType }))
 }
 
-/** `resources/read` : le HTML du bundle sous le type MIME de l'adresse demandée ; `null` pour une adresse inconnue. */
+/**
+ * `resources/read` : le HTML du bundle sous le type MIME de l'adresse demandée ; `null` pour une adresse inconnue. Le
+ * bundle de l'hôte (`registerWidgetViews`) porte aussi les vues du paquet : il remplace celui du paquet.
+ */
 export function readWidgetResource(uri: string) {
   const resource = RESOURCES.find((one) => one.uri === uri)
-  return resource ? { contents: [{ uri: resource.uri, mimeType: resource.mimeType, text: VIEW_HTML }] } : null
+  const html = erpWidgetBundle()?.html ?? VIEW_HTML
+  return resource ? { contents: [{ uri: resource.uri, mimeType: resource.mimeType, text: html }] } : null
 }

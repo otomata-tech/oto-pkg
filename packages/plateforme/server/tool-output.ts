@@ -1,6 +1,6 @@
 // Ce que rend un service servi par un outil MCP (N16). Sans ce fichier, les services de server/
 // importeraient un type de mcp/, contre le sens des dépendances entre faces (architecture § 3).
-import type { ViewKind } from "../schemas/views"
+import type { ServedViewKind } from "../schemas/views"
 
 /**
  * Plafond d'un résultat, mesuré sur `structuredContent` sérialisé (banc E04, mesure 3) : `read`
@@ -44,5 +44,5 @@ export type ToolOutput = {
    * La vue du widget qui rend ce résultat ; ses données sont déjà dans `data`. La porte la sert avec le thème quand
    * les widgets sont allumés (`structuredContent.view`), l'ignore sinon (story widgets-dans-la-conversation).
    */
-  view?: ViewKind
+  view?: ServedViewKind
 }

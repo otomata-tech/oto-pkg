@@ -375,3 +375,6 @@ widget, texte et routage inchangés. Le routage de chaque ligne est celui des li
 | W4 | Combien de prospects par ville ? | `acme_call table.aggregate` : aucune vue. **Mesure** : un cadre vide est-il visible ? Elle décide du lot 2 (outil `view` dédié sinon) |
 | W5 | Lis-moi la section Dimensionnement de la méthode d'étude. | Routage de RW2 : aucune vue ; même mesure que W4 |
 | W6 | Qu'est-ce que je peux te demander ici ? | Routage de C1 : `acme_context` seul, aucun cadre (le widget n'est déclaré que sur `call` et `read`) |
+| W7 | Liste tous nos prospects. | `acme_call table.rows` (20 lignes, `next_cursor`) : « Lignes suivantes » dans le widget appelle `acme_call table.rows` avec le même filtre et le curseur, sans `confirm` ; le journal porte un second `tools/call` sous le même `ctx` |
+| W8 | (même conversation) Un bouton de suite proposé sous le tableau (`table.write`, par exemple) | Un message « Lance table.write sur ce résultat. » apparaît dans la conversation ; l'assistant demande ou choisit les arguments ; aucun appel du widget au journal |
+| W9 | (hôte qui inscrit une vue de l'ERP, `view: "devis"`) Montre-moi le devis D-041. | `acme_call erp.<fonction>` : `view.kind = "erp:devis"`, la vue de l'hôte rendue ; un bouton de la vue qui appelle une fonction sensible ne rend que son récapitulatif |

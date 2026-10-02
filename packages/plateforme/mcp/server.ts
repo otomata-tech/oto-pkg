@@ -201,7 +201,8 @@ async function runTool(
       ? { ...served, text: withCtxNotice(served.text, deps.org.prefix, validated.ctx), data: { ...served.data, new_ctx: validated.ctx.code } }
       : served
     // La vue du widget, au thème de la personne sinon de l'organisation, comme ses écrans (ADR-008 § 3).
-    const view = deps.widgets && output.view ? { kind: output.view, theme: preferredTheme(member.identity) } : undefined
+    // `call` : l'outil que le widget appelle (page suivante, vue de l'ERP), sous le préfixe de l'organisation.
+    const view = deps.widgets && output.view ? { kind: output.view, theme: preferredTheme(member.identity), call: `${deps.org.prefix}_call` } : undefined
     const result = formatResult(output, (next) => findFunction(functions, next)?.class === "sensitive", view)
     Object.assign(entry, {
       ctx: output.ctx ?? validated.ctx?.code ?? entry.ctx,

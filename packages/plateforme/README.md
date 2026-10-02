@@ -16,7 +16,8 @@ sans étape de build, sous licence MIT.
 | `api/` | `@otomata_tech/oto_platform/api` | Route handlers `/api/platform/*` : adaptateurs des services |
 | `server/` | `@otomata_tech/oto_platform/server` | Services : la seule porte d'écriture (Zod → droits → écriture → journal) |
 | `migrations/` | `@otomata_tech/oto_platform/migrations/*` | SQL du schéma `platform`, additif, copié par l'application hôte |
-| `cli/` | commande `oto-platform` | Copie et contrôle des migrations dans l'application hôte ; préparation d'une base (`db prepare`) |
+| `cli/` | commande `oto-platform` | Copie et contrôle des migrations dans l'application hôte ; préparation d'une base (`db prepare`) ; bundle du widget avec les vues de l'ERP (`widgets build`) |
+| `widgets/` | `@otomata_tech/oto_platform/widgets` | Widget routeur dans la conversation (sources construites par Vite) ; l'export ne porte que les types d'une vue de l'ERP (`ErpView`, `ErpViewProps`) |
 
 ## Règle de dépendance entre faces
 
@@ -354,6 +355,28 @@ les fonctions natives, sans outil de plus. Un besoin nouveau devient une fonctio
 - **Contrat** : une fonction ERP est toujours active, pour toute l'organisation ; la description de
   `call` ne la cite pas, `find` la trouve. Un contrat servi ne se durcit pas en place : une fonction
   dont les arguments changent s'inscrit sous un autre nom.
+
+## Widgets dans la conversation
+
+Un résultat de `call` ou de `read` peut s'afficher rendu dans Claude et ChatGPT (MCP Apps) : un tableau, une
+fiche, une page, ou une vue de l'ERP. Éteint par défaut, le MCP reste en texte seul.
+
+- **Allumer** : `handleMcpPost(request, { verifyToken, defer, widgets: true })` dans `src/app/api/mcp/route.ts`.
+  Les six outils ne changent pas ; `call` et `read` gagnent la méta du widget et le serveur sert son bundle
+  (`ui://oto/view.html`). Sans `widgets`, rien de ce qui est servi ne change.
+- **Vues du paquet** : `table` et `record` (`table.rows`, `table.claim`), `page` (une page lue entière), sans
+  rien à construire : le bundle est livré dans le paquet.
+- **Vues de l'ERP** : un fichier `.tsx` par vue dans un dossier de l'application (`src/widgets/devis.tsx`), dont
+  l'export par défaut est un `ErpView` (`import type { ErpViewProps } from "@otomata_tech/oto_platform/widgets"`) :
+  il reçoit `result` (les données que `run` a rendues), `theme`, et `call(fn, args)` pour appeler une fonction du
+  catalogue, jamais avec `confirm`. Construire : `oto-platform widgets build --views src/widgets --out
+  src/lib/widgets.generated.ts`, qui demande en `devDependencies` `vite`, `@vitejs/plugin-react`,
+  `vite-plugin-singlefile`, `@tailwindcss/postcss`, `tailwindcss` et `@modelcontextprotocol/ext-apps`. Puis, dans
+  `src/lib/fonctions-metier.ts`, `registerWidgetViews(WIDGET_BUNDLE)` avant `registerFunctions`, et
+  `view: "devis"` dans `defineErpFunction`. Une fonction dont la vue n'est pas dans le bundle inscrit lève
+  `CatalogRegistrationError`. Sans vue de l'ERP, rien à construire ni à installer.
+- **Actions** : « Lignes suivantes » d'un tableau et `call` d'une vue de l'ERP passent par l'host vers l'outil
+  `call`, sous le `ctx` de la conversation ; une suite proposée part en message à l'assistant.
 
 ## Capacités par organisation
 

@@ -7,7 +7,11 @@
 // listes que chaque source modifie (NH12).
 import type { ErpFunction } from "./erp"
 
+/** Le bundle du widget construit par l'hôte (`oto-platform widgets build`) : son HTML et les vues de l'ERP qu'il porte. */
+export type ErpWidgetBundle = { html: string; views: readonly string[] }
+
 let erpSource: readonly ErpFunction[] = []
+let erpBundle: ErpWidgetBundle | null = null
 
 /** Les fonctions de l'ERP inscrites. */
 export function erpFunctions(): readonly ErpFunction[] {
@@ -17,4 +21,14 @@ export function erpFunctions(): readonly ErpFunction[] {
 /** Remplace toute la source (NH1) ; seul appelant : `registerFunctions`, la liste entière validée. */
 export function replaceErpFunctions(functions: readonly ErpFunction[]): void {
   erpSource = [...functions]
+}
+
+/** Le bundle inscrit par `registerWidgetViews`, servi à la place de celui du paquet ; `null` sans vue de l'ERP. */
+export function erpWidgetBundle(): ErpWidgetBundle | null {
+  return erpBundle
+}
+
+/** Remplace le bundle ; seul appelant : `registerWidgetViews`, le bundle validé. */
+export function replaceErpWidgetBundle(bundle: ErpWidgetBundle): void {
+  erpBundle = { html: bundle.html, views: [...bundle.views] }
 }

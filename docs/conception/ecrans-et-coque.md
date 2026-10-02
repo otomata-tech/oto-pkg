@@ -1,7 +1,7 @@
 # Écrans et coque
 
 - **Statut** : validé avec JB le 23/09/2026
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-02
 
 ## Résumé
 
@@ -18,7 +18,7 @@ Ce document répond à : d'où viennent les écrans du paquet, et comment l'hôt
 - Reprendre l'essentiel de l'interface d'`oto-frontend`, fidèle à 90-95 %, sans dépendre de son dépôt.
 - Un écran s'embarque aussi seul dans une page d'un ERP (la vue d'un tableau dans une fiche client).
 - Une seule navigation visible, quel que soit le niveau d'intégration choisi par l'hôte.
-- Hors objectif : agents, runs, projets et pages héritées d'`oto-frontend` ; l'écran Connecteurs refait sur notre modèle (V2, [connecteurs et comptes](connecteurs-et-comptes.md)) ; la traduction des écrans ([adresses et langue](adresses-et-langue.md)) ; les widgets dans la conversation (texte seul, ADR-009).
+- Hors objectif : agents, runs, projets et pages héritées d'`oto-frontend` ; l'écran Connecteurs refait sur notre modèle (V2, [connecteurs et comptes](connecteurs-et-comptes.md)) ; la traduction des écrans ([adresses et langue](adresses-et-langue.md)).
 
 ## Conception
 
@@ -28,7 +28,7 @@ Ce document répond à : d'où viennent les écrans du paquet, et comment l'hôt
 - **ADR-008 § 2** : un écran reçoit la navigation de l'hôte (liens, `onNavigate`, paramètres), n'importe ni TanStack Router ni `next/navigation` ; l'hôte monte l'écran dans sa route et lui passe son rafraîchissement.
 - **ADR-008 § 3** : le contrat `.oto` et ses huit thèmes, portés à l'identique dans `ui/styles/oto.css`, s'appliquent sous `CoquilleOto`, au thème de l'organisation. Classes sémantiques du jeu (`bg-island`, `text-ink`…) ; aucune couleur numérotée, aucun token de l'hôte absent du jeu (test et `check:framework`). Le client choisit l'un des huit thèmes, avec son logo et son nom affiché ; la favicon prend la couleur du thème ; la nuit suit la classe `.dark` de l'hôte. La couleur de l'organisation est le défaut de tout compte sans choix, nouveau ou non, lue à chaque page, sans copie à la création d'un compte ; un compte qui a choisi garde son choix (HN-E05S11-3).
 - **ADR-008 § 4** : `ui/` n'importe jamais `server/`, `migrations/` ni un client de base ; il parle à `api/` par HTTP, même origine, avec la session de l'utilisateur (FR-INST-03, lint et test) ; ses mutations passent par `/api/platform/*` (H03, [vue d'ensemble](vue-d-ensemble.md)).
-- **ADR-008 § 5** : les mêmes composants serviront plus tard aux widgets dans la conversation.
+- **ADR-008 § 5** : les mêmes composants servent au widget routeur dans la conversation (`packages/plateforme/widgets/`, [outils MCP](outils-mcp.md), ADR-009 § 3 proposé) : `Table`, `RenduDUnBloc`, `EmptyState`, `Skeleton`, `Alert` et `Button`, sous `.oto` au thème de la personne sinon de l'organisation ; le widget n'importe ni `server/`, ni `api/`, ni `mcp/` (ESLint).
 - **ADR-008 § 6** : une copie, pas un import ; un écran porté ne change que le routeur, la donnée et les icônes.
 - **ADR-008 § 7** : une seule coque, le rail d'`oto-frontend` porté dans `ui/`, montée une fois dans le layout de l'hôte, qui ne pose aucune autre navigation ; tout nœud (page, tableau, procédure, Contexte) s'ouvre à la même adresse de nœud, sans page de liste par genre. Trois niveaux, tous exportés par `ui/` : la coque entière ; les morceaux du rail (sections de l'arbre, recherche, menus) dans la coque de l'ERP, sans second rail ; un écran seul dans une page de l'ERP.
 - Une page de montage et ses données d'exemple partent dès que l'écran réel existe : un client ne voit jamais de données fictives (P16).
@@ -91,7 +91,6 @@ Ce document répond à : d'où viennent les écrans du paquet, et comment l'hôt
 
 ## Écart avec le code
 
-- ADR-008 § 5 : le widget routeur dans la conversation (`packages/plateforme/widgets/`, lot 1 de la story `widgets-dans-la-conversation`) rend déjà `Table`, `RenduDUnBloc`, `EmptyState`, `Skeleton` et `Alert` du design system, sous `.oto` au thème de la personne sinon de l'organisation, derrière l'interrupteur `widgets` du MCP (éteint par défaut).
 - M65 : retirer `RailThemePicker`, les écrans Marque, Drapeaux et Accès plateforme et leurs clés d'adresse.
 - M52 : restes de la reprise des écrans (export de `recentDocuments` par `./server`, `connexionsDe` en double entre `/` et `/connect`, lien d'évitement `#main-content`, `/auth/confirmer` au `Button` du design system, aides des specs e2e).
 - M69 : après un déplacement par « ⋯ », le focus tombe sur le document au lieu du nœud déplacé.
@@ -112,3 +111,4 @@ Ce document répond à : d'où viennent les écrans du paquet, et comment l'hôt
 - 2026-09-29 : vue « Contexte » au menu engrenage, rail de l'admin réduit à ses équipes, créateur responsable, guide par onglet d'assistant ; le Contexte reste dans le rail ; « Télécharger en .md » sur un Contexte — décidé par JB et le responsable d'Oto (source : fiches D136, D139, stories E11-S09, E11-S10).
 - 2026-09-30 : le rail relit seul son arbre à la navigation, au retour sur l'onglet et après chaque geste — décidé par le pilote (source : story E11-S20).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-008, les fiches D15, D16, D90, D136, D139, P16, les questions Q3 et Q4 et les choix des stories E05-S07, E05-S09, E05-S11, E11-S09, E11-S10, E11-S20 — décidé par Alexis, accord de JB.
+- 2026-10-02 : ADR-008 § 5 appliqué : le widget routeur dans la conversation rend les composants du design system — proposé par la session de la story widgets-dans-la-conversation, avec ADR-009 § 3 ([outils MCP](outils-mcp.md)).

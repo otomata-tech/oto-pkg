@@ -79,6 +79,8 @@ export type CatalogFunction = {
   examples: Record<string, unknown>[]
   refusals: string[]
   next?: string[]
+  /** Une fonction de l'ERP : le nom de la vue de l'hôte qui rend `data` (`erp:<nom>`, story widgets-dans-la-conversation). */
+  view?: string
   run: (context: FunctionContext, args: never) => Promise<FunctionOutput>
   /** Fonctions sensibles : récapitulatif nominatif montré avant l'accord, sans rien exécuter. */
   summarize?: (context: FunctionContext, args: never) => Promise<FunctionSummary>
@@ -96,6 +98,7 @@ export function defineFunction<S extends StrictSchema>(fn: {
   examples: z.input<S>[]
   refusals: string[]
   next?: string[]
+  view?: string
   run: (context: FunctionContext, args: z.output<S>) => Promise<FunctionOutput>
   summarize?: (context: FunctionContext, args: z.output<S>) => Promise<FunctionSummary>
   checkArgs?: CheckArgs

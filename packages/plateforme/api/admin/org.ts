@@ -6,6 +6,7 @@
 import { TOOL_KEYS } from "../../mcp/tools"
 import { orgSettingsFormSchema, type OrgView } from "../../schemas"
 import { getOrg, updateOrg } from "../../server/admin/orgs"
+import { setOpenEntry } from "../../server/open-entry"
 import type { PlatformDb } from "../../server/db"
 import { invalidInput } from "../../server/errors"
 import type { Identity } from "../../server/identity"
@@ -41,5 +42,16 @@ export const orgRoute: Route = {
     if (!parsed.success) throw invalidInput(parsed.error)
     await updateOrg(db, identity, parsed.data)
     return { status: 200, data: { org: await readOrgView(db, identity) }, journal: { target: "org" } }
+  },
+}
+
+/** `PATCH admin/open-entry` : l'entrée sans invitation de l'organisation ; droits et validation dans `setOpenEntry`. */
+export const openEntryRoute: Route = {
+  params: 1,
+  fixed: { 0: "open-entry" },
+  target: () => "open-entry",
+  async handle({ db, identity, body }) {
+    const { data, target, teamId } = await setOpenEntry(db, identity, body)
+    return { status: 200, data: { open_entry: data }, journal: { target, teamId } }
   },
 }

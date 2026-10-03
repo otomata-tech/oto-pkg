@@ -315,6 +315,8 @@ async function seedRows(fx: LocalFixtures, admin: TestSql, of: { b: Place; peopl
   await admin`
     insert into platform.upload_tickets (org_id, user_id, token_hash, form_token_hash, kind, mode, target_path, expires_at)
     values (${b.id}, ${people.b.id}, ${hex(32)}, ${hex(32)}, 'csv', 'merge', 'ventes/suivi_prospects', now() + interval '15 minutes')`
+  // Une personne retirée de B (entrée sans invitation) : son exclusion.
+  await admin`insert into platform.member_exclusions (org_id, user_id, excluded_by) values (${b.id}, gen_random_uuid(), ${people.b.id})`
   // L'accès général de B (ADR-014) : toute l'organisation B peut modifier son tableau.
   await admin`insert into platform.access_rules (org_id, node_id, subject_org, level, created_by) values (${b.id}, ${table}, true, 'write', ${people.b.id})`
   const rule = await one(admin<{ id: string }[]>`select id from platform.access_rules where org_id = ${b.id} limit 1`, "rule of B read")

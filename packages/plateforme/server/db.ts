@@ -23,6 +23,11 @@ export type PlatformDb = {
    * session. Un `tx` appelé pendant un autre, sous la même session, reprend sa transaction.
    */
   tx<T>(fn: (sql: Tx) => Promise<T>): Promise<T>
+  /**
+   * Oublie la traduction de l'appelant gardée par ce client : la transaction suivante le retraduit. Pour une entrée faite
+   * pendant la requête (`join_org`), qui crée l'identité d'un sujet que la base ne connaissait pas.
+   */
+  retranslate?(): void
 }
 
 /** Un appelant qui désigne quelqu'un : un identifiant interne, ou un émetteur et un sujet. */
@@ -35,7 +40,8 @@ function designates(caller: Caller | undefined): caller is Caller {
  * Le client d'une requête sous `caller`, l'appelant vérifié de la session ; `undefined` (jeton sans
  * sujet) : `tx` lève `PlatformConfigError`. Un appelant émis (E01-S11) est traduit par
  * `identity_for_caller()` avant la première transaction de ce client, une fois : un client par requête,
- * donc une traduction par requête ; chaque transaction porte ensuite son identifiant interne en `sub`.
+ * donc une traduction par requête (`retranslate` l'oublie, après une entrée qui crée l'identité) ; chaque transaction
+ * porte ensuite son identifiant interne en `sub`.
  */
 export function createPlatformDb(session: { caller: Caller | undefined }): PlatformDb {
   const { caller } = session
@@ -46,6 +52,9 @@ export function createPlatformDb(session: { caller: Caller | undefined }): Platf
     tx: async <T>(fn: (sql: Tx) => Promise<T>): Promise<T> => {
       if (!designates(caller)) throw new PlatformConfigError("caller absent : l'hôte doit passer l'appelant vérifié de la session")
       return withCallerSession(await sessionCaller(caller), fn)
+    },
+    retranslate: () => {
+      translated = undefined
     },
   }
 }

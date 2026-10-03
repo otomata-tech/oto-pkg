@@ -6,7 +6,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { makeVerifyToken } from "../../packages/plateforme/mcp/auth"
 import { handleMcpPost, mcpMethodNotAllowed } from "../../packages/plateforme/mcp/handler"
 import { PlatformError } from "../../packages/plateforme/server/errors"
-import { resolveIdentity } from "../../packages/plateforme/server/identity"
+import { resolveIdentity, resolveOrg, type ServedHost } from "../../packages/plateforme/server/identity"
 
 // La base n'est jamais atteinte : client factice, identité simulée.
 vi.mock("../../packages/plateforme/server/db", async (importOriginal) => ({
@@ -69,11 +69,12 @@ function post({ bearer, forwarded = true, body = JSON.stringify(INITIALIZE) }: {
   return new Request("http://localhost:3000/api/mcp", { method: "POST", headers, body })
 }
 
-async function call(request: Request) {
+async function call(request: Request, host?: ServedHost) {
   const tasks: (() => Promise<void>)[] = []
   const response = await handleMcpPost(request, {
     verifyToken: makeVerifyToken({ jwks, issuer: ISSUER }),
     defer: (task) => tasks.push(task),
+    host,
   })
   return { response, tasks }
 }
@@ -135,6 +136,67 @@ describe("organisation of the called address (AC4)", () => {
     })
     expect(tasks).toEqual([])
     expect(log).toHaveBeenCalled()
+  })
+})
+
+// L'adresse choisie par l'hôte (previews, ERP sur un seul domaine) : seule la source de l'adresse change.
+describe("organisation of the address the host chooses", () => {
+  const UNKNOWN = new PlatformError("unknown_org", "No organisation is served at this address.")
+
+  it("should resolve the address the host gives, normalised, from the called address and the request", async () => {
+    vi.mocked(resolveIdentity).mockRejectedValue(UNKNOWN)
+    const host = vi.fn<ServedHost>(() => "Staging.Example.test:443")
+    const request = post({ bearer: await token() })
+    await call(request, host)
+    expect(vi.mocked(resolveIdentity).mock.calls[0][1]).toBe("staging.example.test")
+    expect(host).toHaveBeenCalledTimes(1)
+    expect(host.mock.calls[0][0].host).toBe("acme.example.test")
+    expect(host.mock.calls[0][0].request).toBeInstanceOf(Request)
+  })
+
+  it("should answer 404 when the host gives no address, after the token", async () => {
+    vi.mocked(resolveIdentity).mockRejectedValue(UNKNOWN)
+    const { response, tasks } = await call(post({ bearer: await token() }), async () => null)
+    expect(response.status).toBe(404)
+    expect(vi.mocked(resolveIdentity).mock.calls[0][1]).toBeNull()
+    expect(tasks).toEqual([])
+  })
+
+  it("should not ask the host for an address without a valid token, the 401 naming the called origin", async () => {
+    const host = vi.fn<ServedHost>(() => "staging.example.test")
+    const { response } = await call(post(), host)
+    expect(response.status).toBe(401)
+    expect(response.headers.get("www-authenticate")).toBe(WWW_AUTHENTICATE("https://acme.example.test"))
+    expect(host).not.toHaveBeenCalled()
+  })
+
+  it("should answer 503 when the host's choice throws, and serve no organisation by default", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { response, tasks } = await call(post({ bearer: await token() }), () => Promise.reject(new Error("erp down")))
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({ jsonrpc: "2.0", error: { code: -32603, message: "Service unavailable. Retry in a moment." }, id: null })
+    expect(resolveIdentity).not.toHaveBeenCalled()
+    expect(tasks).toEqual([])
+    expect(log).toHaveBeenCalled()
+  })
+
+  // L'entrée sans invitation au plafond de membres : servi comme un non-membre, le refus dit la limite, jamais un 503.
+  it("should serve the member limit of an entry without invitation as a refusal, not as an outage", async () => {
+    vi.mocked(resolveIdentity).mockRejectedValue(new PlatformError("forbidden", "Acme is limited to 3 members, pending invitations included.", { reason: "limit", limit: "members_max", max: 3 }))
+    vi.mocked(resolveOrg).mockResolvedValue({ id: "org-1", slug: "acme", name: "Acme", prefix: "acme", brand: null, domains: null } as never)
+    const { response, tasks } = await call(post({ bearer: await token() }))
+    expect(response.status).toBe(200)
+    expect(tasks).toEqual([])
+  })
+
+  it("should still refuse a caller who is not a member of the organisation of the chosen address", async () => {
+    vi.mocked(resolveIdentity).mockRejectedValue(new PlatformError("not_member", "claire@example.test is not a member of Staging."))
+    vi.mocked(resolveOrg).mockResolvedValue({ id: "org-1", slug: "staging", name: "Staging", prefix: "staging", brand: null, domains: null } as never)
+    const { response, tasks } = await call(post({ bearer: await token() }), () => "staging.example.test")
+    // Servi sans droit : aucun journal, et l'organisation relue à l'adresse choisie.
+    expect(response.status).toBe(200)
+    expect(vi.mocked(resolveOrg).mock.calls[0][1]).toBe("staging.example.test")
+    expect(tasks).toEqual([])
   })
 })
 

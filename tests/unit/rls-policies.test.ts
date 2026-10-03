@@ -103,6 +103,8 @@ ADDED.push("node_shares_select_member", "node_shares_insert_member", "node_share
 ADDED.push("files_select_member", "files_insert_member", "files_update_member", "files_delete_member")
 // Les tickets de dépôt par lien (E10-S02 lot f, ADR-018) : isolation par organisation, attribution à l'appelant, ménage des expirés.
 ADDED.push("upload_tickets_select_member", "upload_tickets_insert_own", "upload_tickets_delete_expired")
+// Les exclusions de l'entrée sans invitation : lues et inscrites dans son organisation, jamais modifiées ni retirées par une session.
+ADDED.push("member_exclusions_select_member", "member_exclusions_insert_member")
 // La ligne `ctx` de l'appelant avancée par l'auteur d'un Contexte (E11-S19, lot a) : isolation par organisation, attribution à l'appelant.
 ADDED.push("ctx_update_own")
 

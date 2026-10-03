@@ -95,8 +95,10 @@ export {
   orgUpdateSchema,
   platformAccessSchema,
   signupSchema,
+  openEntrySchema,
+  OPEN_ENTRY_DOMAINS_MAX,
 } from "./admin"
-export type { OrgSettings, PersonOrganisation, SignupInput } from "./admin"
+export type { OpenEntry, OrgSettings, PersonOrganisation, SignupInput } from "./admin"
 export { moveNodeSchema } from "./nodes"
 export type { MoveNodeInput } from "./nodes"
 // Tableaux (E07-S01) : en-tête, grammaire de filtre et arguments des trois fonctions de lecture, que

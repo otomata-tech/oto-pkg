@@ -722,6 +722,35 @@ export type Database = {
           },
         ]
       }
+      member_exclusions: {
+        Row: {
+          excluded_at: string
+          excluded_by: string | null
+          org_id: string
+          user_id: string
+        }
+        Insert: {
+          excluded_at?: string
+          excluded_by?: string | null
+          org_id: string
+          user_id: string
+        }
+        Update: {
+          excluded_at?: string
+          excluded_by?: string | null
+          org_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_exclusions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           created_at: string
@@ -1435,6 +1464,10 @@ export type Database = {
       }
       is_org_admin: { Args: { org: string }; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
+      join_org: {
+        Args: { p_members_max?: number; p_org: string }
+        Returns: string
+      }
       level_rank: { Args: { p_level: string }; Returns: number }
       lexicon_fix: { Args: { p_org: string; p_word: string }; Returns: string }
       lexicon_rebuild: { Args: { p_org: string }; Returns: undefined }
@@ -1506,6 +1539,11 @@ export type Database = {
           created: boolean
         }[]
       }
+      open_entry_admits: { Args: { p_org: string }; Returns: boolean }
+      open_entry_gate: {
+        Args: { p_email: string; p_org: string; p_user: string }
+        Returns: boolean
+      }
       org_by_host: {
         Args: { p_host: string }
         Returns: {
@@ -1522,6 +1560,23 @@ export type Database = {
         Returns: {
           email: string
           name: string
+        }[]
+      }
+      org_skeleton: {
+        Args: {
+          p_author: string
+          p_hosts: string[]
+          p_name: string
+          p_prefix: string
+          p_slug: string
+        }
+        Returns: string
+      }
+      org_usage: {
+        Args: { p_org: string }
+        Returns: {
+          members: number
+          pending_invitations: number
         }[]
       }
       platform_access_directory: {
@@ -1598,6 +1653,15 @@ export type Database = {
           summary: string
           title: string
         }[]
+      }
+      signup_org: {
+        Args: {
+          p_hosts: string[]
+          p_name: string
+          p_prefix: string
+          p_slug: string
+        }
+        Returns: string
       }
       staff_directory: {
         Args: never

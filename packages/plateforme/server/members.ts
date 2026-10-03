@@ -148,7 +148,8 @@ export async function updateMember(
 
 /**
  * Retire une personne de l'organisation (AC9) : ses équipes, ses règles nominatives et ses
- * responsabilités tombent par `members_cleanup` ; ses pages personnelles restent, invisibles de tous.
+ * responsabilités tombent par `members_cleanup` ; ses pages personnelles restent, invisibles de tous. Elle est inscrite
+ * aux exclusions de l'organisation (`member_exclusions`).
  */
 export async function removeMember(db: PlatformDb, identity: Identity, userId: unknown): Promise<Mutation<{ userId: string }>> {
   const id = parseId(userId, "member")
@@ -159,6 +160,11 @@ export async function removeMember(db: PlatformDb, identity: Identity, userId: u
     if (!person) throw unknownMember(identity, id)
     guardLastAdmin(identity, directory, person)
 
+    // Retirée, la personne ne rentre plus par l'entrée sans invitation (`join_org`) : seule une invitation acceptée lève
+    // l'exclusion. Inscrite que le réglage soit actif ou non : l'activer plus tard ne fait pas revenir d'anciens membres.
+    // Avant le retrait : qui se retire lui-même n'écrit plus rien dans l'organisation une fois sa ligne partie (RLS).
+    await sql`insert into platform.member_exclusions (org_id, user_id, excluded_by) values (${identity.org.id}, ${id}, ${identity.user.id})
+              on conflict (org_id, user_id) do nothing`
     const removed = await sql`delete from platform.members where org_id = ${identity.org.id} and user_id = ${id} returning user_id`
     if (removed.length === 0) throw memberChanged("removeMember", person)
     return { data: { userId: id }, target: person.email, teamId: null }

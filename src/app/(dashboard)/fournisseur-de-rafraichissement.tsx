@@ -3,6 +3,7 @@
 import { useTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import { ContexteDeLHote, ContexteDeRafraichissement } from "@otomata_tech/oto_platform/ui"
 import { logoutAction } from "@/lib/actions/auth"
 
@@ -19,7 +20,11 @@ export function FournisseurDeRafraichissement({ children }: { children: ReactNod
   const [, demarrer] = useTransition()
   // `null` hors du routeur de l'App Router (rendu isolé d'un test) : aucune ligne n'est alors courante.
   const chemin = usePathname() ?? ""
-  const hote = { Lien: Link, chemin, naviguer: (adresse: string) => router.push(adresse), deconnecter: () => demarrer(() => logoutAction()) }
+  // Le mode jour ou nuit est à l'hôte (next-themes) : le rail en offre la bascule, une fois le mode connu du navigateur.
+  const { resolvedTheme, setTheme } = useTheme()
+  const apparence =
+    resolvedTheme === "dark" || resolvedTheme === "light" ? { mode: resolvedTheme === "dark" ? ("dark" as const) : ("light" as const), basculer: () => setTheme(resolvedTheme === "dark" ? "light" : "dark") } : undefined
+  const hote = { Lien: Link, chemin, naviguer: (adresse: string) => router.push(adresse), deconnecter: () => demarrer(() => logoutAction()), apparence }
   return (
     <ContexteDeRafraichissement.Provider value={() => router.refresh()}>
       <ContexteDeLHote.Provider value={hote}>{children}</ContexteDeLHote.Provider>

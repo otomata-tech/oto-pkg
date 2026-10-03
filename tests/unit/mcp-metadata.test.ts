@@ -149,6 +149,29 @@ describe("refusals (AC4)", () => {
     expect(findOrg).not.toHaveBeenCalled()
   })
 
+  it("should name the organisation of the address the host chooses, the resource staying the called address", async () => {
+    const seen: string[] = []
+    const known = async (host: string) => (seen.push(host), host === "acme.example.test" ? { id: "org-acme" } : null)
+    const preview = { host: "preview-42.example.test", proto: "https" }
+
+    expect((await handleResourceMetadata(lecture(`${ROOT}/api/mcp`, preview), { findOrg: known })).status).toBe(404)
+    const response = await handleResourceMetadata(lecture(`${ROOT}/api/mcp`, preview), { findOrg: known, host: ({ host }) => (host?.startsWith("preview-") ? "Acme.Example.test" : host) })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual(metadataOf("https://preview-42.example.test"))
+    expect(seen).toEqual(["preview-42.example.test", "acme.example.test"])
+  })
+
+  it("should answer 404 when the host gives no address, and 503 when its choice throws", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    const none = await handleResourceMetadata(lecture(`${ROOT}/api/mcp`, ACME), { findOrg, host: () => null })
+    expect(none.status).toBe(404)
+    expect(await none.json()).toStrictEqual({ error: { code: "unknown_org", message: "No organisation is served at this address." } })
+    const failed = await handleResourceMetadata(lecture(`${ROOT}/api/mcp`, ACME), { findOrg, host: () => Promise.reject(new Error("erp down")) })
+    expect(failed.status).toBe(503)
+    expect(log).toHaveBeenCalled()
+  })
+
   it("should answer 503 internal when the resolution throws, the cause in the server log only", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {})
     const cause = new Error("fetch failed: db.internal:5432")

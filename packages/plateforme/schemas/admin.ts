@@ -114,6 +114,26 @@ export type OrgView = {
   contact: { name: string; email: string } | null
 }
 
+/** Un domaine d'email (`acme.fr`), en minuscules, sans `@` : celui que porte l'adresse vérifiée d'une personne. */
+const emailDomainSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/, "an email domain such as acme.fr, without @")
+
+/** Au plus autant de domaines admis par organisation. */
+export const OPEN_ENTRY_DOMAINS_MAX = 20
+
+/**
+ * L'entrée sans invitation d'une organisation (`orgs.settings.open_entry`) : ouverte, elle fait entrer comme membre tout
+ * compte vérifié de l'émetteur de l'hôte dont l'email est d'un de ces domaines ; au moins un domaine pour l'ouvrir.
+ */
+export const openEntrySchema = z
+  .strictObject({ enabled: z.boolean(), email_domains: z.array(emailDomainSchema).max(OPEN_ENTRY_DOMAINS_MAX) })
+  .refine((value) => !value.enabled || value.email_domains.length > 0, { path: ["email_domains"], message: "Name at least one email domain to open the entry." })
+
+export type OpenEntry = z.infer<typeof openEntrySchema>
+
 /**
  * L'inscription d'une organisation (E12-S01, ADR-023) : nom, slug et préfixe, contrôlés comme par `orgCreateSchema`, sans
  * adresse (celles de l'hôte, `OrgCreationHook`) ; deux temps. `accepted_terms` : la case des conditions de l'hôte, cochée

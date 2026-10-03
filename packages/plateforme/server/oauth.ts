@@ -16,7 +16,7 @@ import { authorizationIdSchema, consentDecisionSchema, webUrl, type DecisionErro
 import { readBrand } from "./brand"
 import type { PlatformDb } from "./db"
 import { fromDatabaseError, isPlatformError, PlatformError } from "./errors"
-import { normalizeHost, resolveOrg } from "./identity"
+import { normalizeHost, resolveOrg, servedHost, type ServedHost } from "./identity"
 import { oidcMode } from "./issuer"
 
 export const CONSENT_PATH = "/oauth/consent"
@@ -176,13 +176,22 @@ async function orgOfHost(db: PlatformDb, host: string): Promise<ConsentOrg> {
  * Organisation visée par la demande. Une ressource `…/api/mcp` la dit par son hôte ; celle du MCP
  * admin est nommée, son organisation étant un argument de ses outils et pas son adresse (H105) ;
  * toute autre ne dit rien. Ne lève jamais : le consentement n'ouvre aucun droit, l'appartenance est
- * revérifiée à chaque appel (ADR-004, HN-E02S02-2).
+ * revérifiée à chaque appel (ADR-004, HN-E02S02-2). `chooseHost` : la fonction de l'hôte qui choisit l'adresse à servir
+ * (`ServedHost`), pour nommer l'organisation que la porte MCP servira ; sa panne laisse l'organisation non déterminée.
  */
-async function consentOrg(db: PlatformDb, authorizationId: string): Promise<ConsentOrg> {
+async function consentOrg(db: PlatformDb, authorizationId: string, chooseHost?: ServedHost): Promise<ConsentOrg> {
   const resource = await pendingResource(db, authorizationId)
   if (resource?.pathname === MCP_ADMIN_RESOURCE_PATH) return ADMINISTRATION
-  const host = resource?.pathname === MCP_RESOURCE_PATH ? normalizeHost(resource.host) : null
-  return host ? orgOfHost(db, host) : UNDETERMINED
+  const called = resource?.pathname === MCP_RESOURCE_PATH ? normalizeHost(resource.host) : null
+  if (!called) return UNDETERMINED
+  let host: string | null
+  try {
+    host = await servedHost(chooseHost, { host: called })
+  } catch (error) {
+    console.error("[platform] consent: the host's address choice failed", error)
+    return UNDETERMINED
+  }
+  return host ? orgOfHost(db, host) : { etat: "inconnue", hote: called }
 }
 
 /**
@@ -193,7 +202,7 @@ async function consentOrg(db: PlatformDb, authorizationId: string): Promise<Cons
  * l'émetteur, et Supabase Auth n'a aucune demande à montrer (E01-S11, AC-a10).
  */
 export async function consentRequest(
-  deps: { auth: ConsentAuth; db: PlatformDb },
+  deps: { auth: ConsentAuth; db: PlatformDb; host?: ServedHost },
   rawAuthorizationId: unknown,
 ): Promise<ConsentRequest> {
   if (oidcMode()) throw new PlatformError("not_found", "Consent is given at the identity provider of this host.")
@@ -220,7 +229,7 @@ export async function consentRequest(
       compte: data.user.email,
       adresseDeRetour: asTheBrowserReadsIt(data.redirect_uri),
       acces: scopes.map((scope) => ({ scope, libelle: scopeLine(scope) })),
-      organisation: await consentOrg(deps.db, authorizationId),
+      organisation: await consentOrg(deps.db, authorizationId, deps.host),
     },
   }
 }

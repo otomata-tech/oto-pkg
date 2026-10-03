@@ -228,6 +228,24 @@ describe.skipIf(!projectConfigured)(
         expect((await demande(id)).organisation).toMatchObject({ etat: "connue", nom: ref.org.name, membre: true })
       })
 
+      // Une preview, à une adresse inconnue d'`org_domains` : l'hôte dit l'adresse à servir, la même fonction qu'à la porte MCP.
+      it("should name the organisation of the address the host chooses for a resource at an unknown address", async () => {
+        const preview = "preview-42.example.invalid"
+        const db = await ref.db("lea")
+
+        const sans = await consentRequest({ auth, db }, await pending(mcpOf(preview)))
+        expect(sans.kind === "ask" && sans.demande.organisation).toEqual({ etat: "inconnue", hote: preview })
+
+        const seen: (string | null)[] = []
+        const host = ({ host: called }: { host: string | null }) => (seen.push(called), ref.org.host)
+        const avec = await consentRequest({ auth, db, host }, await pending(mcpOf(preview)))
+        expect(avec.kind === "ask" && avec.demande.organisation).toMatchObject({ etat: "connue", nom: ref.org.name, membre: true })
+        expect(seen).toEqual([preview])
+
+        const aucune = await consentRequest({ auth, db, host: () => null }, await pending(mcpOf(preview)))
+        expect(aucune.kind === "ask" && aucune.demande.organisation).toEqual({ etat: "inconnue", hote: preview })
+      })
+
       // Un « а » cyrillique se lit comme un « a » : l'adresse s'affiche telle que la suit le navigateur.
       it("should show the return address as the browser reads it, the host in punycode", async () => {
         oauth.getAuthorizationDetails.mockResolvedValue({ data: { ...DETAILS, redirect_uri: "https://clаude.ai/api/mcp/auth_callback" }, error: null })

@@ -6,9 +6,10 @@
 // dont dépendent les invitations (elles-mêmes, ou les équipes qui les nomment) se dit par son alerte, et le
 // tableau montre alors les membres seuls, sans tuile d'invitations (on ne sait pas), jamais « Équipe
 // inconnue » (AC2). Retiré : TanStack Query et `useMe` (qui regarde est servi par la page).
-import type { MemberView, ReglagesDesListes, TeamView } from "../../schemas"
+import type { MemberView, OpenEntry, ReglagesDesListes, TeamView } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import { ErreurDeLecture } from "../components/erreur-de-lecture"
+import { EntreeSansInvitation } from "./entree-sans-invitation"
 import { lignesDesPersonnes, type InvitationsLues } from "./lignes-des-personnes"
 import { OutilsDesPersonnes } from "./outils-des-personnes"
 import { TableauDesPersonnes } from "./tableau-des-personnes"
@@ -28,6 +29,8 @@ export type OngletMembresProps = {
   navigation: Navigation
   /** L'adresse de l'onglet sous d'autres réglages ; un réglage absent y prend son défaut. */
   adresseAvec: (reglages: Partial<ReglagesDesListes>) => string
+  /** L'entrée sans invitation, pour qui administre ; absente : aucun réglage montré. */
+  entreeSansInvitation?: OpenEntry
 }
 
 /** « /teams?tab=members&order=desc » : le chemin et ses paramètres, auxquels la recherche ajoute `q`. */
@@ -80,6 +83,7 @@ export function OngletMembres(props: OngletMembresProps) {
         filtrePose={reglages.q !== "" || reglages.filter !== undefined}
         ancre={ANCRE_DES_PERSONNES}
       />
+      {props.entreeSansInvitation && <EntreeSansInvitation reglage={props.entreeSansInvitation} nomOrganisation={nomOrganisation} />}
     </div>
   )
 }

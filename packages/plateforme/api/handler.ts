@@ -34,7 +34,7 @@ import { teamsRoutes } from "./teams"
 import { accountCreationRoute, accountDisablingRoute } from "./admin/accounts"
 import { activationRoute, deactivationRoute } from "./admin/connectors"
 import { flagRoute } from "./admin/flags"
-import { orgRoute } from "./admin/org"
+import { openEntryRoute, orgRoute } from "./admin/org"
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE"
 
@@ -92,10 +92,10 @@ const RESOURCES: Record<string, ResourceRoutes> = {
   "platform-access": platformAccessRoutes,
   nodes: nodesRoutes,
   feedback: feedbackRoutes,
-  // Tableau de bord (E08-S03) : `admin/org`, `admin/connectors/<nom>/activation`, `admin/accounts`,
+  // Tableau de bord (E08-S03) : `admin/org`, `admin/open-entry`, `admin/connectors/<nom>/activation`, `admin/accounts`,
   // `admin/accounts/<id>/disable` et `admin/flags`, départagées par leurs segments fixes.
   admin: {
-    PATCH: [orgRoute, flagRoute],
+    PATCH: [orgRoute, flagRoute, openEntryRoute],
     POST: [activationRoute, accountCreationRoute, accountDisablingRoute],
     DELETE: deactivationRoute,
   },

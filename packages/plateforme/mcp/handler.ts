@@ -11,7 +11,7 @@ import { ensureZodMessages } from "../schemas/zod-messages"
 import { loadActiveConnectors } from "../server/connectors/activations"
 import { createPlatformDb } from "../server/db"
 import { isPlatformError } from "../server/errors"
-import { requestHost, resolveIdentity, resolveOrg, type IdentityOrg } from "../server/identity"
+import { requestHost, resolveIdentity, resolveOrg, servedHost, type IdentityOrg, type ServedHost } from "../server/identity"
 import { initializeSignatures, writeJournal, type JournalEntry } from "../server/journal"
 import { verifiedCaller, type VerifyToken } from "./auth"
 import { installPlatformMcp, serverOptions, type McpDeps } from "./server"
@@ -75,7 +75,9 @@ export async function resolveMcpRequest(facts: McpRequestFacts): Promise<Resolve
   } catch (error) {
     if (!isPlatformError(error)) throw error
     if (error.code === "unknown_org") return { kind: "unknown_org", host: facts.host, message: error.message }
-    if (error.code !== "not_member") throw error
+    // Le plafond de membres atteint à l'entrée sans invitation (`enterOrg`) : un refus d'appartenance qui dit sa raison.
+    const atLimit = error.code === "forbidden" && error.details?.reason === "limit"
+    if (error.code !== "not_member" && !atLimit) throw error
     const org = await resolveOrg(db, facts.host)
     // Un non-membre ne lit pas les activations (RLS) : sa liste d'outils n'a pas d'exemples de connecteur.
     const none = () => Promise.resolve(new Set<string>())
@@ -107,7 +109,7 @@ function initializeEntries(deps: McpDeps, body: string): JournalEntry[] {
   }))
 }
 
-type RequestContext = { body: string; host: string | null; origin: string; userAgent: string | null; defer: Defer; widgets: boolean }
+type RequestContext = { body: string; host: string | null; chooseHost?: ServedHost; origin: string; userAgent: string | null; defer: Defer; widgets: boolean }
 
 async function serveAuthenticated(request: Request, context: RequestContext): Promise<Response> {
   // mcp-handler lit le corps sans attendre son échec : il ne répondrait jamais (banc E03).
@@ -118,7 +120,9 @@ async function serveAuthenticated(request: Request, context: RequestContext): Pr
 
   let resolved: ResolvedMcpRequest
   try {
-    resolved = await resolveMcpRequest({ accessToken: auth.token, claims: auth.extra, host: context.host, origin: context.origin, userAgent: context.userAgent })
+    // L'adresse que l'hôte choisit ne se lit qu'après le jeton (E03-S01 N1) ; sa panne ne sert aucune organisation par défaut.
+    const host = await servedHost(context.chooseHost, { host: context.host, request })
+    resolved = await resolveMcpRequest({ accessToken: auth.token, claims: auth.extra, host, origin: context.origin, userAgent: context.userAgent })
   } catch (error) {
     console.error("[platform] mcp: organisation or membership unavailable", error)
     return rpcError(503, -32603, SERVICE_UNAVAILABLE)
@@ -141,15 +145,18 @@ async function serveAuthenticated(request: Request, context: RequestContext): Pr
 
 /**
  * `POST /api/mcp`. `verifyToken` : `makeVerifyToken()` de `./auth` ; `defer` : `after` de Next ; `widgets` : le
- * widget routeur sur `call` et `read` (éteint par défaut : texte seul, story widgets-dans-la-conversation).
+ * widget routeur sur `call` et `read` (éteint par défaut : texte seul, story widgets-dans-la-conversation) ; `host` :
+ * l'adresse à servir, choisie par l'hôte (`ServedHost`), à défaut l'adresse appelée ; l'origine du 401 et des liens reste
+ * celle de la requête.
  * Sans jeton valide : 401 ; adresse sans organisation : 404 ; base injoignable : 503.
  */
-export async function handleMcpPost(request: Request, options: { verifyToken: VerifyToken; defer: Defer; widgets?: boolean }): Promise<Response> {
+export async function handleMcpPost(request: Request, options: { verifyToken: VerifyToken; defer: Defer; widgets?: boolean; host?: ServedHost }): Promise<Response> {
   // Avant toute validation : chez un hôte empaqueté, Zod n'a pas ses messages (`schemas/zod-messages.ts`).
   ensureZodMessages()
   const context: RequestContext = {
     body: await request.clone().text(),
     host: requestHost(request.headers),
+    chooseHost: options.host,
     origin: getPublicOrigin(request),
     userAgent: request.headers.get("user-agent"),
     defer: options.defer,

@@ -356,6 +356,23 @@ les fonctions natives, sans outil de plus. Un besoin nouveau devient une fonctio
   `call` ne la cite pas, `find` la trouve. Un contrat servi ne se durcit pas en place : une fonction
   dont les arguments changent s'inscrit sous un autre nom.
 
+### Choisir l'adresse servie au MCP (previews, ERP sur un seul domaine)
+
+Par défaut, l'organisation est celle de l'adresse appelée. Une preview a une adresse nouvelle à chaque déploiement, et un ERP peut n'avoir qu'un domaine : l'hôte passe alors **la même fonction** aux trois points qui lisent l'organisation.
+
+```ts
+import type { ServedHost } from "@otomata_tech/oto_platform/server"
+
+// L'adresse déclarée dans `org_domains` que cette application sert ; `null` : aucune organisation (404).
+export const adresseServie: ServedHost = ({ host }) => (process.env.APP_ENV === "production" ? host : "staging.acme.fr")
+
+handleMcpPost(request, { verifyToken, defer, host: adresseServie })   // app/api/mcp/route.ts
+handleResourceMetadata(request, { host: adresseServie })             // route des métadonnées OAuth
+consentRequest({ auth, db, host: adresseServie }, authorizationId)   // page de consentement (mode Supabase)
+```
+
+La fonction reçoit `{ host, request? }` : l'adresse appelée, normalisée, et la requête (absente au consentement, qui lit l'adresse de la ressource demandée). L'option ne choisit qu'une adresse : le jeton est vérifié avant, l'appartenance est relue à chaque appel, l'origine du 401 et de `resource` reste l'adresse appelée. Une exception de la fonction répond 503 ; aucune organisation n'est servie par défaut. Le MCP admin n'a pas cette option.
+
 ## Widgets dans la conversation
 
 Un résultat de `call` ou de `read` peut s'afficher rendu dans Claude et ChatGPT (MCP Apps) : un tableau, une
@@ -436,6 +453,19 @@ Une personne connectée crée une organisation, autant qu'elle en veut, et en de
   organisation ».
 - **Refus** : `email_required`, `signup_refused` (le
   texte d'`admit`, dans `details.text`), `conflict` pour un slug, un préfixe ou une adresse pris.
+
+## Entrée sans invitation (annuaire de l'ERP)
+
+Par défaut, on rejoint une organisation par une invitation. Dans un ERP dont les comptes existent déjà, un administrateur ouvre l'organisation dans « Équipes & accès » (onglet Membres) : toute personne qui a un compte vérifié chez l'émetteur de l'hôte, avec un email d'un des domaines qu'il nomme, entre comme membre, sans équipe, à son premier écran ou au premier appel de son assistant.
+
+- **Monter** : la page de l'écran passe `entreeSansInvitation={await readOpenEntry(db, identity)}` à `EcranEquipes`, pour qui administre ; l'écran écrit par `PATCH /api/platform/admin/open-entry`. Sans la prop, le réglage n'est pas montré (il reste réglable par l'API).
+- **Ce qui n'entre pas** : un email hors des domaines, une personne retirée par un administrateur (jusqu'à une nouvelle invitation acceptée), l'équipe plateforme servie par un accès en cours. Le refus reste `not_member`.
+- **Plafond** : `members_max` de `registerOrgLimits` s'applique ; atteint, `resolveIdentity` lève `forbidden` avec `details.reason: "limit"`. L'hôte le traite comme un `not_member` (l'hôte de référence : `src/lib/plateforme/session.ts`) ; la porte MCP le sert elle-même.
+- **Mode Supabase** : garder « Confirm email » ; une inscription ouverte à tous donne un compte vérifié à quiconque possède une adresse du domaine, ce qui est le but.
+
+## Mode jour ou nuit
+
+Le mode est à l'hôte : il pose la classe `.dark` (next-themes ou autre), que les écrans du paquet suivent. Pour que le menu du compte du rail en offre la bascule, l'hôte ajoute `apparence` à ce qu'il prête par `ContexteDeLHote` : `{ mode: "light" | "dark", basculer: () => void }`. Absente, aucune entrée.
 
 ## Migrations
 

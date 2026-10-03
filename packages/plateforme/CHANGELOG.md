@@ -17,7 +17,16 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.4.0 — 2026-10-03
+
 ### Hosts
+- Install: upgrade to 1.4.0, run `oto-platform migrations sync` and apply `20261003090000_v1_4_0.sql` before deploying (a new table and four functions; additive). No new variable.
+- Server: entry without invitation. An administrator opens the organisation to the accounts whose verified email is of a domain they name (`readOpenEntry`, `setOpenEntry`, `PATCH /api/platform/admin/open-entry`; at least one domain). Such a person becomes a member, without a team, at the first screen or assistant call, inside `resolveIdentity`. A removed member stays out until an accepted invitation; the platform team served by an access does not become a member. Closed by default.
+- Server: with the entry open and `members_max` reached, `resolveIdentity` throws `forbidden` with `details.reason: "limit"`. Treat it as `not_member` where you catch `not_member` (the reference host does, in `src/lib/plateforme/session.ts`); the MCP door serves it by itself.
+- UI: `EcranEquipes` takes `entreeSansInvitation?` (what `readOpenEntry` gives, for an administrator) and shows the setting under the members. Absent, nothing shows.
+- CLI: `oto-platform widgets build` on Windows now generates the classes of the host's views (the styles module was compared with the system separator and never matched).
+- UI: the account menu of the rail offers « Mode sombre » / « Mode clair » when the host lends `apparence: { mode, basculer }` through `ContexteDeLHote`. The mode stays the host's (its `.dark` class); absent, no entry.
+- MCP: `handleMcpPost`, `handleResourceMetadata` and `consentRequest` take `host`, one function of the host (`ServedHost`, from `/server`) that gives the address to serve instead of the called one: a preview gives its declared address, a single-organisation ERP the address of its organisation. `null`: no organisation (404); a throw: 503. The token is still checked first and membership at each call; the 401 and `resource` keep the called origin. Without `host`, nothing changes.
 - MCP: `handleMcpPost(request, { verifyToken, defer, widgets: true })` turns on a result widget in Claude and ChatGPT on `call` and `read` (a table, a record, a page read whole). Without `widgets`, the MCP serves exactly what it served before. Off by default until the hosts are measured.
 - Install: the package ships its widget bundle, generated (`mcp/widgets/generated.ts`, about 1 MB); nothing to build, no variable.
 - Server: `registerWidgetViews(WIDGET_BUNDLE)` registers the host's widget bundle, served instead of the package's; `defineErpFunction({ view: "<name>" })` renders the function's result with that host view. Call it before `registerFunctions`, which refuses a view missing from the bundle (`CatalogRegistrationError`).

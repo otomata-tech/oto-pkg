@@ -10,6 +10,7 @@ import {
   listMembers,
   listTeams,
   orgLimitsView,
+  readOpenEntry,
   type Identity,
   type PlatformDb,
 } from "@otomata_tech/oto_platform/server"
@@ -56,15 +57,17 @@ async function lire(db: PlatformDb, identity: Identity): Promise<Donnees> {
     estAdmin: isOrgAdmin(identity),
     equipesDirigees: identity.teams.filter((equipe) => equipe.role === "lead").map((equipe) => equipe.id),
   }
-  const [membres, invitations, optionsDInvitation, equipes, limites] = await Promise.all([
+  const [membres, invitations, optionsDInvitation, equipes, limites, entreeSansInvitation] = await Promise.all([
     resultatDe(listMembers(db, identity)),
     resultatDe(listInvitations(db, identity, { state: "pending" })),
     resultatDe(optionsOuRien(db, identity)),
     resultatDe(listTeams(db, identity)),
     // Les capacités (E12-S02) : leur panne ne grise rien, le service refuse quand même.
     orgLimitsView(db, identity).catch(() => undefined),
+    // L'entrée sans invitation, pour qui administre ; sa panne ne montre pas le réglage.
+    moi.estAdmin ? readOpenEntry(db, identity).catch(() => undefined) : undefined,
   ])
-  return { nomOrganisation: identity.org.name, moi, membres, invitations, optionsDInvitation, equipes, limites }
+  return { nomOrganisation: identity.org.name, moi, membres, invitations, optionsDInvitation, equipes, limites, entreeSansInvitation }
 }
 
 /** Une panne de la résolution de l'identité : l'écran le dit dans chaque onglet, sans rien proposer (AC2). */

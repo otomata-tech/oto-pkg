@@ -117,6 +117,8 @@ export const getPlatformIdentity = cache(async (): Promise<PlatformIdentityResul
     if (isPlatformError(error) && (error.code === "unknown_org" || error.code === "not_member")) {
       return { error: { code: error.code } }
     }
+    // L'entrée sans invitation au plafond de membres (`forbidden`, `reason: "limit"`) : la personne n'est pas entrée.
+    if (isPlatformError(error) && error.code === "forbidden" && error.details?.reason === "limit") return { error: { code: "not_member" } }
     throw error
   }
 })

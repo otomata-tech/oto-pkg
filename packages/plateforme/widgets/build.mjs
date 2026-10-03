@@ -13,7 +13,7 @@
  * Vite, ses plugins, Tailwind et `ext-apps` se chargent à la demande : un hôte sans vue de l'ERP ne les installe pas.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
@@ -72,8 +72,11 @@ function erpViewsPlugin(views, sources) {
         const map = entries.map(([name], index) => `${JSON.stringify(name)}: V${index}`).join(', ')
         return `${imports.join('\n')}\nexport default { ${map} }\n`
       }
-      if (id === STYLES && sources.length > 0) {
-        return `${readFileSync(STYLES, 'utf8')}\n${sources.map((source) => `@source ${JSON.stringify(source)};`).join('\n')}\n`
+      // Barres obliques : sous Windows, Tailwind ne lit pas un `@source` au séparateur du système, et les classes des
+      // vues de l'hôte manqueraient au bundle.
+      // L'identifiant d'un module porte des barres obliques sur tout système : le chemin du fichier s'y compare ainsi.
+      if (id.split(sep).join('/') === STYLES.split(sep).join('/') && sources.length > 0) {
+        return `${readFileSync(STYLES, 'utf8')}\n${sources.map((source) => `@source ${JSON.stringify(source.split(sep).join('/'))};`).join('\n')}\n`
       }
       return null
     },

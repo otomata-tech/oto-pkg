@@ -13,7 +13,7 @@
 import { generateProtectedResourceMetadata, getPublicOrigin, metadataCorsOptionsRequestHandler } from "mcp-handler"
 import { createAnonPlatformDb } from "../server/db"
 import { isPlatformError } from "../server/errors"
-import { requestHost, resolveOrg, type IdentityOrg } from "../server/identity"
+import { requestHost, resolveOrg, servedHost, type IdentityOrg, type ServedHost } from "../server/identity"
 import { issuerConfig } from "../server/issuer"
 import { MCP_ADMIN_RESOURCE_PATH, MCP_RESOURCE_PATH } from "../server/oauth"
 
@@ -36,7 +36,9 @@ const RESOURCE_OF_PATH = new Map([
 
 type MetadataDeps = {
   /** Organisation servie à cet hôte normalisé, ou `null` ; lève sur une panne. */
-  findOrg: (host: string) => Promise<{ id: string } | null>
+  findOrg?: (host: string) => Promise<{ id: string } | null>
+  /** L'adresse à servir, choisie par l'hôte (`ServedHost`, la même fonction que celle de `handleMcpPost`). */
+  host?: ServedHost
 }
 
 /** `org_by_host`, seule fonction exécutable par `anon` (E02-S01) : aucune session ici. */
@@ -71,27 +73,29 @@ function metadata(issuer: string, origin: string, resourcePath: string): Respons
 /**
  * `GET /.well-known/oauth-protected-resource[/api/mcp | /api/mcp-admin]`. `resource` part de
  * l'origine appelée, lue comme `withMcpAuth` la lit pour le 401 (`getPublicOrigin` : en-têtes
- * `X-Forwarded-*`, `Forwarded`, sinon l'URL) ; l'organisation vient de l'hôte normalisé. Autre
+ * `X-Forwarded-*`, `Forwarded`, sinon l'URL) ; l'organisation vient de l'hôte normalisé, ou de l'adresse que choisit
+ * l'hôte de l'application (`host`), `resource` restant l'adresse appelée. Autre
  * chemin : 404 `not_found` ; adresse sans organisation : 404 `unknown_org` ; panne : 503 `internal`.
  */
 export async function handleResourceMetadata(
   request: Request,
-  deps: MetadataDeps = { findOrg: findOrgByHost },
+  { findOrg = findOrgByHost, host: chooseHost }: MetadataDeps = {},
 ): Promise<Response> {
   const path = new URL(request.url).pathname
   const resourcePath = RESOURCE_OF_PATH.get(path)
   if (!resourcePath) return refusal(404, "not_found", `No protected resource at ${path}.`)
 
   if (resourcePath === MCP_RESOURCE_PATH) {
-    const host = requestHost(request.headers)
-    if (!host) return refusal(404, "unknown_org", "No organisation is served at this address.")
-    let org: { id: string } | null
+    let host: string | null
+    let org: { id: string } | null = null
     try {
-      org = await deps.findOrg(host)
+      host = await servedHost(chooseHost, { host: requestHost(request.headers), request })
+      if (host) org = await findOrg(host)
     } catch (error) {
       console.error("[platform] metadata: organisation unavailable", error)
       return refusal(503, "internal", SERVICE_UNAVAILABLE)
     }
+    if (!host) return refusal(404, "unknown_org", "No organisation is served at this address.")
     if (!org) return refusal(404, "unknown_org", `No organisation is served at ${host}.`)
   }
 

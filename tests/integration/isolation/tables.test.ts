@@ -59,7 +59,7 @@ const ANON_FUNCTIONS: Record<string, string> = {
  * `team_members` et `platform_grants`, `user_id` est la personne ajoutée ou le bénéficiaire : l'appelant
  * y est refusé par ce qui refusait la ligne de B (l'organisation, ou l'équipe plateforme pour `a`).
  */
-const AUTHORS = ["user_id", "created_by", "invited_by", "granted_by", "activated_by"]
+const AUTHORS = ["user_id", "created_by", "invited_by", "granted_by", "activated_by", "excluded_by"]
 
 /**
  * L'état d'une création qu'exigent les policies d'insertion : un retour s'ouvre

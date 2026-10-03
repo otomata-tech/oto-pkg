@@ -7,23 +7,37 @@
 // « Brancher un assistant », la Corbeille (AC-e22) —, puis un filet et la déconnexion de l'hôte. Retiré :
 // Agents, Procédures (portage-ecrans.md § 0), la ligne « Couleur » et « Apparence » (E05-S11, AC-6 : la
 // couleur de la personne se choisit dans Profil, celle de l'organisation dans Organisation), la ligne
-// « Corbeille » du pied (AC-e22).
+// « Corbeille » du pied (AC-e22). Ajouté : la bascule jour ou nuit, quand l'hôte la sert (`Hote.apparence`) ; le paquet
+// n'écrit pas le mode, il est à l'hôte.
+import { Moon } from "@phosphor-icons/react/dist/csr/Moon"
 import { SignOut } from "@phosphor-icons/react/dist/csr/SignOut"
+import { Sun } from "@phosphor-icons/react/dist/csr/Sun"
 import { AnimatedIcon } from "../ds/react/icon"
 import { RailFoot, RailItem } from "../ds/react/layout"
 import type { MenuItem } from "../ds/react/overlays"
 import { RailAccount } from "../ds/react/rail"
-import { useHote } from "../hote/navigation"
+import { useHote, type Hote } from "../hote/navigation"
 import { LigneDuRail } from "./arbre-du-rail"
 import { ecransPermis, type EcranPermis } from "./ecrans"
 import { COMPTE } from "./libelles"
 import type { AdressesDuRail } from "./types"
 
-/** Les items du menu du compte : ses écrans, puis la déconnexion quand l'hôte la sert. */
-function itemsDuCompte(ecrans: readonly EcranPermis[], { naviguer, deconnecter }: { naviguer: (adresse: string) => void; deconnecter?: () => void }): MenuItem[] {
+/** L'entrée qui passe à l'autre mode : elle nomme le mode où l'on va, jamais celui où l'on est. */
+function bascule({ mode, basculer }: NonNullable<Hote["apparence"]>): MenuItem {
+  return mode === "dark"
+    ? { label: COMPTE.modeClair, icon: <AnimatedIcon as={Sun} size="xs" />, onSelect: basculer }
+    : { label: COMPTE.modeSombre, icon: <AnimatedIcon as={Moon} size="xs" />, onSelect: basculer }
+}
+
+/** Les items du menu du compte : ses écrans, puis, sous un filet, le mode jour ou nuit et la déconnexion quand l'hôte les sert. */
+function itemsDuCompte(ecrans: readonly EcranPermis[], { naviguer, deconnecter, apparence }: Pick<Hote, "naviguer" | "deconnecter" | "apparence">): MenuItem[] {
+  const gestes: MenuItem[] = [
+    ...(apparence ? [bascule(apparence)] : []),
+    ...(deconnecter ? [{ label: COMPTE.deconnexion, icon: <AnimatedIcon as={SignOut} size="xs" />, onSelect: deconnecter }] : []),
+  ]
   return [
     ...ecrans.map((ecran) => ({ label: ecran.libelle, icon: <AnimatedIcon as={ecran.glyphe} size="xs" />, onSelect: () => naviguer(ecran.adresse) })),
-    ...(deconnecter ? [{ separator: true }, { label: COMPTE.deconnexion, icon: <AnimatedIcon as={SignOut} size="xs" />, onSelect: deconnecter }] : []),
+    ...(gestes.length > 0 ? [{ separator: true }, ...gestes] : []),
   ]
 }
 

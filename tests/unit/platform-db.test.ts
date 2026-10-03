@@ -11,11 +11,11 @@ import { createAnonPlatformDb, createPlatformDb } from "@otomata_tech/oto_platfo
 const CALLER = { userId: "5f0c1d7e-0000-4000-8000-000000000001", email: "claire@acme.test" }
 
 describe("createPlatformDb and createAnonPlatformDb (E01-S10 f2, AC-f2)", () => {
-  it("should build, for a caller and without session, a client whose only face is tx, with no Supabase variable", () => {
+  it("should build, for a caller and without session, a client whose only data face is tx, with no Supabase variable", () => {
     // Aucune variable de Supabase dans ce fichier : la face PostgREST exigeait l'URL et la clé publique.
-    for (const db of [createPlatformDb({ caller: CALLER }), createAnonPlatformDb()]) {
-      expect(Object.keys(db)).toEqual(["tx"])
-    }
+    // `retranslate` n'ouvre aucune lecture : il fait relire l'identité de l'appelant après une entrée sans invitation.
+    expect(Object.keys(createPlatformDb({ caller: CALLER }))).toEqual(["tx", "retranslate"])
+    expect(Object.keys(createAnonPlatformDb())).toEqual(["tx"])
   })
 })
 

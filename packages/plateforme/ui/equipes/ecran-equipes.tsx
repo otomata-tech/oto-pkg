@@ -12,7 +12,7 @@
 // rail en tient lieu) ; les onglets « Règles d'accès » et « Accès plateforme » (E05-S13, AC-5, fiche D127 b,
 // c : les droits se règlent dans « Partager » de chaque contenu, les accès plateforme depuis la console Oto).
 import { Users } from "@phosphor-icons/react/dist/ssr/Users"
-import { limitReached, type EquipesTab, type MemberView, type OrgLimitsView, type ReglagesDesListes, type TeamView } from "../../schemas"
+import { limitReached, type EquipesTab, type MemberView, type OpenEntry, type OrgLimitsView, type ReglagesDesListes, type TeamView } from "../../schemas"
 import type { Resultat } from "../api/resultat"
 import type { LienDeLHote } from "../arbre/navigateur-d-arbre"
 import { Icon } from "../ds/react/icon"
@@ -41,6 +41,8 @@ export type EcranEquipesProps = {
   equipes: Resultat<TeamView[]>
   /** Les capacités de l'organisation (`orgLimitsView`, E12-S02) ; absentes : aucun geste grisé. */
   limites?: OrgLimitsView
+  /** L'entrée sans invitation (`readOpenEntry`), montrée à qui administre sous les membres ; absente : rien. */
+  entreeSansInvitation?: OpenEntry
   Lien: LienDeLHote
   /** L'adresse d'un onglet ; `reglages` : ceux de ses tableaux (un réglage absent y prend son défaut). */
   hrefDOnglet: (onglet: EquipesTab, reglages?: Partial<ReglagesDesListes>) => string
@@ -98,6 +100,7 @@ function Contenu(props: EcranEquipesProps & { reglages: ReglagesDesListes }) {
       reglages={reglages}
       navigation={navigation}
       adresseAvec={adresseAvec}
+      entreeSansInvitation={moi.estAdmin ? props.entreeSansInvitation : undefined}
     />
   )
 }

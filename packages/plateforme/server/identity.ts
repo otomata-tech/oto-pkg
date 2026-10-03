@@ -12,8 +12,9 @@
 // ses lectures en une transaction (HN-E01S10-2).
 import type { Json } from "./database"
 import type { PlatformDb } from "./db"
-import { fromDatabaseError, inTransaction, PlatformError } from "./errors"
+import { fromDatabaseError, inTransaction, isPlatformError, PlatformError } from "./errors"
 import { isJsonObject } from "./json"
+import { enterOrg } from "./open-entry"
 import type { Tx } from "./sql"
 
 /** Ce qu'il faut des en-têtes d'une requête : `Headers`, ou ceux de `next/headers`. */
@@ -91,6 +92,19 @@ export function rawRequestHost(headers: HeadersLike): string | null {
 /** Hôte normalisé de la requête, celui qui désigne l'organisation. */
 export function requestHost(headers: HeadersLike): string | null {
   return normalizeHost(rawRequestHost(headers))
+}
+
+/**
+ * L'adresse à servir, choisie par l'hôte de l'application à la place de l'adresse appelée (previews aux adresses
+ * changeantes, ERP sur un seul domaine) : il reçoit l'adresse appelée, normalisée, et la requête quand il y en a une
+ * (le consentement n'en a pas : il lit l'adresse de la ressource demandée). `null` : aucune organisation. L'organisation
+ * reste lue dans `org_domains` et l'appartenance revérifiée à chaque appel : seule la source de l'adresse change.
+ */
+export type ServedHost = (called: { host: string | null; request?: Request }) => string | null | Promise<string | null>
+
+/** L'adresse servie : celle que rend `choose`, normalisée comme une adresse appelée ; sans `choose`, l'adresse appelée. Une exception de l'hôte remonte. */
+export async function servedHost(choose: ServedHost | undefined, called: { host: string | null; request?: Request }): Promise<string | null> {
+  return choose ? normalizeHost(await choose(called)) : called.host
 }
 
 /**
@@ -189,23 +203,46 @@ async function sessionPerson(sql: Tx): Promise<{ userId: string | null; kind: st
  * appelant d'un émetteur OIDC sans ligne `members` dans l'organisation voit d'abord ses invitations en
  * attente acceptées (`accept_invitations`, AC-a4) : il n'est passé par aucun écran pour les accepter.
  * `caller.email` : le texte du refus et le nom de repli.
+ *
+ * Une personne de la session refusée `not_member` tente l'entrée sans invitation de l'organisation (`enterOrg`,
+ * `open_entry`) : admise, elle devient membre et son identité se relit ; sinon le refus reste le même, sauf au plafond
+ * de membres, qui se dit (`forbidden`, `reason: "limit"`). Un membre ne paie aucune lecture de plus.
  */
 export async function resolveIdentity(
   db: PlatformDb,
   host: string | null,
   caller: { userId?: string; email: string },
 ): Promise<Identity> {
+  const first = await identityAtHost(db, host, caller)
+  if ("identity" in first) return first.identity
+  // L'outillage qui nomme la personne ne la fait pas entrer : seule une session, dont la base lit l'email vérifié.
+  if (caller.userId || !(await enterOrg(db, first.org))) throw first.refusal
+  const second = await identityAtHost(db, host, caller)
+  if ("identity" in second) return second.identity
+  throw second.refusal
+}
+
+/** L'identité à cette adresse, ou le refus `not_member` et l'organisation qu'il vise ; `unknown_org` et les pannes lèvent. */
+async function identityAtHost(
+  db: PlatformDb,
+  host: string | null,
+  caller: { userId?: string; email: string },
+): Promise<{ identity: Identity } | { refusal: PlatformError; org: IdentityOrg }> {
   return inTransaction(db, "resolveIdentity", async (sql) => {
     const org = await resolveOrg(db, host)
-    if (caller.userId) return identityInOrg(db, org, { userId: caller.userId, email: caller.email })
+    const refused = (error: unknown) => {
+      if (isPlatformError(error) && error.code === "not_member") return { refusal: error, org }
+      throw error
+    }
+    if (caller.userId) return identityInOrg(db, org, { userId: caller.userId, email: caller.email }).then((identity) => ({ identity }), refused)
     const person = await sessionPerson(sql)
-    if (!person.userId) throw notMember(org, caller.email)
+    if (!person.userId) return { refusal: notMember(org, caller.email), org }
     if (person.kind === "oidc") {
       // Une instruction : l'acceptation ne court que sans ligne `members` visible dans l'organisation.
       await sql`select platform.accept_invitations()
                  where not exists (select 1 from platform.members where org_id = ${org.id} and user_id = ${person.userId})`
     }
-    return identityInOrg(db, org, { userId: person.userId, email: caller.email })
+    return identityInOrg(db, org, { userId: person.userId, email: caller.email }).then((identity) => ({ identity }), refused)
   })
 }
 

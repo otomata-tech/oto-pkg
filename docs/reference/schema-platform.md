@@ -29,6 +29,7 @@ erDiagram
     nodes ||--o{ node_shares : "liens publics"
     nodes ||--o{ files : "fichiers joints"
     orgs ||--o{ upload_tickets : ""
+    orgs ||--o{ member_exclusions : ""
     nodes ||--o{ access_rules : ""
     accounts ||--o{ access_rules : ""
     orgs ||--o{ accounts : ""
@@ -59,6 +60,7 @@ erDiagram
 | `node_shares` | Lien public d'un nœud (ADR-013) | `node_id`, `token` (43 caractères base64url, unique), `include_children`, `created_by`, `created_at`, `revoked_at` ; un seul lien actif par nœud |
 | `files` | Fichier joint à un nœud (ADR-016) : métadonnées seules, les octets dans le stockage sous la clé `<org_id>/<id>` | `node_id` (cascade), `name` (1 à 255, jamais dans la clé), `mime`, `size` (1 octet à 50 Mo), `status` (`pending` · `ready` ; insertion `pending` seule), `created_by`, `created_at` ; quota de 10 Go par organisation sous le verrou 7501 ; un fichier appartient à un seul nœud |
 | `upload_tickets` | Ticket d'envoi d'`upload.link` (ADR-018), jamais exporté | `user_id`, `ctx`, `token_hash` et `form_token_hash` (empreintes SHA-256 des jetons de `curl` et du formulaire, uniques, jamais un jeton), `kind` (`file` · `md` · `csv`), `mode`, `target_path`, `name`, `title`, `summary`, `key`, `base_revision`, `publish`, `expires_at` (15 minutes), `used_at` ; lu par sa personne et, expiré, par tout membre ; aucune mise à jour hors `consume_upload_ticket` |
+| `member_exclusions` | Personne retirée d'une organisation par un administrateur : l'entrée sans invitation la refuse ; jamais exportée | `org_id`, `user_id` (clé), `excluded_at`, `excluded_by` ; inscrite par `removeMember`, levée par une invitation acceptée, supprimée par `forget_user` |
 | `access_rules` | Un droit | `node_id` **ou** `account_id` ; exactement un sujet : `subject_team_id`, `subject_user_id` ou `subject_org` (nœud seulement, ADR-014) ; `level` (`none` · `read` · `write` · `manage`) ; unique par cible et sujet |
 | `platform_staff` | Équipe plateforme (sans `org_id`) | `user_id` (clé), `email`, `name`, `added_by`, `added_at` ; écrite par l'outillage seul |
 | `platform_grants` | Accès d'un consultant à une organisation | `user_id`, `granted_by`, `granted_at`, `revoked_at`, `revoked_by`, `reason` ; `user_email`, `user_name` copiés de `platform_staff` ; un seul accès en cours par couple ; révocation datée par la base |
@@ -92,6 +94,7 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `unique_handle(org, email)` | `handle` de l'espace personnel : partie locale de l'email, ASCII, unique dans l'organisation (outillage) |
 | `create_org(name, slug, prefix, hosts)` | Organisation avec sa racine, son dossier `private`, son nœud `contexte` et ses adresses (équipe plateforme), par `org_skeleton` (interne, exécutable par aucun rôle), l'accès `creation` du créateur en plus |
 | `signup_org(name, slug, prefix, hosts)` | Inscription (ADR-023) : l'identité de l'appelant s'il n'en a pas (mode OIDC), l'arbre de départ par `org_skeleton`, les adresses et le premier membre `admin`, sans équipe ni accès plateforme ; refus `42501` sans email ni émetteur ; aucune borne du nombre d'organisations d'une personne. Seconde barrière : l'activation est décidée par le service |
+| `join_org(org, members_max)` | Entrée sans invitation : fait de l'appelant un membre (`member`, sans équipe) si `orgs.settings.open_entry` est actif, que son email vérifié est d'un domaine admis, qu'il n'est ni exclu ni servi par un accès plateforme ; plafond passé par le service, compté sous le verrou 7601 ; rend `joined`, `refused` ou `limit` ; crée l'identité d'un sujet OIDC inconnu ; une ligne `member joined` au journal. `open_entry_admits(org)` pose la même question sans écrire ; `open_entry_gate` est interne |
 | `org_usage(org)` | Compteurs d'une organisation lus sans session (ADR-022 § 10) : membres et invitations en attente, rien d'autre ; aucune ligne pour une organisation inconnue (`anon`) |
 | `is_context_path(org, path)` | Seule définition d'un chemin de Contexte : `contexte`, `<équipe>/contexte`, `private/<handle>/contexte` |
 | `node_owner(node)` | Propriétaire effectif d'un nœud : le plus proche ancêtre, lui compris, qui en porte un |
@@ -142,7 +145,7 @@ dans les colonnes accordées une à une. Seule la portée plateforme appelle `is
 les droits se décident dans le service (ADR-012 § 3). Les écritures sans porte de l'API passent
 par les fonctions du paquet : racine et `private` jamais supprimés, versions, liens et alias écrits
 par `publish_node` et les déclencheurs, `identities` par `identity_for_caller()`, `orgs` créées
-par `create_org`. Rien pour `anon`, sauf `org_by_host`, `public_node_by_token`, `public_file_by_token`,
+par `create_org`, `members` hors invitation, import et inscription par `join_org` seule. Rien pour `anon`, sauf `org_by_host`, `public_node_by_token`, `public_file_by_token`,
 `consume_upload_ticket` et `org_usage`.
 
 **Outillage.** Organisation Démo, équipe plateforme, export-import, oubli d'une personne, ménage

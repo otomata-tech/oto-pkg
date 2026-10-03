@@ -222,6 +222,9 @@ NEVER_EXPORTED.push('lexicon')
 // Les tickets de dépôt par lien (E10-S02 lot f, ADR-018) : 15 minutes, un envoi, liés à une conversation ; un ticket
 // ne se transfère pas (AC-f10).
 NEVER_EXPORTED.push('upload_tickets')
+// Les exclusions (entrée sans invitation) nomment des personnes qui ne sont plus membres : l'export ne porte pas leur
+// email, l'import n'aurait rien pour les rapprocher.
+NEVER_EXPORTED.push('member_exclusions')
 
 /** @param {string} name */
 function tableSpec(name) {

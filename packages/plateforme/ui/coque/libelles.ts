@@ -36,6 +36,8 @@ export const COMPTE = {
   profil: "Profil",
   brancher: "Brancher mon Claude, ChatGPT ou Mistral",
   deconnexion: "Déconnexion",
+  modeSombre: "Mode sombre",
+  modeClair: "Mode clair",
   anonyme: "Mon compte",
 } as const
 

@@ -1,7 +1,7 @@
 # Connecteurs et comptes
 
 - **Statut** : validé avec JB le 30/09/2026
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-05
 
 ## Résumé
 
@@ -23,7 +23,7 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 ### Deux sortes de connecteurs (ADR-019 amendé le 2026-09-30)
 
 - **Propre à un hôte** : écrit à la main dans le projet hôte, en TypeScript, au contrat de fonction du paquet (`defineFunction`), puis inscrit au catalogue. C'est le cas normal : le premier connecteur d'un projet qui ajoute le paquet est son propre backend.
-- **Partagé** : sa source vit dans la bibliothèque `oto-connectors`, au format YAML (une description par fonction servie : nom, description en anglais, schéma, classe, exemples, refus nommés, et l'appel derrière) ; sa fabrique en tire des fonctions TypeScript au contrat du paquet, livrées dans un paquet npm que le paquet déclare et inscrit. La source de vérité reste dans `oto-connectors`.
+- **Partagé** : sa source vit dans le dépôt `connectors` (bibliothèque Python, distribution PyPI `oto-core`), au format YAML (une description par fonction servie : nom, description en anglais, schéma, classe, exemples, refus nommés, et l'appel derrière) ; sa fabrique en tire des fonctions TypeScript au contrat du paquet, livrées dans un paquet npm que le paquet déclare et inscrit. La source de vérité reste dans `connectors` (format : `connectors : docs/conception/format-de-description.md` ; fabrique : `connectors : docs/conception/fabrique.md`).
 - Les deux s'exécutent dans le serveur de l'application hôte, sans service intermédiaire (ADR-019 § 1) : installé dans l'ERP d'un client, le paquet exécute les connecteurs chez lui.
 - **Le secret est toujours fourni par le consommateur** : la bibliothèque n'en lit aucun (garde mécanique) et un connecteur le reçoit en paramètre ; un appel sans secret échoue au lieu de retomber sur une clé par défaut (ADR-007 § 3). Côté paquet, le secret d'un compte vit dans le coffre du paquet, déchiffré par le serveur de l'hôte pour le seul appel au tiers ; il ne revient jamais vers un écran, le modèle ou le journal (ADR-019 § 3, NFR-ADMIN-01).
 - Le contrat vu des assistants ne change pas (ADR-019 § 4). Le branchement « distant » d'ADR-007 § 5 (un serveur MCP tiers, ou l'ERP existant d'un client) reste possible ; il ne sert pas aux connecteurs écrits par l'équipe (ADR-019 § 5, hypothèse à confirmer par JB).
@@ -32,6 +32,7 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 ### Catalogue et activation
 
 - H80 : le catalogue de `call` vit dans le code, avec trois sources : native (`table.*`), simulée (`mail.*`) et ERP (inscrite par l'hôte) ; chaque fonction porte son origine et sa classe (`read`, `write`, `sensitive`).
+- Les connecteurs forment une table, et toute référence à un connecteur (`accounts`, `connector_activations`, `sim_outbox`) est une clé étrangère vers elle : un renommage se fait à un seul endroit, et une référence à un connecteur inconnu est refusée par la base. Dans oto 1, un connecteur renommé alors que son nom restait en texte libre ailleurs a fait perdre leurs outils à des membres, en silence. Le catalogue des fonctions, lui, reste dans le code (H80).
 - H81 : l'activation d'un connecteur se range dans `connector_activations(org_id, connector, state)` ; les fonctions natives et ERP sont toujours actives.
 - E04-S01 N9, E04-S01 N27, E04-S01 N38 : les connecteurs actifs se relisent à chaque requête (`tools/list`, `find`, `call`, `context`, `read`), sans cache : une activation vaut dès la requête suivante. Ils se lisent au premier usage d'une requête MCP et ne valent que pour elle ; un non-membre reçoit un ensemble vide, sans lecture. Une panne ne touche que `tools/list`, servie sans exemples de connecteur (log serveur) ; `context` échoue en `internal` quand ses lignes connecteurs ne se lisent pas.
 - E04-S01 N13 : désactiver un connecteur arrête aussitôt ses fonctions et garde ses comptes, qui reviennent à la réactivation. E04-S01 N18 : date d'activation = dernière mise à jour de la ligne active ; activer un connecteur déjà actif n'écrit rien ; désactiver ne touche pas `activated_by` ; un connecteur inactif se lit sans date ni auteur.
@@ -95,8 +96,9 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 
 - **Un service connecteurs sans état, dans un autre dépôt, joint comme un serveur MCP** (ADR-007 § 1 : langage et dépôt au choix de l'équipe ; § 2 : `tools/list` alimente le catalogue, `tools/call` exécute, secret du compte dans un en-tête ; § 4 : déploiement partagé en France, joint par réseau privé ou jeton de service, une instance par cellule sur exigence). Remplacé par ADR-019 (D129) : un morceau de plus à héberger et joindre, une latence réseau par appel, un second langage ; le service n'a jamais été construit.
 - **D108** : les connecteurs (V2) repartent de zéro ; le service connecteurs n'est pas construit sur `oto-core` et ne reprend pas les outils d'Oto ; langage et dépôt au choix de l'équipe ; contrat vu du paquet : un serveur MCP, secret en en-tête, sans état. Remplacée par D129 pour le dépôt et le langage.
-- **D129, dans sa première lecture** : « les connecteurs réels s'écrivent en TypeScript dans le paquet npm, sans service connecteurs séparé » (ADR-019, JB, 2026-09-29), ce qui écartait toute bibliothèque commune (« on part de zéro : pas d'oto-core »). Amendée le 2026-09-30 : la bibliothèque `oto-connectors` (ex `oto-core`) est gardée pour les connecteurs partagés, au secret fourni par le consommateur ; seuls les connecteurs propres à un hôte s'écrivent à la main au contrat du paquet. Les deux phrases décrivent deux sortes de connecteurs.
+- **D129, dans sa première lecture** : « les connecteurs réels s'écrivent en TypeScript dans le paquet npm, sans service connecteurs séparé » (ADR-019, JB, 2026-09-29), ce qui écartait toute bibliothèque commune (« on part de zéro : pas d'oto-core »). Amendée le 2026-09-30 : la bibliothèque du dépôt `connectors` (distribution `oto-core`) est gardée pour les connecteurs partagés, au secret fourni par le consommateur ; seuls les connecteurs propres à un hôte s'écrivent à la main au contrat du paquet. Les deux phrases décrivent deux sortes de connecteurs.
 - **Monter Oto en connecteur distant** : importe sa surface (`oto_call`, `_org`, `_run_id`) et son journal, contraires à ADR-002. Écarté (ADR-007).
+- **Nommer un connecteur en texte libre dans chaque table qui s'y réfère** : écarté le 2026-10-01 ; un renommage y casse des références sans erreur (leçon d'oto 1).
 - **Un choix silencieux entre équipes ou comptes** : écarté ; l'assistant montre les candidats à l'utilisateur.
 
 ## Sécurité et confidentialité
@@ -109,7 +111,8 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 ## Écart avec le code
 
 - Le contrat public de l'hôte est aujourd'hui `defineErpFunction` et `registerFunctions` (origine `erp`) ; `defineFunction` n'est exporté que pour les sources du paquet, et l'origine `service_connecteurs` de `server/catalog/define.ts` porte encore le nom du service abandonné.
-- Ni le paquet npm de connecteurs partagés issu d'`oto-connectors`, ni son inscription, ni le secret dans le contexte d'appel ne sont écrits ; les comptes sont simulés seuls (H85).
+- Ni le paquet npm de connecteurs partagés issu de `connectors`, ni son inscription, ni le secret dans le contexte d'appel ne sont écrits ; les comptes sont simulés seuls (H85).
+- Les connecteurs n'ont pas encore de table : ils sont nommés en texte libre dans `accounts`, `connector_activations` et `sim_outbox`.
 - Restent en V2, avec leurs stories : connecteur Sellsy réel, connecteur mail réel, comptes tiers et coffre (AES-GCM, OAuth ou clé du tiers, santé), écran Connecteurs, sondes et alertes des comptes (`.method/sprint/status.md § Stories V2`). La story du connecteur Sellsy perd son client MCP de serveur à serveur et sa table `functions` de source distante.
 
 ## Questions ouvertes
@@ -124,3 +127,4 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 - 2026-09-29 : connecteurs écrits en TypeScript dans le paquet, sans service séparé ; remplace ADR-007 § 1, § 2 et § 4 et D108 — décidé par JB (source : ADR-019, fiche D129).
 - 2026-09-30 : deux sortes de connecteurs : la bibliothèque `oto-connectors` est gardée pour les connecteurs partagés, les connecteurs propres à un hôte s'écrivent au contrat `defineFunction`, le secret est toujours fourni par le consommateur — décidé par Alexis, accord de JB à l'oral (point du 30/09).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-007, ADR-019, D42, D108, D129, H80 à H87, H108 et les choix des stories E03-S04, E04-S01, E08-S05 — décidé par Alexis, accord de JB.
+- 2026-10-01 : les connecteurs forment une table, et toute référence à un connecteur est une clé étrangère vers elle — décidé par Alexis, à valider avec JB (source : séance de travail du 01/10, reprise de `oto-saas : docs/conception/bascule-oto1.md`).

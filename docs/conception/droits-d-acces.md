@@ -1,7 +1,7 @@
 # Droits d'accès
 
 - **Statut** : validé avec JB le 27/09/2026
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-05
 
 ## Résumé
 
@@ -112,6 +112,7 @@ La suite d'isolation prouve qu'aucune ligne ne passe d'une organisation à l'aut
 - **`teams.lead_user_id` seule source du responsable, `team_members.role` dérivé par déclencheur** (P17) : remplacé par D128, qui fait de `team_members.role` la source pour admettre plusieurs responsables ; `lead_user_id` est vidé et part en 1.1 (M73).
 - **L'équipe par défaut d'une personne** : « une équipe par défaut dont la personne n'est plus membre se lit `null` (« aucune »), sans déclencheur en base » (HN-E05S03-7) ne vaut plus, l'équipe par défaut étant retirée du modèle (D128).
 - **La face SQL passe chaque liste en un seul paramètre (`= any(…)`), sans borne d'adresse ni tranches** (HN-E01S07-23) : marqué « Plus en vigueur » au registre ; le code a quitté ce choix.
+- **Une autorisation répartie entre plusieurs sources et recalculée par les écrans** : écartée, leçon d'oto 1. Là-bas, savoir si un acteur peut un acte sur une ressource demandait de croiser quatre sources (octroi, trois axes de droits…, ADR 0053 et 0066 d'oto 1, archive oto-enterprise), et le front en refaisait une partie. Ici, un seul contrôle, dans le service, avant la requête ; les écrans ne lisent que ce que le service leur rend (`viewerLevel`, `gestionAccordable`) et n'en déduisent aucun droit.
 - **« Règles d'accès » et « Accès plateforme » sur l'écran Équipes & accès** : retirés par D127 au profit de « Partager » et de la console admin.
 
 ## Sécurité et confidentialité
@@ -135,3 +136,4 @@ Aucune à ce jour.
 - 2026-09-27 : l'organisation entière devient un sujet de règle, « Accès général » à l'écran — décidé par JB (source : ADR-014, fiche D101).
 - 2026-09-28 : plusieurs responsables par équipe, équipe par défaut retirée, règles et accès plateforme hors de l'écran Équipes & accès — décidé par JB (source : fiches D127, D128, story E05-S13).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-014, les fiches D2, D4, D5, D17, D18, D20, D94, D101, D127, D128 et les choix H, P et de story — décidé par Alexis, accord de JB.
+- 2026-10-05 : autorisation répartie et recalculée au front écartée, leçon d'oto 1 (ADR 0053, 0066) — décidé par Alexis (source : tri des issues d'oto-enterprise du 05/10).

@@ -1,0 +1,121 @@
+name: CLA
+
+# Demande la signature du CLA sur toute PR d'un contributeur qui ne l'a pas
+# encore signé. Le CLA vit dans ce dépôt (CLA.md), les signatures dans
+# le repo prive otomata-tech/cla-signatures.
+#
+# Pourquoi pull_request_target et non pull_request : les PR venant d'un fork
+# n'ont pas acces aux secrets avec pull_request. L'action ne fait aucun checkout
+# du code de la PR — elle ne lit que les metadonnees — donc pas d'execution de
+# code non fiable avec les droits du repo de base.
+#
+# Garde-fou (03/09/2026) : sans le jeton, ce job ECHOUE. Il a passe au vert sans
+# rien verifier du 03/08 au 03/09/2026, secret absent, et personne ne l'a vu —
+# un controle qui affirme au lieu de verifier est pire que pas de controle.
+
+# Garde-fou (09/09/2026) : ce workflow ne se declenche QUE sur des events qui
+# verifient reellement une signature. Il ecoutait aussi `closed` ; sur cet event
+# l'action ne controle rien — elle verrouille la PR et sort en succes. Ce succes,
+# poste quelques secondes APRES la fusion sous le meme nom de check (`CLA / cla`),
+# devenait le dernier verdict du rollup et effacait le rouge legitime : une PR
+# entrait sur un depot public avec un CLA vert qui n'avait rien controle
+# (oto-backend#912, 09/09/2026). Le verrouillage d'apres-fusion vit desormais
+# dans `cla-lock.yml`, sous un NOM DE CHECK DISTINCT, pour qu'aucun statut vert
+# ne puisse plus etre lu comme un verdict de CLA.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    # PAS de `closed` : voir le garde-fou du 09/09/2026 ci-dessus.
+    types: [opened, synchronize]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    # Ne tourne que sur les PR et sur le commentaire de signature — pas sur
+    # chaque commentaire d'issue du repo.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      contains(github.event.comment.body, 'I have read the CLA Document and I hereby sign the CLA')
+    env:
+      HAS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN != '' && 'true' || 'false' }}
+    steps:
+      - name: Event non verificateur — echec volontaire
+        # Ceinture. Si quelqu'un remet un event qui ne verifie aucune signature
+        # dans les declencheurs ci-dessus, ce job ne doit surtout pas publier un
+        # succes vide sous le nom `cla` : il echoue, et le rouge reste lisible.
+        if: github.event_name == 'pull_request_target' && github.event.action != 'opened' && github.event.action != 'synchronize' && github.event.action != 'reopened'
+        run: |
+          echo "::error title=CLA NON VERIFIE::Ce job a ete declenche par l'event '${{ github.event.action }}', qui ne verifie aucune signature. Il echoue plutot que de publier un succes vide sous le nom de check du CLA. Retirer cet event des declencheurs de .github/workflows/cla.yml."
+          exit 1
+
+      - name: Jeton de signatures absent — echec volontaire
+        if: env.HAS_TOKEN != 'true'
+        run: |
+          echo "::error title=CLA NON APPLIQUE — ne pas merger::Le secret d'organisation CLA_SIGNATURES_TOKEN est absent ou expire : la signature du CLA n'a PAS ete verifiee sur cette PR. Ce job echoue expres, pour ne pas laisser croire que le controle a eu lieu.%0A%0AFusionner sans ce controle laisse entrer une contribution sans cession de droits : le projet n'a alors pas le droit de la redistribuer.%0A%0ALe jeton est dans 1Password, coffre oto, item « GitHub PAT cla-signatures ». Le reposer :%0A%0Agh secret set CLA_SIGNATURES_TOKEN --org otomata-tech --visibility selected --repos oto-backend,oto-dashboard,connectors,oto-runner,oto-cli,oto-plugin,otomata-mcp,france-opendata,o-browser,studio-otomata,oto-pkg%0A%0APuis relancer ce workflow. Voir le README de otomata-tech/cla-signatures."
+          cat >&2 <<'MSG'
+
+          ================================================================
+           CLA NON APPLIQUE — ce job echoue volontairement
+          ================================================================
+
+          Le secret d'organisation CLA_SIGNATURES_TOKEN est absent ou expire.
+          La signature du CLA n'a PAS ete verifiee sur cette pull request.
+
+          Pourquoi un echec et pas un avertissement : du 03/08 au 03/09/2026 ce
+          job passait au vert sans rien verifier, et personne ne l'a vu. Un
+          controle vert qui n'a rien controle vaut moins que pas de controle.
+
+          Ce que ca coute de merger quand meme : une contribution entre sans
+          cession de droits, donc sans le droit pour le projet de la
+          redistribuer. C'est irrattrapable apres coup sans recontacter
+          l'auteur.
+
+          Comment reparer :
+
+            1. Le jeton est dans 1Password — coffre « oto », item
+               « GitHub PAT cla-signatures » (PAT fine-grained).
+               S'il est expire, en emettre un neuf et remplacer l'item.
+
+            2. Le reposer comme secret d'organisation :
+
+               gh secret set CLA_SIGNATURES_TOKEN \
+                 --org otomata-tech \
+                 --visibility selected \
+                 --repos oto-backend,oto-dashboard,connectors,oto-runner,oto-cli,oto-plugin,otomata-mcp,france-opendata,o-browser,studio-otomata,oto-pkg
+
+            3. Relancer ce workflow, et ne merger qu'une fois ce job vert.
+
+          ================================================================
+          MSG
+          exit 1
+
+      - name: Verifier la signature du CLA
+        if: env.HAS_TOKEN == 'true'
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}
+        with:
+          path-to-document: https://github.com/otomata-tech/oto-pkg/blob/main/CLA.md
+          path-to-signatures: signatures/v1.json
+          branch: main
+          remote-organization-name: otomata-tech
+          remote-repository-name: cla-signatures
+          # Le titulaire des droits et les bots n'ont rien a signer.
+          allowlist: AlexisLaporte,dependabot[bot],github-actions[bot],*[bot]
+          custom-notsigned-prcomment: >-
+            Merci pour cette pull request. Avant de pouvoir la merger, il faut
+            que le CLA soit signe — c'est ce qui permet au projet de continuer a
+            distribuer votre contribution. Vous gardez votre copyright.
+            Lisez-le, puis repondez dans ce fil avec exactement la phrase
+            ci-dessous.
+          custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA
+          custom-allsigned-prcomment: CLA signe — merci.

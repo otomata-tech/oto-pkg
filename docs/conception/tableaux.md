@@ -1,7 +1,7 @@
 # Tableaux
 
 - **Statut** : proposé
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-06
 
 ## Résumé
 
@@ -52,6 +52,7 @@ Les équipes tiennent des listes (prospects, devis, fiches) qu'un assistant doit
 - H92 : `table.write` écrit 50 lignes au plus, `{key, revision?, set, clear, verified_empty}`, chaque ligne atomique et rapportée ; `null` refuse sa ligne ; `create_only: true` refuse (`conflict`) une clé qui existe déjà, avec la ligne telle qu'elle est, sans rien écrire pour elle ; dans un tableau `proof: true`, une valeur nouvelle exige sa preuve `{value, comment | link}`, sinon tout l'appel est refusé ; sans `proof`, elle s'écrit nue (D133, détail dans [file de travail et revue](file-de-travail-et-revue.md)).
 - HN-E11S01-1 : `create_only` est un indicateur par appel, pas par ligne. HN-E11S01-2 : `create_only` avec `revision` sur une ligne est refusé au schéma ; une valeur nue d'un appel `create_only` suit la règle de l'appel entier (`withoutBareValues`), jugée avant tout.
 - E07-S02 N1 et D49 : une ligne est atomique : un seul problème, un `null` compris, la refuse entière avec la consigne de la corriger, et rien n'est écrit pour elle ; les autres lignes du lot s'écrivent. E07-S02 N22 : un commentaire trop long, un lien hors `http(s)` ou une raison de moins de 3 caractères sont refusés par le schéma pour tout l'appel, au chemin exact ; un `null` passe le schéma et ne refuse que sa ligne.
+- Une clé présente plusieurs fois dans un même appel ne fait qu'une ligne : ses occurrences sont fusionnées, dans l'ordre, avant toute écriture, puis écrites comme une seule ligne (valeurs nues, `create_only` et compte rendu compris). Le compte rendu compte une ligne et dit la fusion, avec les rangs fusionnés. Deux occurrences qui disent des choses différentes d'une même colonne (deux valeurs, une valeur et `clear` ou `verified_empty`) ou portent deux `revision` différentes refusent l'appel entier au schéma, avec les rangs en cause.
 - E07-S02 N19 : une clé est normalisée avant tout : espaces de bord retirés, caractère de contrôle refusé, clé `number` rangée en texte canonique (`String(n)`) depuis un nombre fini ou son écriture décimale ; puis `blockKeySchema`, 200 caractères au plus.
 - E07-S02 N2 : une écriture sans `revision` qui croise une autre est relue et réappliquée deux fois au plus ; avec `revision`, elle est gardée par la révision lue. E07-S02 N3 : deux créations concurrentes d'une même clé donnent un seul bloc `row` : la violation d'unicité `23505` est relue puis appliquée comme une mise à jour, jamais par upsert.
 - H100 : chaque ligne a sa révision, 1 à l'insertion, posée par la base ; elle avance quand les valeurs, le bail ou l'état changent, jamais sur une écriture sans effet. E07-S02 N26 : une ligne refusée porte `code` (`invalid_arguments`, `stale_revision`, `conflict`) ; une écriture avec `revision` sur une clé sans ligne, ou relue sur une autre révision, rend `stale_revision`, journalisée.
@@ -97,6 +98,7 @@ Le markdown et le CSV sont des gestes d'import et d'export vers la page et le ta
 - **Clé en `date`** (HN-E10S01-29, FB-0014) : la liste fermée des types de clé (`text`, `email`, `url`, `number`) excluait une colonne de jours ; `datetime` reste écarté (un instant n'est pas une clé lisible).
 - **Pas de `.max` Zod sur le CSV de `table.import`** (HN-E10S01-20) : il rendrait `invalid_arguments` au lieu de `too_large`, qui dit d'envoyer par morceaux.
 - **Pas d'`enum` déduit, pas de date mois d'abord** (HN-E10S01-3, HN-E10S01-9) : la déduction sur un échantillon se trompe trop souvent ; les organisations de la V1 écrivent les dates jour d'abord.
+- **Une clé répétée dans un appel fusionne, et le dit** (2026-10-06) : écarté, le refus de l'appel entier, règle de l'import CSV et correctif d'oto 1 ; écartée aussi, la fusion muette d'avant, qui comptait les lignes envoyées et non les lignes écrites. Une contradiction sur une colonne reste refusée : la fusion ne choisit jamais entre deux valeurs.
 - **Calcul dans le service plutôt qu'en SQL** (E07-S01 N6) : la colonne d'état et les types sont propres à chaque tableau ; la borne de 5 000 lignes garde le coût.
 
 ## Sécurité et confidentialité
@@ -110,10 +112,11 @@ Le markdown et le CSV sont des gestes d'import et d'export vers la page et le ta
 - M77 : une panne de la relecture du propriétaire que `writeNode` fait après `publish_node` fait sortir `createTable` sans `details.created`, le tableau déjà publié (HN-E10S01-21).
 - M78 : les 5 000 lignes d'un `table.import` s'écrivent une requête à la fois ; un import complet reste à mesurer contre `maxDuration`.
 - M56 : deux `table.write` qui prennent les mêmes lignes dans des ordres contraires peuvent s'interbloquer ; écrire les lignes d'un appel dans un ordre commun.
+- Clé répétée dans un appel : le code écrit les occurrences une à une (`server/tables/write.ts`), sans rien dire ni refuser de contradiction ; le compte rendu compte les lignes envoyées (`server/tables/write-report.ts`) ; les valeurs nues de la seconde occurrence se jugent sur la ligne lue au début de l'appel ; avec `create_only`, la seconde occurrence est refusée (`conflict`).
 
 ## Questions ouvertes
 
-Aucune à ce jour.
+- L'import CSV refuse une clé en double (`schemas/csv-cells.ts`) : garde-t-il ce refus, ou fusionne-t-il comme `table.write` ?
 
 ## Historique
 
@@ -122,3 +125,4 @@ Aucune à ce jour.
 - 2026-09-29 : import et export CSV, `table.import`, création au niveau écriture du parent, exports sans journal — décidé par JB (fiches D120, D150, D138, D139 ; story E10-S01).
 - 2026-09-30 : une colonne `date` peut porter la clé ; `match: "any"` de `table.rows` — décidé par JB (FB-0014, HN-E10S01-29 ; story E11-S19).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend H90 à H97, H100, P24, D49, D120, D132, D150 et les choix des stories E07-S01, E07-S02, E07-S04, E10-S01, E11-S01 — décidé par Alexis, accord de JB.
+- 2026-10-06 : une clé répétée dans un même `table.write` fusionne avant écriture, le compte rendu le dit, une contradiction refuse l'appel — décidé par Alexis, à valider avec JB.

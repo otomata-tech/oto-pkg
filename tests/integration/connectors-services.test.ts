@@ -39,6 +39,8 @@ const FUNCTIONS = [
   { name: "mail.create_draft", class: "write" },
   { name: "mail.send_draft", class: "sensitive" },
 ]
+/** Le connecteur réel témoin, qu'aucun cas n'active (prise des connecteurs). */
+const NOTION_INACTIVE = { connector: "notion", state: "inactive", activatedAt: null, activatedBy: null, functions: [{ name: "notion.search_workspace", class: "read" }] }
 
 type Session = { db: PlatformDb; identity: Identity }
 
@@ -124,6 +126,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
         // La ligne inactive, relue : ni date ni auteur, comme sans ligne (N18, écran « Inactif » d'E08-S03).
         expect(await listConnectorsForOrg(db, identity)).toEqual([
           { connector: "mail", state: "inactive", activatedAt: null, activatedBy: null, functions: FUNCTIONS },
+          NOTION_INACTIVE,
         ])
         expect((await accountRow(account)).status).toBe("active")
         expect((await activateConnector(db, identity, { connector: "mail" })).state).toBe("active")
@@ -134,6 +137,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
         const lea = as("lea")
         expect(await listConnectorsForOrg(lea.db, lea.identity)).toEqual([
           { connector: "mail", state: "inactive", activatedAt: null, activatedBy: null, functions: FUNCTIONS },
+          NOTION_INACTIVE,
         ])
         const ada = as("ada")
         await activateConnector(ada.db, ada.identity, { connector: "mail" })
@@ -195,10 +199,10 @@ describe.skipIf(!sqlConfigured || privatePending)(
       it("should refuse a label already taken in the organisation, without case, other connectors and invisible accounts included (AC7)", async () => {
         const tag = hex(3)
         await fx.createAccount(o.org.id, { ownerKind: "team", ownerTeamId: o.teams.ventes, label: `Mail Ventes ${tag}` })
-        await fx.createAccount(o.org.id, { connector: "sellsy", ownerKind: "org", label: `Sellsy ${tag}` })
+        await fx.createAccount(o.org.id, { connector: "notion", ownerKind: "org", label: `Notion ${tag}`, mode: "reel" })
         await fx.createAccount(o.org.id, { ownerKind: "user", ownerUserId: o.people.paul.id, label: `Perso Paul ${tag}` })
         const { db, identity } = as("claire")
-        for (const label of [`mail ventes ${tag}`, `SELLSY ${tag}`, `perso paul ${tag}`]) {
+        for (const label of [`mail ventes ${tag}`, `NOTION ${tag}`, `perso paul ${tag}`]) {
           const error = await refusal(createAccount(db, identity, { connector: "mail", owner_kind: "user", label }))
           expect(error.code, label).toBe("conflict")
           expect(error.message, label).toBe(`An account labelled ${label} already exists in Acme Test.`)

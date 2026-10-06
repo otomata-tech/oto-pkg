@@ -1,10 +1,10 @@
 // `call` (E03-S04, ADR-002, ADR-003) : la seule porte vers les fonctions du catalogue. Dans l'ordre de
 // la maquette : la fonction (nom normalisé, N6), son activation (H81), ses arguments (schéma strict),
-// l'équipe porteuse (H84) et le compte (H83) d'E04-S01, le refus d'un compte non simulé (H85, N5), le
-// récapitulatif d'une fonction sensible sans `confirm` (H86, N1), puis l'exécution et son compte-rendu
-// (N4). Le service ne lit aucune table et ne décide aucun droit lui-même : les services qu'il orchestre
-// décident avant leur requête, et il sert leurs refus tels quels (H123). Sans lui, `<p>_call` répond
-// `unavailable_in_v1` et aucune fonction ne court.
+// l'équipe porteuse (H84) et le compte (H83) d'E04-S01, le secret d'un compte réel d'un connecteur réel (H85 :
+// refus d'un compte simulé ou sans secret), le récapitulatif d'une fonction sensible sans `confirm` (H86, N1), puis
+// l'exécution, le secret déchiffré pour elle seule, et son compte-rendu (N4). Le service ne lit aucune table et ne
+// décide aucun droit lui-même : les services qu'il orchestre décident avant leur requête, et il sert leurs refus tels
+// quels (H123). Sans lui, `<p>_call` répond `unavailable_in_v1` et aucune fonction ne court.
 //
 // Repris de la maquette (`mcp-test/src/proto/services/call.ts` l. 27-56) : l'ordre, les textes « Unknown
 // function … », « Invalid arguments for … Read the contract with … », « Nothing was sent. Show this … »,
@@ -16,8 +16,10 @@ import { ERP_VIEW_PREFIX } from "../schemas/views"
 import { administratorNames } from "./access"
 import type { CatalogFunction, FunctionContext } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive, NATIVE_CONNECTOR } from "./catalog/registry"
-import { modeLabel, requireSimulated } from "./connectors/modes"
+import { accountCiphertext } from "./connectors/accounts"
+import { isSimulatedConnector, modeLabel } from "./connectors/modes"
 import { resolveAccount, runningTeam, type ResolvedAccount, type RunningTeam } from "./connectors/resolution"
+import { decryptSecret } from "./connectors/vault"
 import type { PlatformDb } from "./db"
 import { memberDirectory } from "./directory"
 import { issuesText, PlatformError } from "./errors"
@@ -154,12 +156,13 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
   const trace: CallTrace = deps.trace ?? {}
   trace.teamId = journalTeam(identity, team?.id)
   const account =
-    fn.origin === "service_connecteurs"
+    fn.origin === "connecteur"
       ? await resolveAccount(db, identity, { fn, team, account: input.account, origin: deps.origin })
       : undefined
   trace.accountId = account?.id ?? null
-  // En V1, un connecteur ne court que sur un compte simulé (H85) : refusé avant la fonction (N5).
-  if (account) requireSimulated(account)
+  // Un connecteur réel ne court que sur un compte réel qui a son secret (H85), refusé avant la fonction ; un
+  // connecteur simulé (`mail`) garde lui-même ses comptes simulés.
+  const ciphertext = account && !isSimulatedConnector(fn.connector) ? await accountCiphertext(db, identity, account, fn.connector) : undefined
   const context: FunctionContext = {
     db,
     identity,
@@ -175,8 +178,10 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
     const { text, summary } = await confirmationRequest(fn, context, args, team)
     return { text, data: { ...data, status: "needs_confirmation", summary }, nextActions: [], ...journal }
   }
+  // Le secret ne va qu'à `run`, déchiffré au dernier moment : jamais au récapitulatif, ni au journal, ni au texte.
+  const credential = account && ciphertext !== undefined ? decryptSecret(account.id, ciphertext) : undefined
   // Arguments validés par `fn.schema` : le type commun du catalogue les efface en `never`.
-  const output = await fn.run(context, args as never)
+  const output = await fn.run({ ...context, credential }, args as never)
   return {
     text: account ? `${output.text}\n${accountLine(team, account)}` : output.text,
     data: { ...data, result: output.data ?? {} },

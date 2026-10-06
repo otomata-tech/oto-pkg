@@ -1,8 +1,9 @@
-// Comptes de connecteurs (H67, H85, FR-ADMIN-02, FR-ADMIN-03) : créer un compte simulé, lister les
-// comptes qu'une personne peut utiliser, désactiver ; et la lecture commune aux résolutions (équipe
-// porteuse, compte) et au bloc `team`. Sans ce module, aucun compte simulé ne se pose hors de
-// l'outillage. Aucune colonne de secret n'est lue ni rendue (NFR-ADMIN-01) : chaque requête liste
-// ses colonnes, et `secret_ciphertext` n'est pas accordée à `authenticated`. Chaque droit et chaque
+// Comptes de connecteurs (H67, H85, FR-ADMIN-02, FR-ADMIN-03) : créer un compte, simulé ou réel selon son
+// connecteur, lister les comptes qu'une personne peut utiliser, désactiver, poser le secret d'un compte réel ; et la
+// lecture commune aux résolutions (équipe porteuse, compte) et au bloc `team`. Sans ce module, aucun compte ne se
+// pose hors de l'outillage. Aucun secret n'est rendu (NFR-ADMIN-01) : chaque requête liste ses colonnes,
+// `secret_ciphertext` n'est pas accordée en lecture à `authenticated`, et le chiffré ne se lit que par
+// `platform.account_secret`, pour l'appel au tiers (`accountCiphertext`). Chaque droit et chaque
 // filtre se décident ici, avant la requête, par `access.ts` (E01-S07 AC23) : la RLS n'est qu'un
 // garde-fou. Face SQL (E01-S10, lot d1) : chaque lecture ou écriture dans une transaction `db.tx`, les
 // décisions d'`access.ts` et l'annuaire hors d'elle.
@@ -18,6 +19,7 @@ import {
   type AccountMode,
   type AccountView,
 } from "../../schemas"
+import { accountSecretSchema } from "../../schemas/connectors"
 import {
   ACCESS_LEVELS,
   accountLevel,
@@ -36,7 +38,8 @@ import { fromDatabaseError, inTransaction, invalidInput, isUniqueViolation, Plat
 import type { Identity } from "../identity"
 import type { Tx } from "../sql"
 import { requireActivable } from "./activations"
-import { accountMode } from "./modes"
+import { accountMode, isSimulatedConnector, modeLabel } from "./modes"
+import { encryptSecret } from "./vault"
 
 /** Niveau sur un compte tel que le lit le modèle : 1 lecture, 2 écriture, 3 gestion (H65) ; les noms d'`ACCESS_LEVEL_NAMES`. */
 export type LevelName = Exclude<AccessLevelName, "none">
@@ -142,22 +145,36 @@ async function requireCreationRight(db: PlatformDb, identity: Identity, account:
 }
 
 /**
- * Crée un compte simulé (H85) pour un connecteur activable, actif ou non (N12). Le mode est posé
- * explicitement : le défaut de la colonne est `reel`. Un libellé déjà pris dans l'organisation,
- * sans casse, tous connecteurs et comptes invisibles compris, est refusé par l'index unique
- * d'E01-S06 (`23505` → `conflict`).
+ * Le mode qu'un compte du connecteur admet (H85) : `simule` pour un connecteur simulé, `reel` pour un connecteur
+ * réel (son secret se pose ensuite, `setAccountSecret`) ; `sandbox` n'est pas encore admis.
+ */
+function requireCreatableMode(connector: string, mode: AccountMode): void {
+  if (isSimulatedConnector(connector)) {
+    if (mode === "simule") return
+    throw new PlatformError(
+      "unavailable_in_v1",
+      `${connector} is simulated in this version: its accounts are simulated, a ${modeLabel(mode)} account is not available. Create it with mode simule.`,
+    )
+  }
+  if (mode === "reel") return
+  if (mode === "sandbox") {
+    throw new PlatformError("unavailable_in_v1", `Sandbox accounts are not available yet. Create a live account of ${connector} with mode reel.`)
+  }
+  throw new PlatformError("invalid_arguments", `${connector} is a live connector: its accounts are live, never simulated. Create it with mode reel.`)
+}
+
+/**
+ * Crée un compte pour un connecteur activable, actif ou non (N12), au mode que son connecteur admet
+ * (`requireCreatableMode`). Le mode est posé explicitement : le défaut de la colonne est `reel`. Un libellé déjà
+ * pris dans l'organisation, sans casse, tous connecteurs et comptes invisibles compris, est refusé par l'index
+ * unique d'E01-S06 (`23505` → `conflict`).
  */
 export async function createAccount(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountSummary> {
   const parsed = createAccountSchema.safeParse(input)
   if (!parsed.success) throw invalidInput(parsed.error)
   const account = parsed.data
   requireActivable(account.connector, catalogFunctions())
-  if (account.mode !== "simule") {
-    throw new PlatformError(
-      "unavailable_in_v1",
-      "Live and sandbox accounts arrive with the connector service in V2. In this version, accounts are simulated: create it with mode simule.",
-    )
-  }
+  requireCreatableMode(account.connector, account.mode)
   await requireCreationRight(db, identity, account)
   const teamId = account.owner_kind === "team" ? (account.team_id ?? null) : null
   const userId = account.owner_kind === "user" ? identity.user.id : null
@@ -168,7 +185,7 @@ export async function createAccount(db: PlatformDb, identity: Identity, input: u
     .tx(async (sql) => {
       const [created] = await sql<{ id: string }[]>`
         insert into platform.accounts (org_id, connector, owner_kind, owner_team_id, owner_user_id, label, mode, status)
-        values (${orgId}, ${account.connector}, ${account.owner_kind}, ${teamId}, ${userId}, ${label}, 'simule', 'active')
+        values (${orgId}, ${account.connector}, ${account.owner_kind}, ${teamId}, ${userId}, ${label}, ${account.mode}, 'active')
         returning id`
       const [written] = await accountRows(sql, orgId, { id: created.id })
       // Relue dans la transaction qui l'écrit, la ligne ne manque que si sa lecture la refuse : une panne,
@@ -272,4 +289,61 @@ export async function disableAccount(
     }
   }
   return { ...summary(row), status: "disabled" }
+}
+
+/**
+ * Pose le secret d'un compte réel (H85) : réservé à qui le gère (niveau 3, comme `disableAccount`), décidé avant
+ * l'écriture ; chiffré par le coffre du paquet (`vault.ts`) avant d'être écrit. Rien du secret n'est rendu, ni par le
+ * résultat ni par un refus. Inconnu ou invisible : `not_found` ; compte simulé : `invalid_arguments`.
+ */
+export async function setAccountSecret(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountSummary> {
+  const parsed = accountSecretSchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const id = parsed.data.account_id
+  const [row] = await inTransaction(db, "setAccountSecret: accounts", (sql) => accountRows(sql, identity.org.id, { id }))
+  const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
+  if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
+  if (level < ACCESS_LEVELS.manage) {
+    const who = await describeOwner(db, identity, accountOwner(row))
+    throw new PlatformError("forbidden", `Setting the secret of « ${row.label} » is reserved to those who manage it: ${who}.`)
+  }
+  if (accountMode(row.mode) === "simule") throw new PlatformError("invalid_arguments", `Account « ${row.label} » is simulated: it has no secret.`)
+  const ciphertext = encryptSecret(id, parsed.data.secret)
+  const updated = await inTransaction(
+    db,
+    "setAccountSecret: accounts update",
+    (sql) => sql`update platform.accounts set secret_ciphertext = ${ciphertext} where id = ${id} returning id`,
+  )
+  // Aucune ligne après la décision : le compte a changé entre la lecture et l'écriture.
+  if (updated.length === 0) {
+    console.error(`[platform] setAccountSecret: no row written for account ${id}`)
+    throw new PlatformError("conflict", `Account « ${row.label} » changed meanwhile. Reload it and retry.`)
+  }
+  return summary(row)
+}
+
+/** Ce que l'appel lit d'un compte résolu pour en tirer le secret. */
+type CallAccount = { id: string; label: string; mode: AccountMode; owner: AccountOwner }
+
+/**
+ * Le chiffré du secret du compte d'un appel à un connecteur réel (H85), lu par `platform.account_secret`, qui ne le
+ * rend qu'à un membre de l'organisation du compte ; `runCall` le déchiffre pour `run` seul. Refus nommés, la fonction
+ * non appelée : un compte simulé (un connecteur réel ne court que sur un compte réel) ; un compte réel sans secret.
+ */
+export async function accountCiphertext(db: PlatformDb, identity: Identity, account: CallAccount, connector: string): Promise<string> {
+  if (account.mode === "simule") {
+    const who = await describeOwner(db, identity, account.owner)
+    throw new PlatformError(
+      "not_enabled",
+      `Account « ${account.label} » is simulated, but ${connector} is a live connector: it runs on live accounts only. Ask ${who} to connect a live account.`,
+    )
+  }
+  const [row] = await inTransaction(
+    db,
+    "accountCiphertext: account_secret",
+    (sql) => sql<{ secret: string | null }[]>`select platform.account_secret(${account.id}) as secret`,
+  )
+  if (row?.secret) return row.secret
+  const who = await describeOwner(db, identity, account.owner)
+  throw new PlatformError("not_enabled", `Account « ${account.label} » has no secret yet. Ask ${who} to set it.`)
 }

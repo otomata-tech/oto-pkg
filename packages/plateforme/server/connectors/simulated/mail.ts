@@ -103,7 +103,7 @@ export const mailCreateDraft = defineFunction({
   name: "mail.create_draft",
   connector: "mail",
   class: "write",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description:
     "Saves an email draft on the mail account of the call and returns its id (sim_…); nothing is sent. Use it to prepare an email the user will review; send it with mail.send_draft once they approve. Mail accounts are simulated in this version: nothing leaves the server.",
   schema: z.strictObject({
@@ -158,7 +158,7 @@ export const mailSendDraft = defineFunction({
   name: "mail.send_draft",
   connector: "mail",
   class: "sensitive",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description:
     "Sends an email draft saved by mail.create_draft, from the account it was saved on. Sensitive: without confirm it returns a summary (recipient, subject, body, account and its mode) and sends nothing; call again with confirm: true only after the user explicitly approved it. Mail accounts are simulated in this version: nothing leaves the server.",
   schema: z.strictObject({

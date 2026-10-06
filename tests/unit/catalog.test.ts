@@ -42,7 +42,7 @@ const DRAFT = defineFunction({
   name: "mail.create_draft",
   connector: "mail",
   class: "write",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description: "Creates an email draft in the simulated mailbox.",
   schema: z.strictObject({ to: z.string() }),
   examples: [],
@@ -53,7 +53,7 @@ const SEND = defineFunction({
   name: "mail.send_draft",
   connector: "mail",
   class: "sensitive",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description: "Sends an email draft.",
   schema: z.strictObject({ id: z.string() }),
   examples: [{ id: "sim_0a1b2c3d" }],
@@ -76,7 +76,7 @@ const ALERT = defineFunction({
   name: "slack.post_alert",
   connector: "slack",
   class: "sensitive",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description: "Posts an alert in a channel.",
   schema: z.strictObject({}),
   examples: [],
@@ -92,6 +92,7 @@ describe("catalog (AC23)", () => {
     expect(catalogFunctions().map((fn) => fn.name)).toEqual([
       "mail.create_draft",
       "mail.send_draft",
+      "notion.search_workspace",
       "table.schema",
       "table.rows",
       "table.aggregate",
@@ -230,7 +231,7 @@ describe("catalog (AC23)", () => {
 
   it("should announce the two-step confirmation of a sensitive function", () => {
     expect(describeFunction(SEND, "acme").text.split("\n")[0]).toBe(
-      "Function mail.send_draft (connector mail, origin service_connecteurs, class sensitive: two-step confirmation)",
+      "Function mail.send_draft (connector mail, origin connecteur, class sensitive: two-step confirmation)",
     )
   })
 

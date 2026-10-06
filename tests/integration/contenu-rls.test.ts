@@ -138,7 +138,8 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
       )
 
     it("should refuse a second activation of a connector (23505) and a malformed name (23514)", async () => {
-      const connector = `c_${hex(3)}`
+      // Un connecteur connu de la table des connecteurs (clé étrangère), qu'aucun autre cas de la suite n'active.
+      const connector = "notion"
       await fx.addActivation(o.org.id, connector)
       expect(await codeOf(activate("ada", connector))).toBe("23505")
       // Un nom malformé suffit à prouver la contrainte (M11b).

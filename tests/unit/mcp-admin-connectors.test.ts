@@ -186,6 +186,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       expect(listed.text).toBe(
         [
           "- mail (simulated): active since 2026-09-24 by Ada Martin — mail.create_draft (write), mail.send_draft (sensitive)",
+          "- notion (live): inactive — notion.search_workspace (read)",
           `- table (built in): always active — ${native.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           `- node (built in): always active — ${nodes.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           "- upload (built in): always active — upload.link (write)",
@@ -204,6 +205,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
             { name: "mail.send_draft", class: "sensitive" },
           ],
         },
+        { name: "notion", kind: "live", activable: true, state: "inactive", since: null, functions: [{ name: "notion.search_workspace", class: "read" }] },
         { name: "table", kind: "built_in", activable: false, state: "always_active", since: null, functions: native.map((fn) => ({ name: fn.name, class: fn.class })) },
         { name: "node", kind: "built_in", activable: false, state: "always_active", since: null, functions: nodes.map((fn) => ({ name: fn.name, class: fn.class })) },
         { name: "upload", kind: "built_in", activable: false, state: "always_active", since: null, functions: [{ name: "upload.link", class: "write" }] },
@@ -224,7 +226,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       expect((await connector({ op: "activate", connector: "mail" })).text).toBe(`mail is now active in ${acme}: its functions are callable at once.`)
       expect(await activations()).toEqual([expect.objectContaining({ connector: "mail", state: "active", activated_by: PERSONS.sam.id })])
       expect((await connector({ op: "activate", connector: "mail" })).text).toBe(`mail is already active in ${acme}; nothing changed.`)
-      expect((await connector({ op: "activate", connector: "fax" })).text).toBe("Unknown connector fax. Connectors you can activate: mail.")
+      expect((await connector({ op: "activate", connector: "fax" })).text).toBe("Unknown connector fax. Connectors you can activate: mail, notion.")
       expect((await connector({ op: "activate", connector: "table" })).text).toBe("table is built in: it is always active and has no accounts.")
       expect(codes(journal)).toEqual([null, null, "not_found", "invalid_arguments"])
     })
@@ -271,7 +273,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       // `demo`, sans compte dans la graine : les comptes d'acme, que lisent les autres tests, restent.
       const { demo } = admin.orgs
       expect((await connector({ op: "accounts", org: demo.slug })).text).toBe(
-        `${demo.slug} has no account yet. Create a simulated one with admin_connector {"op": "create_account"}.`,
+        `${demo.slug} has no account yet. Create one with admin_connector {"op": "create_account"}.`,
       )
     })
   })
@@ -290,11 +292,11 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
         "owner must be org or team:<slug>: a personal account is created by its owner, not by the platform team.",
       )
       expect((await create({ account: "Mail Live", owner: "org", mode: "reel" })).text).toBe(
-        "Live and sandbox accounts arrive with the connector service in V2. In this version, accounts are simulated: create it with mode simule.",
+        "mail is simulated in this version: its accounts are simulated, a live account is not available. Create it with mode simule.",
       )
       // Le libellé du compte personnel de Claire, que l'équipe plateforme ne voit pas : l'index unique refuse quand même.
       expect((await create({ account: "Mail Direction", owner: "org" })).text).toBe("An account labelled Mail Direction already exists in Acme Test.")
-      expect((await create({ account: "Fax", connector: "fax", owner: "org" })).text).toBe("Unknown connector fax. Connectors you can activate: mail.")
+      expect((await create({ account: "Fax", connector: "fax", owner: "org" })).text).toBe("Unknown connector fax. Connectors you can activate: mail, notion.")
       expect(codes(journal)).toEqual([null, "invalid_arguments", "unavailable_in_v1", "conflict", "not_found"])
     })
   })

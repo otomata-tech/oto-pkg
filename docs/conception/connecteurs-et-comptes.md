@@ -1,22 +1,23 @@
 # Connecteurs et comptes
 
 - **Statut** : validé avec JB le 30/09/2026
-- **Dernière révision** : 2026-10-05
+- **Dernière révision** : 2026-10-06
 
 ## Résumé
 
-Toute fonction métier passe par l'outil `call` et un catalogue unique, quelle que soit sa source : native, simulée, inscrite par l'hôte, ou connecteur partagé. Un appel est porté par une équipe et, s'il touche un tiers, par un compte résolu dans un ordre fixe, sans choix silencieux. Le secret d'un compte est toujours fourni par le consommateur : ni le paquet ni la bibliothèque de connecteurs n'en lisent un de leur environnement.
+Toute fonction métier passe par l'outil `call` et un catalogue unique, quelle que soit sa source : native, inscrite par l'hôte, ou connecteur (simulé ou réel). Un appel est porté par une équipe et, s'il touche un tiers, par un compte résolu dans un ordre fixe, sans choix silencieux. Le secret d'un compte réel est toujours fourni par le consommateur : posé par l'outillage de l'hôte, gardé chiffré dans le coffre du paquet (clé de l'hôte), déchiffré pour le seul appel au tiers ; la bibliothèque de connecteurs n'en lit aucun.
 
 ## Contexte
 
-La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*` et `node.*`, et les fonctions métier qu'un ERP inscrit au catalogue. Les connecteurs réels (CRM, mail, ERP d'un tiers) arrivent ensuite. Deux besoins coexistent : un projet hôte qui ajoute le paquet veut d'abord brancher son propre backend ; des connecteurs communs (un CRM, une messagerie) servent à plusieurs hôtes et ne doivent s'écrire qu'une fois. Le service connecteurs séparé prévu au départ n'a jamais existé.
+Le paquet porte un connecteur simulé, `mail`, un connecteur réel témoin, `notion` (une fonction, `notion.search_workspace`), les fonctions natives `table.*` et `node.*`, et les fonctions métier qu'un ERP inscrit au catalogue. Les autres connecteurs réels (CRM, mail, ERP d'un tiers) arrivent ensuite, par la fabrique du dépôt `connectors` pour les connecteurs partagés. Deux besoins coexistent : un projet hôte qui ajoute le paquet veut d'abord brancher son propre backend ; des connecteurs communs (un CRM, une messagerie) servent à plusieurs hôtes et ne doivent s'écrire qu'une fois. Le service connecteurs séparé prévu au départ n'a jamais existé.
 
 ## Objectifs et non-objectifs
 
 - Un seul contrat vu des assistants : catalogue, `call`, modes de compte (réel, bac à sable, simulé), confirmation en deux temps (ADR-002).
 - Aucune ambiguïté résolue en silence : équipe et compte se choisissent dans un ordre écrit, sinon le refus liste les candidats.
 - Un connecteur propre à un hôte s'écrit dans l'hôte ; un connecteur partagé s'écrit une fois.
-- Hors objectif : reprendre les outils d'Oto ou ses conventions (`_org`, `_run_id`, `oto_*`) ; un service connecteurs à héberger à part ; le coffre et les comptes réels en V1.
+- Un secret jamais servi : ni écran, ni modèle, ni journal, ni log ; aucune route ni aucun outil MCP ne le reçoit.
+- Hors objectif : reprendre les outils d'Oto ou ses conventions (`_org`, `_run_id`, `oto_*`) ; un service connecteurs à héberger à part ; les comptes de bac à sable, le parcours OAuth d'un tiers et la santé d'un compte (stories `ecran-connecteurs.md`, `sondes-et-alertes.md`).
 
 ## Conception
 
@@ -31,8 +32,8 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 
 ### Catalogue et activation
 
-- H80 : le catalogue de `call` vit dans le code, avec trois sources : native (`table.*`), simulée (`mail.*`) et ERP (inscrite par l'hôte) ; chaque fonction porte son origine et sa classe (`read`, `write`, `sensitive`).
-- Les connecteurs forment une table, et toute référence à un connecteur (`accounts`, `connector_activations`, `sim_outbox`) est une clé étrangère vers elle : un renommage se fait à un seul endroit, et une référence à un connecteur inconnu est refusée par la base. Dans oto 1, un connecteur renommé alors que son nom restait en texte libre ailleurs a fait perdre leurs outils à des membres, en silence. Le catalogue des fonctions, lui, reste dans le code (H80).
+- H80 : le catalogue de `call` vit dans le code ; chaque fonction porte son origine et sa classe (`read`, `write`, `sensitive`). Trois origines : `paquet` (natives : `table.*`, `node.*`, `upload.*`), `erp` (inscrite par l'hôte) et `connecteur` (une fonction de connecteur, simulé comme `mail` ou réel comme `notion`, qui s'active par organisation et court sur un compte). L'origine `connecteur` remplace `service_connecteurs`, nom du service distant abandonné ; `read` la sert telle quelle (« origin connecteur »).
+- Les connecteurs forment une table, `platform.connectors` (`name`, `label`), et toute référence à un connecteur (`accounts`, `connector_activations`, `sim_outbox`) est une clé étrangère vers elle, `on update cascade` et `on delete restrict` : un renommage se fait à un seul endroit, un connecteur cité ne se supprime pas, et une référence à un connecteur inconnu est refusée par la base (`23503`). Dans oto 1, un connecteur renommé alors que son nom restait en texte libre ailleurs a fait perdre leurs outils à des membres, en silence. La table est lue par toute session et écrite par une migration seule (du paquet, ou de l'hôte pour ses propres connecteurs) ; la migration qui la crée y range `mail`, `notion` et chaque nom déjà cité, avant les clés. Le catalogue des fonctions, lui, reste dans le code (H80).
 - H81 : l'activation d'un connecteur se range dans `connector_activations(org_id, connector, state)` ; les fonctions natives et ERP sont toujours actives.
 - E04-S01 N9, E04-S01 N27, E04-S01 N38 : les connecteurs actifs se relisent à chaque requête (`tools/list`, `find`, `call`, `context`, `read`), sans cache : une activation vaut dès la requête suivante. Ils se lisent au premier usage d'une requête MCP et ne valent que pour elle ; un non-membre reçoit un ensemble vide, sans lecture. Une panne ne touche que `tools/list`, servie sans exemples de connecteur (log serveur) ; `context` échoue en `internal` quand ses lignes connecteurs ne se lisent pas.
 - E04-S01 N13 : désactiver un connecteur arrête aussitôt ses fonctions et garde ses comptes, qui reviennent à la réactivation. E04-S01 N18 : date d'activation = dernière mise à jour de la ligne active ; activer un connecteur déjà actif n'écrit rien ; désactiver ne touche pas `activated_by` ; un connecteur inactif se lit sans date ni auteur.
@@ -75,7 +76,16 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 - E04-S01 N12 : libellé d'un compte de 1 à 80 caractères, unique sans casse dans l'organisation, tous connecteurs confondus (index `accounts (org_id, lower(label))`) ; le `23505` devient `conflict` ; un connecteur inactif admet un compte.
 - E04-S01 N15 : un compte personnel n'est créé que par son propriétaire, administrateur compris : aucun champ ne désigne une autre personne. E04-S01 N19 : `createAccount` pour une équipe inconnue de l'organisation → `invalid_arguments` « Unknown team <id> in <org>. ».
 - E04-S01 N35 : `listUsableAccounts` valide sa saisie (`connectorRefSchema`) et refuse un connecteur inconnu ou natif comme `createAccount` ; un connecteur activable sans compte rend une liste vide. E04-S01 N36 : `disableAccount` d'un compte inconnu ou invisible → `not_found` « Unknown account <id>. ».
-- H85 : un compte de connecteur est toujours simulé en V1 : créer un compte réel ou de bac à sable rend `unavailable_in_v1`, et l'exécution simulée écrit dans `sim_outbox` sans rien envoyer. E03-S04 N5 : un compte non simulé rend `unavailable_in_v1` avant tout appel de la fonction (`requireSimulated`).
+- H85 (révisé le 2026-10-06) : un connecteur est simulé (`mail`, liste `isSimulatedConnector` de `server/connectors/modes.ts`) ou réel. Un compte suit son connecteur : simulé (`simule`) pour un connecteur simulé, dont l'exécution écrit dans `sim_outbox` sans rien envoyer ; réel (`reel`) pour un connecteur réel. `createAccount` refuse un compte simulé d'un connecteur réel (`invalid_arguments`), un compte réel ou de bac à sable d'un connecteur simulé et tout compte de bac à sable (`unavailable_in_v1`). E03-S04 N5 (révisé) : `runCall` refuse avant la fonction, en `not_enabled` qui dit à qui demander, un compte simulé d'un connecteur réel et un compte réel sans secret ; un connecteur simulé garde lui-même ses comptes simulés (`requireSimulated` de `mail`), sans rien écrire.
+
+### Coffre et secret à l'appel
+
+- **Coffre du paquet** : AES-256-GCM par `node:crypto`, clé de 32 octets de l'environnement serveur de l'hôte (`PLATFORM_VAULT_KEY`, en base64), vecteur tiré à chaque chiffrement, données associées = l'identifiant du compte (un chiffré recopié sur un autre compte ne s'ouvre pas), chiffré préfixé de sa version (`v1:<vecteur>:<étiquette>:<chiffré>`) dans `accounts.secret_ciphertext`. Le format vit une fois, dans `cli/vault.mjs`, lu par le serveur (`server/connectors/vault.ts`) et par la commande de l'outillage. La clé se lit à l'usage, jamais au démarrage : sans elle, poser ou lire un secret lève `PlatformConfigError` qui la nomme ; un chiffré illisible (autre clé, autre compte) est une panne `internal`, sa cause au log sans le chiffré.
+- **Saisie** : par l'outillage seul, jamais par une route ni un outil MCP. Le service `setAccountSecret` (niveau gestion du compte, comme `disableAccount` ; refus `not_found`, `forbidden`, et `invalid_arguments` pour un compte simulé) chiffre puis écrit, et ne rend jamais le secret ; la commande `oto-platform accounts secret --db-url --account` lit le secret sur l'entrée standard, jamais en argument, et l'écrit par une connexion d'administration.
+- **Lecture** : `secret_ciphertext` n'est pas accordée en lecture à `authenticated` ; le chiffré ne se lit que par `platform.account_secret(compte)`, `security definer`, qui ne le rend qu'à un membre de l'organisation du compte (`member_orgs`).
+- **À l'appel** : `runCall` lit le chiffré après la résolution du compte, pour un compte réel d'un connecteur réel seulement, avant tout récapitulatif ; il le déchiffre juste avant `run` et le passe dans `FunctionContext.credential`, jamais à `summarize`, au texte rendu, au journal ni à une erreur.
+- **Client HTTP** (`server/connectors/http.ts`) : `fetch`, délai du connecteur, en-tête `Authorization: Bearer <secret>`, en-têtes constants (version de l'API), redirection refusée, réponse bornée à 4 Mo ; la table d'erreurs du connecteur traduit le statut en code du paquet, un statut hors table, une panne ou un délai dépassé rendent `upstream_error`, sans cause, sans la requête ni le jeton ; aucun en-tête n'est journalisé. Deux codes s'ajoutent à la liste fermée : `rate_limited` (429) et `upstream_error` (502). Un 401 ou un 403 du tiers rend `upstream_error` avec un message clair, sans changer l'état du compte.
+- **Témoin** : `notion.search_workspace`, écrit à la main au contrat `defineFunction`, fidèle à la description `connectors/notion/connector.yaml` du dépôt `connectors` (`api_version` 2025-09-03, `base_url`, délai de 60 s, table d'erreurs, schéma d'entrée en `strictObject`, exemples) ; il rend une ligne par page ou base (type, titre, id, adresse) et le curseur suivant. La fabrique de ce dépôt générera ce contrat et le remplacera.
 
 ### Le connecteur simulé `mail`
 
@@ -100,25 +110,32 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 - **Monter Oto en connecteur distant** : importe sa surface (`oto_call`, `_org`, `_run_id`) et son journal, contraires à ADR-002. Écarté (ADR-007).
 - **Nommer un connecteur en texte libre dans chaque table qui s'y réfère** : écarté le 2026-10-01 ; un renommage y casse des références sans erreur (leçon d'oto 1).
 - **Un choix silencieux entre équipes ou comptes** : écarté ; l'assistant montre les candidats à l'utilisateur.
+- **Supabase Vault pour le secret d'un compte** : écarté le 2026-10-06 ; le paquet reste portable sur un Postgres nu (ADR-012). Le coffre est celui du paquet, sa clé dans l'environnement de l'hôte.
+- **Saisir le secret par une route HTTP ou un outil MCP** : écarté le 2026-10-06 ; un secret ne passe jamais par une conversation ni par un écran dans ce lot : l'outillage de l'hôte le pose (`setAccountSecret`, `oto-platform accounts secret`).
+- **Garder l'origine `service_connecteurs`, ou une origine par sorte de connecteur** : écarté le 2026-10-06 ; une seule origine `connecteur` porte l'activation et la résolution du compte, simulé ou réel se lit sur le connecteur.
+- **Garder la garde globale du simulé dans `call`** : écarté le 2026-10-06 ; elle refusait tout compte réel. `call` refuse désormais un compte simulé d'un connecteur réel, et le connecteur simulé garde ses comptes.
+- **Attendre la fabrique avant de brancher un connecteur réel** : écarté le 2026-10-06 ; la prise du paquet se prouve d'abord par un témoin écrit à la main, `notion`, que la fabrique remplacera.
 
 ## Sécurité et confidentialité
 
-- Aucun outil n'accepte un secret en argument ; le secret ne revient jamais vers un écran, le modèle ou le journal (ADR-019 § 3).
+- Aucun outil ni aucune route n'accepte un secret ; le secret ne revient jamais vers un écran, le modèle, le journal ni un log (ADR-019 § 3, NFR-ADMIN-01) : listes de comptes, `context`, ligne de journal de `call`, `read` et export de l'organisation (`secret_ciphertext` exclu) l'ignorent, chacun prouvé par un test.
+- Le chiffré ne se lit que par `account_secret`, au seul membre de l'organisation du compte ; il ne s'ouvre qu'avec la clé de l'hôte et pour le compte qui l'a reçu (données associées). Un membre de l'équipe plateforme sous accès en cours compte comme membre (`member_orgs`, comme la RLS). Canal ouvert : qui tient la clé et une connexion d'administration lit tous les secrets, par construction.
 - La bibliothèque partagée ne lit aucun secret ; le consommateur l'injecte et un appel sans secret échoue.
 - Le jeton de l'appelant ne va qu'aux fonctions d'origine `erp` (E08-S05 NH19), qui s'exécutent sous la RLS de l'ERP.
 - Fonctions sensibles en deux temps, jamais proposées en suite d'un autre résultat (H86, H87).
 
 ## Écart avec le code
 
-- Le contrat public de l'hôte est aujourd'hui `defineErpFunction` et `registerFunctions` (origine `erp`) ; `defineFunction` n'est exporté que pour les sources du paquet, et l'origine `service_connecteurs` de `server/catalog/define.ts` porte encore le nom du service abandonné.
-- Ni le paquet npm de connecteurs partagés issu de `connectors`, ni son inscription, ni le secret dans le contexte d'appel ne sont écrits ; les comptes sont simulés seuls (H85).
-- Les connecteurs n'ont pas encore de table : ils sont nommés en texte libre dans `accounts`, `connector_activations` et `sim_outbox`.
-- Restent en V2, avec leurs stories : connecteur Sellsy réel, connecteur mail réel, comptes tiers et coffre (AES-GCM, OAuth ou clé du tiers, santé), écran Connecteurs, sondes et alertes des comptes (`.method/sprint/status.md § Stories V2`). La story du connecteur Sellsy perd son client MCP de serveur à serveur et sa table `functions` de source distante.
+- Le contrat public de l'hôte est aujourd'hui `defineErpFunction` et `registerFunctions` (origine `erp`) ; `defineFunction` n'est exporté que pour les sources du paquet : un hôte ne peut pas encore écrire son propre connecteur à compte.
+- Ni le paquet npm de connecteurs partagés issu de `connectors`, ni son inscription ne sont écrits ; le seul connecteur réel est le témoin `notion`, écrit à la main.
+- Une table des connecteurs propres à l'hôte ne s'alimente que par sa propre migration ; aucun outil ne l'écrit.
+- Restent en V2, avec leurs stories : connecteur Sellsy réel, connecteur mail réel, OAuth ou clé saisie à l'écran, santé d'un compte et effet d'un 401 sur son état, comptes de bac à sable, écran Connecteurs (création d'un compte réel comprise), sondes et alertes des comptes. La story du connecteur Sellsy perd son client MCP de serveur à serveur et sa table `functions` de source distante ; la story « comptes tiers et coffre » est reprise par la prise des connecteurs pour le coffre et la saisie par l'outillage.
 
 ## Questions ouvertes
 
 - Sur un projet hôte qui ajoute le paquet : comment choisir les connecteurs partagés qu'il apporte, et comment créer le connecteur de sa propre API.
 - Le branchement distant d'ADR-007 § 5 reste-t-il permis (ADR-019 § 5, hypothèse à confirmer par JB) ?
+- La rotation de la clé du coffre : reposer chaque secret, ou une seconde clé de déchiffrement le temps de la bascule ?
 
 ## Historique
 
@@ -128,3 +145,4 @@ La V1 ne porte qu'un connecteur simulé, `mail`, les fonctions natives `table.*`
 - 2026-09-30 : deux sortes de connecteurs : la bibliothèque `oto-connectors` est gardée pour les connecteurs partagés, les connecteurs propres à un hôte s'écrivent au contrat `defineFunction`, le secret est toujours fourni par le consommateur — décidé par Alexis, accord de JB à l'oral (point du 30/09).
 - 2026-10-01 : refonte en document de conception vivant, qui reprend ADR-007, ADR-019, D42, D108, D129, H80 à H87, H108 et les choix des stories E03-S04, E04-S01, E08-S05 — décidé par Alexis, accord de JB.
 - 2026-10-01 : les connecteurs forment une table, et toute référence à un connecteur est une clé étrangère vers elle — décidé par Alexis, à valider avec JB (source : séance de travail du 01/10, reprise de `oto-saas : docs/conception/bascule-oto1.md`).
+- 2026-10-06 : prise des connecteurs : origine `connecteur` (remplace `service_connecteurs`), table `connectors` et clés étrangères, coffre du paquet (AES-256-GCM, `PLATFORM_VAULT_KEY`, sans Supabase Vault), secret posé par l'outillage et déchiffré pour le seul `run`, comptes réels pour un connecteur réel, codes `rate_limited` et `upstream_error`, témoin `notion` (H85 et E03-S04 N5 révisés) — décidé par Alexis (source : cadrage de la prise des connecteurs, 06/10).

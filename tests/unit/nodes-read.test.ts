@@ -493,7 +493,9 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
       const registry = await vi.importActual<typeof import("../../packages/plateforme/server/catalog/registry")>("../../packages/plateforme/server/catalog/registry")
       const functions = registry.catalogFunctions()
       vi.mocked(catalogFunctions).mockReturnValue(functions)
-      const activations = [...new Set(functions.map((fn) => fn.connector))].map((connector) => ({ org_id: ORG.id, connector, state: "active" }))
+      // Les connecteurs activables seuls : les natifs, toujours actifs, ne sont pas dans `platform.connectors`.
+      const activable = functions.filter((fn) => fn.origin === "connecteur")
+      const activations = [...new Set(activable.map((fn) => fn.connector))].map((connector) => ({ org_id: ORG.id, connector, state: "active" }))
       await content({ ...base(), connector_activations: activations })
       for (const fn of functions) {
         const contract = await read("lea", { path: fn.name })
@@ -515,7 +517,7 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
         refusals: ["Unknown table."],
         run: async () => ({ text: "" }),
       })
-      const remote = { ...rows, name: "mail.send", connector: "mail", origin: "service_connecteurs" as const }
+      const remote = { ...rows, name: "mail.send", connector: "mail", origin: "connecteur" as const }
       vi.mocked(catalogFunctions).mockReturnValue([rows, remote])
       await content(base())
       const contract = await read("lea", { path: "table.rows" })
@@ -537,11 +539,11 @@ describe.skipIf(!sqlConfigured)(portable("read on a real database"), { timeout: 
 
     // E11-S19 (AC-e3, HN-E11S19-8) : toutes les fonctions actives, par connecteur, avec leur classe ; un connecteur inactif absent.
     it("should list every active function by connector with its class and first sentence, then the contracts", async () => {
-      const define = (name: string, fields: { connector: string; class: "read" | "write" | "sensitive"; origin: "paquet" | "service_connecteurs"; description: string }) =>
+      const define = (name: string, fields: { connector: string; class: "read" | "write" | "sensitive"; origin: "paquet" | "connecteur"; description: string }) =>
         defineFunction({ name, ...fields, schema: z.strictObject({}), examples: [], refusals: [], run: async () => ({ text: "" }) })
       const rows = define("table.rows", { connector: "table", class: "read", origin: "paquet", description: "Reads the rows of a table. Twenty per page." })
       const trash = define("node.trash", { connector: "node", class: "write", origin: "paquet", description: "Moves a node to the trash." })
-      const send = define("mail.send", { connector: "mail", class: "sensitive", origin: "service_connecteurs", description: "Sends a draft." })
+      const send = define("mail.send", { connector: "mail", class: "sensitive", origin: "connecteur", description: "Sends a draft." })
       vi.mocked(catalogFunctions).mockReturnValue([rows, send, trash])
       await content(base())
       const tail = ["Contracts to read before writing: write.procedure, write.table.", 'Read a contract with acme_read {"path": "<function>"}, then run it with acme_call.']

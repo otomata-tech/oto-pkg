@@ -20,7 +20,7 @@ const connectorNameSchema = z
 /** Libellé rogné, 1 à 80 caractères ; unique sans casse dans l'organisation (index d'E01-S06, N12). */
 const accountLabelSchema = z.string().trim().min(1).max(80)
 
-/** `simule` seulement en V1 (H85) : `sandbox` et `reel` arrivent avec le service connecteurs. */
+/** `simule` pour un connecteur simulé, `reel` pour un connecteur réel (H85) ; `sandbox` n'est pas encore admis. */
 const accountModeSchema = z.enum(ACCOUNT_MODES)
 
 export type AccountMode = z.infer<typeof accountModeSchema>
@@ -51,6 +51,12 @@ export const createAccountSchema = z
   })
 
 export const disableAccountSchema = z.object({ account_id: z.uuid() })
+
+/**
+ * Le secret d'un compte réel, posé par qui le gère (`setAccountSecret`) : jamais rendu, ni par le service ni par un
+ * refus (un problème de saisie nomme son chemin, jamais la valeur).
+ */
+export const accountSecretSchema = z.object({ account_id: z.uuid(), secret: z.string().trim().min(1).max(10_000) })
 
 /**
  * Un connecteur activable et son état dans l'organisation, tel que le rend `listConnectorsForOrg`

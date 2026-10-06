@@ -113,8 +113,8 @@ describe("mail.send_draft arguments (AC18, N14)", () => {
 describe("catalog metadata (AC19)", () => {
   it("should declare the classes, the connector and the origin", () => {
     expect([mailCreateDraft, mailSendDraft].map(({ name, connector, class: fnClass, origin }) => ({ name, connector, fnClass, origin }))).toEqual([
-      { name: "mail.create_draft", connector: "mail", fnClass: "write", origin: "service_connecteurs" },
-      { name: "mail.send_draft", connector: "mail", fnClass: "sensitive", origin: "service_connecteurs" },
+      { name: "mail.create_draft", connector: "mail", fnClass: "write", origin: "connecteur" },
+      { name: "mail.send_draft", connector: "mail", fnClass: "sensitive", origin: "connecteur" },
     ])
   })
 
@@ -136,7 +136,7 @@ describe("catalog metadata (AC19)", () => {
 
   it("should serve the send contract as a two-step confirmation", () => {
     expect(describeFunction(mailSendDraft, "acme").text.split("\n")[0]).toBe(
-      "Function mail.send_draft (connector mail, origin service_connecteurs, class sensitive: two-step confirmation)",
+      "Function mail.send_draft (connector mail, origin connecteur, class sensitive: two-step confirmation)",
     )
   })
 })
@@ -149,7 +149,7 @@ describe("guards before the database (H85)", () => {
     }
     const live = await refusal(run(mailSendDraft, { ...ACCOUNT, mode: "reel" }, { id: "sim_1a2b3c4d" }))
     expect(live.message).toBe(
-      "Account « Mail Ventes » is a live account (mode reel): live execution arrives with the connector service in V2. Nothing was sent.",
+      "Account « Mail Ventes » is a live account (mode reel): this connector is simulated in this version and runs on simulated accounts only. Nothing was sent.",
     )
     const sandbox = await refusal(run(mailSendDraft, { ...ACCOUNT, mode: "sandbox" }, { id: "sim_1a2b3c4d" }))
     expect(sandbox.message).toContain("is a sandbox account (mode sandbox)")

@@ -217,7 +217,7 @@ describe.skipIf(!sqlConfigured)(portable("operations of E08-S06 (AC20)"), { time
     const live = await session.call("admin_connector", { ctx: code, op: "create_account", org: acme, connector: "mail", account: "Mail Live", owner: "org", mode: "sandbox" })
     expect(live).toMatchObject({
       isError: true,
-      text: "Live and sandbox accounts arrive with the connector service in V2. In this version, accounts are simulated: create it with mode simule.",
+      text: "mail is simulated in this version: its accounts are simulated, a sandbox account is not available. Create it with mode simule.",
     })
     vi.restoreAllMocks()
   })

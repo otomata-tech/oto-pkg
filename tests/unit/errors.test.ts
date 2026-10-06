@@ -42,6 +42,8 @@ describe("PLATFORM_ERROR_CODES", () => {
         "too_large",
         "conflict",
         "internal",
+        "rate_limited",
+        "upstream_error",
       ].sort(),
     )
   })
@@ -61,6 +63,8 @@ describe("PLATFORM_ERROR_CODES", () => {
       too_large: 413,
       conflict: 409,
       internal: 500,
+      rate_limited: 429,
+      upstream_error: 502,
     })
   })
 })

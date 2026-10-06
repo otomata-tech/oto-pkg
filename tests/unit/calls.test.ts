@@ -11,7 +11,6 @@ import { runCall, type CallInput } from "../../packages/plateforme/server/calls"
 import type { CatalogFunction } from "../../packages/plateforme/server/catalog/define"
 import { catalogFunctions } from "../../packages/plateforme/server/catalog/registry"
 import { loadActiveConnectors } from "../../packages/plateforme/server/connectors/activations"
-import { mailCreateDraft } from "../../packages/plateforme/server/connectors/simulated/mail"
 import type { Identity } from "../../packages/plateforme/server/identity"
 import { TEST_FUNCTIONS, testSend } from "../factories/test-functions"
 import { ACCOUNTS, CONTENT_AT, nodeId, ORG, PEOPLE, referenceTables, teamOf, TEAMS, type Person, type RuleSpec } from "../helpers/reference-org"
@@ -334,8 +333,9 @@ describe.skipIf(!sqlConfigured)(portable("runCall on a real database"), { timeou
       expect(output.data).not.toHaveProperty("status")
     })
 
-    it("should refuse a live or sandbox account without calling the function (AC12)", async () => {
-      const run = vi.spyOn(mailCreateDraft, "run")
+    // Prise des connecteurs (AC14) : `mail` reste simulé ; sa propre garde refuse un compte réel ou de bac à sable avant
+    // toute écriture (`runCall` ne garde plus le simulé que pour un connecteur réel).
+    it("should refuse a live or sandbox mail account, writing nothing (AC12)", async () => {
       for (const [mode, kind] of [
         ["reel", "live"],
         ["sandbox", "sandbox"],
@@ -344,11 +344,10 @@ describe.skipIf(!sqlConfigured)(portable("runCall on a real database"), { timeou
         const { call, writes } = setup()
         await expect(call(ref.identityOf("claire"), { function: "mail.create_draft", arguments: DRAFT })).rejects.toMatchObject({
           code: "unavailable_in_v1",
-          message: `Account « Mail Ventes » is a ${kind} account (mode ${mode}): live execution arrives with the connector service in V2. Nothing was sent.`,
+          message: `Account « Mail Ventes » is a ${kind} account (mode ${mode}): this connector is simulated in this version and runs on simulated accounts only. Nothing was sent.`,
         })
         expect(writes(), mode).toEqual([])
       }
-      expect(run.mock.calls.length).toBe(0)
     })
   })
 

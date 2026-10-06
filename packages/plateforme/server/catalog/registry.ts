@@ -7,6 +7,7 @@
 // contrat, forme du nom. Retiré : le catalogue en dur (sources : E07-S01, E04-S01, E08-S05).
 import * as z from "zod/v4"
 import { normalizeTitle } from "../../schemas"
+import { notionSearchWorkspace } from "../connectors/notion/search-workspace"
 import { mailCreateDraft, mailSendDraft } from "../connectors/simulated/mail"
 import { nodeDiscardDraft } from "../nodes/discard"
 import { nodeMove } from "../nodes/move-function"
@@ -31,12 +32,14 @@ export const NATIVE_CONNECTOR = "table"
  * Catalogue de la V1 (H80) : `mail` simulé (E04-S01), lecture des tableaux (E07-S01), écriture et file
  * de travail (E07-S02), import d'un CSV (E10-S01), suppression de lignes, abandon d'un brouillon et
  * corbeille (E11-S02, connecteur natif `node`) ; ERP (E08-S05) s'y ajoute ; le dépôt par lien (E10-S02 lot f, connecteur
- * `upload`, ADR-018) ; déplacement et écriture par lot (E11-S18, connecteur `node`).
+ * `upload`, ADR-018) ; déplacement et écriture par lot (E11-S18, connecteur `node`) ; le connecteur réel témoin
+ * `notion` (prise des connecteurs).
  */
 export function catalogFunctions(): CatalogFunction[] {
   return [
     mailCreateDraft,
     mailSendDraft,
+    notionSearchWorkspace,
     tableSchema,
     tableRows,
     tableAggregate,
@@ -72,9 +75,9 @@ export function looksLikeFunction(path: string): boolean {
   return /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(path.trim())
 }
 
-/** Native et ERP : toujours actives ; connecteur distant : seulement s'il est activé (H81). */
+/** Native et ERP : toujours actives ; fonction de connecteur : seulement s'il est activé (H81). */
 export function isActive(fn: CatalogFunction, activeConnectors: ReadonlySet<string>): boolean {
-  return fn.origin !== "service_connecteurs" || activeConnectors.has(fn.connector)
+  return fn.origin !== "connecteur" || activeConnectors.has(fn.connector)
 }
 
 /** Mots de 3 lettres au moins, sans casse ni accent (`normalizeTitle`, comme les noms d'équipes et de comptes). */
@@ -149,7 +152,7 @@ const MAX_EXAMPLE_CONNECTORS = 2
  */
 export function callExamples(functions: readonly CatalogFunction[], activeConnectors: ReadonlySet<string>): string[] {
   const active = functions.filter((fn) => isActive(fn, activeConnectors))
-  const connectors = [...new Set(active.filter((fn) => fn.origin === "service_connecteurs").map((fn) => fn.connector))].sort()
+  const connectors = [...new Set(active.filter((fn) => fn.origin === "connecteur").map((fn) => fn.connector))].sort()
   const examples: string[] = []
   for (const connector of connectors) {
     if (examples.length === MAX_EXAMPLE_CONNECTORS) break

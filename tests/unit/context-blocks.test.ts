@@ -539,11 +539,12 @@ describe.skipIf(!sqlConfigured)(portable("what's new (E03-S08, AC2, AC3)"), { ti
       ...Array.from({ length: READ_PAGE_ROWS }, (_, index) => ({ ...version("ventes", 5 + index, "Ailleurs", "2026-09-24T10:30:00.000Z"), node_id: OTHER_ORG.node.id })),
     )
     const activation = (orgId: string, connector: string, state: string, at: string) => ({ org_id: orgId, connector, state, created_at: "2026-09-01T00:00:00.000Z", updated_at: at })
+    // Des connecteurs de `platform.connectors` (clés étrangères) : `notion`, activé avant la borne, est désactivé plus
+    // bas, après elle.
     tables.connector_activations.push(
       activation(O.id, "mail", "active", "2026-09-24T12:00:00.000Z"),
-      activation(O.id, "sellsy", "inactive", "2026-09-24T12:00:00.000Z"),
-      activation(O.id, "slack", "active", "2026-09-18T12:00:00.000Z"),
-      activation(OTHER_ORG.id, "drive", "active", "2026-09-24T13:00:00.000Z"),
+      activation(O.id, "notion", "active", "2026-09-18T12:00:00.000Z"),
+      activation(OTHER_ORG.id, "mail", "active", "2026-09-24T13:00:00.000Z"),
     )
     const ref = await seedO(tables)
 
@@ -558,6 +559,10 @@ describe.skipIf(!sqlConfigured)(portable("what's new (E03-S08, AC2, AC3)"), { ti
         ...NEWS_NODES.map((path, rank) => `- ${path} v2 (2026-09-22): Révision ${rank}`),
       ].join("\n"),
     )
+    // Désactivé après la borne du code émis à l'instant : une activation inactive n'est pas une nouveauté.
+    await theSeed().admin`update platform.connector_activations set state = 'inactive' where org_id = ${ref.org.id} and connector = 'notion'`
+    const after = await buildContext(await ref.db("lea"), ref.identityOf("lea"), {}, { userAgent: null })
+    expect(after.text).not.toContain("Connector notion")
 
     // Sans `ctx` antérieur : depuis 14 jours ; rien → « Nothing new. ». La session s'ouvre avant l'horloge figée.
     const empty = await seedO(oTables())

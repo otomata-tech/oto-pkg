@@ -95,6 +95,8 @@ Pour une application Next 15 (App Router) sur Supabase.
    devenir `authenticated` ou `anon` : chaque requête porte l'appelant vérifié, sous RLS. TLS est
    exigé hors de la machine locale.
 
+   Et `PLATFORM_VAULT_KEY` dès qu'un compte réel de connecteur se pose (« Connecteurs réels et coffre »).
+
 6. Routes à monter : celles de `src/app/` de l'application de base du dépôt
    [`otomata-tech/oto-pkg`](https://github.com/otomata-tech/oto-pkg), qui en est la
    référence. Les écrans s'y montent à l'un des trois niveaux de « Monter les écrans ».
@@ -372,6 +374,34 @@ consentRequest({ auth, db, host: adresseServie }, authorizationId)   // page de 
 ```
 
 La fonction reçoit `{ host, request? }` : l'adresse appelée, normalisée, et la requête (absente au consentement, qui lit l'adresse de la ressource demandée). L'option ne choisit qu'une adresse : le jeton est vérifié avant, l'appartenance est relue à chaque appel, l'origine du 401 et de `resource` reste l'adresse appelée. Une exception de la fonction répond 503 ; aucune organisation n'est servie par défaut. Le MCP admin n'a pas cette option.
+
+## Connecteurs réels et coffre
+
+Le paquet porte un connecteur simulé, `mail` (rien ne sort du serveur), et des connecteurs réels, dont le témoin
+`notion` (`notion.search_workspace`). Un connecteur réel court sur un compte réel (mode `reel`) dont le secret, le
+jeton du tiers, est chiffré par le coffre du paquet (AES-256-GCM, données associées = l'id du compte) et déchiffré
+par le serveur de l'application pour le seul appel au tiers : il ne revient jamais vers un écran, le modèle, le
+journal ni un log.
+
+- **Clé** : `PLATFORM_VAULT_KEY`, 32 octets en base64 (`openssl rand -base64 32`), dans l'environnement serveur de
+  l'application, jamais en `NEXT_PUBLIC_`. Lue à l'usage seulement : sans elle, l'application démarre, et poser un
+  secret ou appeler un connecteur réel lève `PlatformConfigError` qui la nomme. La changer rend illisibles les
+  secrets déjà posés : les reposer.
+- **Compte** : `admin_connector` `create_account` avec `mode: "reel"`, ou `createAccount` de `/server` ; l'écran
+  Connecteurs ne crée encore que des comptes simulés. Un compte simulé d'un connecteur réel est refusé
+  (`invalid_arguments`), un compte réel ou de bac à sable d'un connecteur simulé aussi (`unavailable_in_v1`).
+- **Secret** : jamais par une route ni par un outil MCP. Par l'outillage, le secret sur l'entrée standard, la clé
+  et l'URL d'administration dans l'environnement du shell (chargées d'un fichier non commité, jamais tapées dans la
+  commande, qui finirait dans l'historique) :
+
+  ```bash
+  pnpm exec oto-platform accounts secret --db-url "$ADMIN_DATABASE_URL" --account <id du compte> < jeton.txt
+  ```
+
+  ou par le service `setAccountSecret(db, identity, { account_id, secret })` de `/server`, réservé à qui gère le
+  compte (niveau 3), qui ne rend jamais le secret.
+- **Appel** : un compte réel sans secret est refusé (`not_enabled`, qui dit à qui demander), un compte simulé d'un
+  connecteur réel aussi ; un 401 ou un 403 du tiers rend `upstream_error`, un débit dépassé `rate_limited`.
 
 ## Widgets dans la conversation
 

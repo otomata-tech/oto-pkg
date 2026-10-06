@@ -26,7 +26,7 @@ describe.skipIf(!sqlConfigured)(sqlConfigured ? SUITE_NAME : `${SUITE_NAME} (${S
     const { admin } = data
     const [account] = await admin<{ id: string }[]>`
       insert into platform.accounts (org_id, connector, owner_kind, label, secret_ciphertext)
-      values (${seed.org1}, 'test', 'org', 'Test account', 'not-a-real-secret') returning id`
+      values (${seed.org1}, 'mail', 'org', 'Test account', 'not-a-real-secret') returning id`
     seed.account1 = account.id
     seed.ctx1 = ctxCode()
     await admin`insert into platform.ctx (code, org_id, user_id, rules_version) values (${seed.ctx1}, ${seed.org1}, ${users.a}, 1)`

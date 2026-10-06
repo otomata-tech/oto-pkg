@@ -23,7 +23,7 @@ const CONSEIL: TeamRef = { id: "t-conseil", slug: "conseil", name: "Conseil" }
 
 const ok = async () => ({ text: "ok" })
 
-function fn(name: string, fnClass: FunctionClass, origin: CatalogFunction["origin"] = "service_connecteurs"): CatalogFunction {
+function fn(name: string, fnClass: FunctionClass, origin: CatalogFunction["origin"] = "connecteur"): CatalogFunction {
   const [connector] = name.split(".")
   return defineFunction({ name, connector, class: fnClass, origin, description: "Test.", schema: z.strictObject({}), examples: [], refusals: [], run: ok })
 }

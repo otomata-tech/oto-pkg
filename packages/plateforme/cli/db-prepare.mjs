@@ -15,6 +15,7 @@
  */
 import { readFileSync } from 'node:fs'
 import postgres from 'postgres'
+import { mask, urlPassword } from './masking.mjs'
 import { clean, splitStatements } from './migrations-check.mjs'
 import { sslOption } from './ssl-option.mjs'
 
@@ -52,11 +53,6 @@ function prepareSections(sql = PREPARE_SQL) {
 export function preparePlan(supabase, sections = prepareSections()) {
   const everywhere = sections.get('tout-hote') ?? []
   return supabase ? everywhere : [...(sections.get('postgres-nu') ?? []), ...everywhere]
-}
-
-/** Remplace toute valeur secrète d'un texte à écrire (mot de passe de l'URL, de `platform_app`). */
-function mask(text, secrets) {
-  return secrets.filter(Boolean).reduce((masked, secret) => masked.split(secret).join('***'), String(text))
 }
 
 /**
@@ -102,13 +98,5 @@ export async function prepareDatabase({ dbUrl, password, print, printError, conn
   } finally {
     // La préparation est jouée ou annulée avant : une connexion mal fermée ne change pas le code rendu.
     await sql.end({ timeout: 5 }).catch((error) => printError(mask(`db prepare : connexion mal fermée : ${error?.message ?? error}`, secrets)))
-  }
-}
-
-function urlPassword(dbUrl) {
-  try {
-    return decodeURIComponent(new URL(dbUrl).password) || null
-  } catch {
-    return null
   }
 }

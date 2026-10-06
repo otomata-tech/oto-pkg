@@ -157,6 +157,17 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   Elle commence par un appel à `extensions.similarity`, qui charge la bibliothèque de `pg_trgm` dans la session :
   sans lui, `supabase db push` refuse la clause `set "pg_trgm.similarity_threshold"` de la fonction sur un projet
   Supabase (42501). Aucune table, colonne ni index.
+- `20261006090000_platform_connecteurs.sql` (version 1.5.0, prise des connecteurs) : table `connectors` (`name`
+  clé, contrôlé comme `connector_activations.connector`, `label`), RLS active, lecture par `authenticated`
+  (`connectors_select_authenticated`, `using (true)` : une liste de noms sans organisation), aucune écriture
+  accordée ; ses lignes : `mail` et `notion`, puis chaque nom déjà cité par `accounts`, `connector_activations`
+  et `sim_outbox`, insérés avant les clés, de sorte qu'un hôte installé l'applique sans échec (un nom hors du
+  contrôle la fait échouer, en le nommant). Clés étrangères `accounts_connector_fkey`,
+  `connector_activations_connector_fkey` et `sim_outbox_connector_fkey` vers `connectors(name)`, `on update
+  cascade` (un renommage se fait à un seul endroit) et `on delete restrict` (un connecteur cité ne se supprime
+  pas). `account_secret(compte)`, `security definer`, `search_path` vide, révoquée à `public` et `anon`, accordée
+  à `authenticated` : le chiffré du secret au seul membre de l'organisation du compte (`member_orgs`), rien
+  sinon ; `secret_ciphertext` reste sans droit de lecture. Pas de nouvelle colonne.
 
 ## Installer sur un hôte neuf
 

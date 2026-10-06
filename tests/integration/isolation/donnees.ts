@@ -51,8 +51,11 @@ const PARENTS: Readonly<Record<string, { table: string; column: string }>> = {
   node_drafts: { table: "nodes", column: "node_id" },
 }
 
-/** Sans organisation : l'équipe plateforme, lue à part (AC5) ; les correspondances d'émetteur (E01-S11), lues par leur personne. */
-const WITHOUT_ORG: readonly string[] = ["platform_staff", "identities"]
+/**
+ * Sans organisation : l'équipe plateforme, lue à part (AC5) ; les correspondances d'émetteur (E01-S11), lues par leur
+ * personne ; les connecteurs de l'hôte, lus par tous (prise des connecteurs).
+ */
+const WITHOUT_ORG: readonly string[] = ["platform_staff", "identities", "connectors"]
 
 export type Place = { id: string; slug: string; prefix: string; name: string; host: string; domains: string }
 export type Who = "a" | "b" | "c" | "p"

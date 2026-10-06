@@ -1,7 +1,8 @@
 /**
  * oto-platform — la ligne de commande du paquet, pour l'application hôte qui l'installe : copie
  * et contrôle des migrations du schéma `platform` (ADR-006), préparation d'une base (ADR-012 § 1),
- * bundle du widget avec les vues de l'ERP (story widgets-dans-la-conversation).
+ * bundle du widget avec les vues de l'ERP (story widgets-dans-la-conversation), secret d'un compte
+ * réel de connecteur (connecteurs-et-comptes, H85).
  *
  * `run(argv)` rend le code de sortie : 0 succès, 1 copie ou migration refusée, préparation ou build en
  * échec, 2 usage incorrect. Appelée par `bin.mjs` (le `bin` du paquet) et par les scripts `migrations:sync`
@@ -19,6 +20,7 @@ const PACKAGE_MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.u
 const USAGE = `Usage : oto-platform migrations <sync|check> [options]
         oto-platform db prepare --db-url <url>
         oto-platform widgets build --views <dossier> --out <fichier>
+        oto-platform accounts secret --db-url <url> --account <id> < fichier-du-secret
 
   migrations sync [--from <dossier>] [--to <dossier>]
     Copie les migrations du paquet dans celles de l'application hôte. Une copie qui diffère
@@ -51,9 +53,18 @@ const USAGE = `Usage : oto-platform migrations <sync|check> [options]
     --views  dossier des vues de l'ERP
     --out    module TypeScript à écrire (ex. src/lib/widgets.generated.ts)
 
+  accounts secret --db-url <url> --account <id>
+    Pose le secret d'un compte réel de connecteur (le jeton du tiers), lu sur l'entrée standard,
+    jamais en argument. Chiffré par la clé PLATFORM_VAULT_KEY de l'environnement (32 octets en
+    base64, la même que celle du serveur de l'application), puis écrit dans la base ; rien du
+    secret ni de la clé n'est affiché. Refusé pour un compte inconnu ou simulé.
+    --db-url   URL de connexion d'un rôle d'administration de la base ; TLS exigé, sauf sslmode
+               écrit dans l'URL
+    --account  identifiant (uuid) du compte
+
   -h, --help  cette aide
 
-Codes de sortie : 0 succès, 1 copie, migration, préparation ou build refusé, 2 usage incorrect.`
+Codes de sortie : 0 succès, 1 copie, migration, préparation, build ou secret refusé, 2 usage incorrect.`
 
 const OPTIONS = {
   from: { type: 'string' },
@@ -62,6 +73,7 @@ const OPTIONS = {
   'db-url': { type: 'string' },
   views: { type: 'string' },
   out: { type: 'string' },
+  account: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 }
 // Options de chaque sous-commande : celle d'une autre y est une option inconnue.
@@ -69,6 +81,7 @@ const COMMANDS = {
   migrations: { sync: ['from', 'to'], check: ['file'] },
   db: { prepare: ['db-url'] },
   widgets: { build: ['views', 'out'] },
+  accounts: { secret: ['db-url', 'account'] },
 }
 
 /** Usage incorrect : le problème nommé sur stderr, puis l'usage, code 2. */
@@ -111,6 +124,7 @@ function parse(argv) {
     if (value === '') throw new UsageError(`l'option « --${name} » attend une valeur`)
   }
   if (command === 'db' && !values['db-url']) throw new UsageError("« db prepare » attend --db-url <url>")
+  if (command === 'accounts' && (!values['db-url'] || !values.account)) throw new UsageError('« accounts secret » attend --db-url <url> et --account <id>')
   if (command === 'widgets' && (!values.views || !values.out)) throw new UsageError('« widgets build » attend --views <dossier> et --out <fichier>')
   return { command, subcommand, ...values }
 }
@@ -134,6 +148,18 @@ export async function run(argv) {
     return prepareDatabase({
       dbUrl: options['db-url'],
       password: process.env.PLATFORM_APP_PASSWORD,
+      print: (line) => console.log(line),
+      printError: (line) => console.error(line),
+    })
+  }
+  if (options.command === 'accounts') {
+    // Chargé à la demande, comme `db prepare` : le pilote Postgres ne sert qu'ici.
+    const { readStdin, setAccountSecretCommand } = await import('./account-secret.mjs')
+    return setAccountSecretCommand({
+      dbUrl: options['db-url'],
+      account: options.account,
+      env: process.env,
+      readSecret: () => readStdin(),
       print: (line) => console.log(line),
       printError: (line) => console.error(line),
     })

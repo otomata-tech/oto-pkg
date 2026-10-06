@@ -35,6 +35,9 @@ erDiagram
     orgs ||--o{ accounts : ""
     orgs ||--o{ connector_activations : ""
     accounts ||--o{ sim_outbox : ""
+    connectors ||--o{ accounts : ""
+    connectors ||--o{ connector_activations : ""
+    connectors ||--o{ sim_outbox : ""
     orgs ||--o{ ctx : ""
     ctx ||--o{ journal : ""
     ctx ||--o{ feedback : ""
@@ -65,9 +68,10 @@ erDiagram
 | `platform_staff` | Équipe plateforme (sans `org_id`) | `user_id` (clé), `email`, `name`, `added_by`, `added_at` ; écrite par l'outillage seul |
 | `platform_grants` | Accès d'un consultant à une organisation | `user_id`, `granted_by`, `granted_at`, `revoked_at`, `revoked_by`, `reason` ; `user_email`, `user_name` copiés de `platform_staff` ; un seul accès en cours par couple ; révocation datée par la base |
 | `identities` | Correspondance d'une personne chez l'émetteur (sans `org_id`) | `issuer`, `subject` (clé), `user_id` (unique par émetteur) ; ni email ni nom ; écrite par `identity_for_caller()` seule |
-| `accounts` | Compte de connecteur | `connector`, `owner_kind` (`org` · `team` · `user`), `owner_team_id` (clé différée : une équipe qui possède un compte ne se supprime pas), `label` (unique sans casse dans l'organisation), `status`, `health`, `mode` (`simule` seulement en V1), `secret_ciphertext` (V2, jamais accordée en lecture) |
-| `connector_activations` | Connecteur ouvert chez ce client | `connector`, `state` (`active` · `inactive`), `activated_by` ; clé (`org_id`, `connector`) |
-| `sim_outbox` | Ce que le connecteur simulé « enverrait » | `id` (`sim_` + 8 hex), `account_id`, `connector`, `function`, `payload`, `status` (`draft` · `sent`), `created_by`, `sent_by`, `sent_at` |
+| `connectors` | Connecteurs connus de l'hôte (sans `org_id`), lus par toute session, écrits par une migration seule | `name` (clé, `^[a-z][a-z0-9_]{0,39}$`), `label` ; `accounts`, `connector_activations` et `sim_outbox` y renvoient par clé étrangère (`on update cascade`, `on delete restrict`) : un connecteur cité ne se supprime pas, un nom inconnu est refusé (`23503`) |
+| `accounts` | Compte de connecteur | `connector` (clé vers `connectors`), `owner_kind` (`org` · `team` · `user`), `owner_team_id` (clé différée : une équipe qui possède un compte ne se supprime pas), `label` (unique sans casse dans l'organisation), `status`, `health`, `mode` (`simule` pour un connecteur simulé, `reel` pour un connecteur réel ; `sandbox` pas encore admis), `secret_ciphertext` (chiffré du coffre du paquet, `v1:…` ; jamais accordée en lecture, lue par `account_secret` seule) |
+| `connector_activations` | Connecteur ouvert chez ce client | `connector` (clé vers `connectors`), `state` (`active` · `inactive`), `activated_by` ; clé (`org_id`, `connector`) |
+| `sim_outbox` | Ce que le connecteur simulé « enverrait » | `id` (`sim_` + 8 hex), `account_id`, `connector` (clé vers `connectors`), `function`, `payload`, `status` (`draft` · `sent`), `created_by`, `sent_by`, `sent_at` |
 | `ctx` | Code de contexte | `code`, `user_id`, `rules_version` (compté, plus lu par la garde), `contexts` (`{chemin: révision}` des Contextes servis ; nul : émis avant 1.1.0, périmé ; ADR-002 § 2 ; seule colonne écrite après l'émission : la personne avance ses propres lignes quand elle publie un Contexte, policy `ctx_update_own`, E11-S19), `host`, `user_agent` |
 | `journal` | Chaque appel | `ctx`, `user_id`, `team_id`, `account_id`, `method`, `tool`, `target`, `args` (2 ko, secrets masqués), `args_chars`, `result_chars`, `is_error`, `error`, `duration_ms`, `host`, `user_agent` |
 | `admin_journal` | Journal du MCP admin, à part | comme `journal` sans `team_id`, `org_id` facultatif, plus `op` |
@@ -115,6 +119,7 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `update_my_profile(org, patch)` | La personne écrit son prénom, son nom (80 caractères chacun, `name` recomposé), sa langue et sa couleur |
 | `forget_user(user)` | Oublie une personne (outillage) : ses lignes, ses espaces personnels, ses `identities`, les auteurs mis à nul, le lexique reconstruit ; refus tant qu'un nœud d'un autre propriétaire est rangé sous les siens |
 | `applied_migrations()` | Migrations appliquées, pour `admin_cell` (équipe plateforme) |
+| `account_secret(account)` | Le chiffré du secret d'un compte, rendu au seul membre de l'organisation du compte (`member_orgs`), null sinon ; lu par `runCall` pour un compte réel d'un connecteur réel, déchiffré par le serveur de l'hôte pour le seul appel au tiers (`authenticated`) |
 | `oauth_pending_resource(authorization_id)`, `oauth_clients_activity()` | Mode Supabase : ressource d'une demande OAuth en attente (consentement) ; clients OAuth et dernière activité (ménage, outillage) |
 
 ### Déclencheurs

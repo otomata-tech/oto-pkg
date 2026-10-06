@@ -17,6 +17,22 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+## 1.5.0 — 2026-10-06
+
+### Assistants
+- A function's contract read with `<p>_read` now says « origin connecteur » for a connector function (it said `service_connecteurs`).
+- `<p>_call` can refuse with `rate_limited` (retry later) or `upstream_error` (the third party refused or is down); `notion.search_workspace` searches Notion.
+
+### Hosts
+- Install: upgrade to 1.5.0, run `oto-platform migrations sync` and apply `20261006090000_platform_connecteurs.sql` before deploying (a table, three foreign keys and a function; additive). It fails, naming it, on a connector name that breaks the connector name rule.
+- Migrations: `platform.connectors` lists the connectors (`mail`, `notion`, and every name your tables already cite); `accounts`, `connector_activations` and `sim_outbox` reference it, so an unknown connector is now refused (`23503`). A connector of your own needs its row, through your own migration.
+- Install: `PLATFORM_VAULT_KEY` (32 bytes in base64, `openssl rand -base64 32`, server only) as soon as a live connector account is used. Read when used: without it the host starts, and setting or reading a secret throws `PlatformConfigError`.
+- CLI: `oto-platform accounts secret --db-url <url> --account <id>` sets the secret of a live account, read from standard input, encrypted with `PLATFORM_VAULT_KEY`; nothing of it is printed.
+- Server: `setAccountSecret(db, identity, { account_id, secret })` sets the secret of a live account (manage level), never returned. No route nor MCP tool takes a secret.
+- Server: `createAccount` takes `mode: "reel"` for a live connector (`notion`) and refuses a simulated one (`invalid_arguments`); a simulated connector (`mail`) still takes simulated accounts only. The Connectors screen still creates simulated accounts only.
+- Server: `PLATFORM_ERROR_CODES` gains `rate_limited` (429) and `upstream_error` (502); a host that maps every code adds them.
+- MCP: `admin_connector` lists a live connector as `(live)` and creates a live account with `mode: "reel"`.
+
 ## 1.4.0 — 2026-10-03
 
 ### Hosts

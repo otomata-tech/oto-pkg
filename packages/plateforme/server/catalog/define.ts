@@ -13,8 +13,11 @@ import type { Identity } from "../identity"
 /** read : lecture ; write : écriture ; sensitive : envoie, supprime ou paie → deux temps (H86). */
 export type FunctionClass = "read" | "write" | "sensitive"
 
-/** paquet : native ; erp : inscrite par l'hôte ; service_connecteurs : connecteur distant (V2). */
-export type FunctionOrigin = "paquet" | "erp" | "service_connecteurs"
+/**
+ * paquet : native ; erp : inscrite par l'hôte ; connecteur : fonction d'un connecteur, qui s'active par organisation
+ * et court sur un compte résolu (H81, H83).
+ */
+export type FunctionOrigin = "paquet" | "erp" | "connecteur"
 
 export type FunctionContext = {
   db: PlatformDb
@@ -23,6 +26,11 @@ export type FunctionContext = {
   accessToken?: string
   /** Compte résolu (H83) d'une fonction de connecteur ; absent pour une fonction native ou ERP (E04-S01). */
   account?: ResolvedAccount
+  /**
+   * Secret du compte résolu, déchiffré par `runCall` pour un compte réel d'un connecteur réel, et pour `run` seul
+   * (jamais `summarize`) : le connecteur le pose dans sa requête au tiers, jamais dans un texte, un log ou une erreur.
+   */
+  credential?: string
   /** Code `ctx` de l'appel (E03-S04, N9) : la provenance d'une écriture faite par un assistant (ADR-011 § 2). */
   ctx?: string | null
   /** Client MCP de la conversation (`ctx.host`, `nom@version`), rangé dans la provenance d'une écriture (E11-S01, AC-d2) ; absent sans lui. */

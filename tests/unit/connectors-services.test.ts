@@ -72,7 +72,7 @@ afterEach(() => {
 })
 
 describe("activableConnectors and requireActivable (AC2, AC3, H81)", () => {
-  const functions = [fn("slack.post", "service_connecteurs"), fn("mail.list", "service_connecteurs"), fn("table.rows", "paquet"), fn("erp.list_invoices", "erp")]
+  const functions = [fn("slack.post", "connecteur"), fn("mail.list", "connecteur"), fn("table.rows", "paquet"), fn("erp.list_invoices", "erp")]
 
   it("should keep only the connectors of remote functions, sorted by name", () => {
     expect([...activableConnectors(functions).keys()]).toEqual(["mail", "slack"])
@@ -94,12 +94,12 @@ describe("activableConnectors and requireActivable (AC2, AC3, H81)", () => {
   })
 
   it("should refuse an unknown connector, listing those that can be activated", () => {
-    expect(() => requireActivable("sellsy", catalogFunctions())).toThrow("Unknown connector sellsy. Connectors you can activate: mail.")
+    expect(() => requireActivable("sellsy", catalogFunctions())).toThrow("Unknown connector sellsy. Connectors you can activate: mail, notion.")
     expect(() => requireActivable("sellsy", [])).toThrow("Unknown connector sellsy. Connectors you can activate: none.")
   })
 
   it("should name 20 of 1,000 connectors that can be activated, then count the others (N32)", () => {
-    const many = Array.from({ length: 1000 }, (_, index) => fn(`c${String(index).padStart(4, "0")}.run`, "service_connecteurs"))
+    const many = Array.from({ length: 1000 }, (_, index) => fn(`c${String(index).padStart(4, "0")}.run`, "connecteur"))
     const listed = many.slice(0, 20).map((candidate) => candidate.connector).join(", ")
     expect(() => requireActivable("sellsy", many)).toThrow(`Unknown connector sellsy. Connectors you can activate: ${listed}, … and 980 more.`)
   })
@@ -107,7 +107,7 @@ describe("activableConnectors and requireActivable (AC2, AC3, H81)", () => {
 
 describe("activation refusals before the database (AC2)", () => {
   it.each([
-    [{ connector: "sellsy" }, "not_found", "Unknown connector sellsy. Connectors you can activate: mail."],
+    [{ connector: "sellsy" }, "not_found", "Unknown connector sellsy. Connectors you can activate: mail, notion."],
     [{ connector: "table" }, "invalid_arguments", "table is built in: it is always active and has no accounts."],
     [{ connector: "Mail!" }, "invalid_arguments", "Invalid arguments: connector: Connector: lowercase letters, digits and _, starting with a letter, 40 characters max, e.g. mail."],
     [{}, "invalid_arguments", "Invalid arguments: connector: Invalid input: expected string, received undefined."],
@@ -334,12 +334,15 @@ describe("listConnectorsForOrg (AC3)", () => {
 describe("account refusals before the database (AC6, AC7)", () => {
   const team = "7f4bb501-5627-48f8-855d-3c0f3ffd3c8f"
 
-  it.each(["reel", "sandbox"])("should answer unavailable_in_v1 for mode %s and create nothing", async (mode) => {
-    const error = await refusal(createAccount(untouchable, ADMIN, { connector: "mail", owner_kind: "org", label: "Mail Acme", mode }))
-    expect(error.code).toBe("unavailable_in_v1")
-    expect(error.message).toBe(
-      "Live and sandbox accounts arrive with the connector service in V2. In this version, accounts are simulated: create it with mode simule.",
-    )
+  // Prise des connecteurs (AC13, AC14) : le mode que le connecteur admet, décidé avant la base.
+  it.each([
+    ["mail", "reel", "unavailable_in_v1", "mail is simulated in this version: its accounts are simulated, a live account is not available. Create it with mode simule."],
+    ["mail", "sandbox", "unavailable_in_v1", "mail is simulated in this version: its accounts are simulated, a sandbox account is not available. Create it with mode simule."],
+    ["notion", "sandbox", "unavailable_in_v1", "Sandbox accounts are not available yet. Create a live account of notion with mode reel."],
+    ["notion", "simule", "invalid_arguments", "notion is a live connector: its accounts are live, never simulated. Create it with mode reel."],
+  ])("should refuse a %s account in mode %s and create nothing", async (connector, mode, code, message) => {
+    const error = await refusal(createAccount(untouchable, ADMIN, { connector, owner_kind: "org", label: "Compte Acme", mode }))
+    expect({ code: error.code, message: error.message }).toEqual({ code, message })
   })
 
   it("should refuse an empty or too long label, a missing team, a built-in or unknown connector", async () => {
@@ -355,7 +358,7 @@ describe("account refusals before the database (AC6, AC7)", () => {
     })
     expect(await refusal(createAccount(untouchable, ADMIN, { ...base, connector: "sellsy", label: "Sellsy" }))).toMatchObject({
       code: "not_found",
-      message: "Unknown connector sellsy. Connectors you can activate: mail.",
+      message: "Unknown connector sellsy. Connectors you can activate: mail, notion.",
     })
   })
 
@@ -366,7 +369,7 @@ describe("account refusals before the database (AC6, AC7)", () => {
   it("should list the usable accounts of a connector that can be activated only, as createAccount does (N35)", async () => {
     expect(await refusal(listUsableAccounts(untouchable, ADMIN, { connector: "sellsy" }))).toMatchObject({
       code: "not_found",
-      message: "Unknown connector sellsy. Connectors you can activate: mail.",
+      message: "Unknown connector sellsy. Connectors you can activate: mail, notion.",
     })
     expect(await refusal(listUsableAccounts(untouchable, ADMIN, { connector: "table" }))).toMatchObject({
       code: "invalid_arguments",

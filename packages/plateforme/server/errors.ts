@@ -24,6 +24,10 @@ export const PLATFORM_ERROR_CODES = [
   "too_large",
   "conflict",
   "internal",
+  // Le tiers d'un connecteur limite le débit (429) : réessayer plus tard.
+  "rate_limited",
+  // Le tiers d'un connecteur refuse le secret (401, 403), tombe ou répond hors de sa table d'erreurs.
+  "upstream_error",
 ] as const
 
 export type PlatformErrorCode = (typeof PLATFORM_ERROR_CODES)[number]
@@ -46,6 +50,8 @@ export const HTTP_STATUS: Record<PlatformErrorCode, number> = {
   too_large: 413,
   conflict: 409,
   internal: 500,
+  rate_limited: 429,
+  upstream_error: 502,
 }
 
 /** Précisions lisibles par une porte : `reason`, `revision`, `refusals`… jamais un message de la base. */

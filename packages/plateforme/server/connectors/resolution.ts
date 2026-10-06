@@ -143,7 +143,7 @@ export function chooseTeam(input: TeamChoiceInput): TeamChoice {
   if (input.tableTeam) return running(input.tableTeam, "table")
   if (input.procedureTeam) return running(input.procedureTeam, "procedure")
   const none: TeamChoice = { kind: "team", team: null }
-  if (input.fn.origin !== "service_connecteurs") return none
+  if (input.fn.origin !== "connecteur") return none
   const capable = input.capable ?? new Set<string>()
   const able = bySlug(input.teams.filter((team) => capable.has(team.id)))
   if (able.length === 1) return running(able[0], "only_team")
@@ -392,7 +392,7 @@ export async function runningTeam(
     choice.tableTeam = input.tablePath ? await tableTeam(db, identity, input.tablePath) : null
     const procedure = !choice.tableTeam && input.ctxCode ? await lastProcedure(db, identity, input.ctxCode) : null
     choice.procedureTeam = procedure ? await ownerTeam(db, identity, procedure.id) : null
-    if (!choice.tableTeam && !choice.procedureTeam && input.fn.origin === "service_connecteurs") {
+    if (!choice.tableTeam && !choice.procedureTeam && input.fn.origin === "connecteur") {
       choice.capable = capableTeams(await connectorAccounts(db, identity, input.fn.connector), requiredLevel(input.fn.class))
     }
   }

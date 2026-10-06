@@ -233,7 +233,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
     await fx.createAccount(a.org.id, { ownerKind: "user", ownerUserId: a.people.claire.id, label: "Mail Claire" })
     ids.accountB = await fx.createAccount(b.id, { ownerKind: "org", label: "Mail B" })
     await fx.addActivation(a.org.id, "mail")
-    await fx.addActivation(b.id, "crm")
+    await fx.addActivation(b.id, "notion")
     await seedRows()
 
     scopeA = await scopeOf(a.org.id)
@@ -391,7 +391,7 @@ describe.skipIf(!sqlConfigured || privatePending)(privateFolderSuite(sqlConfigur
         [
           "connector_activations move",
           "42501",
-          () => bea((sql) => sql`update platform.connector_activations set org_id = ${org} where org_id = ${b.id} and connector = 'crm' returning connector`),
+          () => bea((sql) => sql`update platform.connector_activations set org_id = ${org} where org_id = ${b.id} and connector = 'notion' returning connector`),
         ],
       ]
       const tried = new Set(writes.map(([label]) => label.split(" ")[0]))

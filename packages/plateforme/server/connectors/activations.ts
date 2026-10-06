@@ -21,13 +21,13 @@ import type { Tx } from "../sql"
 type ActivationRow = { connector: string; state: string; activated_by: string | null; updated_at: string }
 
 /**
- * Les connecteurs qui demandent une activation (origine `service_connecteurs`, H81), triés par nom,
+ * Les connecteurs qui demandent une activation (origine `connecteur`, H81), triés par nom,
  * avec leurs fonctions. `table` et les fonctions ERP n'y sont jamais : ils sont toujours actifs.
  */
 export function activableConnectors(functions: readonly CatalogFunction[]): Map<string, CatalogFunction[]> {
   const byConnector = new Map<string, CatalogFunction[]>()
   for (const fn of functions) {
-    if (fn.origin === "service_connecteurs") byConnector.set(fn.connector, [...(byConnector.get(fn.connector) ?? []), fn])
+    if (fn.origin === "connecteur") byConnector.set(fn.connector, [...(byConnector.get(fn.connector) ?? []), fn])
   }
   return new Map([...byConnector.entries()].sort(([a], [b]) => a.localeCompare(b)))
 }

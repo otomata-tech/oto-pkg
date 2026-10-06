@@ -32,9 +32,9 @@ const VENTES: TeamRef = { id: "t-ventes", slug: "ventes", name: "Ventes" }
 const SUPPORT: TeamRef = { id: "t-support", slug: "support", name: "Support" }
 const TERRAIN: TeamRef = { id: "t-terrain", slug: "terrain", name: "Équipe Terrain" }
 
-const CREATE: FunctionTraits = { name: "mail.create_draft", connector: "mail", class: "write", origin: "service_connecteurs" }
-const SEND: FunctionTraits = { name: "mail.send_draft", connector: "mail", class: "sensitive", origin: "service_connecteurs" }
-const LIST: FunctionTraits = { name: "mail.list_drafts", connector: "mail", class: "read", origin: "service_connecteurs" }
+const CREATE: FunctionTraits = { name: "mail.create_draft", connector: "mail", class: "write", origin: "connecteur" }
+const SEND: FunctionTraits = { name: "mail.send_draft", connector: "mail", class: "sensitive", origin: "connecteur" }
+const LIST: FunctionTraits = { name: "mail.list_drafts", connector: "mail", class: "read", origin: "connecteur" }
 const ROWS: FunctionTraits = { name: "table.rows", connector: "table", class: "read", origin: "paquet" }
 const INVOICES: FunctionTraits = { name: "erp.list_invoices", connector: "erp", class: "read", origin: "erp" }
 

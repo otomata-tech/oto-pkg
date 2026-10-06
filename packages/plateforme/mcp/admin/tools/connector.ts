@@ -10,7 +10,7 @@ import type { CatalogFunction } from "../../../server/catalog/define"
 import { catalogFunctions } from "../../../server/catalog/registry"
 import { createAccount, disableAccount, listOrgAccounts } from "../../../server/connectors/accounts"
 import { activateConnector, deactivateConnector, deactivationImpact, listConnectorsForOrg } from "../../../server/connectors/activations"
-import { modeLabel } from "../../../server/connectors/modes"
+import { isSimulatedConnector, modeLabel } from "../../../server/connectors/modes"
 import { listAccountRules, removeAccountRule, setAccountRule } from "../../../server/rules"
 import { day, firstOf, listLines, nothingWas, renderHelp, targetOf, type AdminOutput, type OpCall, type OpTable } from "../ops"
 import { noRuleFor, readSubject, ruleOf, rulesOutput, ruleSetText } from "../rule-texts"
@@ -21,21 +21,25 @@ const ACCOUNT_DEFAULTS = "Without a rule, members read an organisation account, 
 const AFTER_ACCOUNT_RULES = ["admin_connector account_rules"]
 
 type Fn = { name: string; class: string }
-type ConnectorData = { name: string; kind: "simulated" | "built_in" | "application"; activable: boolean; state: string; since: string | null; functions: Fn[] }
+type ConnectorData = { name: string; kind: "simulated" | "live" | "built_in" | "application"; activable: boolean; state: string; since: string | null; functions: Fn[] }
 
 const fnText = (functions: readonly Fn[]) => functions.map((fn) => `${fn.name} (${fn.class})`).join(", ")
 
 function activableData(connector: OrgConnector): ConnectorData {
   const { state, activatedAt, functions } = connector
-  return { name: connector.connector, kind: "simulated", activable: true, state, since: activatedAt, functions }
+  return { name: connector.connector, kind: kindOf(connector.connector), activable: true, state, since: activatedAt, functions }
 }
 
-/** « - mail (simulated): active since <date> by <nom> — mail.create_draft (write), … » (AC7) ; en V1, tout connecteur activable est simulé (H85). */
+/** Un connecteur activable est simulé (`mail`) ou réel (H85). */
+const kindOf = (connector: string) => (isSimulatedConnector(connector) ? "simulated" : "live")
+
+/** « - mail (simulated): active since <date> by <nom> — mail.create_draft (write), … » (AC7) ; un connecteur réel dit `live` (H85). */
 function activableLine(connector: OrgConnector): string {
   const functions = fnText(connector.functions)
-  if (connector.state !== "active" || !connector.activatedAt) return `- ${connector.connector} (simulated): inactive — ${functions}`
+  const kind = kindOf(connector.connector)
+  if (connector.state !== "active" || !connector.activatedAt) return `- ${connector.connector} (${kind}): inactive — ${functions}`
   const by = connector.activatedBy?.name ? ` by ${connector.activatedBy.name}` : ""
-  return `- ${connector.connector} (simulated): active since ${day(connector.activatedAt)}${by} — ${functions}`
+  return `- ${connector.connector} (${kind}): active since ${day(connector.activatedAt)}${by} — ${functions}`
 }
 
 /** Les fonctions toujours actives, lues au registre (H81, N15) : natives par connecteur, puis celles de l'application (ERP). */
@@ -117,7 +121,7 @@ async function accounts(call: OpCall): Promise<AdminOutput> {
   const shown = connector ? all.filter((account) => account.connector === connector) : all
   const output = { target: connector, nextActions: ["admin_connector create_account"] }
   if (shown.length === 0) {
-    const text = `${identity.org.slug} has no ${connector ? `${connector} ` : ""}account yet. Create a simulated one with admin_connector {"op": "create_account"}.`
+    const text = `${identity.org.slug} has no ${connector ? `${connector} ` : ""}account yet. Create one with admin_connector {"op": "create_account"}.`
     return { ...output, text, data: { accounts: [] } }
   }
   const line = (account: AccountView) => `- ${account.label} · ${account.connector} · ${ownerShort(account.owner)} · ${modeLabel(account.mode)} · ${account.status}`
@@ -132,7 +136,11 @@ async function createAccountOp(call: OpCall): Promise<AdminOutput> {
   const { connector, account: label, mode } = call.input
   const created = await createAccount(db, identity, { connector, label, mode, ...team })
   const owned = await ownerDescription(db, identity, created.owner)
-  const text = `Simulated account ${created.label} (${created.connector}) created in ${identity.org.slug}, owned by ${owned}. Nothing it does leaves the server.`
+  const after =
+    created.mode === "simule"
+      ? "Nothing it does leaves the server."
+      : "Its secret is set by the host's tooling (oto-platform accounts secret); calls are refused until then."
+  const text = `${created.mode === "simule" ? "Simulated" : "Live"} account ${created.label} (${created.connector}) created in ${identity.org.slug}, owned by ${owned}. ${after}`
   return { text, data: { accounts: [{ label: created.label, connector: created.connector, owner: owned, mode: created.mode, status: "active" }] }, target: `account:${created.label}`, nextActions: AFTER_ACCOUNT_RULES }
 }
 
@@ -244,11 +252,13 @@ export const CONNECTOR_OPS: OpTable = {
     schema: z.object({ ...onConnector, account: label, owner: ref, mode: createAccountSchema.shape.mode }),
     org: "target",
     twoStep: false,
-    summary: "Creates a simulated account of the organisation or of a team (owner org or team:<slug>); nothing it does leaves the server.",
+    summary:
+      "Creates an account of the organisation or of a team (owner org or team:<slug>): simulated for a simulated connector (nothing leaves the server), live (mode reel) for a live one.",
     example: { org: "acme", connector: "mail", account: "Mail Ventes", owner: "team:ventes" },
     refusals: [
       "invalid_arguments: owner must be org or team:<slug>: a personal account is created by its owner, not by the platform team.",
-      "unavailable_in_v1: Live and sandbox accounts arrive with the connector service in V2.",
+      "unavailable_in_v1: a live account of a simulated connector, or a sandbox account.",
+      "invalid_arguments: a simulated account of a live connector: create it with mode reel.",
       "conflict: An account labelled <label> already exists in <org>.",
       unknownConnector,
     ],

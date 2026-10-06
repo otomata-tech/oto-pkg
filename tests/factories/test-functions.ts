@@ -59,7 +59,7 @@ export const testOff = defineFunction({
   name: "test.off",
   connector: "off",
   class: "read",
-  origin: "service_connecteurs",
+  origin: "connecteur",
   description: "Reads through a connector that no test organisation activates.",
   schema: z.strictObject({}),
   examples: [{}],

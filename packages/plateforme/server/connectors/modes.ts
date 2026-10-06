@@ -1,7 +1,7 @@
-// Mode d'un compte de connecteur (H85) tel que le modèle le lit, et la garde du simulé. Fichier à
-// part : la ligne du bloc `team` (`lines.ts`) et le connecteur `mail` simulé en ont besoin, et
-// `simulated/mail.ts`, importé par le catalogue, ne peut dépendre des services qui lisent le
-// catalogue (l'import serait circulaire).
+// Mode d'un compte de connecteur (H85) tel que le modèle le lit, les connecteurs simulés et la garde du simulé.
+// Fichier à part : la ligne du bloc `team` (`lines.ts`), `call` et le connecteur `mail` simulé en ont besoin, et
+// `simulated/mail.ts`, importé par le catalogue, ne peut dépendre des services qui lisent le catalogue (l'import
+// serait circulaire).
 import type { AccountMode } from "../../schemas"
 import { PlatformError } from "../errors"
 
@@ -18,14 +18,23 @@ export function modeLabel(mode: AccountMode): string {
 }
 
 /**
- * En V1, un connecteur ne court que sur un compte simulé (H85) : un compte réel ou de bac à sable,
- * posé par l'outillage, est refusé avant toute écriture. Même texte que le refus de `call`
- * (E03-S04, AC12).
+ * Les connecteurs simulés du paquet (H85) : leurs comptes sont simulés, et eux seuls ; tout autre connecteur est réel
+ * et ne court que sur un compte réel, son secret déchiffré à l'appel (`runCall`).
+ */
+const SIMULATED_CONNECTORS: ReadonlySet<string> = new Set(["mail"])
+
+export function isSimulatedConnector(connector: string): boolean {
+  return SIMULATED_CONNECTORS.has(connector)
+}
+
+/**
+ * Un connecteur simulé ne court que sur un compte simulé (H85) : un compte réel ou de bac à sable, posé par
+ * l'outillage, est refusé avant toute écriture (E03-S04, AC12).
  */
 export function requireSimulated(account: { label: string; mode: AccountMode }): void {
   if (account.mode === "simule") return
   throw new PlatformError(
     "unavailable_in_v1",
-    `Account « ${account.label} » is a ${modeLabel(account.mode)} account (mode ${account.mode}): live execution arrives with the connector service in V2. Nothing was sent.`,
+    `Account « ${account.label} » is a ${modeLabel(account.mode)} account (mode ${account.mode}): this connector is simulated in this version and runs on simulated accounts only. Nothing was sent.`,
   )
 }

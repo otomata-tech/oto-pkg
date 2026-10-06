@@ -225,6 +225,9 @@ NEVER_EXPORTED.push('upload_tickets')
 // Les exclusions (entrée sans invitation) nomment des personnes qui ne sont plus membres : l'export ne porte pas leur
 // email, l'import n'aurait rien pour les rapprocher.
 NEVER_EXPORTED.push('member_exclusions')
+// Les connecteurs (prise des connecteurs) : une liste de l'hôte, sans organisation ; l'organisation importée cite ses
+// noms, que l'hôte cible doit connaître (clés étrangères).
+NEVER_EXPORTED.push('connectors')
 
 /** @param {string} name */
 function tableSpec(name) {

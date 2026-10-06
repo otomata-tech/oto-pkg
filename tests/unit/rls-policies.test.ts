@@ -107,6 +107,8 @@ ADDED.push("upload_tickets_select_member", "upload_tickets_insert_own", "upload_
 ADDED.push("member_exclusions_select_member", "member_exclusions_insert_member")
 // La ligne `ctx` de l'appelant avancée par l'auteur d'un Contexte (E11-S19, lot a) : isolation par organisation, attribution à l'appelant.
 ADDED.push("ctx_update_own")
+// Les connecteurs de l'hôte (prise des connecteurs) : une liste de noms sans organisation, lue par toute session.
+ADDED.push("connectors_select_authenticated")
 
 /** Portée plateforme : les seules policies où `is_staff()` reste (HN-E01S08-3). */
 const PLATFORM_SCOPE = [

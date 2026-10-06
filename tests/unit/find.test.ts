@@ -83,7 +83,7 @@ const CATALOG = {
     fn("table.claim", { class: "write", description: "Reserves rows of a table's work queue for a worker." }),
     fn("table.release", { class: "write", description: "Releases reserved rows of a table, with their new state." }),
     fn("probe.payload", { origin: "erp", description: "Echoes a payload to test the chain of calls" }),
-    fn("sellsy.list_estimates", { origin: "service_connecteurs", description: "Lists the estimates sent from Sellsy." }),
+    fn("sellsy.list_estimates", { origin: "connecteur", description: "Lists the estimates sent from Sellsy." }),
   ],
   activeConnectors: new Set<string>(),
 }

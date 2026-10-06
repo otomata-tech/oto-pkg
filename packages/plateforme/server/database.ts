@@ -131,6 +131,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "accounts_connector_fkey"
+            columns: ["connector"]
+            isOneToOne: false
+            referencedRelation: "connectors"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "accounts_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -322,6 +329,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "connector_activations_connector_fkey"
+            columns: ["connector"]
+            isOneToOne: false
+            referencedRelation: "connectors"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "connector_activations_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -329,6 +343,21 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      connectors: {
+        Row: {
+          label: string | null
+          name: string
+        }
+        Insert: {
+          label?: string | null
+          name: string
+        }
+        Update: {
+          label?: string | null
+          name?: string
+        }
+        Relationships: []
       }
       ctx: {
         Row: {
@@ -1259,6 +1288,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sim_outbox_connector_fkey"
+            columns: ["connector"]
+            isOneToOne: false
+            referencedRelation: "connectors"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "sim_outbox_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
@@ -1408,6 +1444,7 @@ export type Database = {
     }
     Functions: {
       accept_invitations: { Args: never; Returns: Json }
+      account_secret: { Args: { p_account: string }; Returns: string }
       applied_migrations: {
         Args: never
         Returns: {

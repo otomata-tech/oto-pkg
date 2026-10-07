@@ -168,6 +168,13 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   pas). `account_secret(compte)`, `security definer`, `search_path` vide, révoquée à `public` et `anon`, accordée
   à `authenticated` : le chiffré du secret au seul membre de l'organisation du compte (`member_orgs`), rien
   sinon ; `secret_ciphertext` reste sans droit de lecture. Pas de nouvelle colonne.
+- `20261007090000_platform_connecteurs_declares.sql` (version 1.5.0, moteur des connecteurs décrits) :
+  `declare_connector(nom, libellé)`, `security definer`, `search_path` vide, révoquée à `public` et `anon`, accordée à
+  `authenticated` : ajoute à `connectors` le nom d'un connecteur que l'hôte déclare (`registerConnectors`), avant sa
+  première activation ou son premier compte, `on conflict do nothing` (un nom présent ne change pas, libellé compris) ;
+  réservée à un membre d'une organisation (`member_orgs`, sinon `42501`), le nom au motif de `connectors_name_check`, le
+  libellé de 80 caractères au plus (`22023`). Aucune table, colonne ni policy. Fichier à part de `20261006090000`, déjà
+  appliqué au projet de test ; les deux se fusionnent en `<horodatage>_v1_5_0.sql` avant le tag (D124).
 
 ## Installer sur un hôte neuf
 

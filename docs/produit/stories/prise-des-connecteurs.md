@@ -16,6 +16,9 @@
 
 ## Contexte
 
+> Le témoin `notion` est retiré du paquet par la story `moteur-des-connecteurs-decrits.md` : l'hôte déclare désormais
+> ses connecteurs, et ses tests passent sur un connecteur décrit de test (AC11, AC18 et la fumée en dépendent).
+
 Le paquet doit pouvoir exécuter un connecteur réel chez l'hôte : un compte réel, son secret chiffré par le paquet,
 déchiffré par le serveur de l'hôte pour le seul appel au tiers. Ce lot pose cette prise, prouvée par un connecteur
 témoin écrit à la main au contrat `defineFunction`, `notion`, fidèle à sa description YAML du dépôt `connectors`.

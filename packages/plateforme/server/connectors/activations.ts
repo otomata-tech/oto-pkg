@@ -16,6 +16,7 @@ import type { Identity } from "../identity"
 import { isJsonObject } from "../json"
 import { orgLimits, requireUnderLimit } from "../limits"
 import type { Tx } from "../sql"
+import { keepDeclaredConnector } from "./declaration"
 
 /** Une ligne d'activation ; `updated_at` lu par `to_json`, en texte ISO comme PostgREST le rendait (AC-x2). */
 type ActivationRow = { connector: string; state: string; activated_by: string | null; updated_at: string }
@@ -137,6 +138,7 @@ export async function activateConnector(db: PlatformDb, identity: Identity, inpu
     const current = await activationRow(sql, orgId, connector)
     if (current?.state === "active") return current
     await requireUnderLimit(sql, { db, identity, limits }, "connectors_max")
+    await keepDeclaredConnector(sql, connector)
     const [written] = await sql<ActivationRow[]>`
       insert into platform.connector_activations (org_id, connector, state, activated_by)
       values (${orgId}, ${connector}, 'active', ${identity.user.id})

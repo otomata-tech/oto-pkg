@@ -15,12 +15,20 @@ import { isRecord } from "../../schemas/tables"
 import { isPlatformError, issuesText, PlatformError } from "../errors"
 import { VIEW_NAME_PATTERN } from "../../schemas/views"
 import { contractNames } from "./contracts"
-import { defineFunction, type CatalogFunction, type FunctionClass, type FunctionContext, type FunctionOutput, type FunctionSummary } from "./define"
+import {
+  defineFunction,
+  type FunctionClass,
+  type FunctionContext,
+  type FunctionOutput,
+  type FunctionSummary,
+  type StrictSchema,
+  type ZodCatalogFunction,
+} from "./define"
 import { erpWidgetBundle, replaceErpFunctions, replaceErpWidgetBundle, type ErpWidgetBundle } from "./erp-source"
 import { catalogFunctions, looksLikeFunction } from "./registry"
 
 /** Une fonction de l'ERP : une fonction du catalogue d'origine `erp` (H80), de connecteur son espace de noms. */
-export type ErpFunction = CatalogFunction & { origin: "erp" }
+export type ErpFunction = ZodCatalogFunction & { origin: "erp" }
 
 /**
  * Ce que reçoit une fonction de l'ERP (NH4) : la base de la plateforme, l'appelant et son jeton vérifié.
@@ -29,7 +37,7 @@ export type ErpFunction = CatalogFunction & { origin: "erp" }
  */
 export type ErpFunctionContext = Pick<FunctionContext, "db" | "identity"> & { accessToken: string }
 
-type Schema = CatalogFunction["schema"]
+type Schema = StrictSchema
 
 /** Une fonction telle que l'ERP la déclare (H108) : le contrat des autres fonctions, sans origine ni connecteur. */
 type ErpFunctionInput<S extends Schema> = {

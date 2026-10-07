@@ -9,6 +9,7 @@ import type { ViewKind } from "../../schemas/views"
 import type { ResolvedAccount } from "../connectors/resolution"
 import type { PlatformDb } from "../db"
 import type { Identity } from "../identity"
+import type { JsonSchemaArguments } from "./arguments"
 
 /** read : lecture ; write : écriture ; sensitive : envoie, supprime ou paie → deux temps (H86). */
 export type FunctionClass = "read" | "write" | "sensitive"
@@ -58,7 +59,7 @@ export type FunctionOutput = {
 }
 
 /** Un schéma d'arguments strict : une clé inconnue (« filters » pour « filter ») est refusée. */
-type StrictSchema = z.ZodObject<z.core.$ZodShape, z.core.$strict>
+export type StrictSchema = z.ZodObject<z.core.$ZodShape, z.core.$strict>
 
 /**
  * Contrôle propre à la fonction (E03-S06, R13), rejoué à la publication d'une procédure sur les
@@ -83,7 +84,8 @@ export type CatalogFunction = {
   origin: FunctionOrigin
   /** Anglais, première phrase = ce qu'elle fait. */
   description: string
-  schema: StrictSchema
+  /** Zod strict (native, ERP) ou JSON Schema d'un connecteur décrit, validé et servi tel quel (`arguments.ts`). */
+  schema: StrictSchema | JsonSchemaArguments
   examples: Record<string, unknown>[]
   refusals: string[]
   next?: string[]
@@ -94,6 +96,9 @@ export type CatalogFunction = {
   summarize?: (context: FunctionContext, args: never) => Promise<FunctionSummary>
   checkArgs?: CheckArgs
 }
+
+/** Une fonction au schéma Zod (native, ERP), telle que la rend `defineFunction`. */
+export type ZodCatalogFunction = CatalogFunction & { schema: StrictSchema }
 
 /** Fonction typée par son schéma, effacée au type commun du catalogue. */
 export function defineFunction<S extends StrictSchema>(fn: {
@@ -110,8 +115,8 @@ export function defineFunction<S extends StrictSchema>(fn: {
   run: (context: FunctionContext, args: z.output<S>) => Promise<FunctionOutput>
   summarize?: (context: FunctionContext, args: z.output<S>) => Promise<FunctionSummary>
   checkArgs?: CheckArgs
-}): CatalogFunction {
+}): ZodCatalogFunction {
   // `run` et `summarize` reçoivent des arguments déjà validés par `schema` : leur type précis
   // s'efface ici au type commun du catalogue (`never`, jamais appelé sans validation).
-  return fn as unknown as CatalogFunction
+  return fn as unknown as ZodCatalogFunction
 }

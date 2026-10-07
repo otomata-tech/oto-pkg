@@ -1,17 +1,25 @@
-// Client HTTP des connecteurs réels (`connecteurs-et-comptes.md`, H85) : une requête JSON vers l'API d'un tiers, le
-// secret du compte en en-tête d'authentification, les en-têtes constants du connecteur, un délai, et la table
-// d'erreurs du connecteur traduite en `PlatformError`. Sans lui, chaque connecteur recopierait l'appel, le délai et
-// la traduction des statuts ; la fabrique du dépôt `connectors` en reprendra la forme (`auth`, `errors`,
-// `timeout_s` de la description). Le secret ne sort jamais d'ici : ni dans un message, ni dans un log, ni comme cause
-// d'une erreur ; aucun en-tête n'est journalisé.
+// Client HTTP des connecteurs réels (`connecteurs-et-comptes.md`, H85 ; moteur des connecteurs décrits) : une requête
+// vers l'API d'un tiers, au rythme que le tiers admet par compte, un délai, un nouvel essai borné après un 429, et la
+// table d'erreurs du connecteur traduite en `PlatformError`. Sans lui, le moteur recopierait l'appel, le délai et la
+// traduction des statuts. Le secret arrive dans les en-têtes que le moteur pose et ne sort jamais d'ici : ni dans un
+// message, ni dans un log, ni comme cause d'une erreur ; aucun en-tête ni aucune adresse n'est journalisé.
 import { readBounded } from "../bounded-read"
 import { PlatformError, type PlatformErrorCode } from "../errors"
 
 /** Une réponse plus grosse ne se lit pas : le résultat d'un outil tient de toute façon en 45 000 caractères. */
 const MAX_ANSWER_BYTES = 4 * 1024 * 1024
 
-/** Une ligne de la table d'erreurs d'un connecteur : le statut du tiers, le code et le message servis. */
-export type ApiError = { status: number | readonly number[]; code: PlatformErrorCode; message: string }
+/** Après un 429 : deux nouveaux essais au plus, chacun après le `Retry-After` du tiers s'il ne dépasse pas 10 s. */
+const MAX_RETRIES = 2
+const MAX_RETRY_WAIT_MS = 10_000
+/** Sans `Retry-After` lisible, l'attente avant un nouvel essai. */
+const DEFAULT_RETRY_WAIT_MS = 1_000
+
+/**
+ * Une ligne de la table d'erreurs d'un connecteur : le statut du tiers, le code et le message servis, et le refus nommé
+ * par la description (`details.refusal`).
+ */
+export type ApiError = { status: number | readonly number[]; code: PlatformErrorCode; message: string; refusal?: string }
 
 /** L'API d'un tiers, telle que sa description la donne. */
 export type ConnectorApi = {
@@ -20,25 +28,57 @@ export type ConnectorApi = {
   /** Adresse de base, sans barre finale : `https://api.notion.com/v1`. */
   baseUrl: string
   timeoutMs: number
-  /** En-têtes constants (version de l'API) ; jamais le secret, posé par le client. */
-  headers: Readonly<Record<string, string>>
   errors: readonly ApiError[]
+  /** Débit maximal du tiers, par compte : `requests` requêtes par fenêtre de `intervalMs`. */
+  rateLimit?: { requests: number; intervalMs: number }
 }
 
+export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
+
 export type ApiRequest = {
-  method: "GET" | "POST" | "PATCH" | "DELETE"
-  /** Chemin sous `baseUrl`, barre initiale comprise : `/search`. */
+  method: HttpMethod
+  /** Chemin sous `baseUrl`, barre initiale comprise, paramètres déjà encodés : `/pages/1f2e`. */
   path: string
-  /** Corps JSON ; une clé à `undefined` n'est pas envoyée. */
-  body?: Record<string, unknown>
+  /** Paires de la query, dans l'ordre ; une clé peut revenir (listes en `repeat`). */
+  query?: readonly (readonly [string, string])[]
+  /** En-têtes complets, authentification comprise. */
+  headers: Readonly<Record<string, string>>
+  /** Corps JSON, quelle que soit la méthode ; absent, rien n'est envoyé. */
+  body?: unknown
+  /** La clé du rythme : le compte dont le secret signe la requête. */
+  pacingKey: string
 }
 
 /** Ce qu'il faut à `fetch` ici : tests et hôte passent la leur. */
 export type Fetch = (input: string, init: RequestInit) => Promise<Response>
 
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Instants des requêtes récentes, par compte : le rythme que le tiers admet par secret, tenu dans ce processus. Un
+ * hôte à plusieurs instances le dépasse au pire de leur nombre ; le 429 et son nouvel essai couvrent ce reste.
+ */
+const sentAt = new Map<string, number[]>()
+
+/** Attend une place dans la fenêtre du compte, puis la prend. */
+async function pace(key: string, limit: ConnectorApi["rateLimit"]): Promise<void> {
+  if (!limit) return
+  for (;;) {
+    const now = Date.now()
+    const recent = (sentAt.get(key) ?? []).filter((at) => at > now - limit.intervalMs)
+    if (recent.length < limit.requests) {
+      sentAt.set(key, [...recent, now])
+      return
+    }
+    sentAt.set(key, recent)
+    await wait(recent[0] + limit.intervalMs - now)
+  }
+}
+
 function errorOf(api: ConnectorApi, status: number): PlatformError {
   const known = api.errors.find((error) => (typeof error.status === "number" ? error.status === status : error.status.includes(status)))
-  if (known) return new PlatformError(known.code, known.message)
+  if (known) return new PlatformError(known.code, known.message, known.refusal ? { refusal: known.refusal } : undefined)
+  if (status === 429) return new PlatformError("rate_limited", `${api.label} request rate exceeded: retry later.`)
   return new PlatformError("upstream_error", `${api.label} answered with an unexpected status (${status}). Retry later.`)
 }
 
@@ -52,29 +92,48 @@ function unreachable(api: ConnectorApi, error: unknown): PlatformError {
   return new PlatformError("upstream_error", `${api.label} could not be reached. Retry later.`)
 }
 
-/**
- * Envoie la requête au tiers avec `Authorization: Bearer <secret>` et rend le JSON de sa réponse. Refus : sans secret,
- * `internal` (le compte réel en a un, `runCall` l'a vérifié) ; statut hors 2xx, celui de la table d'erreurs du
- * connecteur, sinon `upstream_error` ; panne, délai dépassé, réponse trop grosse ou illisible : `upstream_error`.
- */
-export async function requestJson(api: ConnectorApi, credential: string | undefined, request: ApiRequest, send: Fetch = fetch): Promise<unknown> {
-  if (!credential) {
-    console.error(`[platform] connector ${api.label}: called without the secret of a live account`)
-    throw new PlatformError("internal", "Internal error.")
-  }
-  const headers: Record<string, string> = { accept: "application/json", ...api.headers, authorization: `Bearer ${credential}` }
-  if (request.body) headers["content-type"] = "application/json"
-  let answer: Response
+/** L'attente que demande `Retry-After` (secondes ou date HTTP), `null` au-delà de la borne. */
+function retryWait(answer: Response): number | null {
+  const header = answer.headers.get("retry-after")
+  if (header === null) return DEFAULT_RETRY_WAIT_MS
+  const seconds = Number(header)
+  const ms = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - Date.now()
+  if (Number.isNaN(ms)) return DEFAULT_RETRY_WAIT_MS
+  return ms <= MAX_RETRY_WAIT_MS ? Math.max(ms, 0) : null
+}
+
+async function send(api: ConnectorApi, request: ApiRequest, fetcher: Fetch): Promise<Response> {
+  const query = request.query?.length ? `?${new URLSearchParams(request.query.map(([key, value]) => [key, value])).toString()}` : ""
+  const headers: Record<string, string> = { accept: "application/json", ...request.headers }
+  if (request.body !== undefined) headers["content-type"] = "application/json"
+  await pace(request.pacingKey, api.rateLimit)
   try {
-    answer = await send(`${api.baseUrl}${request.path}`, {
+    return await fetcher(`${api.baseUrl}${request.path}${query}`, {
       method: request.method,
       headers,
-      body: request.body ? JSON.stringify(request.body) : undefined,
+      body: request.body === undefined ? undefined : JSON.stringify(request.body),
       redirect: "error",
       signal: AbortSignal.timeout(api.timeoutMs),
     })
   } catch (error) {
     throw unreachable(api, error)
+  }
+}
+
+/**
+ * Envoie la requête au tiers et rend le JSON de sa réponse, `null` pour une réponse vide. Un 429 se rejoue deux fois au
+ * plus, après le `Retry-After` du tiers s'il tient en 10 s. Refus : statut hors 2xx, celui de la table d'erreurs du
+ * connecteur, sinon `rate_limited` (429) ou `upstream_error` ; panne, délai dépassé, réponse trop grosse ou
+ * illisible : `upstream_error`.
+ */
+export async function requestJson(api: ConnectorApi, request: ApiRequest, fetcher: Fetch = fetch): Promise<unknown> {
+  let answer = await send(api, request, fetcher)
+  for (let retry = 0; answer.status === 429 && retry < MAX_RETRIES; retry++) {
+    const ms = retryWait(answer)
+    if (ms === null) break
+    await answer.body?.cancel()
+    await wait(ms)
+    answer = await send(api, request, fetcher)
   }
   if (!answer.ok) {
     await answer.body?.cancel()
@@ -89,6 +148,7 @@ export async function requestJson(api: ConnectorApi, credential: string | undefi
     throw unreachable(api, error)
   }
   if (bytes === null) throw new PlatformError("upstream_error", `${api.label} sent an answer too large to read. Narrow the request.`)
+  if (bytes.length === 0) return null
   try {
     return JSON.parse(new TextDecoder().decode(bytes))
   } catch {

@@ -120,6 +120,7 @@ fonction réservée à l'outillage n'est accordée à aucun rôle de l'applicati
 | `forget_user(user)` | Oublie une personne (outillage) : ses lignes, ses espaces personnels, ses `identities`, les auteurs mis à nul, le lexique reconstruit ; refus tant qu'un nœud d'un autre propriétaire est rangé sous les siens |
 | `applied_migrations()` | Migrations appliquées, pour `admin_cell` (équipe plateforme) |
 | `account_secret(account)` | Le chiffré du secret d'un compte, rendu au seul membre de l'organisation du compte (`member_orgs`), null sinon ; lu par `runCall` pour un compte réel d'un connecteur réel, déchiffré par le serveur de l'hôte pour le seul appel au tiers (`authenticated`) |
+| `declare_connector(name, label)` | Ajoute à `connectors` le nom d'un connecteur que l'hôte déclare, et son libellé (80 caractères au plus), avant sa première activation ou son premier compte ; un nom présent ne change pas, rien n'est retiré ; réservée à un membre d'une organisation (`authenticated`) |
 | `oauth_pending_resource(authorization_id)`, `oauth_clients_activity()` | Mode Supabase : ressource d'une demande OAuth en attente (consentement) ; clients OAuth et dernière activité (ménage, outillage) |
 
 ### Déclencheurs

@@ -34,12 +34,15 @@ import {
 import { catalogFunctions } from "../catalog/registry"
 import type { PlatformDb } from "../db"
 import { leadNames, leadWord, memberDirectory, teamsWithLeads } from "../directory"
-import { fromDatabaseError, inTransaction, invalidInput, isUniqueViolation, PlatformError } from "../errors"
+import { fromDatabaseError, inTransaction, invalidInput, isPlatformError, isUniqueViolation, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import type { Tx } from "../sql"
+import { declaredConnector } from "../catalog/connector-source"
 import { requireActivable } from "./activations"
+import { keepDeclaredConnector } from "./declaration"
+import { executeDescribed, nonEmpty, valueAt } from "./engine"
 import { accountMode, isSimulatedConnector, modeLabel } from "./modes"
-import { encryptSecret } from "./vault"
+import { decryptSecret, encryptSecret } from "./vault"
 
 /** Niveau sur un compte tel que le lit le modèle : 1 lecture, 2 écriture, 3 gestion (H65) ; les noms d'`ACCESS_LEVEL_NAMES`. */
 export type LevelName = Exclude<AccessLevelName, "none">
@@ -183,6 +186,7 @@ export async function createAccount(db: PlatformDb, identity: Identity, input: u
   const orgId = identity.org.id
   const row = await db
     .tx(async (sql) => {
+      await keepDeclaredConnector(sql, account.connector)
       const [created] = await sql<{ id: string }[]>`
         insert into platform.accounts (org_id, connector, owner_kind, owner_team_id, owner_user_id, label, mode, status)
         values (${orgId}, ${account.connector}, ${account.owner_kind}, ${teamId}, ${userId}, ${label}, ${account.mode}, 'active')
@@ -256,6 +260,22 @@ export async function listUsableAccounts(
 }
 
 /**
+ * Le compte nommé, si l'appelant le gère (niveau 3 : responsable d'un compte d'équipe, administrateur d'un compte
+ * d'organisation, propriétaire d'un compte personnel), décidé avant toute écriture ou tout appel au tiers. Inconnu ou
+ * invisible (niveau 0) : `not_found` ; sous le niveau : `forbidden`, qui dit qui le gère.
+ */
+async function managedAccount(db: PlatformDb, identity: Identity, id: string, use: { service: string; gesture: string }): Promise<AccountRow> {
+  const [row] = await inTransaction(db, `${use.service}: accounts`, (sql) => accountRows(sql, identity.org.id, { id }))
+  const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
+  if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
+  if (level < ACCESS_LEVELS.manage) {
+    const who = await describeOwner(db, identity, accountOwner(row))
+    throw new PlatformError("forbidden", `${use.gesture} « ${row.label} » is reserved to those who manage it: ${who}.`)
+  }
+  return row
+}
+
+/**
  * Désactive un compte (AC9) : réservé à qui le gère (niveau 3 : responsable d'un compte d'équipe,
  * administrateur d'un compte d'organisation, propriétaire d'un compte personnel), décidé avant
  * l'écriture. Inconnu ou invisible (niveau 0) : `not_found`. Déjà désactivé : rien n'est écrit. Une
@@ -269,13 +289,7 @@ export async function disableAccount(
   const parsed = disableAccountSchema.safeParse(input)
   if (!parsed.success) throw invalidInput(parsed.error)
   const id = parsed.data.account_id
-  const [row] = await inTransaction(db, "disableAccount: accounts", (sql) => accountRows(sql, identity.org.id, { id }))
-  const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
-  if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
-  if (level < ACCESS_LEVELS.manage) {
-    const who = await describeOwner(db, identity, accountOwner(row))
-    throw new PlatformError("forbidden", `Disabling « ${row.label} » is reserved to those who manage it: ${who}.`)
-  }
+  const row = await managedAccount(db, identity, id, { service: "disableAccount", gesture: "Disabling" })
   if (row.status !== "disabled") {
     const updated = await inTransaction(
       db,
@@ -300,13 +314,7 @@ export async function setAccountSecret(db: PlatformDb, identity: Identity, input
   const parsed = accountSecretSchema.safeParse(input)
   if (!parsed.success) throw invalidInput(parsed.error)
   const id = parsed.data.account_id
-  const [row] = await inTransaction(db, "setAccountSecret: accounts", (sql) => accountRows(sql, identity.org.id, { id }))
-  const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
-  if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
-  if (level < ACCESS_LEVELS.manage) {
-    const who = await describeOwner(db, identity, accountOwner(row))
-    throw new PlatformError("forbidden", `Setting the secret of « ${row.label} » is reserved to those who manage it: ${who}.`)
-  }
+  const row = await managedAccount(db, identity, id, { service: "setAccountSecret", gesture: "Setting the secret of" })
   if (accountMode(row.mode) === "simule") throw new PlatformError("invalid_arguments", `Account « ${row.label} » is simulated: it has no secret.`)
   const ciphertext = encryptSecret(id, parsed.data.secret)
   const updated = await inTransaction(
@@ -346,4 +354,35 @@ export async function accountCiphertext(db: PlatformDb, identity: Identity, acco
   if (row?.secret) return row.secret
   const who = await describeOwner(db, identity, account.owner)
   throw new PlatformError("not_enabled", `Account « ${account.label} » has no secret yet. Ask ${who} to set it.`)
+}
+
+/** La santé d'un compte selon la sonde de son connecteur : sain, ou non sain et pourquoi, jamais le secret. */
+export type AccountHealth = { healthy: true } | { healthy: false; reason: string }
+
+/**
+ * Joue la sonde du connecteur déclaré (`probe`) sur un compte : sa fonction de lecture appelée avec `{}`, le secret
+ * déchiffré pour ce seul appel, puis chaque chemin de `nonEmpty` exigé non vide dans la réponse. Réservée à qui gère le
+ * compte (niveau 3, comme `setAccountSecret`) ; hors `call`, elle n'écrit aucune ligne de journal et ne compte dans
+ * aucun quota. Refus : compte inconnu ou non géré ; connecteur sans sonde déclarée (`invalid_arguments`). Un compte
+ * simulé ou sans secret, un refus ou une panne du tiers : non sain, avec la raison ; une panne du coffre lève.
+ */
+export async function probeAccount(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountHealth> {
+  // La même saisie que la désactivation : le compte visé, par son identifiant.
+  const parsed = disableAccountSchema.safeParse(input)
+  if (!parsed.success) throw invalidInput(parsed.error)
+  const id = parsed.data.account_id
+  const row = await managedAccount(db, identity, id, { service: "probeAccount", gesture: "Probing" })
+  const connector = declaredConnector(row.connector)
+  const paths = connector?.definition.probe?.nonEmpty
+  if (!connector?.probe || !paths) throw new PlatformError("invalid_arguments", `Connector ${row.connector} declares no probe.`)
+  const account = { id, label: row.label, mode: accountMode(row.mode), owner: accountOwner(row) }
+  try {
+    const ciphertext = await accountCiphertext(db, identity, account, row.connector)
+    const { answers } = await executeDescribed(connector.probe, { credential: decryptSecret(id, ciphertext), accountId: id }, {})
+    const missing = paths.find((path) => !nonEmpty(valueAt(answers[0], path)))
+    return missing === undefined ? { healthy: true } : { healthy: false, reason: `${connector.definition.label} answered without ${missing}.` }
+  } catch (error) {
+    if (isPlatformError(error) && error.code !== "internal") return { healthy: false, reason: error.message }
+    throw error
+  }
 }

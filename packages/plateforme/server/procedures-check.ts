@@ -21,6 +21,7 @@ import {
   type ProcedureRefusalKind,
 } from "../schemas"
 import { listItemTexts, tableCells } from "../schemas/blocks"
+import { argumentNames, checkArguments } from "./catalog/arguments"
 import type { CatalogFunction } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive } from "./catalog/registry"
 import { loadActiveConnectors } from "./connectors/activations"
@@ -173,8 +174,9 @@ function valueProblems(fn: CatalogFunction, args: Record<string, unknown>, issue
 
 /** R9 à R12 d'un bloc : clés inconnues (ordre des clés), arguments requis absents (ordre du schéma), valeurs. */
 function argumentProblems(fn: CatalogFunction, args: Record<string, unknown>, prefix: string): Problem[] {
-  const keys = Object.keys(fn.schema.shape)
-  const issues: Issue[] = fn.schema.safeParse(args).error?.issues ?? []
+  const keys = argumentNames(fn.schema)
+  const checked = checkArguments(fn.schema, args)
+  const issues: Issue[] = checked.success ? [] : checked.issues
   const missing = keys.filter((key) => !Object.hasOwn(args, key) && issues.some((issue) => issue.path[0] === key))
   return [
     ...Object.keys(args)

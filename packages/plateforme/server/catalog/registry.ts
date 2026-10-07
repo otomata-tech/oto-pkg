@@ -5,9 +5,7 @@
 //
 // Repris de la maquette (`mcp-test/src/proto/functions/registry.ts` l. 13-59) : recherche par mots,
 // contrat, forme du nom. Retiré : le catalogue en dur (sources : E07-S01, E04-S01, E08-S05).
-import * as z from "zod/v4"
 import { normalizeTitle } from "../../schemas"
-import { notionSearchWorkspace } from "../connectors/notion/search-workspace"
 import { mailCreateDraft, mailSendDraft } from "../connectors/simulated/mail"
 import { nodeDiscardDraft } from "../nodes/discard"
 import { nodeMove } from "../nodes/move-function"
@@ -21,6 +19,8 @@ import { tableRelease } from "../tables/release"
 import { tableRows } from "../tables/rows"
 import { tableSchema } from "../tables/schema"
 import { tableWrite } from "../tables/write"
+import { argumentsJsonSchema } from "./arguments"
+import { declaredConnectors } from "./connector-source"
 import type { CatalogFunction } from "./define"
 import { erpFunctions } from "./erp-source"
 import { uploadLink } from "./upload-link"
@@ -32,14 +32,13 @@ export const NATIVE_CONNECTOR = "table"
  * Catalogue de la V1 (H80) : `mail` simulé (E04-S01), lecture des tableaux (E07-S01), écriture et file
  * de travail (E07-S02), import d'un CSV (E10-S01), suppression de lignes, abandon d'un brouillon et
  * corbeille (E11-S02, connecteur natif `node`) ; ERP (E08-S05) s'y ajoute ; le dépôt par lien (E10-S02 lot f, connecteur
- * `upload`, ADR-018) ; déplacement et écriture par lot (E11-S18, connecteur `node`) ; le connecteur réel témoin
- * `notion` (prise des connecteurs).
+ * `upload`, ADR-018) ; déplacement et écriture par lot (E11-S18, connecteur `node`) ; les fonctions des connecteurs
+ * décrits que l'hôte déclare (`registerConnectors`).
  */
 export function catalogFunctions(): CatalogFunction[] {
   return [
     mailCreateDraft,
     mailSendDraft,
-    notionSearchWorkspace,
     tableSchema,
     tableRows,
     tableAggregate,
@@ -54,6 +53,7 @@ export function catalogFunctions(): CatalogFunction[] {
     nodeWriteMany,
     uploadLink,
     ...erpFunctions(),
+    ...declaredConnectors().flatMap((connector) => connector.functions),
   ]
 }
 
@@ -117,9 +117,9 @@ export function searchFunctions(
 /** Contrat servi par `read` (path = nom de la fonction) : ce qu'il faut pour appeler juste. */
 export function describeFunction(fn: CatalogFunction, prefix: string): { text: string; data: Record<string, unknown> } {
   // Rendu des entrées des outils (`mcp/schemas.ts`), sans la clé `$schema`, mais côté entrée : ce que le
-  // modèle écrit et que `call` valide, un champ à défaut facultatif (E08-S05, NH8 ; identique pour le paquet).
-  const schema: Record<string, unknown> = z.toJSONSchema(fn.schema, { io: "input" })
-  delete schema.$schema
+  // modèle écrit et que `call` valide, un champ à défaut facultatif (E08-S05, NH8 ; identique pour le paquet) ; le
+  // JSON Schema d'un connecteur décrit tel quel.
+  const schema = argumentsJsonSchema(fn.schema)
   const text = [
     `Function ${fn.name} (connector ${fn.connector}, origin ${fn.origin}, class ${fn.class}${fn.class === "sensitive" ? ": two-step confirmation" : ""})`,
     fn.description,

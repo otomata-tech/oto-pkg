@@ -2,14 +2,17 @@
 // Application de base (E08-S05, AC12, NH2) : `src/lib/fonctions-metier.ts` est importé par chaque route de
 // l'hôte qui monte une porte du paquet. L'état d'un module vit dans chaque bundle serverless : une route qui
 // l'oublierait servirait un catalogue sans les fonctions de l'ERP, et la publication d'une procédure qui les
-// cite passerait par une porte et serait refusée par l'autre. Dans l'application de base, la liste est vide.
+// cite passerait par une porte et serait refusée par l'autre. Dans l'application de base, la liste est vide, celle
+// des connecteurs décrits aussi (moteur des connecteurs décrits).
 import fs from "fs"
 import path from "path"
 import * as z from "zod/v4"
 import { describe, expect, it } from "vitest"
 import { defineErpFunction, registerFunctions } from "../../packages/plateforme/server/catalog/erp"
 import { catalogFunctions } from "../../packages/plateforme/server/catalog/registry"
+import { registerConnectors } from "../../packages/plateforme/server/connectors/declaration"
 import { find } from "../../packages/plateforme/server/find"
+import { describedConnector } from "../factories/described-connector"
 import { identityOf } from "../helpers/reference-org"
 import { simulatedDb } from "../helpers/simulated-db"
 
@@ -52,8 +55,11 @@ describe("ERP functions of the host (E08-S05)", () => {
         run: async () => ({ text: "ok" }),
       }),
     ])
+    // Un connecteur décrit déclaré avant : l'application de base déclare une liste vide, qui le remplace.
+    registerConnectors([describedConnector()])
     await import("@/lib/fonctions-metier")
     const found = await find(simulatedDb().db, identityOf("claire"), { query: "erp", type: "function" }, { functions: catalogFunctions(), activeConnectors: new Set() })
     expect(found.text).not.toContain("erp.")
+    expect(catalogFunctions().filter((fn) => fn.connector === describedConnector().name)).toEqual([])
   })
 })

@@ -377,11 +377,43 @@ La fonction reçoit `{ host, request? }` : l'adresse appelée, normalisée, et l
 
 ## Connecteurs réels et coffre
 
-Le paquet porte un connecteur simulé, `mail` (rien ne sort du serveur), et des connecteurs réels, dont le témoin
-`notion` (`notion.search_workspace`). Un connecteur réel court sur un compte réel (mode `reel`) dont le secret, le
-jeton du tiers, est chiffré par le coffre du paquet (AES-256-GCM, données associées = l'id du compte) et déchiffré
-par le serveur de l'application pour le seul appel au tiers : il ne revient jamais vers un écran, le modèle, le
-journal ni un log.
+Le paquet porte un connecteur simulé, `mail` (rien ne sort du serveur), et le moteur qui exécute les connecteurs
+réels que l'application lui déclare ; il n'en contient aucun. Un connecteur réel court sur un compte réel (mode
+`reel`) dont le secret, le jeton du tiers, est chiffré par le coffre du paquet (AES-256-GCM, données associées = l'id
+du compte) et déchiffré par le serveur de l'application pour le seul appel au tiers : il ne revient jamais vers un
+écran, le modèle, le journal ni un log.
+
+### Déclarer ses connecteurs
+
+L'application déclare les connecteurs qu'elle utilise par `registerConnectors`, dans le module que chaque route qui
+monte une porte du paquet importe pour son effet (comme `registerFunctions`, et avant lui) :
+
+```ts
+// src/lib/fonctions-metier.ts
+import { registerConnectors, registerFunctions, type ConnectorDefinition } from "@otomata_tech/oto_platform/server"
+import { notion, pennylane } from "<sortie TypeScript de la fabrique du dépôt connectors, épinglée à un commit>"
+
+const monApi: ConnectorDefinition = { name: "monapi", label: "Mon API", baseUrl: "https://api.example.fr/v1", /* … */ }
+
+registerConnectors([notion.connector, pennylane.connector, monApi])
+registerFunctions([/* fonctions de l'ERP */])
+```
+
+- **Connecteurs partagés** : les définitions générées par la fabrique du dépôt `connectors` (`ts/src/`), passées
+  telles quelles ; le paquet n'en dépend pas, il accepte toute définition de même forme (`ConnectorDefinition`).
+- **Connecteurs propres** : une définition écrite à la main dans la même forme (adresse, authentification, table
+  d'erreurs, fonctions avec leur JSON Schema d'entrée strict, exemples, requête).
+- **Ce que le moteur exécute** : authentification `bearer` ou `api_key` sur un seul champ de secret (un compte porte
+  un secret) ; `GET`, `POST`, `PUT`, `PATCH`, `DELETE` ; en-têtes et constantes ; listes en query ; arguments encodés
+  en JSON ; pagination (`all_pages`) ; contrôles avant l'appel et sur la réponse ; débit du tiers par compte et nouvel
+  essai après un 429. Le JSON Schema d'entrée est validé et servi tel quel.
+- **Refus** : une définition invalide (authentification `basic` ou OAuth, secret à plusieurs champs, schéma non
+  strict, espace de noms déjà servi…) lève `CatalogRegistrationError` au chargement de la route, qui la nomme, et
+  rien n'est déclaré.
+- **Base** : aucun SQL à écrire ; le paquet ajoute le nom d'un connecteur déclaré à `platform.connectors` à sa
+  première activation ou à son premier compte (migration `20261007090000_platform_connecteurs_declares.sql`).
+- **Sonde** : `probeAccount(db, identity, { account_id })` joue la sonde du connecteur (`probe`) sur un compte, pour
+  qui le gère, et rend `{ healthy: true }` ou `{ healthy: false, reason }`.
 
 - **Clé** : `PLATFORM_VAULT_KEY`, 32 octets en base64 (`openssl rand -base64 32`), dans l'environnement serveur de
   l'application, jamais en `NEXT_PUBLIC_`. Lue à l'usage seulement : sans elle, l'application démarre, et poser un

@@ -44,6 +44,16 @@
 // Une fonction `sensitive` (envoyer, supprimer, payer) déclare aussi `summarize` : le récapitulatif montré
 // avant l'accord de la personne, sans rien exécuter. Le contrat d'une fonction servie ne se durcit pas en
 // place : une fonction dont les arguments changent s'inscrit sous un autre nom.
-import { registerFunctions } from "@otomata_tech/oto_platform/server"
+//
+// Les connecteurs décrits que l'hôte utilise se déclarent ici aussi, avant ses fonctions, par `registerConnectors` :
+// des connecteurs partagés (les définitions générées par la fabrique du dépôt `connectors`, dont l'hôte dépend par un
+// commit épinglé) et ses connecteurs propres, écrits à la main dans la même forme (`ConnectorDefinition`). Leurs
+// fonctions entrent au catalogue de `call` (origine `connecteur`) ; le paquet tient lui-même la liste
+// `platform.connectors` et ne demande aucun SQL. L'application de base n'en utilise aucun : sa liste est vide.
+//
+//   import { notion, pennylane } from "<sortie TypeScript du dépôt connectors>"
+//   registerConnectors([notion.connector, pennylane.connector])
+import { registerConnectors, registerFunctions } from "@otomata_tech/oto_platform/server"
 
+registerConnectors([])
 registerFunctions([])

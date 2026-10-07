@@ -12,7 +12,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { resolveAdminOrg } from "../../packages/plateforme/server/admin/context"
 import { defineErpFunction, registerFunctions } from "../../packages/plateforme/server/catalog/erp"
 import { catalogFunctions } from "../../packages/plateforme/server/catalog/registry"
+import { registerConnectors } from "../../packages/plateforme/server/connectors/declaration"
 import { listAccountRules } from "../../packages/plateforme/server/rules"
+import { describedConnector } from "../factories/described-connector"
 import { adminTree, codes, connectAdminMcp, NODES, ORGS, PERSONS, TEAMS, type AdminPerson } from "../helpers/mcp-admin"
 import { seedAdminFixture, type AdminFixtureSql } from "../helpers/mcp-admin-sql"
 import type { Row, Tables } from "../helpers/simulated-db"
@@ -95,6 +97,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   registerFunctions([])
+  registerConnectors([])
 })
 
 describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-S06)"), { timeout: NETWORK_TIMEOUT }, () => {
@@ -171,6 +174,8 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
 
   describe("admin_connector catalogue (AC7)", () => {
     it("should list each activable connector with its state and functions, then the functions that are always active", async () => {
+      // Un connecteur réel déclaré par l'hôte (moteur des connecteurs décrits), à côté du mail simulé du paquet.
+      registerConnectors([describedConnector()])
       registerFunctions([
         defineErpFunction({ name: "erp.lookup_customer", class: "read", description: "Reads a customer.", schema: z.strictObject({ code: z.string() }), examples: [{ code: "C-1" }], run: async () => ({ text: "ok" }) }),
       ])
@@ -181,12 +186,16 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       const native = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "table")
       const nodes = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "node")
       const uploads = catalogFunctions().filter((fn) => fn.origin === "paquet" && fn.connector === "upload")
+      // Les fonctions d'un connecteur activable, par nom.
+      const crm = catalogFunctions()
+        .filter((fn) => fn.connector === "crm")
+        .sort((a, b) => a.name.localeCompare(b.name))
       expect(nodes.map((fn) => `${fn.name} (${fn.class})`)).toEqual(["node.discard_draft (sensitive)", "node.trash (sensitive)", "node.move (write)", "node.write_many (write)"])
       expect(uploads.map((fn) => `${fn.name} (${fn.class})`)).toEqual(["upload.link (write)"])
       expect(listed.text).toBe(
         [
+          `- crm (live): inactive — ${crm.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           "- mail (simulated): active since 2026-09-24 by Ada Martin — mail.create_draft (write), mail.send_draft (sensitive)",
-          "- notion (live): inactive — notion.search_workspace (read)",
           `- table (built in): always active — ${native.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           `- node (built in): always active — ${nodes.map((fn) => `${fn.name} (${fn.class})`).join(", ")}`,
           "- upload (built in): always active — upload.link (write)",
@@ -194,6 +203,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
         ].join("\n"),
       )
       expect(isoInstants(listed.structured?.connectors)).toEqual([
+        { name: "crm", kind: "live", activable: true, state: "inactive", since: null, functions: crm.map((fn) => ({ name: fn.name, class: fn.class })) },
         {
           name: "mail",
           kind: "simulated",
@@ -205,7 +215,6 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
             { name: "mail.send_draft", class: "sensitive" },
           ],
         },
-        { name: "notion", kind: "live", activable: true, state: "inactive", since: null, functions: [{ name: "notion.search_workspace", class: "read" }] },
         { name: "table", kind: "built_in", activable: false, state: "always_active", since: null, functions: native.map((fn) => ({ name: fn.name, class: fn.class })) },
         { name: "node", kind: "built_in", activable: false, state: "always_active", since: null, functions: nodes.map((fn) => ({ name: fn.name, class: fn.class })) },
         { name: "upload", kind: "built_in", activable: false, state: "always_active", since: null, functions: [{ name: "upload.link", class: "write" }] },
@@ -214,7 +223,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       // Sans activation, le connecteur activable est dit inactif (HN-E08S06-9).
       await withoutActivation()
       const inactive = await session()
-      expect((await inactive.connector({ op: "catalogue" })).text.split("\n")[0]).toBe("- mail (simulated): inactive — mail.create_draft (write), mail.send_draft (sensitive)")
+      expect((await inactive.connector({ op: "catalogue" })).text.split("\n")[1]).toBe("- mail (simulated): inactive — mail.create_draft (write), mail.send_draft (sensitive)")
     })
   })
 
@@ -226,7 +235,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       expect((await connector({ op: "activate", connector: "mail" })).text).toBe(`mail is now active in ${acme}: its functions are callable at once.`)
       expect(await activations()).toEqual([expect.objectContaining({ connector: "mail", state: "active", activated_by: PERSONS.sam.id })])
       expect((await connector({ op: "activate", connector: "mail" })).text).toBe(`mail is already active in ${acme}; nothing changed.`)
-      expect((await connector({ op: "activate", connector: "fax" })).text).toBe("Unknown connector fax. Connectors you can activate: mail, notion.")
+      expect((await connector({ op: "activate", connector: "fax" })).text).toBe("Unknown connector fax. Connectors you can activate: mail.")
       expect((await connector({ op: "activate", connector: "table" })).text).toBe("table is built in: it is always active and has no accounts.")
       expect(codes(journal)).toEqual([null, null, "not_found", "invalid_arguments"])
     })
@@ -296,7 +305,7 @@ describe.skipIf(!sqlConfigured)(portable("admin_connector of the admin MCP (E08-
       )
       // Le libellé du compte personnel de Claire, que l'équipe plateforme ne voit pas : l'index unique refuse quand même.
       expect((await create({ account: "Mail Direction", owner: "org" })).text).toBe("An account labelled Mail Direction already exists in Acme Test.")
-      expect((await create({ account: "Fax", connector: "fax", owner: "org" })).text).toBe("Unknown connector fax. Connectors you can activate: mail, notion.")
+      expect((await create({ account: "Fax", connector: "fax", owner: "org" })).text).toBe("Unknown connector fax. Connectors you can activate: mail.")
       expect(codes(journal)).toEqual([null, "invalid_arguments", "unavailable_in_v1", "conflict", "not_found"])
     })
   })

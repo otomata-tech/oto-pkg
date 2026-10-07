@@ -5,6 +5,7 @@
 // portable depuis E01-S10 f2 (chaque personne par `fx.as`, sans Supabase Auth ni PostgREST) : le job
 // `bare-postgres` la joue.
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { checkArguments } from "../../packages/plateforme/server/catalog/arguments"
 import type { CatalogFunction, FunctionContext } from "../../packages/plateforme/server/catalog/define"
 import { resolveAccount, runningTeam } from "../../packages/plateforme/server/connectors/resolution"
 import { mailCreateDraft, mailSendDraft } from "../../packages/plateforme/server/connectors/simulated/mail"
@@ -58,7 +59,7 @@ describe.skipIf(!sqlConfigured || privatePending)(
     }
 
     function call(fn: CatalogFunction, context: FunctionContext, args: Record<string, unknown>) {
-      const parsed = fn.schema.safeParse(args)
+      const parsed = checkArguments(fn.schema, args)
       if (!parsed.success) throw new Error(`invalid test arguments for ${fn.name}`)
       // Le type commun du catalogue efface les arguments en `never` ; ils ont passé le schéma.
       return fn.run(context, parsed.data as never)

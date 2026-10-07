@@ -94,7 +94,7 @@ describe("activableConnectors and requireActivable (AC2, AC3, H81)", () => {
   })
 
   it("should refuse an unknown connector, listing those that can be activated", () => {
-    expect(() => requireActivable("sellsy", catalogFunctions())).toThrow("Unknown connector sellsy. Connectors you can activate: mail, notion.")
+    expect(() => requireActivable("sellsy", catalogFunctions())).toThrow("Unknown connector sellsy. Connectors you can activate: mail.")
     expect(() => requireActivable("sellsy", [])).toThrow("Unknown connector sellsy. Connectors you can activate: none.")
   })
 
@@ -107,7 +107,7 @@ describe("activableConnectors and requireActivable (AC2, AC3, H81)", () => {
 
 describe("activation refusals before the database (AC2)", () => {
   it.each([
-    [{ connector: "sellsy" }, "not_found", "Unknown connector sellsy. Connectors you can activate: mail, notion."],
+    [{ connector: "sellsy" }, "not_found", "Unknown connector sellsy. Connectors you can activate: mail."],
     [{ connector: "table" }, "invalid_arguments", "table is built in: it is always active and has no accounts."],
     [{ connector: "Mail!" }, "invalid_arguments", "Invalid arguments: connector: Connector: lowercase letters, digits and _, starting with a letter, 40 characters max, e.g. mail."],
     [{}, "invalid_arguments", "Invalid arguments: connector: Invalid input: expected string, received undefined."],
@@ -338,9 +338,11 @@ describe("account refusals before the database (AC6, AC7)", () => {
   it.each([
     ["mail", "reel", "unavailable_in_v1", "mail is simulated in this version: its accounts are simulated, a live account is not available. Create it with mode simule."],
     ["mail", "sandbox", "unavailable_in_v1", "mail is simulated in this version: its accounts are simulated, a sandbox account is not available. Create it with mode simule."],
-    ["notion", "sandbox", "unavailable_in_v1", "Sandbox accounts are not available yet. Create a live account of notion with mode reel."],
-    ["notion", "simule", "invalid_arguments", "notion is a live connector: its accounts are live, never simulated. Create it with mode reel."],
+    ["crm", "sandbox", "unavailable_in_v1", "Sandbox accounts are not available yet. Create a live account of crm with mode reel."],
+    ["crm", "simule", "invalid_arguments", "crm is a live connector: its accounts are live, never simulated. Create it with mode reel."],
   ])("should refuse a %s account in mode %s and create nothing", async (connector, mode, code, message) => {
+    // Un connecteur réel déclaré par l'hôte (moteur des connecteurs décrits), à côté du mail simulé du paquet.
+    vi.mocked(catalogFunctions).mockReturnValueOnce([fn("mail.create_draft", "connecteur"), fn("crm.get_company", "connecteur")])
     const error = await refusal(createAccount(untouchable, ADMIN, { connector, owner_kind: "org", label: "Compte Acme", mode }))
     expect({ code: error.code, message: error.message }).toEqual({ code, message })
   })
@@ -358,7 +360,7 @@ describe("account refusals before the database (AC6, AC7)", () => {
     })
     expect(await refusal(createAccount(untouchable, ADMIN, { ...base, connector: "sellsy", label: "Sellsy" }))).toMatchObject({
       code: "not_found",
-      message: "Unknown connector sellsy. Connectors you can activate: mail, notion.",
+      message: "Unknown connector sellsy. Connectors you can activate: mail.",
     })
   })
 
@@ -369,7 +371,7 @@ describe("account refusals before the database (AC6, AC7)", () => {
   it("should list the usable accounts of a connector that can be activated only, as createAccount does (N35)", async () => {
     expect(await refusal(listUsableAccounts(untouchable, ADMIN, { connector: "sellsy" }))).toMatchObject({
       code: "not_found",
-      message: "Unknown connector sellsy. Connectors you can activate: mail, notion.",
+      message: "Unknown connector sellsy. Connectors you can activate: mail.",
     })
     expect(await refusal(listUsableAccounts(untouchable, ADMIN, { connector: "table" }))).toMatchObject({
       code: "invalid_arguments",

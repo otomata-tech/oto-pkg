@@ -9,6 +9,7 @@
 //
 // Reprend de la maquette (`mcp-test/scripts/lib/proto-data.mjs` l. 270-300) les prospects fictifs du
 // tableau ; retire la colonne d'état à part et les états `relancé`, `gagné`, `perdu` (→ H91).
+import { checkArguments } from "../../packages/plateforme/server/catalog/arguments"
 import type { CatalogFunction, FunctionContext, FunctionOutput } from "../../packages/plateforme/server/catalog/define"
 import type { RowBlock } from "../../packages/plateforme/server/tables/meta"
 import { CONTENT_AT, contentDefaults, contentRpc, contentTables, nodeId, ORG, OTHER_ORG, PEOPLE, referenceRpc, type RuleSpec } from "../helpers/reference-org"
@@ -218,8 +219,8 @@ export function writableDb(tables: Tables = fixtureTables(), hook?: WriteHook) {
  * schéma strict, puis exécutés ; un argument refusé lève avant toute requête.
  */
 export async function runFunction(fn: CatalogFunction, context: FunctionContext, args: Record<string, unknown>): Promise<FunctionOutput> {
-  const parsed = fn.schema.safeParse(args)
-  if (!parsed.success) throw new Error(`${fn.name}: invalid arguments ${JSON.stringify(parsed.error.issues)}`)
+  const parsed = checkArguments(fn.schema, args)
+  if (!parsed.success) throw new Error(`${fn.name}: invalid arguments ${JSON.stringify(parsed.issues)}`)
   // Le type commun du catalogue efface les arguments en `never` ; ceux-ci ont passé le schéma de la fonction.
   return fn.run(context, parsed.data as never)
 }

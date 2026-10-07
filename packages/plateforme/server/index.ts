@@ -110,6 +110,12 @@ export { activateConnector, deactivateConnector, deactivationImpact, listConnect
 export { createAccount, disableAccount, listOrgAccounts } from "./connectors/accounts"
 // Prise des connecteurs : le secret d'un compte réel, posé par l'outillage de l'hôte (niveau gestion), jamais rendu.
 export { setAccountSecret } from "./connectors/accounts"
+// Moteur des connecteurs décrits : l'hôte déclare les connecteurs qu'il utilise, partagés ou propres, au montage de ses
+// routes ; la sonde d'un compte, pour qui le gère.
+export { registerConnectors } from "./connectors/declaration"
+export type { ConnectorDefinition, ConnectorFunctionDefinition } from "./connectors/definition"
+export { probeAccount } from "./connectors/accounts"
+export type { AccountHealth } from "./connectors/accounts"
 export { CatalogRegistrationError, defineErpFunction, registerFunctions, registerWidgetViews } from "./catalog/erp"
 export type { ErpFunction, ErpFunctionContext } from "./catalog/erp"
 // E07-S03 : la grille, son résumé et la file de revue d'un tableau, la décision de la revue, les blocs

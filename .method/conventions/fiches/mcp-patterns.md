@@ -14,7 +14,7 @@ Texte complet : `.method/conventions/mcp-patterns.md`. La fiche suffit pour écr
 - `securitySchemes: oauth2` sur chaque outil authentifié, posé par `toolMeta()`, jamais à la main. § 3. Design des tools
 - Résolution par nom : sans casse et sans accents, `%` et `_` échappés, ou comparée comme l'index d'unicité quand il existe ; une ambiguïté rend les candidats dans `structuredContent` avec la consigne de demander. § 3. Design des tools
 - Un outil destructif n'est jamais dans `next_actions` : deux temps (récapitulatif, puis `confirm: true` après accord), et le compte-rendu liste les ids réellement partis. § 3. Design des tools
-- Le contrat d'une fonction servi par `read` se rend par `z.toJSONSchema(schema, { io: "input" })`. § 3. Design des tools
+- Le contrat d'une fonction servi par `read` se rend par `argumentsJsonSchema` : Zod côté entrée, ou le JSON Schema d'un connecteur décrit tel quel ; `call` valide par `checkArguments`. § 3. Design des tools
 - Ce que le modèle doit lire va dans le texte ET dans `structuredContent` (`message`), les données en champs ; `structuredContent` reste compact. § 4. Résultats de tools
 - Tout résultat se plafonne à 45 000 caractères et se pagine au-delà. § 4. Résultats de tools
 - Un refus bâti sur une liste se borne par `boundedList` ou `issuesText` (20 éléments, puis « … and N more »), les personnes à qui demander par `namesList` ; les clés inconnues d'un `strictObject` aussi, par `boundedList`. § 4. Résultats de tools

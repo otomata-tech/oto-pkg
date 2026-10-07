@@ -3,6 +3,7 @@
 // catalogue livré porte le mail simulé (E04-S01).
 import * as z from "zod/v4"
 import { describe, expect, it } from "vitest"
+import { checkArguments } from "../../packages/plateforme/server/catalog/arguments"
 import { defineFunction, type CatalogFunction } from "../../packages/plateforme/server/catalog/define"
 import {
   callExamples,
@@ -92,7 +93,6 @@ describe("catalog (AC23)", () => {
     expect(catalogFunctions().map((fn) => fn.name)).toEqual([
       "mail.create_draft",
       "mail.send_draft",
-      "notion.search_workspace",
       "table.schema",
       "table.rows",
       "table.aggregate",
@@ -119,10 +119,10 @@ describe("catalog (AC23)", () => {
       ["node.move", "write", "paquet", undefined],
       ["node.write_many", "write", "paquet", undefined],
     ])
-    for (const fn of writing) expect(fn?.schema.safeParse({ ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
+    for (const fn of writing) expect(fn && checkArguments(fn.schema, { ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
     const many = findFunction(catalogFunctions(), "node.write_many")
-    expect(many?.schema.safeParse({ pages: [{ path: "sav/fiche", markdown: "# Fiche" }] }).success).toBe(false)
-    expect(many?.schema.safeParse({ pages: Array.from({ length: 51 }, (_, rank) => ({ path: `sav/p${rank}` })) }).success).toBe(false)
+    expect(many && checkArguments(many.schema, { pages: [{ path: "sav/fiche", markdown: "# Fiche" }] }).success).toBe(false)
+    expect(many && checkArguments(many.schema, { pages: Array.from({ length: 51 }, (_, rank) => ({ path: `sav/p${rank}` })) }).success).toBe(false)
     for (const query of ["move rename node path", "déplacer renommer dossier", "reorganize folder"]) {
       expect(searchFunctions(catalogFunctions(), query, 3)[0]?.fn.name, query).toBe("node.move")
     }
@@ -136,9 +136,10 @@ describe("catalog (AC23)", () => {
       ["node.trash", "sensitive", "paquet", "function"],
       ["table.delete_rows", "sensitive", "paquet", "function"],
     ])
-    for (const fn of deleting) expect(fn?.schema.safeParse({ ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
-    expect(findFunction(catalogFunctions(), "table.delete_rows")?.schema.safeParse({ table: "ventes/salons", keys: [] }).success).toBe(false)
-    expect(findFunction(catalogFunctions(), "table.delete_rows")?.schema.safeParse({ table: "ventes/salons", keys: Array.from({ length: 51 }, (_, rank) => `K${rank}`) }).success).toBe(false)
+    for (const fn of deleting) expect(fn && checkArguments(fn.schema, { ...fn.examples[0], extra: 1 }).success, fn?.name).toBe(false)
+    const deleteRows = deleting[2]
+    expect(deleteRows && checkArguments(deleteRows.schema, { table: "ventes/salons", keys: [] }).success).toBe(false)
+    expect(deleteRows && checkArguments(deleteRows.schema, { table: "ventes/salons", keys: Array.from({ length: 51 }, (_, rank) => `K${rank}`) }).success).toBe(false)
     // Recherchées par leurs mots (AC-h1), jamais proposées ni citées en exemple (H87).
     for (const [query, name] of [["delete rows", "table.delete_rows"], ["trash", "node.trash"], ["discard draft", "node.discard_draft"]]) {
       expect(searchFunctions(catalogFunctions(), query, 3).map((found) => found.fn.name), query).toContain(name)
@@ -157,13 +158,14 @@ describe("catalog (AC23)", () => {
       expect(fn.refusals.length, fn.name).toBeGreaterThan(0)
       for (const example of fn.examples) {
         expect(example.table, fn.name).toBe("ventes/suivi_prospects")
-        expect(fn.schema.safeParse(example).success, JSON.stringify(example)).toBe(true)
+        expect(checkArguments(fn.schema, example).success, JSON.stringify(example)).toBe(true)
       }
       const { text, data } = describeFunction(fn, "acme")
       expect(JSON.stringify({ ...data, text, next_actions: ["acme_call"] }).length, fn.name).toBeLessThan(45_000)
     }
-    const typo = tables.find((fn) => fn.name === "table.rows")?.schema.safeParse({ table: "ventes/suivi_prospects", filters: { ville: "Valbrune" } })
-    expect(typo?.error?.issues).toEqual([expect.objectContaining({ code: "unrecognized_keys", keys: ["filters"] })])
+    const rows = tables.find((fn) => fn.name === "table.rows")
+    const typo = rows && checkArguments(rows.schema, { table: "ventes/suivi_prospects", filters: { ville: "Valbrune" } })
+    expect(typo?.success === false && typo.issues).toEqual([expect.objectContaining({ code: "unrecognized_keys", message: expect.stringContaining("filters") })])
   })
 
   it("should find a function by its exact name, edge spaces removed", () => {

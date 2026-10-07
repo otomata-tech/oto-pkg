@@ -14,6 +14,7 @@
 // comme le `confirm=<N>` et l'envoi d'essai d'`oto_mcp\capabilities\outreach.py` (H86).
 import { ERP_VIEW_PREFIX } from "../schemas/views"
 import { administratorNames } from "./access"
+import { checkArguments } from "./catalog/arguments"
 import type { CatalogFunction, FunctionContext } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive, NATIVE_CONNECTOR } from "./catalog/registry"
 import { accountCiphertext } from "./connectors/accounts"
@@ -79,13 +80,16 @@ async function notEnabled(db: PlatformDb, identity: Identity, fn: CatalogFunctio
   )
 }
 
-/** Arguments validés par le schéma strict de la fonction (AC3) : chaque problème par son chemin, 20 au plus. */
+/**
+ * Arguments validés par le schéma strict de la fonction (AC3), Zod ou JSON Schema d'un connecteur décrit : chaque
+ * problème par son chemin, 20 au plus.
+ */
 function checkedArguments(fn: CatalogFunction, args: Record<string, unknown>, prefix: string): Record<string, unknown> {
-  const parsed = fn.schema.safeParse(args)
-  if (parsed.success) return parsed.data
+  const checked = checkArguments(fn.schema, args)
+  if (checked.success) return checked.data
   throw new PlatformError(
     "invalid_arguments",
-    `Invalid arguments for ${fn.name}: ${issuesText(parsed.error.issues)}. Read the contract with ${prefix}_read {"path": "${fn.name}"}.`,
+    `Invalid arguments for ${fn.name}: ${issuesText(checked.issues)}. Read the contract with ${prefix}_read {"path": "${fn.name}"}.`,
   )
 }
 

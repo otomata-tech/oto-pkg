@@ -3,6 +3,7 @@
 // authentification `bearer`, en-tête constant, listes en query (`brackets`), argument encodé en JSON, pagination par
 // curseur, sortie taillée, refus propre à une fonction, contrôle avant l'appel (`equal_sums`) et sur la réponse
 // (`non_empty`), constantes, `PUT`, `DELETE` à corps, fonction sensible et sonde.
+import type { StoredToken, TokenStore } from "../../packages/plateforme/server/connectors/auth"
 import type { ConnectorDefinition, ConnectorFunctionDefinition } from "../../packages/plateforme/server/connectors/definition"
 
 const ID = { type: "string", pattern: "^[a-z0-9_-]{1,40}$" }
@@ -142,5 +143,19 @@ export function describedConnector(name = "crm"): ConnectorDefinition {
     ],
     probe: { function: `${name}.get_company`, nonEmpty: ["scopes"] },
     functions: functions(name),
+  }
+}
+
+/** Le jeton d'un échange gardé par le test à la place de la ligne du compte ; `written` relève chaque écriture. */
+export function memoryTokens(initial: StoredToken | null = null): TokenStore & { written: StoredToken[] } {
+  let kept = initial
+  const written: StoredToken[] = []
+  return {
+    written,
+    read: async () => kept,
+    write: async (token) => {
+      kept = token
+      written.push(token)
+    },
   }
 }

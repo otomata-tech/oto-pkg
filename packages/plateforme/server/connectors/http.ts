@@ -45,6 +45,8 @@ export type ApiRequest = {
   headers: Readonly<Record<string, string>>
   /** Corps JSON, quelle que soit la méthode ; absent, rien n'est envoyé. */
   body?: unknown
+  /** Corps en formulaire (point de jeton d'un échange), à la place d'un corps JSON. */
+  form?: readonly (readonly [string, string])[]
   /** La clé du rythme : le compte dont le secret signe la requête. */
   pacingKey: string
 }
@@ -106,16 +108,20 @@ async function send(api: ConnectorApi, request: ApiRequest, fetcher: Fetch): Pro
   const query = request.query?.length ? `?${new URLSearchParams(request.query.map(([key, value]) => [key, value])).toString()}` : ""
   const headers: Record<string, string> = { accept: "application/json", ...request.headers }
   if (request.body !== undefined) headers["content-type"] = "application/json"
+  if (request.form !== undefined) headers["content-type"] = "application/x-www-form-urlencoded"
+  const body = request.form !== undefined ? new URLSearchParams(request.form.map(([key, value]) => [key, value])).toString() : request.body
   await pace(request.pacingKey, api.rateLimit)
   try {
     return await fetcher(`${api.baseUrl}${request.path}${query}`, {
       method: request.method,
       headers,
-      body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
       redirect: "error",
       signal: AbortSignal.timeout(api.timeoutMs),
     })
   } catch (error) {
+    // Un refus du transport (adresse saisie gardée, `address-guard.ts`) se dit tel quel.
+    if (error instanceof PlatformError) throw error
     throw unreachable(api, error)
   }
 }
@@ -124,10 +130,15 @@ async function send(api: ConnectorApi, request: ApiRequest, fetcher: Fetch): Pro
  * Envoie la requête au tiers et rend le JSON de sa réponse, `null` pour une réponse vide. Un 429 se rejoue deux fois au
  * plus, après le `Retry-After` du tiers s'il tient en 10 s. Refus : statut hors 2xx, celui de la table d'erreurs du
  * connecteur, sinon `rate_limited` (429) ou `upstream_error` ; panne, délai dépassé, réponse trop grosse ou
- * illisible : `upstream_error`.
+ * illisible : `upstream_error`. `resign` : après un 401, la requête signée de neuf (un jeton renouvelé), envoyée une
+ * fois de plus.
  */
-export async function requestJson(api: ConnectorApi, request: ApiRequest, fetcher: Fetch = fetch): Promise<unknown> {
+export async function requestJson(api: ConnectorApi, request: ApiRequest, fetcher: Fetch = fetch, resign?: () => Promise<ApiRequest>): Promise<unknown> {
   let answer = await send(api, request, fetcher)
+  if (answer.status === 401 && resign) {
+    await answer.body?.cancel()
+    answer = await send(api, await resign(), fetcher)
+  }
   for (let retry = 0; answer.status === 429 && retry < MAX_RETRIES; retry++) {
     const ms = retryWait(answer)
     if (ms === null) break

@@ -52,11 +52,27 @@ export const createAccountSchema = z
 
 export const disableAccountSchema = z.object({ account_id: z.uuid() })
 
+/** Le nom d'un champ du secret ou d'un réglage, comme la déclaration d'un connecteur l'écrit. */
+const accountKeySchema = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "a field or setting name: lowercase letters, digits and _")
+
 /**
- * Le secret d'un compte réel, posé par qui le gère (`setAccountSecret`) : jamais rendu, ni par le service ni par un
- * refus (un problème de saisie nomme son chemin, jamais la valeur).
+ * Une saisie du secret et des réglages d'un compte réel, posée par qui le gère (`setAccountSecret`, écran Connecteurs,
+ * `POST admin/accounts/<id>/secret`) : des champs du secret et des réglages, chacun une valeur, ou `null` (ou vide)
+ * pour l'effacer ; un nom absent garde ce qui est posé. Jamais rendu, ni par le service ni par un refus (un problème
+ * de saisie nomme son chemin, jamais la valeur). Le corps de la route s'écrit sous `secret`, que le journal masque.
  */
-export const accountSecretSchema = z.object({ account_id: z.uuid(), secret: z.string().trim().min(1).max(10_000) })
+export const accountSecretInputSchema = z
+  .object({
+    secret: z.record(accountKeySchema, z.string().trim().max(10_000).nullable()).optional(),
+    settings: z.record(accountKeySchema, z.string().trim().max(2_000).nullable()).optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input.secret ?? {}).length + Object.keys(input.settings ?? {}).length > 0, "give at least one secret field or setting")
+
+export type AccountSecretInput = z.input<typeof accountSecretInputSchema>
+
+/** `accountSecretInputSchema` et le compte visé, tels que les reçoit le service. */
+export const accountSecretSchema = z.object({ account_id: z.uuid(), input: accountSecretInputSchema })
 
 /**
  * Un connecteur activable et son état dans l'organisation, tel que le rend `listConnectorsForOrg`
@@ -93,4 +109,24 @@ export type AccountView = {
   owner: { kind: "org" | "team" | "user"; teamName?: string }
   mode: AccountMode
   status: "active" | "disabled" | "error"
+  /** Ce que l'écran dit du secret, jamais sa valeur : les champs posés et la date de la dernière saisie. */
+  secret?: { fields: string[]; updatedAt: string | null }
+  /** Les réglages saisis, en clair (une région, une adresse). */
+  settings?: Record<string, string>
+}
+
+/**
+ * Le formulaire d'un compte d'un connecteur réel déclaré, tiré de sa déclaration (`connectorAccountForms`) : les
+ * champs du secret (saisie masquée pour un champ `secret`), puis les réglages. L'écran Connecteurs le lit pour créer un
+ * compte réel et pour en saisir le secret.
+ */
+export type ConnectorAccountForm = {
+  connector: string
+  label: string
+  fields: { name: string; label: string; secret: boolean }[]
+  settings: (
+    | { name: string; label: string; type: "choice"; choices: string[]; default?: string }
+    | { name: string; label: string; type: "text"; pattern: string }
+    | { name: string; label: string; type: "url" }
+  )[]
 }

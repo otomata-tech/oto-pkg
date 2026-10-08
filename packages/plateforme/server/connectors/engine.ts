@@ -3,29 +3,35 @@
 // requête composée (en-têtes du connecteur, puis constantes et arguments de la fonction, authentification en dernier ;
 // chemin aux `{param}` encodés ; query, listes selon `queryArrays` ; corps JSON quelle que soit la méthode ; `encode:
 // json`) ; pagination suivie quand l'agent passe `all_pages` ; contrôles de la réponse (`expect`) ; sortie taillée
-// (`output`) et texte du résultat composé ici. Sans lui, chaque connecteur s'écrirait à la main. Le secret ne va que
-// dans l'en-tête d'authentification : jamais dans un argument, un texte, une erreur ni un log.
+// (`output`) et texte du résultat composé ici ; adresse résolue sur les réglages du compte. Sans lui, chaque connecteur
+// s'écrirait à la main. Le secret ne va que dans l'authentification de la requête (`auth.ts`) : jamais dans un
+// argument, un texte, une erreur ni un log.
 import type { FunctionOutput, FunctionSummary } from "../catalog/define"
 import { PlatformError, type PlatformErrorCode } from "../errors"
 import { cut } from "../journal"
 import { isJsonObject } from "../json"
+import { guardedFetch } from "./address-guard"
+import { renewsOnUnauthorized, sign, type AccountCredential, type PreparedAuth, type Signature, type Signer } from "./auth"
 import type { ConnectorDefinition, ConnectorFunctionDefinition, ConnectorPagination } from "./definition"
 import { requestJson, type ApiError, type ApiRequest, type ConnectorApi, type Fetch } from "./http"
+import { resolveAddress, type AddressSpec } from "./settings"
 
 /** Une fonction décrite prête à courir, préparée une fois à la déclaration (`declaration.ts`). */
 export type PreparedFunction = {
   connector: ConnectorDefinition
   fn: ConnectorFunctionDefinition
-  /** Le tiers, avec la table d'erreurs de la fonction : ses refus à statut HTTP, puis ceux du connecteur. */
-  api: ConnectorApi
-  /** L'en-tête d'authentification et ce qui précède le secret : `authorization`, `Bearer `. */
-  auth: { header: string; prefix: string }
+  /** Le tiers, avec la table d'erreurs de la fonction : ses refus à statut HTTP, puis ceux du connecteur ; l'adresse se résout à l'appel. */
+  api: Omit<ConnectorApi, "baseUrl">
+  /** L'adresse déclarée, résolue sur les réglages du compte à chaque appel. */
+  address: AddressSpec
+  /** L'authentification déclarée : les champs du compte qu'elle lit, et où elle les pose. */
+  auth: PreparedAuth
   /** L'argument qui porte le curseur de la page suivante (`pagination.requestParam`), s'il y a pagination. */
   cursorArgument: string | null
 }
 
-/** Ce qu'il faut pour un appel : le secret du compte résolu, son identifiant (clé du rythme), et `fetch`. */
-export type DescribedCall = { credential: string | undefined; accountId: string; fetcher?: Fetch }
+/** Ce qu'il faut pour un appel : le compte résolu (champs, réglages, jeton), son identifiant (clé du rythme), et `fetch`. */
+export type DescribedCall = { credential: AccountCredential | undefined; accountId: string; fetcher?: Fetch }
 
 /** Le code du paquet d'un statut du tiers (H04, liste fermée) ; le refus nommé par la description reste dans le message. */
 export function platformCode(status: number): PlatformErrorCode {
@@ -122,7 +128,7 @@ function asText(value: unknown): string {
 }
 
 /** La requête d'une page, composée des seuls arguments donnés ; l'authentification en dernier, rien ne la remplace. */
-function buildRequest(prepared: PreparedFunction, args: Record<string, unknown>, call: DescribedCall & { credential: string }): ApiRequest {
+function buildRequest(prepared: PreparedFunction, args: Record<string, unknown>, signature: Signature, accountId: string): ApiRequest {
   const { connector, fn } = prepared
   const spec = fn.request
   const placed = (argument: string): unknown => (spec.encode?.[argument] === "json" ? JSON.stringify(args[argument]) : args[argument])
@@ -137,7 +143,7 @@ function buildRequest(prepared: PreparedFunction, args: Record<string, unknown>,
   for (const [name, value] of Object.entries(connector.headers ?? {})) setHeader(name, value)
   for (const [name, value] of Object.entries(spec.constants?.headers ?? {})) setHeader(name, value)
   for (const [name, argument] of Object.entries(spec.headers)) if (args[argument] !== undefined) setHeader(name, asText(placed(argument)))
-  setHeader(prepared.auth.header, `${prepared.auth.prefix}${call.credential}`)
+  for (const [name, value] of Object.entries(signature.headers)) setHeader(name, value)
   const query: [string, string][] = Object.entries(spec.constants?.query ?? {}).map(([name, value]) => [name, String(value)])
   for (const [name, argument] of Object.entries(spec.query)) {
     if (args[argument] === undefined) continue
@@ -152,10 +158,11 @@ function buildRequest(prepared: PreparedFunction, args: Record<string, unknown>,
       throw new PlatformError("internal", "Internal error.")
     }
   }
+  query.push(...signature.query)
   const withBody = Object.keys(spec.body).length > 0 || spec.constants?.body !== undefined
   const body: Record<string, unknown> = { ...spec.constants?.body }
   for (const [name, argument] of Object.entries(spec.body)) if (args[argument] !== undefined) body[name] = placed(argument)
-  return { method: spec.method, path, query, headers, body: withBody ? body : undefined, pacingKey: call.accountId }
+  return { method: spec.method, path, query, headers, body: withBody ? body : undefined, pacingKey: accountId }
 }
 
 /** Le curseur de la page suivante, `null` à la dernière page (`more` faux, ou `next` absent ou vide). */
@@ -170,8 +177,9 @@ function nextCursor(answer: unknown, pagination: ConnectorPagination | undefined
 /**
  * Exécute la fonction et rend ses réponses, une par page, et le curseur de la suite. Sans `all_pages`, une page ; avec,
  * jusqu'à `max_pages` (borné par `maxPages`). Refus : un contrôle des arguments, rien d'envoyé ; une erreur du tiers
- * traduite par la table ; un contrôle de la réponse. Sans secret : `internal` (le compte réel en a un, `runCall` l'a
- * vérifié).
+ * traduite par la table ; un contrôle de la réponse ; une adresse saisie qui mène à un hôte interne. Sans secret :
+ * `internal` (le compte réel en a un, `runCall` l'a vérifié). Une adresse issue d'une saisie part par le transport gardé
+ * (`address-guard.ts`) ; un échange (`oauth2_client_credentials`) rejoue une fois un 401 sur un jeton neuf.
  */
 export async function executeDescribed(
   prepared: PreparedFunction,
@@ -185,6 +193,11 @@ export async function executeDescribed(
     throw new PlatformError("internal", "Internal error.")
   }
   runChecks(fn, args)
+  // `fetch` lu à l'appel, jamais au chargement : l'hôte (et un test) peut le remplacer.
+  const fetcherFor = (guarded: boolean): Fetch => call.fetcher ?? (guarded ? guardedFetch() : (input, init) => fetch(input, init))
+  const address = resolveAddress(prepared.address, credential.settings, connector.settings ?? [])
+  const api: ConnectorApi = { ...prepared.api, baseUrl: address.url }
+  const signer: Signer = { auth: prepared.auth, definition: connector, credential, accountId: call.accountId, fetcherFor }
   const pagination = fn.pagination
   const wanted = typeof args.max_pages === "number" ? args.max_pages : (pagination?.maxPages ?? 1)
   const pages = pagination && args.all_pages === true ? Math.max(1, Math.min(wanted, pagination.maxPages)) : 1
@@ -192,7 +205,10 @@ export async function executeDescribed(
   let current = args
   let next: string | null = null
   for (let page = 0; page < pages; page++) {
-    const answer = await requestJson(prepared.api, buildRequest(prepared, current, { ...call, credential }), call.fetcher)
+    const pageArgs = current
+    const signed = async (fresh: boolean) => buildRequest(prepared, pageArgs, await sign(signer, fresh), call.accountId)
+    const resign = renewsOnUnauthorized(prepared.auth) ? () => signed(true) : undefined
+    const answer = await requestJson(api, await signed(false), fetcherFor(address.guarded), resign)
     runExpectations(fn, answer)
     answers.push(answer)
     next = nextCursor(answer, pagination)

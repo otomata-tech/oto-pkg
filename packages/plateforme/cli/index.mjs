@@ -1,8 +1,8 @@
 /**
  * oto-platform — la ligne de commande du paquet, pour l'application hôte qui l'installe : copie
  * et contrôle des migrations du schéma `platform` (ADR-006), préparation d'une base (ADR-012 § 1),
- * bundle du widget avec les vues de l'ERP (story widgets-dans-la-conversation), secret d'un compte
- * réel de connecteur (connecteurs-et-comptes, H85).
+ * bundle du widget avec les vues de l'ERP (story widgets-dans-la-conversation), secret et réglages d'un
+ * compte réel de connecteur (connecteurs-et-comptes).
  *
  * `run(argv)` rend le code de sortie : 0 succès, 1 copie ou migration refusée, préparation ou build en
  * échec, 2 usage incorrect. Appelée par `bin.mjs` (le `bin` du paquet) et par les scripts `migrations:sync`
@@ -20,7 +20,7 @@ const PACKAGE_MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.u
 const USAGE = `Usage : oto-platform migrations <sync|check> [options]
         oto-platform db prepare --db-url <url>
         oto-platform widgets build --views <dossier> --out <fichier>
-        oto-platform accounts secret --db-url <url> --account <id> < fichier-du-secret
+        oto-platform accounts secret --db-url <url> --account <id> [--setting nom=valeur …] < champs.json
 
   migrations sync [--from <dossier>] [--to <dossier>]
     Copie les migrations du paquet dans celles de l'application hôte. Une copie qui diffère
@@ -53,14 +53,17 @@ const USAGE = `Usage : oto-platform migrations <sync|check> [options]
     --views  dossier des vues de l'ERP
     --out    module TypeScript à écrire (ex. src/lib/widgets.generated.ts)
 
-  accounts secret --db-url <url> --account <id>
-    Pose le secret d'un compte réel de connecteur (le jeton du tiers), lu sur l'entrée standard,
-    jamais en argument. Chiffré par la clé PLATFORM_VAULT_KEY de l'environnement (32 octets en
-    base64, la même que celle du serveur de l'application), puis écrit dans la base ; rien du
-    secret ni de la clé n'est affiché. Refusé pour un compte inconnu ou simulé.
+  accounts secret --db-url <url> --account <id> [--setting nom=valeur …]
+    Pose le secret et les réglages d'un compte réel de connecteur. Les champs du secret se lisent
+    sur l'entrée standard, en objet JSON ({"api_key": "…"}), jamais en argument ; une saisie
+    fusionne avec ce qui est posé (champ absent gardé, null ou vide effacé). Chiffré par la clé
+    PLATFORM_VAULT_KEY de l'environnement (32 octets en base64, la même que celle du serveur de
+    l'application), puis écrit dans la base ; rien du secret ni de la clé n'est affiché. Refusé
+    pour un compte inconnu ou simulé. Noms et valeurs contrôlés contre la déclaration à l'appel.
     --db-url   URL de connexion d'un rôle d'administration de la base ; TLS exigé, sauf sslmode
                écrit dans l'URL
     --account  identifiant (uuid) du compte
+    --setting  un réglage non secret, nom=valeur (nom= l'efface) ; répétable
 
   -h, --help  cette aide
 
@@ -74,6 +77,7 @@ const OPTIONS = {
   views: { type: 'string' },
   out: { type: 'string' },
   account: { type: 'string' },
+  setting: { type: 'string', multiple: true },
   help: { type: 'boolean', short: 'h' },
 }
 // Options de chaque sous-commande : celle d'une autre y est une option inconnue.
@@ -81,7 +85,7 @@ const COMMANDS = {
   migrations: { sync: ['from', 'to'], check: ['file'] },
   db: { prepare: ['db-url'] },
   widgets: { build: ['views', 'out'] },
-  accounts: { secret: ['db-url', 'account'] },
+  accounts: { secret: ['db-url', 'account', 'setting'] },
 }
 
 /** Usage incorrect : le problème nommé sur stderr, puis l'usage, code 2. */
@@ -158,6 +162,7 @@ export async function run(argv) {
     return setAccountSecretCommand({
       dbUrl: options['db-url'],
       account: options.account,
+      settings: options.setting ?? [],
       env: process.env,
       readSecret: () => readStdin(),
       print: (line) => console.log(line),

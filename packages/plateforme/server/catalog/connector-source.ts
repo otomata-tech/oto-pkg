@@ -2,15 +2,17 @@
 // définitions et les fonctions qu'en tire le moteur, lues par le registre à chaque appel (`catalogFunctions`). Module à
 // part, sans import à l'exécution, comme `erp-source.ts` : logée dans `declaration.ts`, qui lit le registre pour
 // valider, elle ferait s'importer registre et déclaration.
+import type { PreparedAuth } from "../connectors/auth"
 import type { ConnectorDefinition } from "../connectors/definition"
 import type { PreparedFunction } from "../connectors/engine"
 import type { CatalogFunction } from "./define"
 
 /**
- * Un connecteur déclaré : sa définition telle que l'hôte l'a passée, ses fonctions au contrat du catalogue, et la
- * fonction préparée de sa sonde (`probeAccount`), `null` sans sonde.
+ * Un connecteur déclaré : sa définition telle que l'hôte l'a passée, son authentification préparée (les champs du compte
+ * qu'elle exige), ses fonctions au contrat du catalogue, et la fonction préparée de sa sonde (`probeAccount`), `null`
+ * sans sonde.
  */
-export type DeclaredConnector = { definition: ConnectorDefinition; functions: readonly CatalogFunction[]; probe: PreparedFunction | null }
+export type DeclaredConnector = { definition: ConnectorDefinition; auth: PreparedAuth; functions: readonly CatalogFunction[]; probe: PreparedFunction | null }
 
 let declared: readonly DeclaredConnector[] = []
 

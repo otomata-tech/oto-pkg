@@ -11,14 +11,15 @@ import { catalogFunctions, findFunction } from "../../packages/plateforme/server
 import { registerConnectors } from "../../packages/plateforme/server/connectors/declaration"
 import type { Fetch } from "../../packages/plateforme/server/connectors/http"
 import { PlatformError } from "../../packages/plateforme/server/errors"
-import { describedConnector } from "../factories/described-connector"
+import { describedConnector, memoryTokens } from "../factories/described-connector"
 import { loggedText } from "../helpers/logs"
 
 const secret = () => `key_${randomBytes(12).toString("hex")}`
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 
-/** Le contexte qu'en donne `runCall` : le compte résolu (clé du rythme) et le secret déchiffré. */
-function context(credential: string | undefined): FunctionContext {
+/** Le contexte qu'en donne `runCall` : le compte résolu (clé du rythme) et le compte ouvert (champ `api_key`). */
+function context(secretValue: string | undefined): FunctionContext {
+  const credential = secretValue === undefined ? undefined : { fields: { api_key: secretValue }, settings: {}, tokens: memoryTokens() }
   // Seuls `account.id` et `credential` sont lus par le moteur : le reste du contexte ne sert pas ici.
   return { credential, account: { id: `account-${randomBytes(4).toString("hex")}` } } as unknown as FunctionContext
 }

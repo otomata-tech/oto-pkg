@@ -1,9 +1,11 @@
 "use client"
 
-// « Créer un compte » (E08-S03, AC6) : un compte simulé de l'organisation ou d'une équipe, pour un
-// connecteur activable, actif ou non (un compte se prépare avant l'activation, E04-S01), envoyé à
-// `POST /api/platform/admin/accounts` sur le schéma de l'API (`createAccountSchema`). Un compte
-// personnel se crée par son propriétaire, jamais ici (N11). Après un succès, la page se relit.
+// « Créer un compte » (E08-S03, AC6 ; comptes à plusieurs champs) : un compte de l'organisation ou d'une équipe,
+// pour un connecteur activable, actif ou non (un compte se prépare avant l'activation, E04-S01), envoyé à
+// `POST /api/platform/admin/accounts` sur le schéma de l'API (`createAccountSchema`). Simulé pour un connecteur
+// simulé ; réel pour un connecteur que l'hôte déclare, dont le formulaire (`ConnectorAccountForm`) ajoute les champs du
+// secret et les réglages, envoyés ensuite à `POST admin/accounts/<id>/secret`. Un compte personnel se crée par son
+// propriétaire, jamais ici (N11). Après un succès, la page se relit.
 //
 // Absent d'oto-frontend, dont les comptes naissent d'une connexion réelle (V2) : écrit sur le modèle de
 // « Créer une équipe » (`ui/equipes/creation-d-equipe.tsx`) et d'« Inviter quelqu'un » (E02-S01), puis posé
@@ -13,7 +15,7 @@ import { useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { FormProvider, useForm, useFormContext, useWatch } from "react-hook-form"
 import type * as z from "zod/v4"
-import { createAccountSchema } from "../../../schemas"
+import { createAccountSchema, type ConnectorAccountForm } from "../../../schemas"
 import { appelerPlateforme } from "../../api/client"
 import { messageDErreur } from "../../api/messages"
 import { Field, Input } from "../../ds/react/forms"
@@ -22,8 +24,9 @@ import { Radio } from "../../ds/react/radio"
 import { Select } from "../../ds/react/select"
 import { useRafraichir } from "../../hote/rafraichir"
 import { LIBELLE_PRIS } from "../textes"
+import { chargeDeLaSaisie, ChampsDuCompte, type SaisieDesChamps } from "./champs-du-compte"
 
-type NouveauCompte = z.input<typeof createAccountSchema>
+type NouveauCompte = z.input<typeof createAccountSchema> & Partial<SaisieDesChamps>
 type Equipe = { id: string; name: string }
 
 const LIBELLE_INVALIDE = "Le libellé compte de 1 à 80 caractères."
@@ -33,6 +36,8 @@ type CreationDeCompteProps = {
   /** Les connecteurs activables, actifs ou non. */
   connecteurs: string[]
   equipes: Equipe[]
+  /** Les formulaires des connecteurs réels déclarés ; un connecteur sans formulaire prend des comptes simulés. */
+  formulaires?: ConnectorAccountForm[]
 }
 
 /** Le connecteur du compte, parmi les connecteurs activables ; relié au formulaire par son contexte. */
@@ -84,27 +89,57 @@ function ChoixDuProprietaire({ equipes, erreur }: { equipes: readonly Equipe[]; 
   )
 }
 
-export function CreationDeCompte({ connecteurs, equipes }: CreationDeCompteProps) {
+/** Le mode d'un compte du connecteur : réel s'il a un formulaire (déclaré par l'hôte), simulé sinon. */
+const modeDe = (formulaire: ConnectorAccountForm | undefined) => (formulaire ? "reel" : "simule")
+
+/** Le mode dit sous le formulaire, selon le connecteur choisi. */
+function MentionDuMode({ reel }: { reel: boolean }) {
+  return (
+    <p className="oto-caption">
+      {reel
+        ? "Mode : réel. Le secret part chiffré au coffre et ne s'affiche plus ensuite. Un compte personnel se crée par son propriétaire, pas ici."
+        : "Mode : simulé. Rien ne sort du serveur. Un compte personnel se crée par son propriétaire, pas ici."}
+    </p>
+  )
+}
+
+export function CreationDeCompte({ connecteurs, equipes, formulaires = [] }: CreationDeCompteProps) {
   const rafraichir = useRafraichir()
   const [annonce, setAnnonce] = useState("")
+  const formulaireDe = (connecteur: string) => formulaires.find((candidat) => candidat.connector === connecteur)
+  const premier = connecteurs[0] ?? ""
   const form = useForm<NouveauCompte>({
-    resolver: zodResolver(createAccountSchema),
+    // `raw` : les champs du secret et les réglages, hors du schéma de création, restent dans la saisie rendue.
+    resolver: zodResolver(createAccountSchema, undefined, { raw: true }),
     mode: "onBlur",
-    defaultValues: { connector: connecteurs[0] ?? "", owner_kind: "org", label: "", mode: "simule" },
+    defaultValues: { connector: premier, owner_kind: "org", label: "", mode: modeDe(formulaireDe(premier)) },
   })
   const { errors, isSubmitting } = form.formState
+  const choisi = useWatch({ control: form.control, name: "connector" })
+  const formulaire = formulaireDe(choisi)
   // Le message de Zod (anglais) ne s'affiche pas : une saisie refusée a sa phrase, le libellé pris la sienne.
   const erreurDuLibelle = errors.label ? (errors.label.type === "server" ? errors.label.message : LIBELLE_INVALIDE) : undefined
 
-  async function creer(compte: NouveauCompte) {
+  async function creer({ secret, effacer, settings, ...compte }: NouveauCompte) {
     setAnnonce("")
-    const reponse = await appelerPlateforme<{ account: { label: string } }>({ methode: "POST", ressource: "admin/accounts", corps: compte })
+    const corps = { ...compte, mode: modeDe(formulaire) }
+    const reponse = await appelerPlateforme<{ account: { id: string; label: string } }>({ methode: "POST", ressource: "admin/accounts", corps })
     if (reponse.erreur) {
       if (reponse.erreur.code === "conflict") form.setError("label", { type: "server", message: LIBELLE_PRIS }, { shouldFocus: true })
       else form.setError("root", { type: "server", message: messageDErreur(reponse.erreur) })
       return
     }
-    setAnnonce(`Compte « ${reponse.data.account.label} » créé.`)
+    const { id, label } = reponse.data.account
+    const charge = formulaire ? chargeDeLaSaisie({ secret: secret ?? {}, effacer: effacer ?? {}, settings: settings ?? {} }, formulaire) : null
+    if (charge) {
+      const pose = await appelerPlateforme({ methode: "POST", ressource: `admin/accounts/${encodeURIComponent(id)}/secret`, corps: charge })
+      if (pose.erreur) {
+        form.setError("root", { type: "server", message: `Compte « ${label} » créé, mais son secret n'est pas posé : ${messageDErreur(pose.erreur)} Saisissez-le sur sa ligne.` })
+        rafraichir()
+        return
+      }
+    }
+    setAnnonce(`Compte « ${label} » créé.`)
     form.reset()
     rafraichir()
   }
@@ -117,10 +152,8 @@ export function CreationDeCompte({ connecteurs, equipes }: CreationDeCompteProps
           <Input type="text" {...form.register("label")} />
         </Field>
         <ChoixDuProprietaire equipes={equipes} erreur={errors.team_id ? EQUIPE_MANQUANTE : undefined} />
-        <p className="oto-caption">
-          Mode : simulé. Rien ne sort du serveur ; les comptes réels arriveront avec le service connecteurs. Un compte personnel se crée par son
-          propriétaire, pas ici.
-        </p>
+        {formulaire && <ChampsDuCompte key={formulaire.connector} formulaire={formulaire} />}
+        <MentionDuMode reel={formulaire !== undefined} />
         {errors.root?.message && <Alert tone="fail" title={errors.root.message} />}
         <div className="flex items-center gap-3">
           <Button type="submit" variant="primary" disabled={isSubmitting} aria-busy={isSubmitting}>

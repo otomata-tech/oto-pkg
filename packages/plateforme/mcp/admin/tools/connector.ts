@@ -139,7 +139,7 @@ async function createAccountOp(call: OpCall): Promise<AdminOutput> {
   const after =
     created.mode === "simule"
       ? "Nothing it does leaves the server."
-      : "Its secret is set by the host's tooling (oto-platform accounts secret); calls are refused until then."
+      : "Its secret and settings are entered by whoever manages it on the dashboard's Connectors screen, never here; calls are refused until then."
   const text = `${created.mode === "simule" ? "Simulated" : "Live"} account ${created.label} (${created.connector}) created in ${identity.org.slug}, owned by ${owned}. ${after}`
   return { text, data: { accounts: [{ label: created.label, connector: created.connector, owner: owned, mode: created.mode, status: "active" }] }, target: `account:${created.label}`, nextActions: AFTER_ACCOUNT_RULES }
 }

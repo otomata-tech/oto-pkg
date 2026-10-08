@@ -381,9 +381,10 @@ La fonction reçoit `{ host, request? }` : l'adresse appelée, normalisée, et l
 
 Le paquet porte un connecteur simulé, `mail` (rien ne sort du serveur), et le moteur qui exécute les connecteurs
 réels que l'application lui déclare ; il n'en contient aucun. Un connecteur réel court sur un compte réel (mode
-`reel`) dont le secret, le jeton du tiers, est chiffré par le coffre du paquet (AES-256-GCM, données associées = l'id
-du compte) et déchiffré par le serveur de l'application pour le seul appel au tiers : il ne revient jamais vers un
-écran, le modèle, le journal ni un log.
+`reel`) qui garde tous les champs de secret que déclare son connecteur (une clé, un identifiant et un secret de
+client…), chiffrés ensemble par le coffre du paquet (AES-256-GCM, données associées = l'id du compte et la colonne),
+et ses réglages non secrets (région, sous-domaine, adresse), en clair ; le secret est déchiffré par le serveur de
+l'application pour le seul appel au tiers : il ne revient jamais vers un écran, le modèle, le journal ni un log.
 
 ### Déclarer ses connecteurs
 
@@ -405,15 +406,18 @@ registerFunctions([/* fonctions de l'ERP */])
   telles quelles ; le paquet n'en dépend pas, il accepte toute définition de même forme (`ConnectorDefinition`).
 - **Connecteurs propres** : une définition écrite à la main dans la même forme (adresse, authentification, table
   d'erreurs, fonctions avec leur JSON Schema d'entrée strict, exemples, requête).
-- **Ce que le moteur exécute** : authentification `bearer` ou `api_key` sur un seul champ de secret (un compte porte
-  un secret) ; `GET`, `POST`, `PUT`, `PATCH`, `DELETE` ; en-têtes et constantes ; listes en query ; arguments encodés
+- **Ce que le moteur exécute** : authentification `api_key` (en en-tête ou en query, la clé alors absente de tout
+  log), `bearer`, `basic`, `oauth2_client_credentials` (jeton échangé, rangé chiffré sur la ligne du compte, renouvelé
+  à son échéance et une fois après un 401) ; adresse fixe, par région (`baseUrls`) ou en gabarit sur un réglage
+  (`https://{domain}.example.net`, `{server}/v1`), une adresse saisie ne joignant jamais un hôte interne ; `GET`, `POST`, `PUT`, `PATCH`, `DELETE` ; en-têtes et constantes ; listes en query ; arguments encodés
   en JSON ; pagination (`all_pages`) ; contrôles avant l'appel et sur la réponse ; débit du tiers par compte et nouvel
   essai après un 429. Le JSON Schema d'entrée est validé et servi tel quel.
-- **Refus** : une définition invalide (authentification `basic` ou OAuth, secret à plusieurs champs, schéma non
-  strict, espace de noms déjà servi…) lève `CatalogRegistrationError` au chargement de la route, qui la nomme, et
+- **Refus** : une définition invalide (consentement d'une personne `oauth2_user`, prévu au lot suivant ; champ ou
+  réglage mal déclaré ; schéma non strict ; espace de noms déjà servi…) lève `CatalogRegistrationError` au chargement de la route, qui la nomme, et
   rien n'est déclaré.
 - **Base** : aucun SQL à écrire ; le paquet ajoute le nom d'un connecteur déclaré à `platform.connectors` à sa
-  première activation ou à son premier compte (migration `20261007090000_platform_connecteurs_declares.sql`).
+  première activation ou à son premier compte (migration `20261007090000_platform_connecteurs_declares.sql`) ; les
+  champs, réglages et jeton d'un compte vivent sur sa ligne (migration `20261008090000_platform_comptes_a_champs.sql`).
 - **Sonde** : `probeAccount(db, identity, { account_id })` joue la sonde du connecteur (`probe`) sur un compte, pour
   qui le gère, et rend `{ healthy: true }` ou `{ healthy: false, reason }`.
 
@@ -421,21 +425,23 @@ registerFunctions([/* fonctions de l'ERP */])
   l'application, jamais en `NEXT_PUBLIC_`. Lue à l'usage seulement : sans elle, l'application démarre, et poser un
   secret ou appeler un connecteur réel lève `PlatformConfigError` qui la nomme. La changer rend illisibles les
   secrets déjà posés : les reposer.
-- **Compte** : `admin_connector` `create_account` avec `mode: "reel"`, ou `createAccount` de `/server` ; l'écran
-  Connecteurs ne crée encore que des comptes simulés. Un compte simulé d'un connecteur réel est refusé
+- **Compte** : à l'écran Connecteurs (un connecteur déclaré y prend des comptes réels, avec leur formulaire), par
+  `admin_connector` `create_account` avec `mode: "reel"`, ou par `createAccount` de `/server`. Un compte simulé d'un connecteur réel est refusé
   (`invalid_arguments`), un compte réel ou de bac à sable d'un connecteur simulé aussi (`unavailable_in_v1`).
-- **Secret** : jamais par une route ni par un outil MCP. Par l'outillage, le secret sur l'entrée standard, la clé
-  et l'URL d'administration dans l'environnement du shell (chargées d'un fichier non commité, jamais tapées dans la
-  commande, qui finirait dans l'historique) :
+- **Secret et réglages** : jamais par un outil MCP. À l'écran Connecteurs, « Secret et réglages » sous la ligne d'un
+  compte réel : la page passe à l'écran `formulaires: connectorAccountForms()` (de `/server`) dans
+  `DonneesDesConnecteurs` ; sans eux, l'écran ne crée que des comptes simulés. L'écran écrit par
+  `POST /api/platform/admin/accounts/<id>/secret` (`{ secret?: { champ: valeur | null }, settings?: { réglage:
+  valeur | null } }`), réservée à qui gère le compte ; un nom absent est gardé, `null` ou vide l'efface ; le secret
+  n'est jamais relu (« posé le … »). Par le service `setAccountSecret(db, identity, { account_id, input })` de
+  `/server`, ou par l'outillage, les champs en objet JSON sur l'entrée standard, la clé et l'URL d'administration
+  dans l'environnement du shell (chargées d'un fichier non commité, jamais tapées dans la commande) :
 
   ```bash
-  pnpm exec oto-platform accounts secret --db-url "$ADMIN_DATABASE_URL" --account <id du compte> < jeton.txt
+  pnpm exec oto-platform accounts secret --db-url "$ADMIN_DATABASE_URL" --account <id du compte> --setting region=eu < champs.json
   ```
-
-  ou par le service `setAccountSecret(db, identity, { account_id, secret })` de `/server`, réservé à qui gère le
-  compte (niveau 3), qui ne rend jamais le secret.
-- **Appel** : un compte réel sans secret est refusé (`not_enabled`, qui dit à qui demander), un compte simulé d'un
-  connecteur réel aussi ; un 401 ou un 403 du tiers rend `upstream_error`, un débit dépassé `rate_limited`.
+- **Appel** : un compte réel sans secret, sans un champ qu'exige l'authentification ou dont un réglage manque est
+  refusé (`not_enabled`, qui dit à qui demander), un compte simulé d'un connecteur réel aussi ; un 401 ou un 403 du tiers rend `upstream_error`, un débit dépassé `rate_limited`.
 
 ## Widgets dans la conversation
 

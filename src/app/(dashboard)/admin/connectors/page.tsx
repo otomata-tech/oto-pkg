@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
+  connectorAccountForms,
   deactivationImpact,
   isOrgAdmin,
   listConnectorsForOrg,
@@ -24,7 +25,8 @@ import { ADRESSES } from "../adresses"
 // « Connecteurs » (E08-S03) : réservée à qui administre l'organisation de l'adresse, décidé ici par
 // `isOrgAdmin` avant tout appel (AC1, N1) ; chaque service redécide son droit. La page lit le
 // catalogue, les comptes et les équipes avec le jeton de la session, puis l'impact de la désactivation
-// de chaque connecteur actif ; l'écran écrit par `/api/platform/admin/*`.
+// de chaque connecteur actif, et le formulaire de compte de chaque connecteur réel déclaré ; l'écran écrit par
+// `/api/platform/admin/*`.
 export const metadata: Metadata = {
   title: "Connecteurs",
   robots: { index: false },
@@ -44,7 +46,14 @@ async function lire(db: PlatformDb, identity: Identity): Promise<DonneesDesConne
   ])
   const actifs = connectors.filter((connecteur) => connecteur.state === "active")
   const impacts = await Promise.all(actifs.map(async ({ connector }) => [connector, await deactivationImpact(db, identity, connector)] as const))
-  return { connectors, impacts: Object.fromEntries(impacts), accounts, options: { teams: teams.map(({ id, name }) => ({ id, name })) }, limites }
+  return {
+    connectors,
+    impacts: Object.fromEntries(impacts),
+    accounts,
+    options: { teams: teams.map(({ id, name }) => ({ id, name })) },
+    limites,
+    formulaires: connectorAccountForms(),
+  }
 }
 
 export default async function ConnecteursPage() {

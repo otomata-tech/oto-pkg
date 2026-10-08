@@ -1,9 +1,9 @@
 // Comptes de connecteurs (H67, H85, FR-ADMIN-02, FR-ADMIN-03) : créer un compte, simulé ou réel selon son
-// connecteur, lister les comptes qu'une personne peut utiliser, désactiver, poser le secret d'un compte réel ; et la
-// lecture commune aux résolutions (équipe porteuse, compte) et au bloc `team`. Sans ce module, aucun compte ne se
-// pose hors de l'outillage. Aucun secret n'est rendu (NFR-ADMIN-01) : chaque requête liste ses colonnes,
-// `secret_ciphertext` n'est pas accordée en lecture à `authenticated`, et le chiffré ne se lit que par
-// `platform.account_secret`, pour l'appel au tiers (`accountCiphertext`). Chaque droit et chaque
+// connecteur, lister les comptes qu'une personne peut utiliser, désactiver ; et la lecture commune aux résolutions
+// (équipe porteuse, compte), au bloc `team` et au secret d'un compte (`account-secret.ts`). Sans ce module, aucun
+// compte ne se pose hors de l'outillage. Aucun secret n'est rendu (NFR-ADMIN-01) : chaque requête liste ses colonnes,
+// `secret_ciphertext` et `token_ciphertext` ne sont pas accordées en lecture à `authenticated`, et leurs chiffrés ne se
+// lisent que par `platform.account_secret` et `platform.account_token`, pour l'appel au tiers. Chaque droit et chaque
 // filtre se décident ici, avant la requête, par `access.ts` (E01-S07 AC23) : la RLS n'est qu'un
 // garde-fou. Face SQL (E01-S10, lot d1) : chaque lecture ou écriture dans une transaction `db.tx`, les
 // décisions d'`access.ts` et l'annuaire hors d'elle.
@@ -19,7 +19,6 @@ import {
   type AccountMode,
   type AccountView,
 } from "../../schemas"
-import { accountSecretSchema } from "../../schemas/connectors"
 import {
   ACCESS_LEVELS,
   accountLevel,
@@ -34,15 +33,12 @@ import {
 import { catalogFunctions } from "../catalog/registry"
 import type { PlatformDb } from "../db"
 import { leadNames, leadWord, memberDirectory, teamsWithLeads } from "../directory"
-import { fromDatabaseError, inTransaction, invalidInput, isPlatformError, isUniqueViolation, PlatformError } from "../errors"
+import { fromDatabaseError, inTransaction, invalidInput, isUniqueViolation, PlatformError } from "../errors"
 import type { Identity } from "../identity"
 import type { Tx } from "../sql"
-import { declaredConnector } from "../catalog/connector-source"
 import { requireActivable } from "./activations"
 import { keepDeclaredConnector } from "./declaration"
-import { executeDescribed, nonEmpty, valueAt } from "./engine"
 import { accountMode, isSimulatedConnector, modeLabel } from "./modes"
-import { decryptSecret, encryptSecret } from "./vault"
 
 /** Niveau sur un compte tel que le lit le modèle : 1 lecture, 2 écriture, 3 gestion (H65) ; les noms d'`ACCESS_LEVEL_NAMES`. */
 export type LevelName = Exclude<AccessLevelName, "none">
@@ -56,8 +52,11 @@ export type AccountSummary = { id: string; label: string; connector: string; mod
 /** Un compte visible de la personne, avec son état et son niveau : ce que lisent les résolutions. */
 export type ConnectorAccount = AccountSummary & { status: string; level: AccessLevel }
 
-/** Un compte lu, et le nom de son équipe propriétaire (`team_name`, sous RLS : `null` quand elle ne se lit pas). */
-type AccountRow = {
+/**
+ * Un compte lu, et le nom de son équipe propriétaire (`team_name`, sous RLS : `null` quand elle ne se lit pas) ; ses
+ * réglages en clair, les noms des champs posés de son secret et la date de la dernière saisie, jamais le secret.
+ */
+export type AccountRow = {
   id: string
   label: string
   connector: string
@@ -67,6 +66,9 @@ type AccountRow = {
   owner_team_id: string | null
   owner_user_id: string | null
   team_name: string | null
+  settings: Record<string, string>
+  secret_fields: string[]
+  secret_updated_at: string | null
 }
 
 /**
@@ -74,9 +76,10 @@ type AccountRow = {
  * absent, `null`, ne retient rien). Colonnes listées, jamais `secret_ciphertext`, que la base n'accorde
  * pas à `authenticated`.
  */
-function accountRows(sql: Tx, orgId: string, only: { connector?: string; id?: string } = {}) {
+export function accountRows(sql: Tx, orgId: string, only: { connector?: string; id?: string } = {}) {
   return sql<AccountRow[]>`
-    select a.id, a.label, a.connector, a.mode, a.status, a.owner_kind, a.owner_team_id, a.owner_user_id, t.name as team_name
+    select a.id, a.label, a.connector, a.mode, a.status, a.owner_kind, a.owner_team_id, a.owner_user_id, t.name as team_name,
+           a.settings, a.secret_fields, to_json(a.secret_updated_at) #>> '{}' as secret_updated_at
       from platform.accounts a left join platform.teams t on t.id = a.owner_team_id
      where a.org_id = ${orgId}
        and a.connector = coalesce(${only.connector ?? null}, a.connector)
@@ -89,7 +92,7 @@ export function levelName(level: AccessLevel): LevelName {
   return name === "none" ? "read" : name
 }
 
-function accountOwner(row: AccountRow): AccountOwner {
+export function accountOwner(row: AccountRow): AccountOwner {
   if (row.owner_kind === "team") {
     return { kind: "team", teamId: row.owner_team_id, userId: null, description: `team ${row.team_name ?? "?"}` }
   }
@@ -97,7 +100,7 @@ function accountOwner(row: AccountRow): AccountOwner {
   return { kind: "org", teamId: null, userId: null, description: "organisation" }
 }
 
-function summary(row: AccountRow): AccountSummary {
+export function summary(row: AccountRow): AccountSummary {
   return { id: row.id, label: row.label, connector: row.connector, mode: accountMode(row.mode), owner: accountOwner(row) }
 }
 
@@ -223,6 +226,8 @@ function accountView(row: AccountRow): AccountView {
     owner: kind === "team" && row.team_name !== null ? { kind, teamName: row.team_name } : { kind },
     mode: accountMode(row.mode),
     status: accountStatus(row.status),
+    secret: { fields: row.secret_fields, updatedAt: row.secret_updated_at },
+    settings: row.settings,
   }
 }
 
@@ -264,7 +269,7 @@ export async function listUsableAccounts(
  * d'organisation, propriétaire d'un compte personnel), décidé avant toute écriture ou tout appel au tiers. Inconnu ou
  * invisible (niveau 0) : `not_found` ; sous le niveau : `forbidden`, qui dit qui le gère.
  */
-async function managedAccount(db: PlatformDb, identity: Identity, id: string, use: { service: string; gesture: string }): Promise<AccountRow> {
+export async function managedAccount(db: PlatformDb, identity: Identity, id: string, use: { service: string; gesture: string }): Promise<AccountRow> {
   const [row] = await inTransaction(db, `${use.service}: accounts`, (sql) => accountRows(sql, identity.org.id, { id }))
   const level = row ? await accountLevel(db, identity, id) : ACCESS_LEVELS.none
   if (!row || level === ACCESS_LEVELS.none) throw new PlatformError("not_found", `Unknown account ${id}.`)
@@ -303,86 +308,4 @@ export async function disableAccount(
     }
   }
   return { ...summary(row), status: "disabled" }
-}
-
-/**
- * Pose le secret d'un compte réel (H85) : réservé à qui le gère (niveau 3, comme `disableAccount`), décidé avant
- * l'écriture ; chiffré par le coffre du paquet (`vault.ts`) avant d'être écrit. Rien du secret n'est rendu, ni par le
- * résultat ni par un refus. Inconnu ou invisible : `not_found` ; compte simulé : `invalid_arguments`.
- */
-export async function setAccountSecret(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountSummary> {
-  const parsed = accountSecretSchema.safeParse(input)
-  if (!parsed.success) throw invalidInput(parsed.error)
-  const id = parsed.data.account_id
-  const row = await managedAccount(db, identity, id, { service: "setAccountSecret", gesture: "Setting the secret of" })
-  if (accountMode(row.mode) === "simule") throw new PlatformError("invalid_arguments", `Account « ${row.label} » is simulated: it has no secret.`)
-  const ciphertext = encryptSecret(id, parsed.data.secret)
-  const updated = await inTransaction(
-    db,
-    "setAccountSecret: accounts update",
-    (sql) => sql`update platform.accounts set secret_ciphertext = ${ciphertext} where id = ${id} returning id`,
-  )
-  // Aucune ligne après la décision : le compte a changé entre la lecture et l'écriture.
-  if (updated.length === 0) {
-    console.error(`[platform] setAccountSecret: no row written for account ${id}`)
-    throw new PlatformError("conflict", `Account « ${row.label} » changed meanwhile. Reload it and retry.`)
-  }
-  return summary(row)
-}
-
-/** Ce que l'appel lit d'un compte résolu pour en tirer le secret. */
-type CallAccount = { id: string; label: string; mode: AccountMode; owner: AccountOwner }
-
-/**
- * Le chiffré du secret du compte d'un appel à un connecteur réel (H85), lu par `platform.account_secret`, qui ne le
- * rend qu'à un membre de l'organisation du compte ; `runCall` le déchiffre pour `run` seul. Refus nommés, la fonction
- * non appelée : un compte simulé (un connecteur réel ne court que sur un compte réel) ; un compte réel sans secret.
- */
-export async function accountCiphertext(db: PlatformDb, identity: Identity, account: CallAccount, connector: string): Promise<string> {
-  if (account.mode === "simule") {
-    const who = await describeOwner(db, identity, account.owner)
-    throw new PlatformError(
-      "not_enabled",
-      `Account « ${account.label} » is simulated, but ${connector} is a live connector: it runs on live accounts only. Ask ${who} to connect a live account.`,
-    )
-  }
-  const [row] = await inTransaction(
-    db,
-    "accountCiphertext: account_secret",
-    (sql) => sql<{ secret: string | null }[]>`select platform.account_secret(${account.id}) as secret`,
-  )
-  if (row?.secret) return row.secret
-  const who = await describeOwner(db, identity, account.owner)
-  throw new PlatformError("not_enabled", `Account « ${account.label} » has no secret yet. Ask ${who} to set it.`)
-}
-
-/** La santé d'un compte selon la sonde de son connecteur : sain, ou non sain et pourquoi, jamais le secret. */
-export type AccountHealth = { healthy: true } | { healthy: false; reason: string }
-
-/**
- * Joue la sonde du connecteur déclaré (`probe`) sur un compte : sa fonction de lecture appelée avec `{}`, le secret
- * déchiffré pour ce seul appel, puis chaque chemin de `nonEmpty` exigé non vide dans la réponse. Réservée à qui gère le
- * compte (niveau 3, comme `setAccountSecret`) ; hors `call`, elle n'écrit aucune ligne de journal et ne compte dans
- * aucun quota. Refus : compte inconnu ou non géré ; connecteur sans sonde déclarée (`invalid_arguments`). Un compte
- * simulé ou sans secret, un refus ou une panne du tiers : non sain, avec la raison ; une panne du coffre lève.
- */
-export async function probeAccount(db: PlatformDb, identity: Identity, input: unknown): Promise<AccountHealth> {
-  // La même saisie que la désactivation : le compte visé, par son identifiant.
-  const parsed = disableAccountSchema.safeParse(input)
-  if (!parsed.success) throw invalidInput(parsed.error)
-  const id = parsed.data.account_id
-  const row = await managedAccount(db, identity, id, { service: "probeAccount", gesture: "Probing" })
-  const connector = declaredConnector(row.connector)
-  const paths = connector?.definition.probe?.nonEmpty
-  if (!connector?.probe || !paths) throw new PlatformError("invalid_arguments", `Connector ${row.connector} declares no probe.`)
-  const account = { id, label: row.label, mode: accountMode(row.mode), owner: accountOwner(row) }
-  try {
-    const ciphertext = await accountCiphertext(db, identity, account, row.connector)
-    const { answers } = await executeDescribed(connector.probe, { credential: decryptSecret(id, ciphertext), accountId: id }, {})
-    const missing = paths.find((path) => !nonEmpty(valueAt(answers[0], path)))
-    return missing === undefined ? { healthy: true } : { healthy: false, reason: `${connector.definition.label} answered without ${missing}.` }
-  } catch (error) {
-    if (isPlatformError(error) && error.code !== "internal") return { healthy: false, reason: error.message }
-    throw error
-  }
 }

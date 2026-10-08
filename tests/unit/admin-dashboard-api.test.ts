@@ -10,11 +10,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { handlePlateforme } from "@otomata_tech/oto_platform/api"
 import type { Identity, PlatformDb } from "@otomata_tech/oto_platform/server"
 import type { VerifyToken } from "../../packages/plateforme/mcp/auth"
+import { registerConnectors } from "../../packages/plateforme/server/connectors/declaration"
 import { resolveIdentity } from "../../packages/plateforme/server/identity"
+import { describedConnector } from "../factories/described-connector"
 import { ORGS, PERSONS } from "../helpers/mcp-admin"
 import { seedAdminFixture, type AdminFixtureSql } from "../helpers/mcp-admin-sql"
 import type { Row, Tables } from "../helpers/simulated-db"
-import { sqlConfigured, recordDb, seedWithAdmin, type SeededData, type SentRequest, portable } from "../helpers/sql"
+import { sqlConfigured, recordDb, seedWithAdmin, testAdminSql, type SeededData, type SentRequest, portable } from "../helpers/sql"
 
 const base = vi.hoisted((): { current: PlatformDb | null } => ({ current: null }))
 
@@ -39,6 +41,11 @@ vi.mock("../../packages/plateforme/server/flags", async (importOriginal) => {
 
 /** Le compte d'organisation d'acme à désactiver, en identifiant simulé ; la fixture lui tire sa valeur réelle. */
 const ACCOUNT = "6b2f3c1d-4e5a-4b6c-8d7e-9f0a1b2c3d4e"
+/** Un connecteur réel déclaré par le test, sous un nom propre au passage : le compte de `admin/accounts/<id>/secret`. */
+const LIVE = `t${Math.random().toString(16).slice(2, 10)}`
+/** Une valeur de secret tirée à l'exécution, qui ne doit jamais atteindre le journal. */
+const SECRET_VALUE = `s_${Math.random().toString(16).slice(2)}`
+
 /** Les six outils d'une organisation, dans l'ordre de la vue (ADR-002 § 3). */
 const TOOLS = ["context", "find", "read", "call", "write", "feedback"]
 
@@ -189,6 +196,19 @@ const ROUTES: RouteCase[] = [
     target: ACCOUNT,
   },
   {
+    name: "POST admin/accounts/secret",
+    method: "POST",
+    path: `admin/accounts/${ACCOUNT}/secret`,
+    body: { secret: { api_key: SECRET_VALUE } },
+    invalid: { path: `admin/accounts/${ACCOUNT}/secret`, body: { secret: { api_key: 42 } } },
+    data: () => ({ account: expect.objectContaining({ id: ACCOUNT, connector: LIVE, mode: "reel" }) }),
+    target: ACCOUNT,
+    // Le compte d'organisation devient un compte réel du connecteur déclaré.
+    change: (all) => {
+      all.accounts = all.accounts.map((row) => ({ ...row, connector: LIVE, label: "Crm Acme", mode: "reel" }))
+    },
+  },
+  {
     name: "PATCH admin/flags",
     method: "PATCH",
     path: "admin/flags",
@@ -204,13 +224,28 @@ beforeEach(() => {
 })
 
 describe.skipIf(!sqlConfigured)(portable("admin/* routes of the dashboard (AC10)"), { timeout: 60_000 }, () => {
+  const savedKey = process.env.PLATFORM_VAULT_KEY
+
   beforeAll(async () => {
+    process.env.PLATFORM_VAULT_KEY = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64")
+    registerConnectors([describedConnector(LIVE)])
     seed = seedWithAdmin()
     admin = await seedAdminFixture(seed)
+    await seed.admin`insert into platform.connectors (name, label) values (${LIVE}, 'Crm')`
   }, 180_000)
 
   afterAll(async () => {
+    registerConnectors([])
+    if (savedKey === undefined) delete process.env.PLATFORM_VAULT_KEY
+    else process.env.PLATFORM_VAULT_KEY = savedKey
     await seed?.cleanup()
+    // La ligne du passage, une fois parti le compte qui la cite (organisations retirées).
+    const sql = testAdminSql()
+    try {
+      await sql`delete from platform.connectors where name = ${LIVE}`
+    } finally {
+      await sql.end({ timeout: 5 })
+    }
   }, 180_000)
 
   it.each(ROUTES)("should serve $name: 401, 403 without a write, 400, then 200 with the view and an api journal line", async (route) => {
@@ -234,6 +269,15 @@ describe.skipIf(!sqlConfigured)(portable("admin/* routes of the dashboard (AC10)
     expect(admin.readable(served.body.data)).toEqual(route.data(admin.orgs.acme.prefix))
     expect(served.writes).not.toEqual([])
     expect(served.journal).toMatchObject([{ org_id: ORGS.acme.id, user_id: PERSONS.ada.id, method: "api", tool, target: route.target, is_error: false, error: null }])
+  })
+
+  it("should mask the whole secret of an account in the journal line, and never answer it", async () => {
+    const route = ROUTES.find((candidate) => candidate.name === "POST admin/accounts/secret")
+    if (!route) throw new Error("no secret route")
+    const served = await call("ada", route)
+    expect(served.status).toBe(200)
+    expect(served.journal).toMatchObject([{ args: { secret: "[masked]" } }])
+    expect(JSON.stringify([served.body, served.journal]).includes(SECRET_VALUE)).toBe(false)
   })
 
   it("should journal a refused account creation under its label made well-formed, a lone surrogate half becoming U+FFFD", async () => {

@@ -1,7 +1,8 @@
-// « Connecteurs » du tableau de bord (E08-S03, AC4 à AC7, AC12) : les connecteurs activables et leur
-// état, qu'on active ou désactive ; les comptes simulés de l'organisation, qu'on crée ou désactive.
-// Server Component : les gestes sont les `ActionPlateforme` d'E05-S03, la question d'une désactivation
-// composée ici depuis son impact ; seul le formulaire de création est un îlot client.
+// « Connecteurs » du tableau de bord (E08-S03, AC4 à AC7, AC12 ; comptes à plusieurs champs) : les connecteurs
+// activables et leur état, qu'on active ou désactive ; les comptes de l'organisation, simulés ou réels, qu'on crée ou
+// désactive, et le secret et les réglages d'un compte réel, saisis sous sa ligne. Server Component : les gestes sont
+// les `ActionPlateforme` d'E05-S03, la question d'une désactivation composée ici depuis son impact ; le formulaire de
+// création et la saisie d'un compte sont des îlots clients.
 //
 // Porté d'oto-frontend (`components/connecteurs/liste-connecteurs.tsx` l. 196-234, 405-432, 480-511, et la
 // capture de `/connectors`), E05-S09 partie d2. Repris : l'en-tête, deux colonnes, l'îlot des connecteurs au
@@ -11,7 +12,7 @@
 // `overQuota`, `stepLeft` : V2), marques d'outils, liens vers une page de connecteur, pile de clés, toolbox
 // (architecture § 10).
 import { Plug } from "@phosphor-icons/react/dist/ssr/Plug"
-import { limitReached, type AccountMode, type AccountView, type DeactivationImpact, type OrgConnector, type OrgLimitsView } from "../../../schemas"
+import { limitReached, type AccountMode, type AccountView, type ConnectorAccountForm, type DeactivationImpact, type OrgConnector, type OrgLimitsView } from "../../../schemas"
 import type { Resultat } from "../../api/resultat"
 import { ActionPlateforme } from "../../components/action-plateforme"
 import { EmptyState } from "../../ds/react/empty-state"
@@ -26,6 +27,7 @@ import { Chargement, Ilot } from "../ilot"
 import { questionDeDesactivation, questionDeDesactivationDuCompte } from "../textes"
 import type { FilDeLEcran, LienDeLAdministration } from "../types"
 import { CreationDeCompte } from "./creation-de-compte"
+import { SaisieDuCompte } from "./saisie-du-compte"
 
 /** Ce que la page lit pour l'écran : le catalogue et son état, l'impact de chaque désactivation possible, les comptes, les équipes. */
 export type DonneesDesConnecteurs = {
@@ -36,6 +38,8 @@ export type DonneesDesConnecteurs = {
   options: { teams: { id: string; name: string }[] }
   /** Les capacités de l'organisation (`orgLimitsView`, E12-S02) ; absentes : aucune activation grisée. */
   limites?: OrgLimitsView
+  /** Le formulaire de compte de chaque connecteur réel déclaré (`connectorAccountForms`) ; absents : comptes simulés seuls. */
+  formulaires?: ConnectorAccountForm[]
 }
 
 export type EcranConnecteursProps = {
@@ -125,10 +129,18 @@ function proprietaire(owner: AccountView["owner"]): string {
   return owner.kind === "org" ? "organisation" : "personnel"
 }
 
-function LigneDeCompte({ compte }: { compte: AccountView }) {
+/** Ce que la ligne dit du secret d'un compte réel, jamais sa valeur. */
+function etatDuSecret(compte: AccountView): string | null {
+  if (compte.mode !== "reel") return null
+  const date = compte.secret?.updatedAt ? dateLisible(compte.secret.updatedAt) : null
+  return date ? `secret posé le ${date}` : "sans secret"
+}
+
+function LigneDeCompte({ compte, formulaire }: { compte: AccountView; formulaire: ConnectorAccountForm | undefined }) {
+  const parties = [compte.label, compte.connector, proprietaire(compte.owner), MODES[compte.mode], ETATS[compte.status], etatDuSecret(compte)]
   return (
     <Row className="flex-wrap gap-3">
-      <span className="min-w-0 flex-1">{[compte.label, compte.connector, proprietaire(compte.owner), MODES[compte.mode], ETATS[compte.status]].join(" · ")}</span>
+      <span className="min-w-0 flex-1">{parties.filter((partie) => partie !== null).join(" · ")}</span>
       {compte.status !== "disabled" && (
         <ActionPlateforme
           libelle="Désactiver"
@@ -138,20 +150,21 @@ function LigneDeCompte({ compte }: { compte: AccountView }) {
           ancre={ANCRE_DES_COMPTES}
         />
       )}
+      {compte.mode === "reel" && compte.status !== "disabled" && formulaire && <SaisieDuCompte compte={compte} formulaire={formulaire} />}
     </Row>
   )
 }
 
-type ComptesProps = { comptes: AccountView[]; connecteurs: string[]; equipes: DonneesDesConnecteurs["options"]["teams"] }
+type ComptesProps = { comptes: AccountView[]; connecteurs: string[]; equipes: DonneesDesConnecteurs["options"]["teams"]; formulaires: ConnectorAccountForm[] }
 
-/** Les annexes : les comptes simulés, puis l'îlot où l'on en crée un. */
-function Comptes({ comptes, connecteurs, equipes }: ComptesProps) {
+/** Les annexes : les comptes, puis l'îlot où l'on en crée un. */
+function Comptes({ comptes, connecteurs, equipes, formulaires }: ComptesProps) {
   return (
     <>
-      <Ilot id={ANCRE_DES_COMPTES} titre="Comptes simulés" compte={pluriel(comptes.length, "compte", "comptes")}>
-        <RowList rules empty={<EmptyState compact>Aucun compte. Créez un compte simulé pour qu&apos;une procédure puisse appeler un connecteur.</EmptyState>}>
+      <Ilot id={ANCRE_DES_COMPTES} titre="Comptes" compte={pluriel(comptes.length, "compte", "comptes")}>
+        <RowList rules empty={<EmptyState compact>Aucun compte. Créez un compte pour qu&apos;une procédure puisse appeler un connecteur.</EmptyState>}>
           {comptes.map((compte) => (
-            <LigneDeCompte key={compte.id} compte={compte} />
+            <LigneDeCompte key={compte.id} compte={compte} formulaire={formulaires.find((formulaire) => formulaire.connector === compte.connector)} />
           ))}
         </RowList>
       </Ilot>
@@ -159,7 +172,7 @@ function Comptes({ comptes, connecteurs, equipes }: ComptesProps) {
         {connecteurs.length === 0 ? (
           <p>Aucun connecteur ne demande de compte dans cette version de la plateforme.</p>
         ) : (
-          <CreationDeCompte connecteurs={connecteurs} equipes={equipes} />
+          <CreationDeCompte connecteurs={connecteurs} equipes={equipes} formulaires={formulaires} />
         )}
       </Ilot>
     </>
@@ -169,7 +182,7 @@ function Comptes({ comptes, connecteurs, equipes }: ComptesProps) {
 function Donnees({ donnees }: { donnees: DonneesDesConnecteurs }) {
   const connecteurs = donnees.connectors.map((connecteur) => connecteur.connector)
   return (
-    <TwoColumns aside={<Comptes comptes={donnees.accounts} connecteurs={connecteurs} equipes={donnees.options.teams} />}>
+    <TwoColumns aside={<Comptes comptes={donnees.accounts} connecteurs={connecteurs} equipes={donnees.options.teams} formulaires={donnees.formulaires ?? []} />}>
       <Connecteurs connecteurs={donnees.connectors} impacts={donnees.impacts} limites={donnees.limites} />
     </TwoColumns>
   )

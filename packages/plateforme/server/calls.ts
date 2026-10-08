@@ -17,10 +17,9 @@ import { administratorNames } from "./access"
 import { checkArguments } from "./catalog/arguments"
 import type { CatalogFunction, FunctionContext } from "./catalog/define"
 import { catalogFunctions, findFunction, isActive, NATIVE_CONNECTOR } from "./catalog/registry"
-import { accountCiphertext } from "./connectors/accounts"
+import { liveCredential } from "./connectors/account-secret"
 import { isSimulatedConnector, modeLabel } from "./connectors/modes"
 import { resolveAccount, runningTeam, type ResolvedAccount, type RunningTeam } from "./connectors/resolution"
-import { decryptSecret } from "./connectors/vault"
 import type { PlatformDb } from "./db"
 import { memberDirectory } from "./directory"
 import { issuesText, PlatformError } from "./errors"
@@ -164,9 +163,9 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
       ? await resolveAccount(db, identity, { fn, team, account: input.account, origin: deps.origin })
       : undefined
   trace.accountId = account?.id ?? null
-  // Un connecteur réel ne court que sur un compte réel qui a son secret (H85), refusé avant la fonction ; un
-  // connecteur simulé (`mail`) garde lui-même ses comptes simulés.
-  const ciphertext = account && !isSimulatedConnector(fn.connector) ? await accountCiphertext(db, identity, account, fn.connector) : undefined
+  // Un connecteur réel ne court que sur un compte réel qui a son secret, ses champs et ses réglages (H85), refusé avant
+  // la fonction ; un connecteur simulé (`mail`) garde lui-même ses comptes simulés.
+  const openCredential = account && !isSimulatedConnector(fn.connector) ? await liveCredential(db, identity, account, fn.connector) : undefined
   const context: FunctionContext = {
     db,
     identity,
@@ -183,7 +182,7 @@ export async function runCall(deps: CallDeps, input: CallInput): Promise<ToolOut
     return { text, data: { ...data, status: "needs_confirmation", summary }, nextActions: [], ...journal }
   }
   // Le secret ne va qu'à `run`, déchiffré au dernier moment : jamais au récapitulatif, ni au journal, ni au texte.
-  const credential = account && ciphertext !== undefined ? decryptSecret(account.id, ciphertext) : undefined
+  const credential = openCredential ? await openCredential() : undefined
   // Arguments validés par `fn.schema` : le type commun du catalogue les efface en `never`.
   const output = await fn.run({ ...context, credential }, args as never)
   return {

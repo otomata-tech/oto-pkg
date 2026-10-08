@@ -1,12 +1,13 @@
 import type { AnchorHTMLAttributes } from "react"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import type { AccountView, OrgConnector } from "@otomata_tech/oto_platform/schemas"
+import type { AccountView, ConnectorAccountForm, OrgConnector } from "@otomata_tech/oto_platform/schemas"
 import { ContexteDeRafraichissement, EcranConnecteurs, EcranConnecteursChargement, type DonneesDesConnecteurs } from "@otomata_tech/oto_platform/ui"
 import { choisirDansLaListe } from "../../helpers/liste-de-choix"
 
-// L'écran « Connecteurs » du tableau de bord (E08-S03 : AC4 à AC7, AC12), sur le design system d'oto-frontend
-// (E05-S09 partie d2) : `fetch` simulé pour l'API, relecture fournie par un contexte de test.
+// L'écran « Connecteurs » du tableau de bord (E08-S03 : AC4 à AC7, AC12 ; comptes-a-plusieurs-champs : saisie du
+// secret et des réglages d'un compte réel), sur le design system d'oto-frontend (E05-S09 partie d2) : `fetch` simulé
+// pour l'API, relecture fournie par un contexte de test.
 
 const VENTES = "0e8e5a3c-7f10-4a5b-8d3b-2b1c4d5e6f70"
 const COMPTE = "6b2f3c1d-4e5a-4b6c-8d7e-9f0a1b2c3d4e"
@@ -124,18 +125,18 @@ describe("EcranConnecteurs, connectors (AC4, AC5)", () => {
   it("should say an empty catalog, in both islands (AC4, AC6)", () => {
     rendre({ connectors: [], impacts: {}, accounts: [] })
     expect(screen.getByText("Aucun connecteur à activer dans cette version de la plateforme.")).toBeInTheDocument()
-    expect(screen.getByText("Aucun compte. Créez un compte simulé pour qu'une procédure puisse appeler un connecteur.")).toBeInTheDocument()
+    expect(screen.getByText("Aucun compte. Créez un compte pour qu'une procédure puisse appeler un connecteur.")).toBeInTheDocument()
     expect(screen.getByText("Aucun connecteur ne demande de compte dans cette version de la plateforme.")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Créer le compte" })).toBeNull()
   })
 })
 
-describe("EcranConnecteurs, simulated accounts (AC6, AC7)", () => {
+describe("EcranConnecteurs, accounts (AC6, AC7)", () => {
   it("should list each account with its owner, mode and state, and disable an active one after the question", async () => {
     fetchMock.mockResolvedValue(reponse(200, { data: { account: { id: COMPTE, status: "disabled" } } }))
     rendre()
 
-    const comptes = within(screen.getByRole("region", { name: "Comptes simulés" }))
+    const comptes = within(screen.getByRole("region", { name: "Comptes" }))
     expect(comptes.getByText("Mail Ventes · mail · équipe Ventes · simulé · actif")).toBeInTheDocument()
     expect(comptes.getByText("Mail Ancien · mail · organisation · simulé · désactivé")).toBeInTheDocument()
     expect(comptes.queryByRole("button", { name: "Désactiver le compte Mail Ancien" })).toBeNull()
@@ -148,7 +149,7 @@ describe("EcranConnecteurs, simulated accounts (AC6, AC7)", () => {
     await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
     expect(envoi()).toEqual({ url: `/api/platform/admin/accounts/${COMPTE}/disable`, methode: "POST", corps: {} })
     // Le geste part avec la relecture (un compte désactivé n'en a plus) : le focus l'attend au titre de la liste.
-    expect(screen.getByRole("heading", { level: 2, name: "Comptes simulés" })).toHaveFocus()
+    expect(screen.getByRole("heading", { level: 2, name: "Comptes" })).toHaveFocus()
   })
 
   it("should create an account for a team, then have the page re-read", async () => {
@@ -183,6 +184,78 @@ describe("EcranConnecteurs, simulated accounts (AC6, AC7)", () => {
     expect(screen.getByLabelText("Libellé")).toHaveAttribute("aria-invalid", "true")
     expect(envoi().corps).toEqual({ connector: "mail", owner_kind: "org", label: "mail ventes", mode: "simule" })
     expect(rafraichir).not.toHaveBeenCalled()
+  })
+})
+
+const CRM: OrgConnector = { connector: "crm", state: "active", activatedAt: null, activatedBy: null, functions: [{ name: "crm.get_company", class: "read" }] }
+const FORMULAIRE_CRM: ConnectorAccountForm = {
+  connector: "crm",
+  label: "Crm",
+  fields: [
+    { name: "client_id", label: "Client ID", secret: false },
+    { name: "client_secret", label: "Client secret", secret: true },
+  ],
+  settings: [{ name: "region", label: "Région", type: "choice", choices: ["us", "eu"], default: "us" }],
+}
+const CRM_VENTES: AccountView = { id: COMPTE, label: "Crm Ventes", connector: "crm", owner: { kind: "org" }, mode: "reel", status: "active", secret: { fields: [], updatedAt: null }, settings: {} }
+const VIVANTS: Partial<DonneesDesConnecteurs> = { connectors: [CRM], impacts: {}, accounts: [CRM_VENTES], formulaires: [FORMULAIRE_CRM] }
+
+describe("EcranConnecteurs, live accounts and their secret (comptes-a-plusieurs-champs)", () => {
+  it("should enter the secret fields masked and a setting, sending only what changed, the secret never shown again", async () => {
+    fetchMock.mockResolvedValue(reponse(200, { data: { account: { id: COMPTE } } }))
+    rendre(VIVANTS)
+    const comptes = within(screen.getByRole("region", { name: "Comptes" }))
+    expect(comptes.getByText("Crm Ventes · crm · organisation · réel · actif · sans secret")).toBeInTheDocument()
+
+    fireEvent.click(comptes.getByRole("button", { name: "Secret et réglages de Crm Ventes" }))
+    const formulaire = within(screen.getByRole("form", { name: "Secret et réglages de Crm Ventes" }))
+    expect(formulaire.getByLabelText("Client secret")).toHaveAttribute("type", "password")
+    expect(formulaire.getByLabelText("Client secret")).toHaveValue("")
+    fireEvent.change(formulaire.getByLabelText("Client secret"), { target: { value: "s3cr3t" } })
+    choisirDansLaListe(formulaire.getByLabelText("Région"), "eu")
+    fireEvent.click(formulaire.getByRole("button", { name: "Enregistrer" }))
+
+    await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
+    expect(envoi()).toEqual({ url: `/api/platform/admin/accounts/${COMPTE}/secret`, methode: "POST", corps: { secret: { client_secret: "s3cr3t" }, settings: { region: "eu" } } })
+    expect(screen.queryByDisplayValue("s3cr3t")).toBeNull()
+    expect(comptes.getByRole("status")).toHaveTextContent("Secret et réglages de « Crm Ventes » enregistrés.")
+  })
+
+  it("should say a field set, keep it when left empty, erase it when ticked, and send nothing when nothing changed", async () => {
+    fetchMock.mockResolvedValue(reponse(200, { data: { account: { id: COMPTE } } }))
+    const pose = { ...CRM_VENTES, secret: { fields: ["client_id", "client_secret"], updatedAt: "2026-10-08T09:00:00.000Z" }, settings: { region: "eu" } }
+    rendre({ ...VIVANTS, accounts: [pose] })
+    expect(screen.getByText("Crm Ventes · crm · organisation · réel · actif · secret posé le 8 octobre 2026")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Secret et réglages de Crm Ventes" }))
+    const formulaire = within(screen.getByRole("form", { name: "Secret et réglages de Crm Ventes" }))
+    expect(formulaire.getAllByText("Posé. Laissez vide pour le garder.")).toHaveLength(2)
+
+    fireEvent.click(formulaire.getByRole("button", { name: "Enregistrer" }))
+    expect(await formulaire.findByText("Rien à enregistrer : saisissez un champ, cochez « Effacer » ou changez un réglage.")).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    fireEvent.click(formulaire.getByLabelText("Effacer Client ID"))
+    fireEvent.click(formulaire.getByRole("button", { name: "Enregistrer" }))
+    await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
+    expect(envoi().corps).toEqual({ secret: { client_id: null } })
+  })
+
+  it("should create a live account with its secret: the account first, mode reel, then its secret", async () => {
+    fetchMock.mockResolvedValueOnce(reponse(200, { data: { account: { id: COMPTE, label: "Crm Support" } } }))
+    fetchMock.mockResolvedValueOnce(reponse(200, { data: { account: { id: COMPTE } } }))
+    rendre({ ...VIVANTS, accounts: [] })
+    expect(screen.getByText(/^Mode : réel\./)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText("Libellé"), { target: { value: "Crm Support" } })
+    fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "id-1" } })
+    fireEvent.change(screen.getByLabelText("Client secret"), { target: { value: "s3cr3t" } })
+    fireEvent.click(screen.getByRole("button", { name: "Créer le compte" }))
+
+    await waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1))
+    const corps = fetchMock.mock.calls.map(([url, init]) => [url, JSON.parse(String(init?.body))])
+    expect(corps).toEqual([
+      ["/api/platform/admin/accounts", { connector: "crm", owner_kind: "org", label: "Crm Support", mode: "reel" }],
+      [`/api/platform/admin/accounts/${COMPTE}/secret`, { secret: { client_id: "id-1", client_secret: "s3cr3t" }, settings: { region: "us" } }],
+    ])
   })
 })
 

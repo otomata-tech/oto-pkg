@@ -13,12 +13,13 @@ import { catalogFunctions, looksLikeFunction } from "../catalog/registry"
 import { issuesText, PlatformError } from "../errors"
 import { isJsonObject } from "../json"
 import type { Tx } from "../sql"
+import { authHeader, prepareAuth, RUN_AUTH_KINDS, type PreparedAuth } from "./auth"
 import type { ConnectorDefinition, ConnectorFunctionDefinition } from "./definition"
 import { describedSummary, errorTable, runDescribed, type DescribedCall, type PreparedFunction } from "./engine"
+import { addressProblem, baseAddress, settingProblem } from "./settings"
 
 /** La contrainte de `platform.connectors.name`. */
 const CONNECTOR_NAME = /^[a-z][a-z0-9_]{0,39}$/
-const HEADER_NAME = /^[A-Za-z0-9-]+$/
 const LABEL_MAX = 80
 const NAME_MAX = 64
 const DESCRIPTION_MAX = 1000
@@ -29,23 +30,6 @@ const QUERY_ARRAYS = ["repeat", "brackets", "comma"]
 
 const namespaceOf = (name: string): string => name.split(".")[0]
 const isPositiveInteger = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0
-
-/** Ce que l'authentification déclarée donne au moteur, ou le problème qui la refuse. */
-function authProblem(definition: ConnectorDefinition): { header: string; prefix: string; field: string } | string {
-  const auth: Record<string, unknown> = { ...definition.auth }
-  const field = auth.kind === "bearer" ? auth.token : auth.kind === "api_key" ? auth.key : undefined
-  if (typeof field !== "string") {
-    return `${definition.name}: auth ${String(auth.kind)} is not supported; the package runs bearer and api_key over a single credential field.`
-  }
-  const only = definition.credential
-  if (!Array.isArray(only) || only.length !== 1 || only[0]?.name !== field) {
-    return `${definition.name}: credential must be the single field that auth names (${field}): an account holds one secret.`
-  }
-  if (auth.kind === "bearer") return { header: "authorization", prefix: "Bearer ", field }
-  if (typeof auth.header !== "string" || !HEADER_NAME.test(auth.header)) return `${definition.name}: auth api_key needs a header name.`
-  if (auth.prefix !== undefined && typeof auth.prefix !== "string") return `${definition.name}: auth api_key prefix must be text.`
-  return { header: auth.header.toLowerCase(), prefix: auth.prefix ?? "", field }
-}
 
 /** Le problème du connecteur lui-même (hors fonctions), dans l'ordre de ses champs ; `null` : aucun. */
 function connectorProblem(definition: ConnectorDefinition, reserved: ReadonlySet<string>, seen: ReadonlySet<string>): string | null {
@@ -72,6 +56,23 @@ function connectorProblem(definition: ConnectorDefinition, reserved: ReadonlySet
   return null
 }
 
+/** Le problème de ce qu'est un compte : les champs du secret, puis les réglages ; `null` : aucun. */
+function accountProblem(definition: ConnectorDefinition): string | null {
+  const { name, credential } = definition
+  const fields = Array.isArray(credential) ? credential : []
+  const badField = fields.find((field) => typeof field?.name !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(field.name) || typeof field.label !== "string" || typeof field.secret !== "boolean")
+  if (fields.length === 0 || badField) return `${name}: credential must list its fields {name, label, secret}, names in lowercase ASCII letters, digits and _.`
+  const settings = definition.settings ?? []
+  if (!Array.isArray(settings)) return `${name}: settings must be a list.`
+  const names = [...fields.map((field) => field.name), ...settings.map((setting) => setting?.name)]
+  if (new Set(names).size !== names.length) return `${name}: credential fields and settings need distinct names.`
+  for (const setting of settings) {
+    const problem = settingProblem(name, setting)
+    if (problem) return problem
+  }
+  return null
+}
+
 /** Les noms d'en-têtes qu'une fonction pose, du connecteur à ses arguments, sans casse. */
 function headerNames(definition: ConnectorDefinition, fn: ConnectorFunctionDefinition): string[] {
   return [...Object.keys(definition.headers ?? {}), ...Object.keys(fn.request.constants?.headers ?? {}), ...Object.keys(fn.request.headers)].map((header) =>
@@ -86,7 +87,7 @@ function typesOf(property: unknown): unknown[] {
 }
 
 /** Le problème de la requête d'une fonction ; `null` : aucun. */
-function requestProblem(definition: ConnectorDefinition, fn: ConnectorFunctionDefinition, authHeader: string): string | null {
+function requestProblem(definition: ConnectorDefinition, fn: ConnectorFunctionDefinition, auth: PreparedAuth): string | null {
   const spec = fn.request
   if (!isJsonObject(spec) || !METHODS.includes(spec.method) || typeof spec.path !== "string" || !spec.path.startsWith("/")) {
     return `${fn.name}: request needs a method (GET, POST, PUT, PATCH, DELETE) and a path starting with /.`
@@ -101,7 +102,11 @@ function requestProblem(definition: ConnectorDefinition, fn: ConnectorFunctionDe
   if (unknown !== undefined) return `${fn.name}: request places ${unknown}, which the schema does not declare.`
   const unlisted = inPath.find((argument) => !spec.pathParams.includes(argument))
   if (unlisted !== undefined) return `${fn.name}: path parameter ${unlisted} is not in pathParams.`
-  if (headerNames(definition, fn).includes(authHeader)) return `${fn.name}: a constant or argument header would replace the authentication header ${authHeader}.`
+  const header = authHeader(auth)
+  if (header !== null && headerNames(definition, fn).includes(header)) return `${fn.name}: a constant or argument header would replace the authentication header ${header}.`
+  if (auth.kind === "query" && [...Object.keys(spec.query), ...Object.keys(spec.constants?.query ?? {})].includes(auth.param)) {
+    return `${fn.name}: a constant or argument query parameter would replace the authentication parameter ${auth.param}.`
+  }
   const encoded = Object.entries(spec.encode ?? {})
   const badEncode = encoded.find(([argument, how]) => how !== "json" || !placed.includes(argument))
   if (badEncode) return `${fn.name}: encode ${badEncode[0]} must be json, on a placed argument.`
@@ -223,13 +228,15 @@ function probeProblem(definition: ConnectorDefinition): string | null {
 
 /** Un connecteur contrôlé et préparé ; au premier problème, `CatalogRegistrationError`. */
 function declared(definition: ConnectorDefinition, reserved: ReadonlySet<string>, seen: Set<string>): DeclaredConnector {
-  const problem = connectorProblem(definition, reserved, seen)
+  // Une authentification que le moteur n'exécute pas se refuse par son nom, avant ses champs (`oauth2_user` n'en a pas).
+  const kindProblem = RUN_AUTH_KINDS.includes(String(definition.auth?.kind)) ? null : prepareAuth(definition)
+  const problem = connectorProblem(definition, reserved, seen) ?? (typeof kindProblem === "string" ? kindProblem : null) ?? accountProblem(definition)
   if (problem) throw new CatalogRegistrationError(problem)
-  const { baseUrl } = definition
-  if (typeof baseUrl !== "string" || !baseUrl.startsWith("https://") || baseUrl.endsWith("/")) {
-    throw new CatalogRegistrationError(`${definition.name}: baseUrl must be an https:// address without a trailing slash.`)
-  }
-  const auth = authProblem(definition)
+  const address = baseAddress(definition)
+  if (!address) throw new CatalogRegistrationError(`${definition.name}: needs baseUrl or baseUrls, not both.`)
+  const addressFault = addressProblem(`${definition.name}: baseUrl`, address, definition.settings ?? [])
+  if (addressFault) throw new CatalogRegistrationError(addressFault)
+  const auth = prepareAuth(definition)
   if (typeof auth === "string") throw new CatalogRegistrationError(auth)
   seen.add(definition.name)
   let probe: PreparedFunction | null = null
@@ -237,24 +244,25 @@ function declared(definition: ConnectorDefinition, reserved: ReadonlySet<string>
     const schema = compiledFunction(definition, fn, seen)
     if (typeof schema === "string") throw new CatalogRegistrationError(schema)
     const cursor = cursorArgument(fn)
-    const later = requestProblem(definition, fn, auth.header) ?? (typeof cursor === "object" && cursor !== null ? cursor.problem : null) ?? controlsProblem(fn)
+    const later = requestProblem(definition, fn, auth) ?? (typeof cursor === "object" && cursor !== null ? cursor.problem : null) ?? controlsProblem(fn)
     if (later) throw new CatalogRegistrationError(later)
     seen.add(fn.name)
-    const api = { label: definition.label, baseUrl, timeoutMs: definition.timeoutMs, errors: errorTable(definition, fn), rateLimit: definition.rateLimit }
-    const prepared: PreparedFunction = { connector: definition, fn, api, auth, cursorArgument: typeof cursor === "string" ? cursor : null }
+    const api = { label: definition.label, timeoutMs: definition.timeoutMs, errors: errorTable(definition, fn), rateLimit: definition.rateLimit }
+    const prepared: PreparedFunction = { connector: definition, fn, api, address, auth, cursorArgument: typeof cursor === "string" ? cursor : null }
     if (fn.name === definition.probe?.function) probe = prepared
     return catalogFunction(prepared, schema)
   })
   const problemOfProbe = probeProblem(definition)
   if (problemOfProbe) throw new CatalogRegistrationError(problemOfProbe)
-  return { definition, functions, probe }
+  return { definition, auth, functions, probe }
 }
 
 /**
  * Déclare les connecteurs décrits de l'hôte, partagés ou propres (`ConnectorDefinition`), à appeler au montage de
  * chaque route qui monte une porte du paquet, comme `registerFunctions`. Toute la liste est contrôlée d'abord : nom du
- * connecteur (celui de `platform.connectors`), espace de noms libre, doublon, libellé, adresse, délai, authentification
- * (`bearer` ou `api_key`, sur un seul champ de secret), table d'erreurs ; puis chaque fonction : nom, classe,
+ * connecteur (celui de `platform.connectors`), espace de noms libre, doublon, libellé, délai, table d'erreurs, champs
+ * du secret et réglages, adresse (fixe, gabarit ou par réglage), authentification (`api_key`, `bearer`, `basic`,
+ * `oauth2_client_credentials` ; `oauth2_user` refusé nommément) ; puis chaque fonction : nom, classe,
  * description, schéma strict et compilé (JSON Schema 2020-12), exemples, requête, pagination, contrôles,
  * récapitulatif d'une fonction sensible ; enfin la sonde. Au premier refus, `CatalogRegistrationError` et rien n'est
  * déclaré ; sinon la liste remplace toute la déclaration précédente (un rechargement à chaud ne double rien).

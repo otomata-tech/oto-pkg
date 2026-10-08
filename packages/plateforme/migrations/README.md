@@ -175,6 +175,13 @@ propre workflow (`supabase db push`, sur Supabase comme sur un Postgres sans Sup
   réservée à un membre d'une organisation (`member_orgs`, sinon `42501`), le nom au motif de `connectors_name_check`, le
   libellé de 80 caractères au plus (`22023`). Aucune table, colonne ni policy. Fichier à part de `20261006090000`, déjà
   appliqué au projet de test ; les deux se fusionnent en `<horodatage>_v1_5_0.sql` avant le tag (D124).
+- `20261008090000_platform_comptes_a_champs.sql` (version 1.5.0, comptes à plusieurs champs et réglages) : colonnes
+  d'`accounts` `settings` (`jsonb`, `{}`, un objet, contrôle `accounts_settings_check`), `secret_fields` (`text[]`,
+  `{}`), `secret_updated_at`, `token_ciphertext`, `token_expires_at`, `status_reason` (500 caractères au plus) ;
+  `secret_updated_at` reprend `updated_at` pour un secret déjà posé ; droits de colonnes à `authenticated`, sans
+  lecture de `token_ciphertext` ; `account_token(compte)`, `security definer`, `search_path` vide, révoquée à `public`
+  et `anon`, accordée à `authenticated` : le chiffré du jeton au seul membre de l'organisation du compte. Fusionnée
+  avec les deux précédentes avant le tag.
 
 ## Installer sur un hôte neuf
 

@@ -27,6 +27,10 @@ import { adminConnectionSecrets, asCaller, portable, SQL_SKIP_REASON, sqlConfigu
 // Ces tests supposent le dossier `private` en base (fiche D107) : sautés, la version nommée, tant que
 // 20260928120000 n'est pas appliquée au projet (`database-patterns.md § Règles`).
 const privatePending = await privateFolderPending()
+// La carte exporte les réglages d'un compte et en écarte le secret et le jeton : sans les colonnes des comptes à plusieurs
+// champs, l'export échoue sur une colonne absente (42703) ; la suite se saute, la version nommée, d'ici leur application.
+const ACCOUNT_FIELDS_VERSION = "20261008090000"
+const accountFieldsPending = (await pendingMigrations()).includes(ACCOUNT_FIELDS_VERSION)
 
 // Semis, trois exports et un import en préparation : une trentaine de secondes au calme ; sous la
 // charge des agents qui testent en même temps, une requête triviale prend jusqu'à 3,5 s et le semis
@@ -131,10 +135,12 @@ const org = () => {
 // test compte les lignes de la base par celle des tests, par la même variable.
 const configured = supabaseConfigured && sqlConfigured
 
-describe.skipIf(!configured)(
-  configured
-    ? "org:export and org:import end to end"
-    : `org:export and org:import end to end (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`,
+describe.skipIf(!configured || accountFieldsPending)(
+  !configured
+    ? `org:export and org:import end to end (${supabaseConfigured ? SQL_SKIP_REASON : SKIP_REASON})`
+    : accountFieldsPending
+      ? `org:export and org:import end to end (${pendingReason([ACCOUNT_FIELDS_VERSION])})`
+      : "org:export and org:import end to end",
   { timeout: TIMEOUT },
   () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "org-transfer-"))

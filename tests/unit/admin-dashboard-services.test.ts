@@ -73,7 +73,10 @@ describe.skipIf(!sqlConfigured)(portable("dashboard views of the connector servi
     await seed?.cleanup()
   }, 180_000)
 
-  describe("deactivationImpact (AC11, H123)", () => {
+  /** Ce que la vue d'un compte dit d'un secret jamais posé. */
+const NO_SECRET = { secret: { fields: [], updatedAt: null }, settings: {} }
+
+describe("deactivationImpact (AC11, H123)", () => {
     it("should name and count only the published procedures the caller reads, whose published call block calls the connector", async () => {
       // Ada administre : Mail Org et Mail Ventes comptent, pas le compte personnel de Claire ni la procédure de sa section Perso.
       expect(await deactivationImpact(await ref.db("ada"), ref.identityOf("ada"), "mail")).toEqual({
@@ -103,9 +106,10 @@ describe.skipIf(!sqlConfigured)(portable("dashboard views of the connector servi
 
         expect(accounts).toHaveLength(PAGE_AND_MORE + 3)
         expect(accounts.filter((account) => !account.label.startsWith("Compte "))).toEqual([
-          { id: "account:mail-old", label: "Mail Ancien", connector: "mail", owner: { kind: "org" }, mode: "simule", status: "disabled" },
-          { id: "account:mail-org", label: "Mail Org", connector: "mail", owner: { kind: "org" }, mode: "simule", status: "active" },
-          { id: "account:mail-ventes", label: "Mail Ventes", connector: "mail", owner: { kind: "team", teamName: "Ventes" }, mode: "simule", status: "active" },
+          // Un compte simulé n'a ni secret ni réglage : l'écran le lit tel quel.
+          { id: "account:mail-old", label: "Mail Ancien", connector: "mail", owner: { kind: "org" }, mode: "simule", status: "disabled", ...NO_SECRET },
+          { id: "account:mail-org", label: "Mail Org", connector: "mail", owner: { kind: "org" }, mode: "simule", status: "active", ...NO_SECRET },
+          { id: "account:mail-ventes", label: "Mail Ventes", connector: "mail", owner: { kind: "team", teamName: "Ventes" }, mode: "simule", status: "active", ...NO_SECRET },
         ])
         // Ni le compte personnel de Claire, ni celui de P.
         expect(accounts.map((account) => account.label)).not.toContain("Mail Claire")

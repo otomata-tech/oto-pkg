@@ -82,16 +82,53 @@ describe("registerConnectors", () => {
     ["an invalid name", () => [{ ...describedConnector(), name: "Crm" }], 'Invalid connector name "Crm": lowercase ASCII letters, digits and _, starting with a letter, 40 characters at most.'],
     ["a namespace of the package", () => [describedConnector("mail")], "Connector mail: the namespace is already served by another source."],
     ["a duplicate", () => [describedConnector(), describedConnector()], "Duplicate connector crm in registerConnectors."],
-    ["an http address", () => [{ ...describedConnector(), baseUrl: "http://crm.example.test" }], "crm: baseUrl must be an https:// address without a trailing slash."],
+    ["an http address", () => [{ ...describedConnector(), baseUrl: "http://crm.example.test" }], "crm: baseUrl must start with https:// or with a url setting."],
     [
-      "basic authentication",
-      () => [{ ...describedConnector(), auth: { kind: "basic", username: "api_id", password: "api_key" } }],
-      "crm: auth basic is not supported; the package runs bearer and api_key over a single credential field.",
+      "a person's consent (oauth2_user), next batch",
+      () => [{ ...describedConnector(), credential: [], auth: { kind: "oauth2_user", authorizeUrl: "https://crm.example.test/authorize", tokenUrl: "https://crm.example.test/token" } }],
+      "crm: auth oauth2_user (a person's consent) is not supported yet: it comes with the next batch of the package.",
     ],
     [
-      "two credential fields",
-      () => [{ ...describedConnector(), credential: [...describedConnector().credential, { name: "api_id", label: "API id", secret: false }] }],
-      "crm: credential must be the single field that auth names (api_key): an account holds one secret.",
+      "basic authentication on a field the credential does not declare",
+      () => [{ ...describedConnector(), auth: { kind: "basic", username: "api_id", password: "api_key" } }],
+      "crm: auth basic must name two credential fields (username, password).",
+    ],
+    [
+      "a key in the query with a prefix",
+      () => [{ ...describedConnector(), auth: { kind: "api_key", in: "query", name: "key", prefix: "Key ", key: "api_key" } as unknown as ConnectorDefinition["auth"] }],
+      "crm: auth api_key: a key in the query takes no prefix.",
+    ],
+    [
+      "a key in the query that an argument would replace",
+      () => [{ ...describedConnector(), auth: { kind: "api_key", in: "query", name: "limit", key: "api_key" } }],
+      "crm.list_contacts: a constant or argument query parameter would replace the authentication parameter limit.",
+    ],
+    [
+      "an address citing an unknown setting",
+      () => [{ ...describedConnector(), baseUrl: "https://{tenant}.crm.example.test" }],
+      "crm: baseUrl cites {tenant}, which is not a setting.",
+    ],
+    [
+      "a url setting in the middle of an address",
+      () => [{ ...describedConnector(), settings: [{ name: "server", label: "Server", type: "url" }], baseUrl: "https://crm.example.test/{server}" }],
+      "crm: baseUrl: url setting {server} must open the address, alone.",
+    ],
+    [
+      "an address per region missing a choice",
+      () => [
+        {
+          ...describedConnector(),
+          baseUrl: undefined,
+          settings: [{ name: "region", label: "Region", type: "choice", choices: ["us", "eu"] }],
+          baseUrls: { setting: "region", values: { us: "https://us.crm.example.test" } },
+        },
+      ],
+      "crm: baseUrl must give one address to each choice of region.",
+    ],
+    [
+      "a text setting whose pattern is not anchored",
+      () => [{ ...describedConnector(), settings: [{ name: "domain", label: "Domain", type: "text", pattern: "[a-z]+" }] }],
+      'crm: setting "domain": pattern must be anchored (^…$).',
     ],
     [
       "a schema that is not strict",

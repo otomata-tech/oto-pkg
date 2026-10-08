@@ -3,7 +3,7 @@
 // exécute. Le paquet ne dépend d'aucun dépôt de connecteurs : ce type est le sien, de même forme que la sortie de la
 // fabrique du dépôt `connectors` (`ts/src/types.ts`), qu'un hôte lui passe telle quelle ; un connecteur propre à
 // l'hôte s'écrit à la main dans cette même forme. Ce qui n'y figure pas (version, modes, quota, exposition) est
-// ignoré. Aucun secret ici : `auth` nomme un champ de `credential`, la valeur vient du compte à l'appel.
+// ignoré. Aucun secret ici : `auth` nomme des champs de `credential`, les valeurs viennent du compte à l'appel.
 
 export type ConnectorFunctionClass = "read" | "write" | "sensitive"
 
@@ -14,16 +14,44 @@ export type ConnectorJsonSchema = { readonly [key: string]: unknown }
 
 export type ConnectorJsonValue = string | number | boolean | null | readonly ConnectorJsonValue[] | { readonly [key: string]: ConnectorJsonValue }
 
-/** Un champ du secret d'un compte ; le paquet n'en garde qu'un, le secret du compte. */
+/** Un champ du secret d'un compte ; un compte garde tous les champs que déclare son connecteur, chiffrés ensemble. */
 export type ConnectorCredentialField = { readonly name: string; readonly label: string; readonly secret: boolean }
 
 /**
- * L'authentification : `bearer` et `api_key` s'exécutent ; toute autre sorte (`basic`, `oauth2_*`, `none`) se
- * déclare mais est refusée nommément par `registerConnectors`.
+ * Un réglage non secret d'un compte, saisi par qui le connecte et gardé en clair : `choice`, une valeur d'une liste
+ * fermée (`default` à défaut) ; `text`, un texte qui satisfait `pattern` (expression ancrée) ; `url`, une adresse
+ * `https://` libre. Un réglage n'est cité que par une adresse (`baseUrl`, `baseUrls`, `tokenUrl`, `tokenUrls`).
+ */
+export type ConnectorSetting =
+  | { readonly name: string; readonly label: string; readonly type: "choice"; readonly choices: readonly string[]; readonly default?: string }
+  | { readonly name: string; readonly label: string; readonly type: "text"; readonly pattern: string }
+  | { readonly name: string; readonly label: string; readonly type: "url" }
+
+/** Une adresse par valeur d'un réglage `choice`. */
+export type ConnectorUrlsBySetting = { readonly setting: string; readonly values: { readonly [choice: string]: string } }
+
+/** Le point de jeton d'un échange : une adresse (gabarit possible) ou une adresse par valeur d'un réglage `choice`. */
+export type ConnectorTokenEndpoint = { readonly tokenUrl: string; readonly tokenUrls?: never } | { readonly tokenUrls: ConnectorUrlsBySetting; readonly tokenUrl?: never }
+
+/**
+ * L'authentification : `api_key` (en en-tête ou en query), `bearer`, `basic` et `oauth2_client_credentials`
+ * s'exécutent ; toute autre sorte (`oauth2_user`, `none`) se déclare mais est refusée nommément par
+ * `registerConnectors`. Chaque valeur qui désigne un secret nomme un champ de `credential`.
  */
 export type ConnectorAuth =
+  | { readonly kind: "api_key"; readonly in: "header"; readonly name: string; readonly prefix?: string; readonly key: string }
+  | { readonly kind: "api_key"; readonly in: "query"; readonly name: string; readonly prefix?: never; readonly key: string }
   | { readonly kind: "bearer"; readonly token: string }
-  | { readonly kind: "api_key"; readonly header: string; readonly prefix?: string; readonly key: string }
+  | { readonly kind: "basic"; readonly username: string; readonly password: string }
+  | ({
+      readonly kind: "oauth2_client_credentials"
+      readonly tokenRequest: "json" | "form"
+      readonly clientAuth: "body" | "basic"
+      readonly clientId: string
+      readonly clientSecret: string
+      readonly scope?: string
+      readonly expiresInDefault?: number
+    } & ConnectorTokenEndpoint)
   | { readonly kind: string }
 
 /** Une ligne de la table d'erreurs : statut du tiers, refus nommé, message en anglais. */
@@ -73,6 +101,8 @@ export type ConnectorOutput = {
   readonly items?: string
   readonly strip?: readonly string[]
   readonly projection?: readonly string[]
+  /** La forme d'un enregistrement, que la fabrique écrit ; ignorée par le moteur. */
+  readonly schema?: ConnectorJsonSchema
 }
 
 /** Contrôle des arguments avant l'appel : rien n'est envoyé s'il échoue. */
@@ -108,9 +138,13 @@ export type ConnectorFunctionDefinition = {
 export type ConnectorDefinition = {
   readonly name: string
   readonly label: string
+  /** Racine `https://` des chemins, sans `/` final ; gabarit possible sur les réglages (`https://{domain}.example.net`). */
   readonly baseUrl?: string
+  /** Racine des chemins par valeur d'un réglage `choice` (une région), à la place de `baseUrl`. */
+  readonly baseUrls?: ConnectorUrlsBySetting
   readonly auth: ConnectorAuth
   readonly credential: readonly ConnectorCredentialField[]
+  readonly settings?: readonly ConnectorSetting[]
   readonly timeoutMs: number
   readonly queryArrays?: "repeat" | "brackets" | "comma"
   /** En-têtes constants de toute requête ; jamais l'en-tête d'authentification. */

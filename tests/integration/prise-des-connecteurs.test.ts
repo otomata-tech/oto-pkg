@@ -11,11 +11,12 @@
 import { randomBytes } from "crypto"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { runCall, type CallInput } from "../../packages/plateforme/server/calls"
-import { createAccount, listOrgAccounts, probeAccount, setAccountSecret } from "../../packages/plateforme/server/connectors/accounts"
+import { probeAccount, setAccountSecret } from "../../packages/plateforme/server/connectors/account-secret"
+import { createAccount, listOrgAccounts } from "../../packages/plateforme/server/connectors/accounts"
 import { activateConnector, loadActiveConnectors } from "../../packages/plateforme/server/connectors/activations"
 import { registerConnectors } from "../../packages/plateforme/server/connectors/declaration"
 import type { Fetch } from "../../packages/plateforme/server/connectors/http"
-import { decryptSecret } from "../../packages/plateforme/server/connectors/vault"
+import { decryptCredential } from "../../packages/plateforme/server/connectors/vault"
 import type { PlatformDb } from "../../packages/plateforme/server/db"
 import { PlatformError } from "../../packages/plateforme/server/errors"
 import { resolveIdentity, type Identity } from "../../packages/plateforme/server/identity"
@@ -29,7 +30,10 @@ import { createSqlFixtures, spyDb, SQL_SKIP_REASON, sqlConfigured, testAdminSql,
 const VERSION = "20261006090000"
 /** La liste des connecteurs tenue depuis la déclaration (`platform.declare_connector`). */
 const DECLARED_VERSION = "20261007090000"
+/** Les comptes à plusieurs champs : les services de compte lisent leurs colonnes. */
+const FIELDS_VERSION = "20261008090000"
 const missing = await pendingMigrations()
+const fieldsPending = missing.includes(FIELDS_VERSION)
 const pending = missing.includes(VERSION)
 const declaredPending = missing.includes(DECLARED_VERSION)
 
@@ -68,9 +72,13 @@ function stubTiers(answer: unknown = { items: [{ id: "c-1", name: "Ada" }], has_
   return { send, authorizations: () => send.mock.calls.map(([, init]) => new Headers(init.headers).get("authorization")) }
 }
 
-const suite = sqlConfigured ? "connector intake on a real database" : `connector intake on a real database (${SQL_SKIP_REASON})`
+const suite = !sqlConfigured
+  ? `connector intake on a real database (${SQL_SKIP_REASON})`
+  : fieldsPending
+    ? `connector intake on a real database (${pendingReason([FIELDS_VERSION])})`
+    : "connector intake on a real database"
 
-describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
+describe.skipIf(!sqlConfigured || fieldsPending)(suite, { timeout: NETWORK_TIMEOUT }, () => {
   let fx: SqlFixtures
   let o: SqlReferenceOrg
   const sessions = new Map<ReferencePerson, Session>()
@@ -138,37 +146,40 @@ describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
       const created = await createAccount(ada.db, ada.identity, { connector: LIVE, owner_kind: "org", label, mode: "reel" })
       expect(created).toMatchObject({ label, connector: LIVE, mode: "reel" })
       const secret = newSecret()
-      const set = await setAccountSecret(ada.db, ada.identity, { account_id: created.id, secret })
+      const set = await setAccountSecret(ada.db, ada.identity, { account_id: created.id, input: { secret: { api_key: secret } } })
       expect(set).toEqual(created)
       const ciphertext = await ciphertextOf(created.id)
       expect(ciphertext).not.toBeNull()
       expect(JSON.stringify(set)).not.toContain(secret)
       expect(ciphertext).not.toContain(secret)
-      expect(decryptSecret(created.id, ciphertext ?? "")).toBe(secret)
+      expect(decryptCredential(created.id, ciphertext ?? "")).toEqual({ fields: { api_key: secret } })
     })
 
     it("should refuse the secret to whoever does not manage the account, and to a simulated account, writing nothing (AC8)", async () => {
       const live = await orgAccount("reel")
       const marc = as("marc")
-      const forbidden = await refusal(setAccountSecret(marc.db, marc.identity, { account_id: live.id, secret: newSecret() }))
+      const forbidden = await refusal(setAccountSecret(marc.db, marc.identity, { account_id: live.id, input: { secret: { api_key: newSecret() } } }))
       expect({ code: forbidden.code, message: forbidden.message }).toEqual({
         code: "forbidden",
         message: `Setting the secret of « ${live.label} » is reserved to those who manage it: the administrators of Acme Test (Ada Martin).`,
       })
       const simulated = await fx.createAccount(o.org.id, { connector: "mail", ownerKind: "org", label: `Mail ${hex(3)}` })
       const ada = as("ada")
-      expect((await refusal(setAccountSecret(ada.db, ada.identity, { account_id: simulated, secret: newSecret() }))).code).toBe("invalid_arguments")
+      expect((await refusal(setAccountSecret(ada.db, ada.identity, { account_id: simulated, input: { secret: { api_key: newSecret() } } }))).code).toBe("invalid_arguments")
       expect([await ciphertextOf(live.id), await ciphertextOf(simulated)]).toEqual([null, null])
     })
 
-    it("should answer conflict, logged, when the account goes away between its read and the write of its secret (AC8)", async () => {
+    it("should answer stale_revision, logged, when the account changes between its read and the write of its secret (AC8)", async () => {
       const live = await orgAccount("reel")
       const ada = as("ada")
       const errors = vi.spyOn(console, "error").mockImplementation(() => {})
       const raced = spyDb(ada.db, { before: (query) => (query.op === "update" ? fx.admin`delete from platform.accounts where id = ${live.id}` : undefined) })
-      const error = await refusal(setAccountSecret(raced.db, ada.identity, { account_id: live.id, secret: newSecret() }))
-      expect({ code: error.code, message: error.message }).toEqual({ code: "conflict", message: `Account « ${live.label} » changed meanwhile. Reload it and retry.` })
-      expect(loggedText(errors)).toContain(`[platform] setAccountSecret: no row written for account ${live.id}`)
+      const error = await refusal(setAccountSecret(raced.db, ada.identity, { account_id: live.id, input: { secret: { api_key: newSecret() } } }))
+      expect({ code: error.code, message: error.message }).toEqual({
+        code: "stale_revision",
+        message: `Account « ${live.label} » was changed meanwhile. Reload it and enter its secret again.`,
+      })
+      expect(loggedText(errors)).toContain(`[platform] setAccountSecret: account ${live.id} changed since its secret was read`)
     })
 
     it("should refuse a simulated account of a live connector before the function (AC13)", async () => {
@@ -212,7 +223,7 @@ describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
     it("should give the ciphertext to a member of the account's organisation only (AC10)", async () => {
       const live = await orgAccount("reel")
       const ada = as("ada")
-      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, secret: newSecret() })
+      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, input: { secret: { api_key: newSecret() } } })
       const other = await fx.createOrg()
       const stranger = await fx.createUser()
       await fx.addMember(other.id, stranger.id, { role: "admin" })
@@ -225,7 +236,7 @@ describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
       const ada = as("ada")
       const live = await orgAccount("reel")
       const secret = newSecret()
-      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, secret })
+      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, input: { secret: { api_key: secret } } })
       const tiers = stubTiers()
       const output = await call("lea", { function: `${LIVE}.list_contacts`, arguments: { limit: 1 }, account: live.label })
       expect(tiers.authorizations()).toEqual([`Bearer ${secret}`])
@@ -257,7 +268,7 @@ describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
       const ada = as("ada")
       const live = await orgAccount("reel")
       const secret = newSecret()
-      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, secret })
+      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, input: { secret: { api_key: secret } } })
       const ciphertext = (await ciphertextOf(live.id)) ?? ""
       stubTiers()
       const errors = vi.spyOn(console, "error")
@@ -291,7 +302,7 @@ describe.skipIf(!sqlConfigured)(suite, { timeout: NETWORK_TIMEOUT }, () => {
       const ada = as("ada")
       const live = await orgAccount("reel")
       const secret = newSecret()
-      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, secret })
+      await setAccountSecret(ada.db, ada.identity, { account_id: live.id, input: { secret: { api_key: secret } } })
       const probe = () => probeAccount(ada.db, ada.identity, { account_id: live.id })
       const tiers = stubTiers({ company: "Acme", scopes: ["contacts:read"] })
       expect(await probe()).toEqual({ healthy: true })

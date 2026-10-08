@@ -6,6 +6,7 @@
 // exemples, refus, `strictObject`. Ajouté : l'origine (H80) et la suite proposée (`next`, H87).
 import type * as z from "zod/v4"
 import type { ViewKind } from "../../schemas/views"
+import type { AccountCredential } from "../connectors/auth"
 import type { ResolvedAccount } from "../connectors/resolution"
 import type { PlatformDb } from "../db"
 import type { Identity } from "../identity"
@@ -28,10 +29,11 @@ export type FunctionContext = {
   /** Compte résolu (H83) d'une fonction de connecteur ; absent pour une fonction native ou ERP (E04-S01). */
   account?: ResolvedAccount
   /**
-   * Secret du compte résolu, déchiffré par `runCall` pour un compte réel d'un connecteur réel, et pour `run` seul
-   * (jamais `summarize`) : le connecteur le pose dans sa requête au tiers, jamais dans un texte, un log ou une erreur.
+   * Le compte résolu ouvert : ses champs déchiffrés, ses réglages et son jeton, par `runCall` pour un compte réel d'un
+   * connecteur réel, et pour `run` seul (jamais `summarize`) : le connecteur les pose dans sa requête au tiers, jamais
+   * dans un texte, un log ou une erreur.
    */
-  credential?: string
+  credential?: AccountCredential
   /** Code `ctx` de l'appel (E03-S04, N9) : la provenance d'une écriture faite par un assistant (ADR-011 § 2). */
   ctx?: string | null
   /** Client MCP de la conversation (`ctx.host`, `nom@version`), rangé dans la provenance d'une écriture (E11-S01, AC-d2) ; absent sans lui. */

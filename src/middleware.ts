@@ -39,6 +39,23 @@ function publicShare(): NextResponse {
   return response
 }
 
+/**
+ * L'adresse publique d'une destination de la requête. Sous `next start` derrière un proxy, Next bâtit
+ * `request.url` du middleware sur l'adresse d'écoute (`localhost:<port>`) : une redirection qui s'en servirait
+ * enverrait le navigateur sur `https://localhost:<port>`. L'hôte vient donc de `X-Forwarded-Host`, sinon de
+ * `Host`, et le protocole de `X-Forwarded-Proto`, comme l'organisation (`rawRequestHost` et `requestOrigin` du
+ * paquet, que le middleware n'importe pas : il tourne sur Edge, sans la face server). Sans ces en-têtes,
+ * l'adresse de la requête.
+ */
+function publicUrl(request: NextRequest, destination: string): URL {
+  const target = new URL(destination, request.url)
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() || request.headers.get("host")?.trim()
+  if (!host) return target
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase()
+  const protocol = forwarded === "http" || forwarded === "https" ? forwarded : target.protocol.slice(0, -1)
+  return new URL(`${target.pathname}${target.search}`, `${protocol}://${host}`)
+}
+
 /** La session Supabase de la requête, rafraîchie par `getUser()` : ses cookies sont sur `response`. */
 async function supabaseSession(request: NextRequest): Promise<{ response: NextResponse; signedIn: boolean }> {
   let supabaseResponse = NextResponse.next({
@@ -84,13 +101,9 @@ export async function middleware(request: NextRequest) {
   // La session a pu être rafraîchie et ses cookies écrits sur `response`. Une réponse de redirection
   // neuve ne les porte pas : l'ancien jeton de rafraîchissement est déjà consommé et le nouveau serait
   // jeté, ce qui produit des déconnexions aléatoires. Recopier les cookies avant de retourner.
-  // `destination` donne le chemin et la requête (HN-E02S02-16).
+  // `destination` donne le chemin et la requête (HN-E02S02-16), à l'adresse publique de la requête.
   function redirectTo(destination: string) {
-    const url = request.nextUrl.clone()
-    const cible = new URL(destination, request.url)
-    url.pathname = cible.pathname
-    url.search = cible.search
-    const redirect = NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(publicUrl(request, destination))
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie))
     return redirect
   }

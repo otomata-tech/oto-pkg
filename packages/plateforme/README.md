@@ -194,7 +194,9 @@ Pour une application Next 15 (App Router) sur Supabase.
 
 Un hôte, un émetteur. Sans `PLATFORM_OIDC_ISSUER`, c'est Supabase Auth du projet, comme avant ; avec
 elle, un émetteur OpenID Connect (Logto, Keycloak), dont le paquet lit les clés par la découverte, et
-dont chaque jeton doit porter `PLATFORM_OIDC_AUDIENCE` dans `aud`. Une personne y entre par
+dont chaque jeton doit porter dans `aud` `PLATFORM_OIDC_AUDIENCE`, ou, sur `/api/mcp` et
+`/api/mcp-admin`, la ressource que les métadonnées annoncent pour l'adresse appelée (RFC 8707 ; chez
+Logto, une ressource d'API déclarée par adresse et par MCP). Une personne y entre par
 invitation : son sujet chez l'émetteur est relié à un identifiant interne à sa première requête, par
 l'email vérifié de l'invitation (ou de l'équipe plateforme). Les métadonnées de ressource protégée
 annoncent l'émetteur aux assistants, qui s'y enregistrent et y consentent.

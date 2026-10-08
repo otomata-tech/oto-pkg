@@ -89,6 +89,32 @@ describe("OIDC issuer: audience (AC-a3)", () => {
     expect(await makeVerifyToken()(REQUEST, bearer)).toBeUndefined()
     expect(loggedText(log)).toContain("PLATFORM_OIDC_AUDIENCE")
   })
+
+  it("should accept the resource announced for the called address, on /api/mcp-admin and on a second organisation address", async () => {
+    const issuer = await testIssuer()
+    hostOn(issuer)
+    const verify = makeVerifyToken()
+    const admin = new Request("https://acme.example.test/api/mcp-admin", { method: "POST" })
+    // Derrière un proxy : l'origine publique vient de `X-Forwarded-*`, comme dans les métadonnées.
+    const second = new Request("http://127.0.0.1:3000/api/mcp", { method: "POST", headers: { "x-forwarded-host": "deux.example.test", "x-forwarded-proto": "https" } })
+
+    expect(await verify(admin, await issuer.sign({ sub: SUBJECT }, { audience: "https://acme.example.test/api/mcp-admin" }))).toBeDefined()
+    expect(await verify(second, await issuer.sign({ sub: SUBJECT }, { audience: "https://deux.example.test/api/mcp" }))).toBeDefined()
+    expect(await verify(second, await issuer.sign({ sub: SUBJECT }, { audience: AUDIENCE }))).toBeDefined()
+  })
+
+  it("should refuse a token issued for another address or another resource", async () => {
+    const issuer = await testIssuer()
+    hostOn(issuer)
+    const verify = makeVerifyToken()
+    const second = new Request("https://deux.example.test/api/mcp", { method: "POST" })
+
+    expect(await verify(second, await issuer.sign({ sub: SUBJECT }, { audience: "https://trois.example.test/api/mcp" }))).toBeUndefined()
+    expect(await verify(second, await issuer.sign({ sub: SUBJECT }, { audience: "https://deux.example.test/api/mcp-admin" }))).toBeUndefined()
+    // Hors des deux ressources (route de l'API de l'hôte) : la seule audience de l'hôte.
+    const api = new Request("https://deux.example.test/api/platform/me")
+    expect(await verify(api, await issuer.sign({ sub: SUBJECT }, { audience: "https://deux.example.test/api/platform/me" }))).toBeUndefined()
+  })
 })
 
 describe("OIDC issuer: verified email only (AC-a6)", () => {

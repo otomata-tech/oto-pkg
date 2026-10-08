@@ -3,7 +3,8 @@
 // `withMcpAuth` ne rendrait aucun 401 sur un jeton faux ou expiré. Émetteur configuré (E01-S11,
 // `server/issuer.ts`) : Supabase Auth par défaut, dont `aud` vaut `authenticated` pour tout jeton du
 // projet et n'est pas vérifiée (l'appartenance, relue à chaque appel, compense) ; un émetteur OIDC,
-// dont les clés viennent de la découverte et dont `aud` doit porter `PLATFORM_OIDC_AUDIENCE`.
+// dont les clés viennent de la découverte et dont `aud` doit porter `PLATFORM_OIDC_AUDIENCE` ou la
+// ressource que les métadonnées annoncent pour l'adresse appelée (`<origine>/api/mcp`, `/api/mcp-admin`).
 //
 // Repris du banc E03 (`mcp-test/src/auth-test/token.ts` l. 23-102) : JWKS mémoïsée, tolérance
 // d'horloge de 5 s, aucun `expiresAt`. Retiré : le motif de refus journalisé (aucune ligne n'est écrite
@@ -13,8 +14,10 @@
 // l'émetteur, le relais d'autorisation et les jetons maison (ADR-004, ADR-012 § 2).
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
 import { createRemoteJWKSet, errors, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from "jose"
+import { getPublicOrigin } from "mcp-handler"
 import { discover, issuerConfig } from "../server/issuer"
 import { isJsonObject } from "../server/json"
+import { MCP_ADMIN_RESOURCE_PATH, MCP_RESOURCE_PATH } from "../server/oauth"
 import { callerName, PlatformConfigError, type Caller, type IssuedCaller } from "../server/sql"
 
 /** Signature attendue par `withMcpAuth` (mcp-handler) : `undefined` → 401. */
@@ -48,10 +51,25 @@ function verifiedIn(claims: Record<string, unknown>): string | undefined {
 type TokenCheck = {
   issuer: string
   kind: IssuedCaller["issuerKind"]
-  audience?: string
+  audience?: string[]
   keys: JWTVerifyGetKey
   email: (payload: JWTPayload, bearer: string) => Promise<string | undefined>
   variable: "NEXT_PUBLIC_SUPABASE_URL" | "PLATFORM_OIDC_ISSUER"
+}
+
+/** Les chemins des ressources que décrivent les métadonnées (`metadata.ts`) : le MCP de l'organisation et le MCP admin. */
+const RESOURCE_PATHS = new Set([MCP_RESOURCE_PATH, MCP_ADMIN_RESOURCE_PATH])
+
+/**
+ * Les audiences admises d'un jeton OIDC : celle de l'hôte (`PLATFORM_OIDC_AUDIENCE`, que le client web demande),
+ * et, sur `/api/mcp` et `/api/mcp-admin`, la ressource que les métadonnées annoncent pour l'adresse appelée
+ * (RFC 8707 : `<origine publique>/<chemin>`, la même lecture de l'origine que `metadata.ts`). Un émetteur qui met
+ * dans `aud` la ressource demandée (Logto) sert ainsi le MCP admin et chaque adresse d'organisation, chacune
+ * déclarée chez lui ; un jeton émis pour une autre adresse reste refusé.
+ */
+function audiencesOf(configured: string, request: Request): string[] {
+  const path = new URL(request.url).pathname
+  return RESOURCE_PATHS.has(path) ? [configured, `${getPublicOrigin(request)}${path}`] : [configured]
 }
 
 /** Clés de l'émetteur injoignables ou illisibles (jose) : une panne de configuration, pas un jeton faux. */
@@ -143,14 +161,14 @@ function configFailure(error: unknown): null {
 }
 
 /** Ce que vérifie un jeton : l'émetteur passé (tests), sinon celui de la configuration ; `null` : 401. */
-async function tokenCheck(options: { jwks?: JWTVerifyGetKey; issuer?: string }): Promise<TokenCheck | null> {
+async function tokenCheck(options: { jwks?: JWTVerifyGetKey; issuer?: string }, request: Request): Promise<TokenCheck | null> {
   if (options.issuer) return supabaseCheck(options.issuer, options.jwks)
   try {
     const config = issuerConfig()
     if (config.kind === "supabase") return supabaseCheck(config.issuer, options.jwks)
     const found = await discover(config.issuer)
     const keys = options.jwks ?? remoteJwks(found.jwksUri)
-    return { issuer: config.issuer, kind: "oidc", audience: config.audience, keys, email: oidcEmail(found.userinfoEndpoint), variable: "PLATFORM_OIDC_ISSUER" }
+    return { issuer: config.issuer, kind: "oidc", audience: audiencesOf(config.audience, request), keys, email: oidcEmail(found.userinfoEndpoint), variable: "PLATFORM_OIDC_ISSUER" }
   } catch (error) {
     return configFailure(error)
   }
@@ -209,9 +227,9 @@ export function verifiedCaller(extra: Record<string, unknown> | undefined): Call
  * (`createLocalJWKSet`) et, pour la forme de Supabase Auth, son émetteur. Tout refus rend `undefined`.
  */
 export function makeVerifyToken(options: { jwks?: JWTVerifyGetKey; issuer?: string } = {}): VerifyToken {
-  return async (_request, bearer) => {
+  return async (request, bearer) => {
     if (!bearer) return undefined
-    const check = await tokenCheck(options)
+    const check = await tokenCheck(options, request)
     return check ? verify(bearer, check) : undefined
   }
 }

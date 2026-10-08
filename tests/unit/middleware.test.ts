@@ -154,3 +154,25 @@ describe("middleware with a session", () => {
     expect(response.cookies.get("sb-test-auth-token")?.value).toBe("fresh")
   })
 })
+
+// Sous `next start` derrière un proxy, `request.url` porte l'adresse d'écoute : la redirection prend
+// l'adresse publique des en-têtes du proxy (deploiement.md d'oto-saas, § 8.3).
+describe("middleware behind a proxy", () => {
+  function derriere(path: string, headers: Record<string, string>): NextRequest {
+    return new NextRequest(`https://localhost:3000${path}`, { headers })
+  }
+
+  it("should redirect to the forwarded host and protocol, never to the listening address", async () => {
+    const response = await middleware(derriere("/n/contexte", { host: "localhost:3000", "x-forwarded-host": "acme.example.test", "x-forwarded-proto": "https" }))
+
+    expect(response.headers.get("location")).toBe("https://acme.example.test/login?redirect=%2Fn%2Fcontexte")
+  })
+
+  it("should take the Host header when the proxy keeps it and sends no X-Forwarded-Host", async () => {
+    session.user = { id: "user-1" }
+
+    const response = await middleware(derriere("/login", { host: "acme.example.test", "x-forwarded-proto": "https" }))
+
+    expect(response.headers.get("location")).toBe("https://acme.example.test/")
+  })
+})

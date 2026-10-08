@@ -1,7 +1,7 @@
 # Identité et connexion
 
 - **Statut** : validé avec JB le 23/09/2026
-- **Dernière révision** : 2026-10-01
+- **Dernière révision** : 2026-10-08
 
 ## Résumé
 
@@ -36,7 +36,7 @@ Une personne a un compte dans l'annuaire de l'application hôte : il sert aux é
 
 - HN-E01S11-1 : `PLATFORM_OIDC_ISSUER` posée choisit un émetteur OpenID Connect ; absente, Supabase Auth, déduit de `NEXT_PUBLIC_SUPABASE_URL`.
 - **Mode Supabase** : `aud` = `authenticated`, non vérifiée (l'appartenance compense) ; session web `@supabase/ssr`. HN-E01S11-4 : sur Supabase Auth, l'identifiant interne d'une personne est son `sub` ; sa ligne `identities` naît au premier passage.
-- **Mode OIDC** (`PLATFORM_OIDC_ISSUER` et `PLATFORM_OIDC_AUDIENCE`) : chaque jeton est vérifié par la JWKS de sa découverte, `iss` exact, `aud` égale à l'audience de l'hôte. L'hôte se connecte chez l'émetteur (`/auth/oidc/*`, oauth4webapi) et garde la session dans un cookie `__Host-` chiffré (`PLATFORM_SESSION_SECRET`, AES-GCM), que le middleware rafraîchit ; les pages propres à Supabase Auth y rendent 404.
+- **Mode OIDC** (`PLATFORM_OIDC_ISSUER` et `PLATFORM_OIDC_AUDIENCE`) : chaque jeton est vérifié par la JWKS de sa découverte, `iss` exact, `aud` égale à l'audience de l'hôte ou, sur `/api/mcp` et `/api/mcp-admin`, à la ressource que les métadonnées annoncent pour l'adresse appelée (`<origine publique>/<chemin>`, RFC 8707) : un émetteur qui grave la ressource demandée (Logto) sert ainsi le MCP admin et chaque adresse d'organisation, un jeton d'une autre adresse restant refusé. L'hôte se connecte chez l'émetteur (`/auth/oidc/*`, oauth4webapi) et garde la session dans un cookie `__Host-` chiffré (`PLATFORM_SESSION_SECRET`, AES-GCM), que le middleware rafraîchit ; les pages propres à Supabase Auth y rendent 404.
 - HN-E01S11-2 : en mode OIDC, l'email vient du jeton, sinon de `userinfo`, et n'entre dans les claims que vérifié (`email_verified`) ; le résultat est gardé jusqu'à l'expiration du jeton.
 - HN-E01S11a1c-4 : découverte en forme OpenID Connect, puis, sur un 404, les métadonnées OAuth (RFC 8414) ; l'`issuer` annoncé doit égaler la variable ; gardée une heure, un échec dix secondes, écrit une fois au log. HN-E01S11a1c-5 : `PLATFORM_OIDC_ISSUER` est une adresse `https` sans requête ni fragment (`http` en local seulement), prise telle quelle et comparée exactement à `iss` ; `jwks_uri` et `userinfo_endpoint` suivent la même règle.
 - HN-E01S11b-12 : `oidcEnabled()` choisit pages et routes : `/auth/oidc/*` rendent 404 en mode Supabase, les pages propres à Supabase en mode OIDC ; en mode OIDC, seul le retour de l'émetteur accepte les invitations.
@@ -112,3 +112,4 @@ Aucune à ce jour.
 - 2026-10-01 : « Se déconnecter » ne ferme que la session du navigateur, et la personne n'est pas bornée à une seule session : les assistants branchés restent connectés — décidé par JB (source : connecteurs débranchés à chaque connexion sur l'hôte SaaS, réglage « une seule session par utilisateur » relevé en production).
 - 2026-10-03 : l'hôte de l'application peut choisir l'adresse à servir sur le canal MCP, consentement compris ; pas sur le MCP admin — décidé par JB (source : besoin d'un ERP monté sur le paquet, previews et domaine unique).
 - 2026-10-03 : entrée sans invitation des comptes de l'hôte, par domaines d'email, réglée par un administrateur ; exclusion au retrait, levée par une invitation acceptée ; l'équipe plateforme n'entre pas comme membre ; le plafond de membres se dit — décidé par JB (source : story « entrée automatique des membres », révision d'ADR-004 § 4).
+- 2026-10-08 : en mode OIDC, la ressource annoncée pour l'adresse appelée est une audience admise, à côté de celle de l'hôte (MCP admin et seconde adresse injoignables chez Logto, banc Logto d'oto-saas) — proposé par Alexis pour la préproduction now.oto.zone, **à valider par JB**.

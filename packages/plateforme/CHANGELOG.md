@@ -17,6 +17,10 @@ Version 1.0.0 describes the whole package; each later version lists what it chan
 
 ## Unreleased
 
+### Hosts
+- MCP: in OIDC mode, a token is also accepted when its `aud` is the resource the metadata announce for the called address (`<origin>/api/mcp`, `<origin>/api/mcp-admin`), besides `PLATFORM_OIDC_AUDIENCE`. An issuer that puts the requested resource in `aud` (Logto) now serves the admin MCP and every organisation address, each declared at the issuer as an API resource; a token issued for another address is still refused.
+- Install: the reference host's `src/middleware.ts` builds its redirects on `X-Forwarded-Host` (else `Host`) and `X-Forwarded-Proto`: under `next start` behind a proxy it sent browsers to `https://localhost:<port>`. Copy the new `publicUrl` into your middleware.
+
 ## 1.5.0 — 2026-10-06
 
 ### Assistants
